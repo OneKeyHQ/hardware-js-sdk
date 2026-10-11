@@ -1,0 +1,55 @@
+---
+title: "Reglas de seguridad"
+description: "Define la confirmación, el manejo de secretos y las condiciones de detención de los flujos de agentes."
+---
+
+<span id="safety-rules" />
+
+# Reglas de seguridad
+
+Los flujos de Agent Wallet pueden consultar saldos, construir transacciones y ejecutar intercambios. Mantén explícitos los límites de seguridad.
+
+## Lectura frente a escritura [#read-versus-write]
+
+| Tipo de solicitud | Ejemplos | Comportamiento requerido |
+| --- | --- | --- |
+| Solo lectura | Saldo, dirección de recepción, precio, tokens en tendencia, historial e información de tokens | Devuelve resultados concisos y un siguiente paso útil. |
+| Preparación | Cotización de intercambio, construcción de transacción, auditoría de tokens y simulación | Muestra el resultado y el contexto de riesgo; no envíes la operación. |
+| Escritura | Transferencia, ejecución de intercambio, autorización, difusión de transacción y firma | Solicita una confirmación explícita antes de ejecutar. |
+| Escritura con confirmación por hardware | Transferencia de alto valor, llamada a un contrato sensible o firma con una cartera oculta | Exige la confirmación en el dispositivo OneKey y detente si el dispositivo rechaza la operación. |
+
+## Nunca exponer secretos [#never-expose-secrets]
+
+Los agentes nunca deben revelar:
+
+- Claves privadas o frases de recuperación.
+- Credenciales descifradas de Agent Wallet.
+- Passphrases del dispositivo físico.
+- Tokens de acceso.
+- Contenido del llavero o datos de credenciales.
+
+## Confirmar las operaciones de escritura [#confirm-writes]
+
+Antes de cualquier transferencia, ejecución de intercambio, autorización o solicitud de firma, muestra una confirmación breve:
+
+| Campo | Obligatorio |
+| --- | --- |
+| Acción | Transferir, intercambiar, firmar, autorizar o difundir |
+| Origen | Dirección de la cartera y cadena |
+| Destino | Destinatario, contrato o cadena de destino |
+| Importe | Importe en moneda nativa o token |
+| Comisiones | Estimación de gas o comisión, si está disponible |
+| Resultado de riesgo | Resultado de la auditoría de seguridad o simulación, si está disponible |
+| Paso en el dispositivo | Requisito de confirmación en el dispositivo, cuando corresponda |
+
+No envíes la operación hasta que el usuario confirme.
+
+## Condiciones de detención [#stop-conditions]
+
+Detente e informa del estado cuando:
+
+- `onekey auth status` no esté autenticado.
+- La dirección activa no coincida con la cartera que espera el usuario.
+- El dispositivo esté bloqueado, desconectado, haya rechazado la solicitud o esté esperando un PIN o una passphrase.
+- El esquema de la CLI no incluya el parámetro que el agente quiere usar.
+- Un comando de seguridad informe de un resultado de alto riesgo y el usuario no lo haya aceptado explícitamente.

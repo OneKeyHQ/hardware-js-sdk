@@ -39,7 +39,7 @@ const permissions = await window.$onekey.ethereum.request({
   params: [{ eth_accounts: {} }]
 })
 
-console.log('已授权权限:', permissions)
+console.log('Granted permissions:', permissions)
 // [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
 ```
 
@@ -54,7 +54,7 @@ const permissions = await window.$onekey.ethereum.request({
 const hasAccountsPermission = permissions.some(
   p => p.parentCapability === 'eth_accounts'
 )
-console.log('是否有账户权限:', hasAccountsPermission)
+console.log('Has accounts permission:', hasAccountsPermission)
 ```
 
 ---
@@ -74,3 +74,5 @@ console.log('是否有账户权限:', hasAccountsPermission)
 - 如果尚未连接，调用此方法会触发连接弹窗
 - 权限会持久化，直到用户撤销
 - 遵循 [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255) 规范
+
+请处理目标钱包版本不支持该方法时返回的错误。账户权限与 RPC 连接状态不同，也不代表用户预先批准了签名或交易。基础账户连接使用 `eth_requestAccounts`。

@@ -1,0 +1,101 @@
+---
+description: "共通のウォレット関連付け、トランスポートのオプション、導出パスのパラメーターを参照します。"
+title: "共通パラメーター"
+---
+
+# 共通パラメーター
+
+ほとんどのチェーン/デバイスメソッドは `params` オブジェクトを受け取ります。初期化、イベント、ライフサイクルの API には独自のシグネチャがあります。このページのキーは、アドレス取得、署名、デバイスメソッドの共通セットですが、**すべてに使えるわけではありません**。`openWalletSession` は `useEmptyPassphrase`、`initSession`、`deviceId`、`passphraseState` を拒否します。値が `false` の場合や、共通のデフォルトオブジェクトから展開された場合も同様です。チェーン/デバイス固有のフィールド (`path`、`coin`、`tx`、`message`、…) は各メソッドのページに記載しています。
+
+このページはパラメーターの**リファレンス**です。呼び出しのライフサイクルは [Core API ガイド](/ja/hardware-sdk/core-api-guide)、各種 ID (`connectId`, `deviceId`, `uuid`, `session_id`, …) は[識別子](/ja/hardware-sdk/concepts/identifiers)を参照してください。
+
+<div id="common-params" />
+
+| パラメーター | 型 | 目的 | 注意事項 |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | 呼び出しを特定の隠しウォレットに関連付け | `openWalletSession` (または非推奨の `getPassphraseState`) で一度取得し、そのウォレットを維持する必要がある以降の各呼び出しに渡します。`useEmptyPassphrase` とは併用できません。ウォレットのフィンガープリントであり、ファームウェアの `session_id` ではありません。 |
+| `useEmptyPassphrase` | `boolean` | 標準ウォレットを強制 | 残っている隠しウォレットセッションで、アドレスが知らないうちに変わるのを防ぎます。次とは併用できません: `passphraseState`. |
+| `initSession` | `boolean` | 呼び出し前にセッションの初期化を強制 | 互換経路で `passphraseState` と組み合わせます。新しいコードでは `openWalletSession({ mode })` を優先し、`mode` とこのフラグを併用しないでください。 |
+| `deriveCardano` | `boolean` | Cardano サブツリーを事前導出 | セッション内の最初の Cardano 呼び出しで設定します。 |
+| `retryCount` | `number` | 接続確立の再試行上限 | Core が接続の確立/初期化時に使用します。完了または失敗した署名操作を再実行するものではありません。 |
+| `pollIntervalTime` | `number` | 再試行間のポーリング間隔 (ms) | 次と組み合わせます: `retryCount` 接続の設定時に使用します。 |
+| `timeout` | `number` | 接続試行のタイムアウト (ms) | 署名/ファームウェア転送のタイムアウトは設定しません。 |
+| `detectBootloaderDevice` | `boolean` | デバイスが Bootloader モードなら即座に失敗 | Bootloader が有効になり得ない署名経路で使用します。 |
+| `skipWebDevicePrompt` | `boolean` | 再実行時に WebUSB 選択画面を省略 | **WebUSB のみ。** 以前の WebUSB 許可を再利用します。 |
+| `keepSession` | `boolean` | 呼び出し後もトランスポートを保持 | `Device.run()` が接続を解放するかを制御します。ウォレットの関連付けではなく、`passphraseState` や `openWalletSession` の代わりには**なりません**。USB の連続署名 / 確認後の更新、および Electron BLE のファームウェア処理中に維持してください。 |
+
+## トランスポート別の注意事項 [#transport-specific-notes]
+
+| パラメーター | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | デスクトップ BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | 接続の設定 | 接続の設定 | 接続の設定 | 接続の設定 | 接続の設定 | 接続の設定 |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## よく使う組み合わせ [#common-combos]
+
+**標準ウォレット — 意図しない隠しウォレットのプロンプトを防ぐ**
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**隠しウォレット — 呼び出し間で関連付けを再利用**
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
+const hiddenWallet = {
+  passphraseState: opened.payload.passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+```
+
+非推奨の互換経路では、`getPassphraseState(connectId, { initSession: true })` を呼び出し、以降の呼び出しに `{ initSession: true, passphraseState }` を渡します。[ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)を参照してください。
+
+**BLE の控えめな再試行 (検出 / アドレス取得 / 署名のみ)**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+```
+
+`bleDefaults` を `firmwareUpdateV2` / `V3` / `V4` に展開しないでください。[再接続と破棄](/ja/hardware-sdk/transport/reconnect)を参照してください。
+
+## HD パス [#hd-path]
+
+
+メソッドの最小パス長は SDK の入力チェックであり、その長さのすべてのパスが対応する保証ではありません。ファームウェアもチェーン固有の導出規則とハード化規則を適用します。
+
+`path: string | number[]` は BIP44 に従います。ed25519 チェーン (Solana、NEAR など) は完全にハード化する必要があります。
+
+| チェーン | パスの例 | 注意事項 |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | 標準の EVM アカウント |
+| BTC (ネスト型 SegWit) | `m/49'/0'/0'/0/0` | `84'` はネイティブ SegWit 用 |
+| Solana | `m/44'/501'/0'/0'` | 完全にハード化 |
+| NEAR | `m/44'/397'/0'/0'/1'` | 完全にハード化 |
+| Cardano | `m/1852'/1815'/0'/0/0` | ステークのパス: `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | EVM 形式のパス |
+
+数値配列の例: `[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+
+禁止パスのエラー: チェーンメソッドのページで長さとハード化を確認してください。
+
+Protocol V1 では、パスフレーズ保護が無効な場合、`select-hidden` が標準ウォレットを返すことがあります。`passphraseState` を保存または使用する前に `walletType` を確認してください。

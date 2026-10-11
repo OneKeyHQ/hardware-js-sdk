@@ -1,0 +1,166 @@
+---
+title: "Premiers pas"
+description: "Se connecter à TON avec le fournisseur OneKey compatible TON Connect"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Premiers pas
+
+Connectez le portefeuille avant d’envoyer des requêtes. Remplacez les adresses et URL de manifeste d’exemple par des valeurs valides. Pour l’authentification, utilisez un défi à usage unique généré par le serveur et vérifiez la preuve sur votre serveur.
+
+Découvrez comment détecter TON, s’y connecter et interagir avec lui à l’aide du fournisseur OneKey.
+
+<Callout type="info">
+OneKey implémente le protocole TON Connect 2.0 pour les opérations documentées ici.
+</Callout>
+
+---
+
+## Détection du fournisseur [#provider-detection]
+
+```typescript
+// Detect OneKey TON provider
+const provider = window.$onekey?.tonconnect
+
+if (!provider) {
+  throw new Error('OneKey TON provider not detected')
+}
+
+// Check device and wallet info
+console.log('Device:', provider.deviceInfo)
+console.log('Wallet:', provider.walletInfo)
+console.log('Protocol Version:', provider.protocolVersion) // 2
+```
+
+---
+
+## Connecter le portefeuille [#connect-wallet]
+
+```typescript
+// Basic connection
+const connectEvent = await provider.connect()
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(
+    item => item.name === 'ton_addr'
+  )
+  console.log('Connected:', addressItem?.address)
+} else {
+  console.error('Connection failed:', connectEvent.payload.message)
+}
+```
+
+---
+
+## Connexion avec un manifeste [#connect-with-manifest]
+
+Pour les applications de production, fournissez une URL de manifeste :
+
+```typescript
+const connectRequest = {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    { name: 'ton_proof', payload: 'your-challenge-string' }
+  ]
+}
+
+const connectEvent = await provider.connect(2, connectRequest)
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  console.log('Address:', addressItem?.address)
+  console.log('Proof:', proofItem?.proof)
+}
+```
+
+---
+
+## Format du manifeste d’application [#app-manifest-format]
+
+Créez `tonconnect-manifest.json` à la racine de votre application :
+
+```json
+{
+  "url": "https://yourapp.com",
+  "name": "Your App Name",
+  "iconUrl": "https://yourapp.com/icon.png",
+  "termsOfUseUrl": "https://yourapp.com/terms",
+  "privacyPolicyUrl": "https://yourapp.com/privacy"
+}
+```
+
+---
+
+## Restaurer la connexion [#restore-connection]
+
+Restaurer une session précédente :
+
+```typescript
+const connectEvent = await provider.restoreConnection()
+
+if (connectEvent.event === 'connect') {
+  console.log('Session restored')
+}
+```
+
+---
+
+## Déconnexion [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Gestion des événements [#event-handling]
+
+```typescript
+provider.listen((event) => {
+  console.log('Wallet event:', event)
+})
+
+// Or use specific event listeners
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('Account changed:', address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+
+provider.on('disconnect', () => {
+  console.log('Wallet disconnected')
+})
+```
+
+---
+
+## Utilisation avec le SDK TON Connect [#using-with-ton-connect-sdk]
+
+Pour les applications React, utilisez le SDK TON Connect officiel :
+
+```bash
+npm install @tonconnect/ui-react
+```
+
+```tsx
+import { TonConnectUIProvider, TonConnectButton } from '@tonconnect/ui-react'
+
+function App() {
+  return (
+    <TonConnectUIProvider manifestUrl="https://yourapp.com/tonconnect-manifest.json">
+      <TonConnectButton />
+      <YourApp />
+    </TonConnectUIProvider>
+  )
+}
+```
+
+OneKey est automatiquement détecté par le SDK TON Connect.

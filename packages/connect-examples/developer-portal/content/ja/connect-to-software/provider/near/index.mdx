@@ -1,0 +1,82 @@
+---
+title: "NEAR プロバイダー"
+description: "OneKey ウォレットで NEAR Protocol を dApp に統合 — プロバイダーの検出、アカウント接続、トランザクション送信、メッセージ署名"
+---
+
+# NEAR
+
+OneKey の NEAR プロバイダーで NEAR Protocol を dApp に統合します。以下のメソッドには、プロバイダー SDK と、その SDK が対応する near-api-js のバージョンを使用してください。
+
+## 機能 [#features]
+
+- アカウントの接続と管理
+- トランザクションの署名と送信
+- メッセージへの署名
+- ネットワーク状態の読み取り (メインネット/テストネット)
+- 選択したネットワークのエンドポイント経由の RPC リクエスト
+
+## インストール [#installation]
+
+```bash
+npm install @onekeyfe/onekey-near-provider near-api-js@^0.44.2
+# or
+yarn add @onekeyfe/onekey-near-provider near-api-js@^0.44.2
+```
+
+## クイックスタート [#quick-start]
+
+```typescript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider'
+
+// Create provider instance
+const provider = new OneKeyNearProvider()
+
+// Request account access
+const accounts = await provider.requestSignIn()
+console.log('Connected accounts:', accounts)
+
+// Get current network
+const network = await provider.request({ method: 'near_network' })
+console.log('Current network:', network)
+```
+
+## ドキュメント [#documentation]
+
+### はじめに [#getting-started]
+- [はじめに](introduction) - NEAR プロバイダーの概要
+- [Provider SDK をインストール](integrating/install-the-provider-sdk) - セットアップ手順
+
+### 統合ガイド [#integration-guides]
+- [プロバイダーの検出](integrating/detecting-the-provider) - OneKey がインストールされているか確認
+- [接続の確立](integrating/establishing-a-connection) - ユーザーアカウントに接続
+- [アカウントへのアクセス](integrating/accessing-accounts) - アカウント情報を取得
+- [プロバイダーのネットワークを検出](integrating/detecting-provider-network) - 現在のネットワークを確認
+- [アカウントとネットワークの状態を監視](integrating/watch-accounts-and-network-status) - 変更を購読
+
+### トランザクションと署名 [#transactions--signing]
+- [トランザクションの送信](integrating/sending-transactions) - トランザクションを作成して送信
+- [メッセージへの署名](integrating/signing-messages) - 任意のメッセージに署名
+- [RPC API の呼び出し](integrating/rpc-api-calling) - RPC への直接アクセス
+
+### 高度な使い方 [#advanced]
+- [デバッグログ](integrating/debug-logging) - デバッグモードを有効化
+- [NEAR Web Wallet からの移行](integrating/migrate-from-near-web-wallet) - 移行ガイド
+
+### リファレンス [#reference]
+- [API リファレンス](reference/api-reference) - 完全な API ドキュメント
+- [トラブルシューティング](reference/trouble-shooting) - よくある問題と解決方法
+- [例とデモ](resources/example-and-demo) - サンプルコード
+- [よくある質問](resources/faq) - よくある質問
+
+## エラー処理 [#error-handling]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーによる拒否 | ユーザーがリクエストを拒否 |
+| -32602 | 無効なパラメーター | メソッドのパラメーターが無効 |
+| -32603 | 内部エラー | 内部 JSON-RPC エラー |
+
+## 関連リソース [#related-resources]
+
+- [NEAR ドキュメント](https://docs.near.org/)
+- [OneKey GitHub](https://github.com/OneKeyHQ)

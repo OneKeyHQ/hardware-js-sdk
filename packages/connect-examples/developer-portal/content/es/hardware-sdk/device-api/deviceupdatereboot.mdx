@@ -1,0 +1,44 @@
+---
+description: "Solicita el modo bootloader en un dispositivo Protocol V1 y vuelve a detectar su conexión antes de realizar operaciones de firmware."
+title: "deviceUpdateReboot"
+---
+
+# deviceUpdateReboot
+
+## Reiniciar el dispositivo [#reboot-device]
+
+Solicita el modo bootloader en dispositivos **Protocol V1** como parte de un flujo explícito de actualización del firmware. Este método no declara compatibilidad con Protocol V2; usa el [flujo de actualización del firmware de Protocol V2](/es/hardware-sdk/device-api/firmwareupdatev4) para Pro 2 y Neo.
+
+El dispositivo puede desconectarse y aparecer con un identificador de conexión distinto. Vuelve a detectarlo y verifica su estado antes de continuar.
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## Parámetros [#params]
+
+* vacío
+
+## Ejemplo [#example]
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## Resultado [#result]
+
+Un resultado correcto del SDK confirma la recepción de la solicitud. No deduzcas el nuevo modo a partir de una estructura de payload fija; vuelve a leer el estado del dispositivo tras su reconexión.
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

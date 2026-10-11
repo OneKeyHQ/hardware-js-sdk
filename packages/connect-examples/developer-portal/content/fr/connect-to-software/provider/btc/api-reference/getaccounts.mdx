@@ -1,0 +1,25 @@
+---
+title: "getAccounts"
+---
+
+# getAccounts
+
+Lire les adresses actuellement exposées à ce site. Pour demander l’accès, utilisez [requestAccounts](/fr/connect-to-software/provider/btc/api-reference/requestaccounts).
+
+## Méthode [#method]
+
+```typescript
+declare function getAccounts(): Promise<string[]>;
+```
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const accounts = await provider.getAccounts()
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/qBgMXRM)

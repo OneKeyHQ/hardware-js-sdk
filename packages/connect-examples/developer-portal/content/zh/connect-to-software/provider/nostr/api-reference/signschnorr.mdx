@@ -4,29 +4,28 @@ title: signSchnorr
 
 # signSchnorr
 
-### 方法
+## 方法
 
 ```typescript
-async function signSchnorr(sigHash: string) : string;
+declare function signSchnorr(sigHash: string): Promise<string>;;
 ```
 
-### 参数
+## 参数
 
 * `sigHash` — _必填_ `string` 要签名的哈希
 
-### 响应
+## 响应
 
-使用当前活跃 Nostr 账户的私钥对任意文本进行签名后的签名
+使用当前 Nostr 账户，对提供的哈希生成 Schnorr 签名。这是 OneKey 扩展方法，不属于 NIP-07。
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
 
-const signature = async provider.signSchnorr("010203")
+const signature = await provider.signSchnorr("<SIGNATURE_HASH_HEX>")
 ```
 
-### 演示
+## 演示
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/poGOPXB" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/poGOPXB)

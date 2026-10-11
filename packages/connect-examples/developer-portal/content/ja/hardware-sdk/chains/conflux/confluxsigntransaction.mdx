@@ -1,0 +1,79 @@
+---
+title: "confluxSignTransaction"
+---
+
+# confluxSignTransaction
+
+## 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 3.0.0
+  * Classic/Mini: 2.4.0
+
+### Conflux: トランザクションに署名 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a> [#conflux-sign-transaction-]
+
+トランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```typescript
+const response = await HardwareSDK.confluxSignTransaction(connectId, deviceId, params)
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _必須_ `ConfluxTransaction` 型
+  * `to` - _必須  `string`_ アドレスの 16 進数文字列
+  * `value` - _必須  `string`_ 金額を BigInt の 16 進数文字列に変換したもの
+  * `gasLimit` - _必須  `string`_ ガスリミットを BigInt の 16 進数文字列に変換したもの
+  * `gasPrice` - _必須  `string`_ ガス価格を BigInt の 16 進数文字列に変換したもの
+  * `nonce` - _必須  `string`_ nonce を BigInt の 16 進数文字列に変換したもの
+  * `epochHeight` - _必須  `string`_ エポック高を BigInt の 16 進数文字列に変換したもの
+  * `storageLimit` - _必須  `string`_ ストレージリミットを BigInt の 16 進数文字列に変換したもの
+  * `chainId` - _任意  `number`_ チェーンの ID
+  * `data` - _任意  `string`_ 16 進数データ
+
+### 例 [#example]
+
+```typescript
+HardwareSDK.confluxSignTransaction(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    transaction: {
+        to: "0x1386b4185a223ef49592233b69291bbe5a80c527",
+        value: "0xf4240",
+        data: "0x01",
+        chainId: 1,
+        nonce: "0x00",
+        epochHeight: "0x00",
+        gasPrice: "0xbebc200",
+        gasLimit: "0x5208",
+        storageLimit: "0x5208",
+    }
+});
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string;
+        r: string;
+        s: string;
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

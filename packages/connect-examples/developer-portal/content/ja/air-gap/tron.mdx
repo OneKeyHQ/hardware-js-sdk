@@ -1,0 +1,79 @@
+---
+title: "Tron"
+---
+
+# Tron
+
+UR を使う Tron のオフライン署名でも、同じアニメーション QR 転送方式を使用します。
+
+## データ型 [#data-types]
+
+- リクエスト UR: `tron-sign-request`
+- レスポンス UR: `tron-signature`
+
+これらの例は Tron レジストリパッケージを直接使用します。レジストリオブジェクトの互換性を保つため、そのパッケージが再エクスポートする keypath クラスをインポートしてください。
+
+## フロー [#flow]
+
+1. Tron 署名リクエストを構築 (トランザクション/メッセージ + BIP-44 パス)
+2. UR にエンコードし、アニメーション QR として表示
+3. デバイスのレスポンスをスキャンして署名をデコード
+4. Tron ネットワークにブロードキャスト
+
+## 例 [#examples]
+
+`@keystonehq/bc-ur-registry-tron` および `@ngraveio/bc-ur` をインストールします。例には Buffer の実装が必要です。レジストリのエンコードだけではデバイスの対応は確認できません。対象ファームウェアが受け付ける UR タイプを検証してください。
+
+ウォレットは、未署名のトランザクションデータと、デバイスからエクスポートした実際のアカウントパスおよびマスターフィンガープリントを提供します。QR レンダラーはタイマーで `nextFrame()` を定期的に呼び出し、署名ダイアログが閉じたら停止します。これらのスニペットは転送データのエンコードとデコードを行うもので、トランザクションを送信するものではありません。
+
+
+### Tron 署名リクエストを構築 (UR) [#build-tron-sign-request-ur]
+
+```ts
+import { TronSignRequest, DataType, CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry-tron';
+
+
+// BIP44: m/44'/195'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 195, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+], Buffer.from(masterFingerprintHex, 'hex'));
+
+const requestId = globalThis.crypto.randomUUID();
+const requestIdBytes = Buffer.from(requestId.replace(/-/g, ''), 'hex');
+
+const req = new TronSignRequest({
+  requestId: requestIdBytes,
+  signData: Buffer.from(rawTxHex, 'hex'),
+  dataType: DataType.transaction,
+  derivationPath: keypath,
+});
+
+const encoder = req.toUREncoder(200);
+const nextFrame = () => encoder.nextPart(); // Call from your QR animation timer.
+```
+
+### Tron 署名をデコード (UR) [#decode-tron-signature-ur]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { TronSignature } from '@keystonehq/bc-ur-registry-tron';
+
+const dec = new URDecoder();
+// dec.receivePart(frameString) for each scanned frame
+if (dec.isError()) throw new Error('QR decoding failed');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'tron-signature') throw new Error('Expected tron-signature');
+  const sig = TronSignature.fromCBOR(ur.cbor);
+  const returnedId = sig.getRequestId();
+  if (!returnedId || !returnedId.equals(requestIdBytes)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = sig.getSignature();
+  // Verify the signer and signature against the original transaction before broadcasting.
+}
+```

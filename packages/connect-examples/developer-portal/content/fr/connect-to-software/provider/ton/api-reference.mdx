@@ -1,0 +1,130 @@
+---
+title: "Référence de l’API"
+description: "Référence complète de l’API du fournisseur TON OneKey"
+---
+
+<span id="api-reference" />
+
+# Référence de l’API
+
+Référence des méthodes et types du fournisseur TON OneKey.
+
+---
+
+## Méthodes [#methods]
+
+| Méthode | Description |
+|--------|-------------|
+| `connect(version?, request?)` | Connecter le portefeuille |
+| `restoreConnection()` | Restaurer la session précédente |
+| `disconnect()` | Déconnecter le portefeuille |
+| `send(message)` | Envoyer une requête RPC |
+| `listen(callback)` | Écouter les événements du portefeuille |
+
+---
+
+## Méthodes d’envoi [#send-methods]
+
+| Méthode | Description |
+|--------|-------------|
+| `sendTransaction` | Envoyer des TON ou interagir avec des contrats |
+| `signData` | Signer des cellules de données arbitraires |
+| `disconnect` | Se déconnecter via RPC |
+
+---
+
+## Types [#types]
+
+### Informations du compte [#account-info]
+
+```typescript
+interface AccountInfo {
+  address: string      // Raw address (0:<hex>)
+  network: string      // Network ID (-239 mainnet, -3 testnet)
+  publicKey: string    // Hex public key (no 0x)
+  walletStateInit: string // Base64 encoded state init
+}
+```
+
+### Requête de transaction [#transaction-request]
+
+```typescript
+interface TransactionRequest {
+  valid_until?: number  // UNIX timestamp for validity
+  network?: string      // Network ID
+  from?: string         // Sender address
+  messages: Message[]   // Respect the wallet-advertised maximum
+}
+```
+
+### Message [#message]
+
+```typescript
+interface Message {
+  address: string      // Recipient (raw format)
+  amount: string       // Amount in nanotons
+  payload?: string     // Base64 BOC for contract calls
+  stateInit?: string   // Base64 StateInit for deployment
+}
+```
+
+### Requête de signature de données [#sign-data-request]
+
+```typescript
+interface SignDataRequest {
+  schema_crc: number   // Schema identifier
+  cell: string         // Base64 encoded cell
+  publicKey?: string   // Optional specific key
+}
+```
+
+### Résultat de signature de données [#sign-data-result]
+
+```typescript
+interface SignDataResult {
+  signature: string    // Base64 signature
+  timestamp: number    // UNIX timestamp (UTC)
+}
+```
+
+### Informations de l’appareil [#device-info]
+
+```typescript
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // Wallet version
+  maxProtocolVersion: number // 2
+  features: Array<string | { name: string; maxMessages?: number; [key: string]: unknown }> // Advertised capabilities
+}
+```
+
+---
+
+## Réseaux [#networks]
+
+| Réseau | ID du réseau |
+|---------|------------|
+| Mainnet | -239 |
+| Testnet | -3 |
+
+---
+
+## Événements [#events]
+
+| Événement | Description |
+|-------|-------------|
+| `accountChanged` | Compte modifié |
+| `disconnect` | Portefeuille déconnecté |
+
+---
+
+## Codes d’erreur [#error-codes]
+
+| Code | Description |
+|------|-------------|
+| 0 | Erreur inconnue |
+| 1 | Requête incorrecte |
+| 100 | Application inconnue |
+| 300 | Demande rejetée par l’utilisateur |
+| 400 | Méthode non prise en charge |

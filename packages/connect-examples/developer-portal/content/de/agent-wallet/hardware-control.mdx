@@ -1,0 +1,78 @@
+---
+title: "Gerätesteuerung"
+description: "Eine hardwaregestützte Sitzung auswählen und die Gerätebestätigung ausdrücklich behandeln."
+---
+
+<span id="hardware-control" />
+
+# Gerätesteuerung
+
+Eine hardwaregestützte Sitzung verwendet für unterstützte Signieranfragen ein verbundenes OneKey-Gerät. Der Nutzer prüft und bestätigt Anfragen auf dem Gerät. Die Gerätefunktionen und die zur Prüfung verfügbaren Transaktionsdetails hängen von Chain, Firmware und CLI-Version ab.
+
+## Wann eskaliert werden muss [#when-to-escalate]
+
+| Ablauf | Erwartetes Hardware-Verhalten |
+| --- | --- |
+| Überweisung mit hohem Wert | Der Nutzer prüft Empfänger, Betrag, Chain und Gebühr auf dem OneKey-Gerät. |
+| Vertragsinteraktion | Der Agent führt zuerst eine Simulation aus; anschließend zeigt das Gerät, sofern unterstützt, die Clear-Signing-Details an. |
+| Swap-Ausführung | Der Agent holt zunächst ein Angebot ein und erstellt die Transaktion; die Gerätebestätigung erfolgt erst, nachdem der Nutzer die Ausführung genehmigt hat. |
+| Versteckte Wallet | Der Passphrase-Modus wird ausdrücklich festgelegt, damit der Agent nicht raten muss, ob eine versteckte Wallet aktiv ist. |
+| Vertrauensprüfung des Geräts | `onekey device verify` führt die Geräteprüfung aus. Eine erfolgreiche Prüfung bestätigt nicht die Sicherheit einer Transaktion. |
+
+## Verbinden und anmelden [#connect-and-login]
+
+Verbundene Geräte auflisten:
+
+```bash
+onekey device search
+```
+
+Mit einer Hardware-Wallet authentifizieren:
+
+```bash
+onekey auth login --hardware
+```
+
+Wenn mehrere Geräte verbunden sind, wählen Sie ausdrücklich eines aus:
+
+```bash
+onekey auth login --hardware --device-id <uuid>
+```
+
+Wählen Sie für die gewünschte Wallet einen Passphrase-Modus. Dies sind Alternativen, keine Abfolge:
+
+| Modus | Wallet-Auswahl |
+| --- | --- |
+| `none` | Standard-Wallet ohne Passphrase. |
+| `on-host` | Versteckte Wallet mit Passphrase-Eingabe auf dem Host. Halten Sie die Passphrase aus Agentennachrichten und Protokollen heraus. |
+| `on-device` | Versteckte Wallet mit Passphrase-Eingabe auf einem Gerät, das dies unterstützt. |
+
+Prüfen Sie vor der Auswahl eines Modus das Schema der installierten CLI. Überprüfen Sie nach der Anmeldung die aktive Adresse; eine andere Passphrase wählt eine andere Wallet aus.
+
+## Aktive Sitzung [#active-session]
+
+Hardwaregestützte Sitzungen werden von `onekey auth status` wie folgt gemeldet:
+
+| Feld | Erwarteter Wert |
+| --- | --- |
+| `loginMethod` | `hardware` |
+| `walletKind` | `hw` |
+| `device` | Informationen zum verbundenen OneKey-Gerät |
+| `passphraseMode` | `none`, `on_host`, oder `on_device` |
+
+Nach der Anmeldung verwenden nachfolgende Befehle automatisch die aktive Sitzung.
+
+## Gerätelebenszyklus [#device-lifecycle]
+
+Führen Sie nur die vom Nutzer angeforderte Aktion aus, nachdem Sie das Schema der installierten CLI geprüft und jede Einstellungsänderung erläutert haben:
+
+| Aktion | Befehlsfamilie |
+| --- | --- |
+| Verbundenes Gerät prüfen | `onekey device verify` |
+| Geräte-PIN ändern | `onekey device change-pin` |
+| Passphrase-Schutz ändern | `onekey device toggle-passphrase` |
+| Geräteeinstellungen prüfen oder ändern | `onekey device settings` |
+
+Wenn ein Befehl in `onekey schema --list` fehlt, melden Sie den nicht unterstützten Befehl, statt seine Parameter zu erraten.
+
+Umgehen Sie die physische Bestätigung nicht. Wenn das Gerät gesperrt oder getrennt ist, eine PIN oder Passphrase anfordert oder eine Anfrage ablehnt, melden Sie diesen Zustand und halten Sie an.

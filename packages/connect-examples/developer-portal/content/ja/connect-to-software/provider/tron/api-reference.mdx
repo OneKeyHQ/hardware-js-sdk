@@ -1,0 +1,83 @@
+---
+title: "API リファレンス"
+description: "OneKey の TRON プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の TRON プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## プロバイダーメソッド [#provider-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `request({ method, params })` | 汎用 JSON-RPC リクエスト |
+| `sign(transaction)` | トランザクションに署名 |
+| `signMessage(hexMessage)` | 16 進数メッセージに署名 (V1) |
+| `signMessageV2(message)` | UTF-8 メッセージに署名 (V2) |
+| `getNodeInfo(callback)` | ノード情報を取得 |
+
+---
+
+## リクエストメソッド [#request-methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `tron_requestAccounts` | 接続を要求 |
+| `tron_getProviderState` | プロバイダーの状態を取得 |
+| `tron_signTransaction` | トランザクションに署名 |
+| `signMessageV1` | メッセージに署名 V1 |
+| `signMessageV2` | メッセージに署名 V2 |
+
+---
+
+## レスポンスコード [#response-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 200 | 成功 |
+| 4000 | ユーザーが拒否 |
+| 4001 | リクエストはキュー内 |
+
+---
+
+## イベント [#events]
+
+| イベント | 説明 |
+|-------|-------------|
+| `accountsChanged` | アカウント変更時 |
+| `chainChanged` | ネットワーク変更時 |
+| `connect` | 接続済み |
+| `disconnect` | 切断時 |
+
+---
+
+## TronWeb メソッド [#tronweb-methods]
+
+接続後は `window.tronWeb` を使用します:
+
+| メソッド | 説明 |
+|--------|-------------|
+| `tronWeb.trx.getBalance(address)` | TRX 残高を取得 |
+| `tronWeb.trx.sendTransaction(to, amount)` | TRX を送信 |
+| `tronWeb.trx.sendRawTransaction(signedTx)` | 署名済みトランザクションをブロードキャスト |
+| `tronWeb.trx.verifyMessageV2(msg, sig)` | 署名を検証 |
+| `tronWeb.contract().at(address)` | コントラクトのインスタンスを取得 |
+| `tronWeb.toSun(trx)` | TRX を Sun に変換 |
+| `tronWeb.fromSun(sun)` | Sun を TRX に変換 |
+| `tronWeb.toHex(string)` | 16 進数に変換 |
+
+---
+
+## プロパティ [#properties]
+
+| プロパティ | 型 | 説明 |
+|----------|------|-------------|
+| `isTronLink` | `boolean` | TronLink 互換 |
+| `isOneKey` | `boolean` | OneKey 識別子 |
+| `tronWeb.ready` | `boolean` | TronWeb の準備状態 |
+| `tronWeb.defaultAddress.base58` | `string` | 現在のアドレス |

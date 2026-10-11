@@ -1,8 +1,11 @@
 ---
 title: Wallet Skills
+description: 安装四个 OneKey wallet skills，并按实时 schema 路由请求。
 ---
 
 # Wallet Skills
+
+> 当前为私有测试版。访问资格、支持的命令与钱包流程取决于 OneKey 和 CLI 版本。使用示例前，先检查已安装 CLI 的 schema。
 
 [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) 为 AI coding assistant 提供钱包能力层。用户用自然语言提需求；skills 选择安全路由，在需要时读取实时 schema，并用用户能理解的语言解释结果。
 
@@ -20,29 +23,29 @@ title: Wallet Skills
 安装后先试这些 prompt：
 
 ```text
-Show my wallet balance and receiving address.
+显示我的钱包余额和收款地址。
 ```
 
 ```text
-What Solana tokens are trending right now?
+Solana 现在有哪些热门代币？
 ```
 
 ```text
-Quote 1 ETH to USDC. Do not execute yet.
+查询 1 ETH 兑换 USDC 的报价，先不要执行。
 ```
 
 ```text
-Is this token safe before I buy it?
+买入前，先检查这个代币的风险。
 ```
 
 ## Skill Router
 
 | Skill | 适用请求 | 示例 prompt |
 | --- | --- | --- |
-| `onekey-wallet` | 登录、活动钱包、余额、收款地址、历史、转账、BTC/SOL 钱包操作、硬件发现 | `Show my wallet balance and receiving address.` |
-| `onekey-swap` | Swap、buy、sell、convert、bridge、swap status、BTC sign-only PSBT | `Swap 1 ETH to USDC, but show me the quote first.` |
-| `onekey-market` | 价格、token 搜索、trending、K 线、流动性、持仓、BTC/SOL 指标、研究 | `What Solana tokens are trending right now?` |
-| `onekey-security` | Token audit、交易模拟、授权风险、硬件安全、secret-safety 检查 | `Is this token safe before I buy it?` |
+| `onekey-wallet` | 登录、活动钱包、余额、收款地址、历史、转账、BTC/SOL 钱包操作、硬件发现 | `显示我的钱包余额和收款地址。` |
+| `onekey-swap` | Swap、buy、sell、convert、bridge、swap status、BTC sign-only PSBT | `将 1 ETH 兑换为 USDC，先让我看报价。` |
+| `onekey-market` | 价格、token 搜索、trending、K 线、流动性、持仓、BTC/SOL 指标、研究 | `Solana 现在有哪些热门代币？` |
+| `onekey-security` | Token audit、交易模拟、授权风险、硬件安全、secret-safety 检查 | `买入前，先检查这个代币的风险。` |
 
 ## Schema 契约
 
@@ -62,11 +65,11 @@ Is this token safe before I buy it?
 
 | 自然语言 | Skill 应该做什么 |
 | --- | --- |
-| `Connect my OneKey Agent Wallet.` | 通过 App Transfer 配对，并总结活动钱包。 |
-| `What wallet am I using?` | 展示 login method、wallet kind、address，以及已有 device 状态。 |
-| `Show my balance.` | 自动使用活动钱包，不要求用户粘贴地址。 |
-| `Receive BTC.` | 返回 BTC 收款地址；缺少地址类型时只问地址类型。 |
-| `Send 0.2 SOL to this address.` | 保留 Solana 上下文，校验地址格式，并进入确认。 |
+| `连接我的 OneKey Agent Wallet。` | 通过 App Transfer 配对，并总结活动钱包。 |
+| `我当前使用的是哪个钱包？` | 展示 login method、wallet kind、address，以及已有 device 状态。 |
+| `显示我的余额。` | 自动使用活动钱包，不要求用户粘贴地址。 |
+| `我要接收 BTC。` | 返回 BTC 收款地址；缺少地址类型时只问地址类型。 |
+| `向这个地址发送 0.2 SOL。` | 保留 Solana 上下文，校验地址格式，并进入确认。 |
 
 ## Swap
 
@@ -74,11 +77,11 @@ Is this token safe before I buy it?
 
 | 自然语言 | Skill 应该做什么 |
 | --- | --- |
-| `Swap 1 ETH to USDC.` | 先 quote，展示 route 和 risk，再在执行前请求确认。 |
-| `Buy $200 of PEPE on Ethereum.` | 保留 Ethereum 上下文，审计 token，并进入交易确认。 |
-| `Bridge 500 USDC from Ethereum to Base.` | 先发现 bridge 支持，再报价。 |
-| `Swap 0.01 BTC to USDC using taproot and sign only.` | 保留 taproot，返回 signed 或 preview PSBT，而不是广播。 |
-| `Yes, confirm the swap.` | 只执行已经确认过的订单。 |
+| `将 1 ETH 兑换为 USDC。` | 先 quote，展示 route 和 risk，再在执行前请求确认。 |
+| `在 Ethereum 上买入 200 美元的 PEPE。` | 保留 Ethereum 上下文，审计 token，并进入交易确认。 |
+| `将 500 USDC 从 Ethereum 跨链到 Base。` | 先发现 bridge 支持，再报价。 |
+| `使用 Taproot 地址将 0.01 BTC 兑换为 USDC，只签名，不广播。` | 保留 taproot，返回 signed 或 preview PSBT，而不是广播。 |
+| `确认这笔兑换。` | 只执行已经确认过的订单。 |
 
 ## Market
 
@@ -86,11 +89,11 @@ Is this token safe before I buy it?
 
 | 自然语言 | Skill 应该做什么 |
 | --- | --- |
-| `What is the BTC price?` | 先返回价格和 24h change，再给 chart 或 trend follow-up。 |
-| `What tokens are trending right now?` | 返回短 trending 列表，不直接开始交易。 |
-| `Search BONK on Solana.` | 保留 Solana，把标识符当作 SPL token 或 mint。 |
-| `Show ETH liquidity.` | 返回流动性或持仓视图。 |
-| `Give me a quick ETH analysis.` | 提供 bias、catalyst、risk 和一个下一步。 |
+| `BTC 当前价格是多少？` | 先返回价格和 24h change，再给 chart 或 trend follow-up。 |
+| `现在有哪些热门代币？` | 返回短 trending 列表，不直接开始交易。 |
+| `在 Solana 上搜索 BONK。` | 保留 Solana，把标识符当作 SPL token 或 mint。 |
+| `查询 ETH 的流动性。` | 返回流动性或持仓视图。 |
+| `简要分析 ETH。` | 提供 bias、catalyst、risk 和一个下一步。 |
 
 Market 回答默认只读。买入或兑换应该进入单独的确认流程。
 
@@ -100,11 +103,11 @@ Market 回答默认只读。买入或兑换应该进入单独的确认流程。
 
 | 自然语言 | Skill 应该做什么 |
 | --- | --- |
-| `Is this token safe?` | 运行 token audit，并报告风险等级和原因。 |
-| `Simulate approving this contract for all my USDC.` | 模拟并提示 unlimited approval 风险。 |
-| `Send SOL to 0x...` | 因 Solana/EVM 地址不匹配停止。 |
-| `Show me the App Transfer payload.` | 拒绝暴露 secret，改为提供活动会话摘要。 |
-| `Is my hardware wallet safe to use?` | 使用 device/auth status 和设备验证；绝不要求助记词。 |
+| `这个代币有哪些风险？` | 运行 token audit，并报告风险等级和原因。 |
+| `模拟将我全部 USDC 授权给这个合约。` | 模拟并提示 unlimited approval 风险。 |
+| `向 0x... 发送 SOL。` | 因 Solana/EVM 地址不匹配停止。 |
+| `显示 App Transfer 的凭据内容。` | 拒绝暴露 secret，改为提供活动会话摘要。 |
+| `检查我的硬件钱包状态和设备验证结果。` | 使用 device/auth status 和设备验证；绝不要求助记词。 |
 
 ## 回答形态
 

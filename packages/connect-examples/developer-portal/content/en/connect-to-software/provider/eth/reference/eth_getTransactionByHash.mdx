@@ -51,7 +51,7 @@ const tx = await window.$onekey.ethereum.request({
 if (tx) {
   console.log('From:', tx.from)
   console.log('To:', tx.to)
-  console.log('Value:', parseInt(tx.value, 16))
+  console.log('Value:', BigInt(tx.value).toString())
   console.log('Status:', tx.blockHash ? 'Mined' : 'Pending')
 }
 ```
@@ -59,7 +59,8 @@ if (tx) {
 ### Track Transaction After Sending
 
 ```typescript
-async function sendAndTrack(txParams) {
+async function sendAndTrack(txParams, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
   // Send transaction
   const txHash = await window.$onekey.ethereum.request({
     method: 'eth_sendTransaction',
@@ -70,6 +71,7 @@ async function sendAndTrack(txParams) {
 
   // Poll for transaction details
   const checkTx = async () => {
+    if (Date.now() >= deadline) throw new Error("Transaction lookup timed out")
     const tx = await window.$onekey.ethereum.request({
       method: 'eth_getTransactionByHash',
       params: [txHash]

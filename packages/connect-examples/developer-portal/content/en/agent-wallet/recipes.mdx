@@ -1,10 +1,11 @@
 ---
 title: Recipes
+description: Follow staged examples for wallet reads, swap preparation, and confirmed signing.
 ---
 
 # Recipes
 
-These examples show how a user can talk to an AI agent and what the OneKey skill should do behind the scenes.
+These examples show the intended sequence behind a user request. Before running commands, inspect `onekey schema --list` and the relevant command schema in the installed CLI. Replace example addresses and order IDs with validated values. Availability varies by beta version.
 
 ## Check Wallet State
 
@@ -99,7 +100,12 @@ onekey device search
 onekey auth login --hardware
 onekey auth status
 onekey balance --chain eth --token USDC
-onekey transfer --to 0x... --amount 50 --token USDC --chain eth
+```
+
+Show the active wallet, full recipient address, chain, token, amount, estimated fee, and device confirmation step. Only after the user confirms the transfer:
+
+```bash
+onekey transfer --to <verified-full-address> --amount 50 --token USDC --chain eth
 ```
 
 The transfer confirmation must mention the device confirmation step. If the device is locked, disconnected, asks for PIN/passphrase, or rejects the request, the agent should stop and report that state.
@@ -118,6 +124,11 @@ Expected flow:
 onekey wallet address --chain btc --address-type taproot
 onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
 onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+```
+
+Show the prepared order, address type, amount, output, and fees. Signing requires explicit confirmation even when no transaction will be broadcast. Only after the user confirms:
+
+```bash
 onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
 ```
 

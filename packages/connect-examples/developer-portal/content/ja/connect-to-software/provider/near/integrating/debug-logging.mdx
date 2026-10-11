@@ -1,0 +1,26 @@
+---
+title: "デバッグログ"
+---
+
+<span id="debug-logging" />
+
+# デバッグログ
+
+プロバイダーと OneKey ウォレット間の内部通信メッセージを出力できます。開発中に使用してください。ログにはアカウントやリクエストのデータが含まれる場合があるため、共有前に確認してください。
+
+ログメッセージは次でグループ化されています: **jsBridge**, **providerBase** および **extInjected.** 以下のように有効・無効を切り替えられます。変更はページの再読み込み後に反映されます:
+
+```javascript
+// turn on all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '*');
+
+// turn off all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '');
+
+// turn on `jsBridge` group only
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge');
+
+// turn on both `jsBridge` and `providerBase` group
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge,providerBase');
+
+```

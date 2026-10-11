@@ -1,0 +1,34 @@
+---
+title: "Geräteeinrichtung und Löschen"
+description: "Geräteverwaltung ist von normaler Kontoerkennung und Signieren getrennt. Bieten Sie diese Vorgänge nur in einem klar bezeichneten Verwaltungsablauf an, den der Nutzer bewusst startet. Eine erste Verbindung darf niemals automatisch ein Gerät initialisieren oder löschen."
+---
+
+<span id="device-setup-and-erase" />
+
+# Geräteeinrichtung und Löschen
+
+Geräteverwaltung ist von normaler Kontoerkennung und Signieren getrennt. Bieten Sie diese Vorgänge nur in einem klar bezeichneten Verwaltungsablauf an, den der Nutzer bewusst startet. Eine erste Verbindung darf niemals automatisch ein Gerät initialisieren oder löschen.
+
+## deviceReset: Eine Wallet auf einem Gerät erstellen [#devicereset-create-a-wallet-on-a-device]
+
+`deviceReset(connectId, params)` fordert die Geräteeinrichtung und die Erzeugung neuen Wiederherstellungsmaterials an. Die aktuelle SDK-Implementierung verwendet Protocol V1; sie deklariert keine V2-Unterstützung. Leiten Sie Pro-2-Unterstützung nicht aus dem Methodennamen ab.
+
+| Parameter | Typ | Bedeutung |
+| --- | --- | --- |
+| `displayRandom` | `boolean` | Geräteseitig erzeugte Entropie anzeigen, bevor zusätzliche Entropie angefordert wird. |
+| `strength` | `number` | Angeforderte Entropiestärke. Das SDK verwendet ersatzweise `256`; akzeptierte Stärken hängen auch von der Firmware ab. |
+| `pinProtection`, `passphraseProtection` | `boolean` | Angeforderte Schutzeinstellungen. |
+| `language`, `label` | `string` | Angeforderte Gerätesprache und Bezeichnung. |
+| `u2fCounter` | `number` | U2F-Zähler; SDK-Ersatzwert ist der aktuelle Unix-Zeitstempel in Sekunden. |
+| `skipBackup`, `noBackup` | `boolean` | Optionen für den Sicherungsablauf; keine davon bedeutet, dass das Gerät keinen Seed hat. Aktivieren Sie sie nicht stillschweigend. |
+| `backupType` | `string \| number` | Firmwareabhängiges Sicherungsformat. |
+
+Diese Optionen sind im öffentlichen Typ optional. Prüfen Sie die Zielfirmware und lesen Sie die Vorgangsantwort. Belassen Sie Wiederherstellungsmaterial auf dem Gerät; fordern Sie es nicht in einem Host-Formular oder Protokoll an.
+
+## deviceWipe: Private Gerätedaten löschen [#devicewipe-erase-private-device-data]
+
+`deviceWipe(connectId)` entfernt private Gerätedaten und erfordert eine bewusste Nutzerbestätigung. Im aktuellen Quellcode sendet Protocol V1 `WipeDevice`; Protocol V2 öffnet den geräteseitigen Einstellungsablauf zum Zurücksetzen. Eine Geräteaufforderung belegt nicht, dass der Vorgang abgeschlossen ist: Warten Sie die Antwort ab und behandeln Sie einen Abbruch.
+
+Nach erfolgreichem Löschen macht das SDK den Gerätestatus ungültig. Verwerfen Sie das ausgewählte Konto und die Wallet-Bindung der Anwendung und erkennen Sie das Gerät vor einem weiteren Vorgang erneut. Verwenden Sie keinen früheren `deviceId` erneut und nehmen Sie nicht an, dass die Wiederherstellungsphrase weiterhin verfügbar ist.
+
+Beide Methoden verwenden die `success` / `payload`-Antworthülle des SDKs. Behandeln Sie Fehler, ohne destruktive Vorgänge automatisch zu wiederholen. Lesen Sie [UI-Ereignisbehandlung](/de/hardware-sdk/core-api-guide#events-ui) und [Gerätekennungen](/de/hardware-sdk/concepts/identifiers) vor der Implementierung des Ablaufs.

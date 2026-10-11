@@ -1,0 +1,97 @@
+---
+title: "dnxGetAddress"
+---
+
+# dnxGetAddress
+
+### Dynex: obtener una dirección [#dynex-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Cuando `showOnOneKey` es `true`, el usuario debe confirmar la dirección en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
+```
+
+#### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * classic: 3.8.0
+
+#### Parámetros [#parameters]
+
+connectId: `string`
+
+* Identificador único de la conexión
+
+deviceId: `string`
+
+* Identificador único del dispositivo físico
+
+params: `object`
+
+* path: `string` - Ruta BIP32 (p. ej., "m/44'/29538'/0'/0/0") \[obligatorio\]
+* showOnOneKey: `boolean` - Si se muestra la dirección en el dispositivo (predeterminado: true)
+
+Para direcciones por lotes:
+
+* bundle: Matriz de objetos con los parámetros anteriores
+
+#### Ejemplo [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    path: "m/44'/29538'/0'/0/0",
+    showOnOneKey: true
+});
+
+// Get multiple addresses
+const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    bundle: [
+        { path: "m/44'/29538'/0'/0/0", showOnOneKey: false },
+        { path: "m/44'/29538'/0'/0/1", showOnOneKey: false }
+    ]
+});
+```
+
+#### Devuelve [#returns]
+
+Respuesta correcta para una dirección:
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Dynex address
+        path: string        // BIP32 path used
+    }
+}
+```
+
+Respuesta correcta para varias direcciones:
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string },
+        { address: string, path: string }
+    ]
+}
+```
+
+Respuesta de error:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code?: string | number
+    }
+}
+```
+
+#### Requisitos de firmware [#firmware-requirements]
+
+* Versión mínima de firmware: 3.8.0

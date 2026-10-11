@@ -1,0 +1,163 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den Cosmos-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des Cosmos-Providers von OneKey.
+
+---
+
+## Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `enable(chainIds)` | Zugriff auf eine oder mehrere Chains anfordern; wird ohne Rückgabewert aufgelöst |
+| `disable(chainIds)` | Eine oder mehrere Chains deaktivieren |
+| `disconnect()` | Von allen Chains trennen |
+| `getKey(chainId)` | Kontoschlüssel für die Chain abrufen |
+| `signAmino(chainId, signer, signDoc)` | Amino-kodierte Transaktion signieren |
+| `signDirect(chainId, signer, signDoc)` | Protobuf-kodierte Transaktion signieren |
+| `sendTx(chainId, tx, mode)` | Signierte Transaktion übertragen |
+| `signArbitrary(chainId, signer, data)` | Beliebige Nachricht signieren |
+| `verifyArbitrary(chainId, signer, data, signature)` | Signatur prüfen |
+| `signEthereum(chainId, signer, data, type)` | Ethereum-Daten signieren |
+| `experimentalSuggestChain(chainInfo)` | Benutzerdefinierte Chain hinzufügen |
+| `getOfflineSigner(chainId)` | Direct-Offline-Signierer abrufen |
+| `getOfflineSignerOnlyAmino(chainId)` | Reinen Amino-Offline-Signierer abrufen |
+| `getOfflineSignerAuto(chainId)` | Besten Signierertyp automatisch erkennen |
+| `getChainInfosWithoutEndpoints()` | Alle Chain-Informationen abrufen |
+| `getChainInfoWithoutEndpoints(chainId)` | Informationen zu einer bestimmten Chain abrufen |
+| `ping()` | Verbindung prüfen |
+| `babylonConnectWallet()` | Mit Babylon-Wallet verbinden |
+| `babylonGetKey()` | Babylon-Wallet-Schlüssel abrufen |
+
+---
+
+## Key-Schnittstelle [#key-interface]
+
+```typescript
+interface Key {
+  name: string              // Human-readable name
+  algo: string              // Signing algorithm
+  pubKey: Uint8Array        // Public key bytes
+  address: Uint8Array       // Address bytes
+  bech32Address: string     // Bech32 formatted address
+  isNanoLedger: boolean     // Ledger compatibility flag
+  isKeystone: boolean       // True if Keystone hardware
+}
+```
+
+---
+
+## Sign-Doc-Typen [#sign-doc-types]
+
+### Amino Sign Doc [#amino-sign-doc]
+
+```typescript
+interface StdSignDoc {
+  chain_id: string
+  account_number: string
+  sequence: string
+  fee: {
+    amount: { denom: string; amount: string }[]
+    gas: string
+  }
+  msgs: {
+    type: string
+    value: any
+  }[]
+  memo: string
+}
+```
+
+### Direct Sign Doc [#direct-sign-doc]
+
+```typescript
+interface DirectSignDoc {
+  bodyBytes: Uint8Array | null
+  authInfoBytes: Uint8Array | null
+  chainId: string | null
+  accountNumber: Long | null
+}
+```
+
+---
+
+## Signaturantworttypen [#sign-response-types]
+
+```typescript
+interface AminoSignResponse {
+  signed: StdSignDoc
+  signature: StdSignature
+}
+
+interface DirectSignResponse {
+  signed: DirectSignDoc
+  signature: StdSignature
+}
+
+interface StdSignature {
+  pub_key: {
+    type: string
+    value: string  // Base64 encoded
+  }
+  signature: string  // Base64 encoded
+}
+```
+
+---
+
+## Übertragungsmodi [#broadcast-modes]
+
+| Modus | Beschreibung |
+|------|-------------|
+| `block` | Auf Aufnahme in einen Block warten |
+| `sync` | Auf CheckTx warten |
+| `async` | Sofort zurückkehren |
+
+---
+
+## Unterstützte Chains [#supported-chains]
+
+| Chain | Chain-ID | Wallet-Verfügbarkeit |
+|-------|----------|----------------|
+| Cosmos Hub | `cosmoshub-4` | In der Ziel-Wallet prüfen |
+| Osmosis | `osmosis-1` | In der Ziel-Wallet prüfen |
+| Juno | `juno-1` | In der Ziel-Wallet prüfen |
+| Stargaze | `stargaze-1` | In der Ziel-Wallet prüfen |
+| Akash | `akashnet-2` | In der Ziel-Wallet prüfen |
+| Secret Network | `secret-4` | In der Ziel-Wallet prüfen |
+| Evmos | `evmos_9001-2` | In der Ziel-Wallet prüfen |
+| Injective | `injective-1` | In der Ziel-Wallet prüfen |
+| Benutzerdefiniert | Chainspezifisch | Anfordern mit `experimentalSuggestChain`; Annahme ist nicht garantiert |
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Beschreibung |
+|-------|-------------|
+| `keplr_keystorechange` | Konto oder Schlüssel geändert |
+| `connect` | Mit Chain verbunden |
+| `disconnect` | Getrennt |
+
+```typescript
+// Listen for keystore changes
+window.addEventListener('keplr_keystorechange', () => {
+  console.log('Key changed, refresh account info')
+})
+```
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| 4100 | Nicht autorisiert |
+| -32603 | Interner Fehler |

@@ -1,0 +1,113 @@
+---
+title: "Eine Transaktion senden"
+---
+
+<span id="sending-a-transaction" />
+
+# Eine Transaktion senden
+
+Sobald eine Webanwendung mit OneKey verbunden ist, kann sie den Nutzer um Erlaubnis bitten, Transaktionen in seinem Namen zu senden. Dazu muss eine Webanwendung:
+
+1. Eine unsignierte Transaktion erstellen.
+2. Die Transaktion von der OneKey-Wallet des Nutzers signieren und an das Netzwerk senden lassen.
+3. Optional über eine Solana-JSON-RPC-Verbindung auf die Netzwerkbestätigung warten.
+
+Weitere Informationen zur Funktionsweise von Solana-Transaktionen finden Sie in [`solana-web3.js` Dokumentation](https://solana-foundation.github.io/solana-web3.js/v1.x/index.html) sowie im [Solana Cookbook](https://solanacookbook.com/core-concepts/transactions.html#transactions).
+
+## Voraussetzungen [#prerequisites]
+
+Die Beispiele verwenden `Connection` und `Transaction` aus `@solana/web3.js`; die rohen `request`-Beispiele verwenden außerdem `bs58`. Verbinden Sie zuerst die Wallet und erstellen Sie eine Transaktion mit Anweisungen, Gebührenzahler und aktuellem Blockhash aus dem vorgesehenen Netzwerk. Ersetzen Sie `<NETWORK_URL>` mit dem RPC-Endpunkt dieses Netzwerks. Eine leere `new Transaction()` kann nicht signiert oder gesendet werden.
+
+## Eine Transaktion signieren und senden <a href="#signing-and-sending-a-transaction" id="signing-and-sending-a-transaction"></a> [#signing-and-sending-a-transaction-]
+
+Nachdem eine Transaktion erstellt wurde, kann die Webanwendung die OneKey-Wallet des Nutzers bitten, sie zu signieren und zu senden.
+
+Bei Annahme signiert OneKey die Transaktion mit dem privaten Schlüssel des Nutzers und sendet sie über eine Solana-JSON-RPC-Verbindung. Der mit Abstand **einfachste** und am meisten **empfohlene** Weg dafür ist die Verwendung der `signAndSendTransaction`-Methode des Providers; es ist aber auch möglich mit `request`. In beiden Fällen gibt der Aufruf ein [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) für ein Objekt zurück, das Folgendes enthält: `signature`.
+
+### signAndSendTransaction [#signandsendtransaction]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const { signature } = await provider.signAndSendTransaction(transaction);
+const status = await connection.getSignatureStatus(signature);
+// This is a status query, not a wait for confirmation. Inspect status.value.
+```
+
+### Anfrage [#request]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const { signature } = await provider.request({
+    method: "signAndSendTransaction",
+    params: {
+         message: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
+    },
+});
+const status = await connection.getSignatureStatus(signature);
+// This is a status query, not a wait for confirmation. Inspect status.value.
+```
+
+Sie können auch ein `SendOptions`-[Objekt](https://solana-foundation.github.io/solana-web3.js/v1.x/types/SendOptions.html) als zweites Argument an `signAndSendTransaction` oder bei Verwendung von `request` als `options`-Parameter übergeben.
+
+## Weitere Signiermethoden <a href="#other-signing-methods" id="other-signing-methods"></a> [#other-signing-methods-]
+
+Verwenden Sie reine Signiermethoden, wenn Ihre Anwendung die Übermittlung steuern muss. Sie geben signierte Transaktionen zurück, ohne sie zu übertragen; Ihre Anwendung muss sie einreichen und das Ergebnis bestätigen. Der Provider kennzeichnet diese Hilfsmethoden als veraltet; prüfen Sie daher den von Ihrer SDK-Version unterstützten Integrationsweg.
+
+### Eine Transaktion signieren (ohne Senden) <a href="#signing-a-transaction-without-sending" id="signing-a-transaction-without-sending"></a> [#signing-a-transaction-without-sending-]
+
+Nachdem eine Transaktion erstellt wurde, kann eine Webanwendung die OneKey-Wallet des Nutzers bitten, sie zu signieren, _ohne_ sie auch an das Netzwerk zu senden. Der einfachste und empfohlene Weg ist die `signTransaction`-Methode des Providers; es ist aber auch möglich über `request`. In beiden Fällen gibt der Aufruf ein [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) für die signierte Transaktion.
+
+Nachdem die Transaktion signiert wurde, kann eine Anwendung sie selbst einreichen über [web3js `sendRawTransaction`](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/Connection.html#sendrawtransaction).
+
+### signTransaction [#signtransaction]
+```javascript
+const provider = getProvider();
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const signedTransaction = await provider.signTransaction(transaction);
+const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+```
+
+### Anfrage [#request-1]
+```javascript
+const provider = getProvider();
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const signedTransaction = await provider.request({
+    method: "signTransaction",
+    params: {
+         message: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
+    },
+});
+const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+```
+
+### Mehrere Transaktionen signieren <a href="#signing-multiple-transactions" id="signing-multiple-transactions"></a> [#signing-multiple-transactions-]
+
+Verwenden Sie `signAllTransactions`, um mehrere Transaktionen zu signieren. Sie werden nicht gesendet; reichen Sie jede signierte Transaktion bei Bedarf separat ein.
+
+### signAllTransactions [#signalltransactions]
+```javascript
+const signedTransactions = await provider.signAllTransactions(transactions);
+```
+
+### request [#request-2]
+```javascript
+const message = transactions.map(transaction => {
+    return bs58.encode(transaction.serialize({ requireAllSignatures: false }));
+});
+const signedTransactions = await provider.request({
+    method: "signAllTransactions",
+    params: { message },
+});
+```

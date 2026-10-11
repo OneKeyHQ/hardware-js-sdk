@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+签名前先连接 provider。交易示例使用 algosdk 2 的 `from` / `to` 字段，请安装匹配的 SDK 主版本。运行示例前，需要准备好 `algodClient`、地址和分组交易。在浏览器中使用 `Buffer` 时，应显式导入 `buffer`，或使用等效的 base64 编码工具。
+
 了解如何在 Algorand 上签署和发送交易。
 
 ---
@@ -18,7 +20,7 @@ import { Callout } from 'nextra/components'
 ```typescript
 import algosdk from 'algosdk'
 
-// 创建交易
+// Create transaction
 const suggestedParams = await algodClient.getTransactionParams().do()
 
 const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
@@ -28,15 +30,15 @@ const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
   suggestedParams,
 })
 
-// 准备签名
+// Prepare for signing
 const walletTxns = [{
   txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
 }]
 
-// 签名
+// Sign
 const signedTxns = await provider.signTxns(walletTxns)
 
-console.log('已签名的交易:', signedTxns)
+console.log('Signed transactions:', signedTxns)
 ```
 
 ---
@@ -44,16 +46,16 @@ console.log('已签名的交易:', signedTxns)
 ## 签署多个交易
 
 ```typescript
-// 交易组
+// Group transactions
 const txns = [txn1, txn2, txn3]
 algosdk.assignGroupID(txns)
 
-// 准备签名
+// Prepare for signing
 const walletTxns = txns.map(txn => ({
   txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
 }))
 
-// 签署全部
+// Sign all
 const signedTxns = await provider.signTxns(walletTxns)
 ```
 
@@ -62,15 +64,15 @@ const signedTxns = await provider.signTxns(walletTxns)
 ## 部分签名（多签）
 
 ```typescript
-// 只签署组中的特定交易
+// Only sign specific transactions in a group
 const walletTxns = [
   { txn: encodedTxn1 },
-  { txn: encodedTxn2, signers: [] }, // 跳过这个
+  { txn: encodedTxn2, signers: [] }, // Skip this one
   { txn: encodedTxn3 },
 ]
 
 const signedTxns = await provider.signTxns(walletTxns)
-// signedTxns[1] 将为 null
+// signedTxns[1] will be null
 ```
 
 ---
@@ -80,8 +82,12 @@ const signedTxns = await provider.signTxns(walletTxns)
 广播已签名的交易：
 
 ```typescript
-const result = await provider.postTxns(signedTxns)
-console.log('交易 ID:', result.txIDs)
+const completeTxns = signedTxns.filter((txn) => txn !== null)
+if (completeTxns.length !== signedTxns.length) {
+  throw new Error('Complete all required signatures before broadcasting the group')
+}
+const result = await provider.postTxns(completeTxns)
+console.log('Transaction IDs:', result.txnIDs)
 ```
 
 ---
@@ -92,7 +98,7 @@ console.log('交易 ID:', result.txIDs)
 
 ```typescript
 const result = await provider.signAndPostTxns(walletTxns)
-console.log('交易 ID:', result.txIDs)
+console.log('Transaction IDs:', result.txnIDs)
 ```
 
 ---
@@ -102,13 +108,13 @@ console.log('交易 ID:', result.txIDs)
 ### 签署交易（旧版）
 
 ```typescript
-// 创建交易为 Uint8Array
+// Create transaction as Uint8Array
 const txnBytes = algosdk.encodeUnsignedTransaction(txn)
 
-// 签名
+// Sign
 const signedTxnBytes = await provider.signTransaction([txnBytes])
 
-// 发送
+// Send
 const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
 ```
 
@@ -116,7 +122,7 @@ const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
 
 ```typescript
 const result = await provider.signAndSendTransaction([txnBytes])
-console.log('交易 ID:', result.txId)
+console.log('Transaction ID:', result.txId)
 ```
 
 ---
@@ -127,21 +133,22 @@ console.log('交易 ID:', result.txId)
 import algosdk from 'algosdk'
 
 async function sendAlgo() {
-  // 连接
+  // Connect
   const provider = window.$onekey?.algo
+  if (!provider) throw new Error("OneKey Algorand provider is unavailable")
   const { address } = await provider.connect()
 
-  // 设置客户端
+  // Setup client
   const algodClient = new algosdk.Algodv2(
     '',
     'https://mainnet-api.algonode.cloud',
     ''
   )
 
-  // 获取参数
+  // Get params
   const suggestedParams = await algodClient.getTransactionParams().do()
 
-  // 创建交易
+  // Create transaction
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     from: address,
     to: 'RECIPIENT_ADDRESS',
@@ -149,23 +156,24 @@ async function sendAlgo() {
     suggestedParams,
   })
 
-  // 签名
+  // Sign
   const walletTxns = [{
     txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
   }]
 
   const signedTxns = await provider.signTxns(walletTxns)
 
-  // 发送
+  if (!signedTxns[0]) throw new Error("The transaction was not signed")
+
+  // Send
   const { txId } = await algodClient.sendRawTransaction(
     Buffer.from(signedTxns[0], 'base64')
   ).do()
 
-  console.log('交易 ID:', txId)
+  console.log('Transaction ID:', txId)
 
-  // 等待确认
+  // Wait for confirmation
   await algosdk.waitForConfirmation(algodClient, txId, 4)
-  console.log('已确认！')
+  console.log('Confirmed!')
 }
 ```
-

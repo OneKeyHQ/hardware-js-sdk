@@ -1,0 +1,77 @@
+---
+title: "機能"
+description: "ウォレット、スワップ、市場情報、セキュリティに関するリクエストを、対応するスキルに割り当てます。"
+---
+
+<span id="capabilities" />
+
+# 機能
+
+4 つの OneKey ウォレットスキルを使って、リクエストをウォレット、スワップ、市場情報、セキュリティの各コマンドに振り分けます。対応チェーン、パラメーター、レスポンスフィールドは、インストール済み CLI のスキーマを確認してください。
+
+## ウォレット操作 [#wallet-operations]
+
+残高、受取アドレス、取引履歴、BTC アドレスタイプ、送金をユーザーが求める場合に使用します。
+
+| ユーザーの意図 | 自然言語 | 使用するスキル |
+| --- | --- | --- |
+| 有効なウォレットを確認 | `What wallet am I using?` | `onekey-wallet` は有効なセッションの状態を読み取ります。 |
+| 受取アドレスを表示 | `Show my ETH receiving address.` | `onekey-wallet` は現在の受取アドレスを返します。 |
+| 残高を確認 | `Show my wallet balance on Ethereum.` | `onekey-wallet` は有効なウォレットの残高を確認します。 |
+| 履歴を照会 | `Show my last 5 BTC transactions.` | `onekey-wallet` は最近の履歴を取得します。 |
+| BTC アドレスタイプ | `Show my BTC taproot address.` | `onekey-wallet` は指定された BTC アドレスタイプを維持します。 |
+| 資金を送金 | `Send 50 USDC to this address.` | `onekey-wallet` は検証と準備を行い、確認を求めます。 |
+
+送金リクエストでは、実行前に確認画面を表示する必要があります。確認内容には、資産、金額、受取人、チェーン、判明している場合は手数料、残高の状況、次の安全確認手順を含めてください。
+
+## スワップとブリッジ [#swap-and-bridge]
+
+取引、購入、売却、交換、ブリッジ、BTC PSBT への署名をユーザーが求める場合に使用します。
+
+| ユーザーの意図 | 自然言語 | 使用するスキル |
+| --- | --- | --- |
+| スワップの見積もりを取得 | `Quote 1 ETH to USDC.` | `onekey-swap` は実行せずに見積もりを取得します。 |
+| トランザクションを構築 | `Prepare the swap, but do not submit.` | `onekey-swap` は内容の確認後に注文を準備します。 |
+| 確認後に実行 | `Yes, execute the swap.` | `onekey-swap` は確認済みの注文だけを実行します。 |
+| ステータスを確認 | `What happened to this swap?` | `onekey-swap` は既存の注文を追跡します。 |
+| 利用可能なブリッジを検索 | `Can I bridge USDC from Ethereum to Base?` | `onekey-swap` は見積もりの取得前にブリッジへの対応状況を確認します。 |
+| BTC の署名のみ | `Swap BTC to USDC using taproot and sign only.` | `onekey-swap` は taproot を維持し、署名済みまたはプレビュー用の PSBT を返します。 |
+
+通常のフローは、見積もり、安全確認、ユーザーによる確認、構築、実行の順です。見積もりと実行をアシスタントの 1 回の応答にまとめないでください。
+
+## 市場情報と調査 [#market-and-research]
+
+価格、注目のトークン、トークン情報、ローソク足データ、流動性、保有者、調査をユーザーが求める場合に使用します。
+
+| ユーザーの意図 | 自然言語 | 使用するスキル |
+| --- | --- | --- |
+| 単一銘柄の価格 | `What is the SOL price?` | `onekey-market` は価格と 24h の関連情報を返します。 |
+| 注目のトークン | `What tokens are trending on Solana?` | `onekey-market` は注目のトークンを短い一覧で返します。 |
+| トークン検索 | `Search BONK on Solana.` | `onekey-market` は Solana のコンテキストを維持します。 |
+| トークンの詳細 | `Show token info for USDC on Ethereum.` | `onekey-market` はトークンの詳細を取得します。 |
+| ローソク足 | `Show ETH 1H candles.` | `onekey-market` はチャートデータを返します。 |
+| 流動性 / 保有者 | `Show liquidity for PEPE.` | `onekey-market` は流動性または保有者のデータを要約します。 |
+
+市場に関する回答は、デフォルトで読み取り専用にしてください。その後ユーザーが購入やスワップを求めた場合は、まず調査を完了し、別の確認フローで取引を準備してください。
+
+## セキュリティチェック [#security-checks]
+
+資金の移動やコントラクト操作の前、およびトークンやトランザクションが安全かどうかをユーザーが尋ねた場合に使用します。
+
+| ユーザーの意図 | 自然言語 | 使用するスキル |
+| --- | --- | --- |
+| トークン監査 | `Is this token safe?` | `onekey-security` はリスクレベルとその理由を報告します。 |
+| トランザクションをシミュレーション | `What happens if I sign this?` | `onekey-security` は署名前にシミュレーションを実行します。 |
+| 承認のリスク | `Review this unlimited USDC approval.` | `onekey-security` は無制限承認のリスクを明示します。 |
+| チェーンの不一致 | `Send SOL to 0x...` | 処理を停止し、Solana/EVM アドレスの不一致を報告 |
+| 偽コントラクトのリスク | `Swap 500 USDC to WETH at 0x...` | トークンとコントラクトが一致しない場合は停止 |
+
+リスクが高い場合やデータが不完全な場合は、ユーザーがリスクを明示的に受け入れるまで、それに依存する資金移動フローをブロックしてください。
+
+## ハードウェア制御 [#hardware-control]
+
+デバイスによる署名、デバイスの検証、PIN/パスフレーズの変更、機密性の高い操作でのクリア署名をユーザーが求める場合に使用します。
+
+ユーザーの操作は引き続き自然言語で行います。デバイスを接続して検証し、ハードウェアを利用するセッションに切り替え、必要に応じてパスフレーズの動作を選択し、機密性の高い操作をデバイス上で確認します。
+
+ハードウェアログインを行うと、有効なセッションが切り替わります。ログイン後は、ウォレット、送金、スワップ、署名の各コマンドが自動的にハードウェアを利用するセッションを使用します。

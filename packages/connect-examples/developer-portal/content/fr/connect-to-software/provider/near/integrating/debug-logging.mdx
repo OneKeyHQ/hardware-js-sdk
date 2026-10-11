@@ -1,0 +1,26 @@
+---
+title: "Journalisation de débogage"
+---
+
+<span id="debug-logging" />
+
+# Journalisation de débogage
+
+Vous pouvez afficher les messages de communication internes entre le fournisseur et le portefeuille OneKey. Utilisez cette fonctionnalité pendant le développement. Examinez les journaux avant de les partager, car ils peuvent contenir des données de compte ou de requête.
+
+Les messages de journal sont regroupés par **jsBridge**, **providerBase** et **extInjected.** Vous pouvez les activer ou les désactiver comme indiqué ci-dessous ; les changements prennent effet après le rechargement de la page :
+
+```javascript
+// turn on all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '*');
+
+// turn off all groups logging
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '');
+
+// turn on `jsBridge` group only
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge');
+
+// turn on both `jsBridge` and `providerBase` group
+localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge,providerBase');
+
+```

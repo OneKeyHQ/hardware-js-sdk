@@ -10,7 +10,7 @@ import { Callout, Tabs } from 'nextra/components'
 Integrate Cosmos ecosystem chains using OneKey's Keplr-compatible provider. Access via `window.$onekey.cosmos`.
 
 <Callout type="info">
-OneKey's Cosmos provider is fully compatible with the Keplr wallet interface, making migration seamless.
+OneKey exposes Keplr-compatible methods. Verify the methods and chains required by your application against the target wallet version.
 </Callout>
 
 ---
@@ -47,8 +47,8 @@ console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
 ```typescript
 const chainId = 'cosmoshub-4'
 
-// Enable the chain - returns key info
-const key = await provider.enable(chainId)
+// Request access to the chain. Read key information separately with getKey().
+await provider.enable(chainId)
 
 // Or enable multiple chains at once
 await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
@@ -64,9 +64,9 @@ console.log({
   name: key.name,           // Account name
   algo: key.algo,           // Signing algorithm (secp256k1)
   pubKey: key.pubKey,       // Public key (Uint8Array)
-  address: key.address,     // Bech32 address (Uint8Array)
+  address: key.address,     // Raw address bytes
   bech32Address: key.bech32Address,  // Bech32 formatted address
-  isNanoLedger: key.isNanoLedger,    // Hardware wallet flag
+  isNanoLedger: key.isNanoLedger,    // Ledger compatibility flag
 })
 ```
 
@@ -206,7 +206,7 @@ console.log('Signature valid:', isValid)
 
 ```typescript
 const chainId = 'cosmoshub-4'
-const txBytes = new Uint8Array([...]) // Signed transaction bytes
+// `txBytes` is the complete signed transaction as a Uint8Array.
 
 // Broadcast modes: 'block', 'sync', 'async'
 const result = await provider.sendTx(chainId, txBytes, 'sync')
@@ -255,7 +255,7 @@ const result = await client.sendTokens(
 
 | Method | Description |
 |--------|-------------|
-| `enable(chainIds)` | Enable chain(s) and get key info |
+| `enable(chainIds)` | Request access to chain(s); resolves without a value |
 | `disable(chainIds)` | Disable chain(s) |
 | `disconnect()` | Disconnect from all chains |
 | `getKey(chainId)` | Get account key for chain |
@@ -278,22 +278,22 @@ interface Key {
   pubKey: Uint8Array        // Public key bytes
   address: Uint8Array       // Address bytes
   bech32Address: string     // Bech32 formatted address
-  isNanoLedger: boolean     // True if hardware wallet
+  isNanoLedger: boolean     // Ledger compatibility flag
   isKeystone: boolean       // True if Keystone hardware
 }
 ```
 
 ### Supported Chains
 
-| Chain | Chain ID | Native Support |
+| Chain | Chain ID | Wallet Availability |
 |-------|----------|----------------|
-| Cosmos Hub | `cosmoshub-4` | Yes |
-| Osmosis | `osmosis-1` | Yes |
-| Juno | `juno-1` | Yes |
-| Stargaze | `stargaze-1` | Yes |
-| Akash | `akashnet-2` | Yes |
-| Secret Network | `secret-4` | Yes |
-| Custom | Any | Via `experimentalSuggestChain` |
+| Cosmos Hub | `cosmoshub-4` | Verify in the target wallet |
+| Osmosis | `osmosis-1` | Verify in the target wallet |
+| Juno | `juno-1` | Verify in the target wallet |
+| Stargaze | `stargaze-1` | Verify in the target wallet |
+| Akash | `akashnet-2` | Verify in the target wallet |
+| Secret Network | `secret-4` | Verify in the target wallet |
+| Custom | Chain-specific | Request with `experimentalSuggestChain`; acceptance is not guaranteed |
 
 ---
 
@@ -326,4 +326,3 @@ const provider = window.keplr
 // After (OneKey with Keplr fallback)
 const provider = window.$onekey?.cosmos || window.keplr
 ```
-

@@ -1,0 +1,109 @@
+---
+title: "Referencia de la API"
+description: "Referencia completa de la API del proveedor de Algorand de OneKey"
+---
+
+<span id="api-reference" />
+
+# Referencia de la API
+
+Referencia de los métodos y tipos del proveedor de Algorand de OneKey.
+
+---
+
+## Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `connect()` | Conectar la cartera (heredado) |
+| `disconnect()` | Desconectar la cartera |
+| `enable(opts?)` | Habilitar la cartera (ARC-0001) |
+| `signTxns(transactions)` | Firmar transacciones (ARC-0001) |
+| `postTxns(signedTxns)` | Difundir transacciones |
+| `signAndPostTxns(transactions)` | Firmar y difundir |
+| `signTransaction(txns)` | Firmar transacciones (heredado) |
+| `signAndSendTransaction(txns)` | Firmar y enviar (heredado) |
+| `signMessage(message, encoding?)` | Firmar un mensaje arbitrario |
+| `getAlgodv2Client()` | Obtener el cliente Algod |
+| `getIndexerClient()` | Obtener el cliente Indexer |
+
+---
+
+## Tipos [#types]
+
+### Opciones de habilitación [#enable-options]
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+```
+
+### Resultado de habilitación [#enable-result]
+
+```typescript
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+```
+
+### Transacción de cartera [#wallet-transaction]
+
+```typescript
+interface WalletTransaction {
+  txn: string                  // Base64 encoded unsigned transaction
+  signers?: string[]           // Addresses that should sign (empty = skip)
+  stxn?: string                // Pre-signed transaction
+  message?: string             // Message to display
+  msig?: MultisigMetadata
+  authAddr?: string            // Rekeyed auth address
+}
+```
+
+### Resultado de firma de transacciones [#sign-txns-result]
+
+```typescript
+type SignTxnsResult = (string | null)[]; // Base64 signed transactions; null means skipped.
+```
+
+### Resultado de envío de transacciones [#post-txns-result]
+
+```typescript
+interface PostTxnsResult {
+  txnIDs: string[]
+}
+```
+
+---
+
+## Propiedades [#properties]
+
+| Propiedad | Tipo | Descripción |
+|----------|------|-------------|
+| `isConnected` | `boolean` | Estado de conexión |
+| `address` | `string \| null` | Dirección conectada |
+| `isOneKey` | `boolean` | Identificador de OneKey |
+
+---
+
+## Eventos [#events]
+
+| Evento | Parámetros | Descripción |
+|-------|------------|-------------|
+| `connect` | `{ address }` | Cartera conectada |
+| `disconnect` | - | Cartera desconectada |
+| `accountChanged` | `address` | Cuenta cambiada |
+
+---
+
+## Códigos de error [#error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| 4200 | Método no compatible |
+| -32602 | Parámetros no válidos |

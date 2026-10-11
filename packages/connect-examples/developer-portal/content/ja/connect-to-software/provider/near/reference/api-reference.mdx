@@ -1,0 +1,24 @@
+---
+title: "API リファレンス"
+---
+
+<span id="near-api-reference" />
+
+# NEAR API リファレンス
+
+[SDK をインストール](/ja/connect-to-software/provider/near/integrating/install-the-provider-sdk) の説明に従って `OneKeyNearProvider` インスタンスを作成します。プロバイダーは便利なメソッドと `request({ method, params })` を公開しています。
+
+| 操作 | 方法 | 結果 |
+| --- | --- | --- |
+| 拡張機能を検出 | `detectWalletInstalled()` | `Promise<boolean>` |
+| アカウントへのアクセスを要求 | `requestSignIn()` / `near_requestAccounts` | `{ accounts: NearAccountInfo[] }` |
+| 公開されたアカウントを読み取る | `near_accounts` | `{ accounts: NearAccountInfo[] }` |
+| 選択中のネットワークを読み取る | `near_networkInfo` | `{ networkId: string, nodeUrls?: string[] }` |
+| 切断 | `signOut()` / `near_signOut` | 接続状態を更新する前に完了を待機 |
+| トランザクションを構築 | `createTransaction({ receiverId, actions, nonceOffset })` | 未署名トランザクション |
+| 署名して送信 | `requestSignTransactions({ transactions })` / `near_sendTransactions` | `{ transactionHashes: string[] }` |
+| メッセージに署名 | `near_signMessages` | `{ signatures: string[] }` |
+
+`NearAccountInfo` には `accountId` と `publicKey` が含まれ、任意で `allKeys` も含まれます。公開されたアカウントがない場合、配列の結果は空になります。
+
+参照: [トランザクションへの署名](/ja/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction) は署名のみのリクエスト用、 [イベント](/ja/connect-to-software/provider/near/integrating/watch-accounts-and-network-status) は状態の変更用、 [トラブルシューティング](/ja/connect-to-software/provider/near/reference/trouble-shooting) はエラー用です。追加で使用できるメソッドは、RPC エンドポイントとウォレットのバージョンによって決まります。

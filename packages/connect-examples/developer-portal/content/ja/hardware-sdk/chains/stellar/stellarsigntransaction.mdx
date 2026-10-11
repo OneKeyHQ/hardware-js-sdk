@@ -1,0 +1,95 @@
+---
+title: "stellarSignTransaction"
+---
+
+# stellarSignTransaction
+
+## Stellar: トランザクションに署名 [#stellar-sign-transaction]
+
+指定パスから導出した鍵でトランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```typescript
+const result = await HardwareSDK.stellarSignTransaction(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` 完全にハード化された Stellar アカウントパス。例: `m/44'/148'/0'`。詳細を読む
+* `networkPassphrase` - _必須_ `string` ネットワークのパスフレーズ
+* `transaction` - _必須_ `Object` StellarTransaction の型
+
+#### StellarTransaction 型 [#stellartransaction-type]
+
+```typescript
+export type StellarTransaction = {
+  source: string;
+  fee: number;
+  sequence: string | number;
+  timebounds?: {
+    minTime: number;
+    maxTime: number;
+  };
+  memo?: {
+    type: 0 | 1 | 2 | 3 | 4;
+    id?: string;
+    text?: string;
+    hash?: string | Buffer;
+  };
+  operations: StellarOperation[];
+};
+```
+
+### 例 [#examples]
+
+```typescript
+const response = await HardwareSDK.stellarSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/148'/0'",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    transaction: {
+        source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+        fee: 200,
+        sequence: 4238497296,
+        memo: {
+            type: 0,
+        },
+        operations: [
+            {
+                type: "payment",
+                source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                amount: "10000"
+            }
+        ]
+    }
+  }
+);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    public_key: string,
+    signature: string,
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

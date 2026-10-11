@@ -1,0 +1,29 @@
+---
+title: "switchChain"
+---
+
+# switchChain
+
+Chain wechseln
+
+## Methode [#method]
+
+```typescript
+declare function switchChain(chain: string): Promise<{
+  enum: string;
+  name: string;
+  network: string;
+}>;
+```
+
+## Parameter [#params]
+
+Das Chain-Enum, z. B. `BITCOIN_MAINNET`, `BITCOIN_TESTNET`
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+await provider.switchChain("BITCOIN_TESTNET");
+```

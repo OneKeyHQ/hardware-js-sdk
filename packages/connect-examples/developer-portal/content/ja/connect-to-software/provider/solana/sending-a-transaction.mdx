@@ -1,0 +1,113 @@
+---
+title: "トランザクションの送信"
+---
+
+<span id="sending-a-transaction" />
+
+# トランザクションの送信
+
+OneKey に接続した Web アプリケーションは、ユーザーに代わってトランザクションを送信する許可を求められます。送信には次が必要です:
+
+1. 未署名トランザクションを作成します。
+2. ユーザーの OneKey ウォレットで署名し、ネットワークに送信します。
+3. 必要に応じて、Solana JSON RPC 接続を使ってネットワークでの確定を待ちます。
+
+Solana のトランザクションについて詳しくは、次を参照してください: [`solana-web3.js` ドキュメント](https://solana-foundation.github.io/solana-web3.js/v1.x/index.html) および [Solana Cookbook](https://solanacookbook.com/core-concepts/transactions.html#transactions).
+
+## 前提条件 [#prerequisites]
+
+例では `@solana/web3.js` の `Connection` と `Transaction` を使用し、生の `request` の例では `bs58` も使用します。まずウォレットに接続し、対象ネットワークの命令、手数料支払者、recent blockhash を含むトランザクションを構築します。`<NETWORK_URL>` は、そのネットワークの RPC エンドポイントに置き換えてください。空の `new Transaction()` は署名も送信もできません。
+
+## トランザクションへの署名と送信 <a href="#signing-and-sending-a-transaction" id="signing-and-sending-a-transaction"></a> [#signing-and-sending-a-transaction-]
+
+トランザクションを作成したら、Web アプリケーションはユーザーの OneKey ウォレットに署名と送信を要求できます。
+
+承認されると、OneKey はユーザーの秘密鍵でトランザクションに署名し、Solana JSON RPC 接続で送信します。**最も簡単な** **推奨される** 方法は、プロバイダーの `signAndSendTransaction` メソッドを使用することですが、`request` でも実行できます。どちらの場合も、呼び出しは `signature` を含むオブジェクトの [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) を返します。
+
+### signAndSendTransaction [#signandsendtransaction]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const { signature } = await provider.signAndSendTransaction(transaction);
+const status = await connection.getSignatureStatus(signature);
+// This is a status query, not a wait for confirmation. Inspect status.value.
+```
+
+### リクエスト [#request]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const { signature } = await provider.request({
+    method: "signAndSendTransaction",
+    params: {
+         message: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
+    },
+});
+const status = await connection.getSignatureStatus(signature);
+// This is a status query, not a wait for confirmation. Inspect status.value.
+```
+
+`SendOptions` [オブジェクト](https://solana-foundation.github.io/solana-web3.js/v1.x/types/SendOptions.html) を `signAndSendTransaction` の第 2 引数、または `request` の `options` パラメーターとして指定することもできます。
+
+## その他の署名メソッド <a href="#other-signing-methods" id="other-signing-methods"></a> [#other-signing-methods-]
+
+アプリケーション側で送信を制御する場合は、署名専用メソッドを使用してください。ブロードキャストせずに署名済みトランザクションを返すため、アプリケーションが送信して結果を確認する必要があります。プロバイダーではこれらの便利なメソッドを非推奨としているため、SDK のバージョンが対応する統合方法を確認してください。
+
+### トランザクションへの署名 (送信なし) <a href="#signing-a-transaction-without-sending" id="signing-a-transaction-without-sending"></a> [#signing-a-transaction-without-sending-]
+
+トランザクションを作成したら、Web アプリケーションはユーザーの OneKey ウォレットに、ネットワークへ_送信せずに_署名だけを要求できます。最も簡単で推奨される方法は、プロバイダーの `signTransaction` メソッドを使うことですが、`request` でも実行できます。どちらの場合も、呼び出しは署名済みトランザクションの [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) を返します。
+
+署名後、アプリケーション自身が次でトランザクションを送信できます: [web3js の `sendRawTransaction`](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/Connection.html#sendrawtransaction).
+
+### signTransaction [#signtransaction]
+```javascript
+const provider = getProvider();
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const signedTransaction = await provider.signTransaction(transaction);
+const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+```
+
+### リクエスト [#request-1]
+```javascript
+const provider = getProvider();
+const network = "<NETWORK_URL>";
+const connection = new Connection(network);
+// `transaction` is a fully constructed Transaction with instructions,
+// feePayer, and a recent blockhash for this connection.
+const signedTransaction = await provider.request({
+    method: "signTransaction",
+    params: {
+         message: bs58.encode(transaction.serialize({ requireAllSignatures: false })),
+    },
+});
+const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+```
+
+### 複数のトランザクションへの署名 <a href="#signing-multiple-transactions" id="signing-multiple-transactions"></a> [#signing-multiple-transactions-]
+
+`signAllTransactions` で複数のトランザクションに署名します。送信は行わないため、必要に応じて各署名済みトランザクションを個別に送信してください。
+
+### signAllTransactions [#signalltransactions]
+```javascript
+const signedTransactions = await provider.signAllTransactions(transactions);
+```
+
+### request [#request-2]
+```javascript
+const message = transactions.map(transaction => {
+    return bs58.encode(transaction.serialize({ requireAllSignatures: false }));
+});
+const signedTransactions = await provider.request({
+    method: "signAllTransactions",
+    params: { message },
+});
+```

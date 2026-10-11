@@ -1,0 +1,75 @@
+---
+title: "ガイド"
+---
+
+<span id="guide" />
+
+# ガイド
+
+## 概要 [#overview]
+
+このガイドでは、OneKey Lightning Network Provider API で Bitcoin Lightning Network アプリケーションを構築する方法を説明します。
+
+
+### Web アプリの構築 **ユースケース** [#building-web-apps-use-cases]
+
+* Lightning Network の支払いの受け付け
+* 分散型アイデンティティアプリケーション
+
+## インストール [#install]
+
+### 1. OneKey ウォレットをダウンロード [#1-download-onekey-wallet]
+
+次をダウンロードします: [OneKey ウォレット](https://onekey.so/download?client=browserExtension)。OneKey ブラウザー拡張機能をインストールしてください。
+
+#### 2. API の注入について [#2-api-injection-explanation]
+
+* OneKey ブラウザー拡張機能は、アクセスした Web サイトに `Provider API` を注入します。
+* 2 種類の API が提供されています: `window.webln` および `window.$onekey.webln`.
+* `window.$onekey.webln` の使用を推奨します。
+
+> 次を優先してください: `window.$onekey.webln` を使うと OneKey を明示的に選択できます。グローバルの `window.webln` は、複数の拡張機能がインストールされている場合、別のウォレットに属していることがあります。
+
+### Provider API 対応の検出 [#detecting-provider-api-support]
+
+リクエスト前にプロバイダーが利用可能か確認してください:
+
+```javascript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+if (!provider) {
+  throw new Error("No provider is available.");
+}
+```
+
+### OneKey に接続 [#connecting-to-onekey]
+
+以下の API を使用する前に、まず次の `provider.enable` メソッドで該当アカウントへのアクセスをユーザーに要求します。
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+```
+
+他の API は、ユーザーの承認後にのみ呼び出すことができます。
+
+## API [#api]
+
+アプリケーションに必要な操作に対応する API を選択します。
+
+* ユーザーの Bitcoin Lightning ノード情報を取得: [`provider.getInfo`](/ja/connect-to-software/provider/webln/api-reference/getinfo)
+* 支払いを送信: [`provider.sendPayment`](/ja/connect-to-software/provider/webln/api-reference/sendpayment)
+* 支払いを受け取るインボイスを要求: [`provider.makeInvoice`](/ja/connect-to-software/provider/webln/api-reference/makeinvoice)
+* 任意のメッセージへの署名を要求: [`provider.signMessage`](/ja/connect-to-software/provider/webln/api-reference/signmessage)
+
+**その他のインターフェース**: [詳細を表示](/ja/connect-to-software/provider/webln/api-reference)
+
+## イベント [#event]
+
+* **主な操作**: アカウントの切り替えなど
+* **詳細情報**: [さらに表示](/ja/connect-to-software/provider/webln/event)
+
+## リクエストの処理 [#handling-requests]
+
+ウォレットへのリクエストは async 関数または ES モジュールから実行してください。Promise の拒否をキャッチし、アプリケーションにエラーを表示します。接続、署名、支払いはユーザー操作から要求し、リクエストの処理中は起点となったボタンを無効にしてください。

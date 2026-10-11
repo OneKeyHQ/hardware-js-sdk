@@ -1,0 +1,124 @@
+---
+title: "Habilidades de la cartera"
+description: "Instala las cuatro skills de cartera de OneKey y canaliza las solicitudes a través de ellas."
+---
+
+<span id="wallet-skills" />
+
+# Habilidades de la cartera
+
+[`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) proporciona funciones de cartera a los asistentes de programación con IA. Los usuarios hacen solicitudes en lenguaje natural; las skills eligen la ruta segura, consultan el esquema en tiempo real cuando hace falta y explican los resultados en un lenguaje comprensible para el usuario.
+
+El usuario no debería necesitar escribir comandos de la CLI. La CLI es un detalle de implementación del paquete de skills.
+
+## Instalar primero [#install-first]
+
+| Cliente | Método de instalación |
+| --- | --- |
+| Claude Code | `/plugin marketplace add OneKeyHQ/onekey-wallet-skills`, después `/plugin install onekey-wallet-skills` |
+| Codex | Pide a Codex que siga `https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md` |
+| Cursor | Clona `https://github.com/OneKeyHQ/onekey-wallet-skills` y configura Cursor para que use el directorio del plugin |
+| OpenCode / OpenClaw | Sigue la guía de instalación correspondiente del repositorio de skills |
+
+Después de instalar, empieza con estas instrucciones:
+
+```text
+Show my wallet balance and receiving address.
+```
+
+```text
+What Solana tokens are trending right now?
+```
+
+```text
+Quote 1 ETH to USDC. Do not execute yet.
+```
+
+```text
+Is this token safe before I buy it?
+```
+
+## Selección de skills [#skill-router]
+
+| Skill | Usar cuando el usuario pregunte por | Ejemplo de instrucción |
+| --- | --- | --- |
+| `onekey-wallet` | Inicio de sesión, cartera activa, saldo, dirección de recepción, historial, transferencias, operaciones de cartera BTC/SOL y detección de dispositivos | `Show my wallet balance and receiving address.` |
+| `onekey-swap` | Intercambiar, comprar, vender, convertir, usar puentes, consultar el estado de intercambios y PSBT de BTC solo para firma | `Swap 1 ETH to USDC, but show me the quote first.` |
+| `onekey-market` | Precio, búsqueda de tokens, tendencias, velas, liquidez, titulares, métricas BTC/SOL e investigación | `What Solana tokens are trending right now?` |
+| `onekey-security` | Auditoría de tokens, simulación de transacciones, riesgo de autorizaciones, seguridad del hardware y comprobaciones de protección de secretos | `Is this token safe before I buy it?` |
+
+## Contrato del esquema [#schema-contract]
+
+Cada skill considera el esquema en tiempo real de la CLI como la fuente de referencia, en lugar de fijar ejemplos obsoletos en el código.
+
+| Comprobación | Comportamiento esperado |
+| --- | --- |
+| Descubrir capacidades | Consulta la lista de comandos cuando no esté claro si una función es compatible. |
+| Elegir parámetros | Consulta el esquema exacto del comando antes de elegir campos no triviales. |
+| Asignar los nombres correctamente | Distingue los nombres de comandos del esquema de las familias de comandos que ve el usuario. |
+| Gestionar campos no admitidos | Detente y explica la situación si el esquema actual no incluye el parámetro solicitado. |
+| Mantener una salida estructurada | Prioriza el resultado, el riesgo, la ruta y el siguiente paso sobre la salida sin procesar del terminal. |
+
+## Cartera [#wallet]
+
+Usa `onekey-wallet` para el estado de la cartera, las direcciones de recepción, las transferencias, los tipos de direcciones BTC y las sesiones de hardware.
+
+| Lenguaje natural | Qué debe hacer la skill |
+| --- | --- |
+| `Connect my OneKey Agent Wallet.` | Vincular mediante App Transfer y resumir la cartera activa. |
+| `What wallet am I using?` | Mostrar el método de inicio de sesión, el tipo de cartera, la dirección y el estado del dispositivo, si lo hay. |
+| `Show my balance.` | Usar automáticamente la cartera activa; no pedir al usuario que pegue una dirección. |
+| `Receive BTC.` | Devolver una dirección de recepción BTC; preguntar solo por el tipo de dirección si no se ha indicado. |
+| `Send 0.2 SOL to this address.` | Mantener el contexto de Solana, validar el formato de la dirección y preparar la confirmación. |
+
+## Intercambio [#swap]
+
+Usa `onekey-swap` para operaciones, compras, ventas, conversiones, rutas entre cadenas y flujos de BTC solo para firma.
+
+| Lenguaje natural | Qué debe hacer la skill |
+| --- | --- |
+| `Swap 1 ETH to USDC.` | Cotizar primero, mostrar la ruta y el riesgo y solicitar confirmación antes de ejecutar. |
+| `Buy $200 of PEPE on Ethereum.` | Mantener el contexto de Ethereum, auditar el token y preparar la operación. |
+| `Bridge 500 USDC from Ethereum to Base.` | Consultar la compatibilidad con puentes antes de cotizar. |
+| `Swap 0.01 BTC to USDC using taproot and sign only.` | Mantener taproot y devolver una PSBT firmada o para previsualizar en lugar de difundirla. |
+| `Yes, confirm the swap.` | Ejecutar solo la orden ya confirmada. |
+
+## Mercado [#market]
+
+Usa `onekey-market` para flujos de consulta de mercado e investigación de solo lectura.
+
+| Lenguaje natural | Qué debe hacer la skill |
+| --- | --- |
+| `What is the BTC price?` | Mostrar primero el precio y la variación de 24h y ofrecer después un gráfico o análisis de tendencias. |
+| `What tokens are trending right now?` | Devolver una lista breve de tendencias sin iniciar una operación. |
+| `Search BONK on Solana.` | Mantener Solana y tratar el identificador como un token SPL o mint. |
+| `Show ETH liquidity.` | Mostrar la liquidez o la distribución de titulares. |
+| `Give me a quick ETH analysis.` | Indicar la orientación del análisis, el catalizador, el riesgo y un siguiente paso. |
+
+Las respuestas de mercado son de solo lectura de forma predeterminada. Comprar o intercambiar debe iniciar un flujo de confirmación independiente.
+
+## Seguridad [#security]
+
+Usa `onekey-security` para comprobaciones de riesgo y protección previa a la ejecución.
+
+| Lenguaje natural | Qué debe hacer la skill |
+| --- | --- |
+| `Is this token safe?` | Ejecutar la auditoría del token e informar del nivel de riesgo y sus motivos. |
+| `Simulate approving this contract for all my USDC.` | Simular y señalar el riesgo de una autorización ilimitada. |
+| `Send SOL to 0x...` | Detenerse si hay una discrepancia entre direcciones de Solana y EVM. |
+| `Show me the App Transfer payload.` | Rechazar la exposición de secretos y ofrecer en su lugar un resumen de la sesión activa. |
+| `Is my hardware wallet safe to use?` | Usar el estado del dispositivo y de autenticación y la verificación del dispositivo; nunca pedir frases de recuperación. |
+
+## Formato de respuesta [#response-shape]
+
+Las buenas respuestas de las skills son breves y presentan primero el resultado:
+
+```text
+Route: swap-quote
+Fields: chain=eth, from=ETH, to=USDC, amount=1
+Quote: 1 ETH -> <estimated USDC>
+Risk: <audit or simulation state>
+Next: I can build the transaction and ask for confirmation.
+```
+
+Las respuestas sobre movimientos de fondos deben terminar con una pregunta de confirmación. Las respuestas de mercado y cartera de solo lectura deben terminar con un siguiente paso útil, no con una acción de compraventa.

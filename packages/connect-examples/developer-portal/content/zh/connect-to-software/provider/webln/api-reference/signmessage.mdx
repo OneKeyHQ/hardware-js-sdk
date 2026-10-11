@@ -4,15 +4,15 @@ title: signMessage
 
 # signMessage
 
-请求用户签名一个字符串消息。
+请求用户签署字符串消息。
 
-### 方法
+## 方法
 
 ```typescript
-async function signMessage(message: string): SignMessageResponse
+declare function signMessage(message: string): Promise<SignMessageResponse>;
 ```
 
-### 响应
+## 响应
 
 ```typescript
 interface SignMessageResponse {
@@ -21,7 +21,7 @@ interface SignMessageResponse {
 }
 ```
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.webln) || window.webln;
@@ -31,8 +31,6 @@ await provider.enable();
 const signature = await provider.signMessage(message);
 ```
 
-### 演示
+## 演示
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/mdvGmLm" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/mdvGmLm)

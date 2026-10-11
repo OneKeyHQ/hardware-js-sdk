@@ -1,0 +1,32 @@
+---
+title: "BTC"
+description: "OneKey が注入する BTC プロバイダー (window.$onekey.btc / window.unisat) による Bitcoin の統合"
+slug: /dapp/chains/btc
+---
+
+# BTC
+
+OneKey が注入する BTC プロバイダーで Bitcoin を統合します。`window.$onekey.btc` を使用して OneKey を選択します。グローバルな互換プロバイダーは、別のウォレットに属していることがあります。
+
+## クイックリンク [#quick-links]
+
+- [ガイド](guide)
+- [API リファレンス](api-reference)
+- [イベント](event)
+
+## 最小構成 [#minimal-pattern]
+
+```js
+const provider = window.$onekey?.btc
+if (!provider) throw new Error('OneKey BTC provider not detected')
+await provider.requestAccounts()
+```
+
+## イベントとネットワーク [#events--network]
+
+- `accountsChanged`, `chainChanged` — アカウントとネットワークの状態を再同期
+
+## 主なエラー [#common-errors]
+
+- ユーザーによる拒否: 適切に処理し、再試行を可能にする
+- 無効なパラメーター: アドレス/金額が正しい形式か確認する

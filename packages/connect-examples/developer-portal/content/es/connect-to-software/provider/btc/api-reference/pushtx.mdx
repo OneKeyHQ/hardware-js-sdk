@@ -1,0 +1,34 @@
+---
+title: "pushTx"
+---
+
+# pushTx
+
+Difunde una transacción en bruto firmada.
+
+## Método [#method]
+
+```typescript
+declare function pushTx(rawtx: string): Promise<string>;
+```
+
+## Parámetros [#params]
+
+* `rawtx` — _obligatorio_ `string`  la rawtx que se va a difundir
+
+## Respuesta [#response]
+
+`txid` — `string`
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const rawtx = "<SIGNED_RAW_TRANSACTION_HEX>";
+const txid = await provider.pushTx(rawtx);
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/VwgGzxO)

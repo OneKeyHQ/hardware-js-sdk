@@ -5,7 +5,7 @@ description: OneKey Polkadot provider 完整 API 参考
 
 # API 参考
 
-OneKey Polkadot provider 方法和类型的完整参考。
+OneKey Polkadot provider 的方法和类型参考。
 
 ---
 
@@ -32,10 +32,10 @@ OneKey Polkadot provider 方法和类型的完整参考。
 
 ```typescript
 interface InjectedAccount {
-  address: string          // Substrate 地址
-  name?: string            // 账户名称
+  address: string          // Substrate address
+  name?: string            // Account name
   type?: 'sr25519' | 'ed25519' | 'ecdsa'
-  genesisHash?: string     // 可选的链限制
+  genesisHash?: string     // Optional chain restriction
 }
 ```
 
@@ -63,7 +63,7 @@ interface SignerPayloadJSON {
 ```typescript
 interface SignerPayloadRaw {
   address: string
-  data: string             // 十六进制编码的数据
+  data: string             // Hex-encoded data
   type: 'bytes' | 'payload'
 }
 ```
@@ -73,7 +73,7 @@ interface SignerPayloadRaw {
 ```typescript
 interface SignerResult {
   id: number
-  signature: string        // 十六进制签名
+  signature: string        // Hex signature
 }
 ```
 
@@ -81,12 +81,11 @@ interface SignerResult {
 
 ## 支持的链
 
-| 链 | 描述 |
-|----|------|
+| 链 | 说明 |
+|-------|-------------|
 | Polkadot | 主中继链 |
-| Kusama | 金丝雀网络 |
-| Acala | DeFi 中心 |
-| Moonbeam | EVM 兼容 |
+| Kusama | 先行网络 |
+| Acala | DeFi 平台 |
+| Moonbeam | 兼容 EVM |
 | Astar | 智能合约平台 |
-| 任意 Substrate | 自定义链 |
-
+| 其他 Substrate 链 | 使用前验证钱包和 runtime 支持情况 |

@@ -6,26 +6,25 @@ title: verifyMessage
 
 请求客户端验证签名是否正确，结果将在客户端显示。
 
-### 方法
+## 方法
 
 ```typescript
-async function verifyMessage(signature: string, message: string): void
+declare function verifyMessage(signature: string, message: string): Promise<void>;
 ```
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.webln) || window.webln;
 
 const message = "Plain Message";
 await provider.enable();
-const signature = await provider.signMessage(message)
+const { signature } = await provider.signMessage(message);
 await provider.verifyMessage(signature, message);
-
 ```
 
-### 演示
+## 演示
 
+[打开示例](https://codepen.io/OneKeyHQ/pen/eYxLvXK)
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/eYxLvXK" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+Promise 成功完成时不返回值。该方法不返回布尔值；Promise 被拒绝时，应按验证请求失败处理。

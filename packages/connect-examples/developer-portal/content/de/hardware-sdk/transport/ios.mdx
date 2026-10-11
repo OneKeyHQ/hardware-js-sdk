@@ -1,0 +1,81 @@
+---
+description: "OneKey über CoreBluetooth und WKWebView mit geordneter Ein-/Ausgabe und geprüfter Benachrichtigungsbereitschaft verbinden."
+title: "iOS: Über Bluetooth verbinden"
+---
+
+<span id="ios-connect-via-bluetooth" />
+
+# iOS: Über Bluetooth verbinden
+
+Führen Sie `@onekeyfe/hd-common-connect-sdk` in WKWebView aus und verbinden Sie seinen Low-Level-Transport mit CoreBluetooth. Beginnen Sie mit dem [nativen iOS-Beispiel](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example) und der Schnittstellenvereinbarung des [Low-Level-Transport-Plugins](/de/hardware-sdk/concepts/low-level-plugin).
+
+Der native Host übernimmt den Bluetooth-Lebenszyklus. Das SDK übernimmt Protokollerkennung, Rahmung und Anfrage-/Antwortverarbeitung.
+
+## App konfigurieren [#configure-the-app]
+
+- Fügen Sie `NSBluetoothAlwaysUsageDescription` mit einer Erklärung zur Hardware-Wallet-Verbindung hinzu. Prüfen Sie zusätzliche Anforderungen, wenn Sie ältere iOS-Versionen unterstützen.
+- Verwenden Sie CoreBluetooth und die im nativen Beispiel deklarierte Bridge-Abhängigkeit.
+- Testen Sie auf einem physischen iOS-Gerät mit erteilter Bluetooth-Berechtigung. Behandeln Sie vor dem Scannen die Zustände abgelehnt, eingeschränkt und ausgeschaltet.
+
+## JavaScript-Bundle erstellen und laden [#build-and-load-the-javascript-bundle]
+
+Aus dem hardware-js-sdk-Checkout:
+
+```bash
+cd packages/connect-examples/native-ios-example/web
+yarn
+yarn build
+```
+
+Fügen Sie das vollständige `web_dist/`-Verzeichnis den Ressourcen des App-Targets hinzu. Behalten Sie relative Asset-Pfade bei. Erstellen Sie WKWebView und die Bridge, registrieren Sie native Handler und laden Sie dann das mitgelieferte HTML. Navigieren Sie eine WebView mit Gerätezugriff nicht zu nicht vertrauenswürdigen Inhalten.
+
+Verwenden Sie die vollständige Implementierung und die Abhängigkeitsversionen des Beispiels. Die folgenden Tabellen legen fest, was eine eigene Bridge gewährleisten muss.
+
+## Verbindungslebenszyklus [#connection-lifecycle]
+
+`CBCentralManager.connect()` startet einen Verbindungsversuch. Lösen Sie die JS-`connect`-Anfrage zu diesem Zeitpunkt nicht auf.
+
+| Phase | Erforderliche Behandlung |
+| --- | --- |
+| Scannen | Warten auf `.poweredOn`; nach dem OneKey-Dienst filtern, Ergebnisse deduplizieren und den Scan nach einer begrenzten Zeit stoppen. |
+| Auswählen | Die ausgewählte Peripheral-UUID abgleichen. Beim Scannen zur Wiederverbindung nur mit diesem ausgewählten Peripheral verbinden. |
+| Verbinden | Warten auf `didConnect`; Fehler zurückgeben bei `didFailToConnect` oder Zeitüberschreitung. |
+| Erkennen | Erforderlichen Dienst und Schreib-/Benachrichtigungs-Characteristics finden; Erkennungsfehler und fehlende Characteristics behandeln. |
+| Abonnieren | Benachrichtigungen aktivieren und dann warten auf `didUpdateNotificationStateFor` ohne Fehler und mit aktivierten Benachrichtigungen. |
+| Bereit | Erst jetzt die ausstehende JS-Verbindungsanfrage auflösen. Jeden Bridge-Callback genau einmal abschließen. |
+
+Siehe Apples [Callback zum Benachrichtigungsstatus](https://developer.apple.com/documentation/corebluetooth/cbperipheraldelegate/peripheral(_:didupdatenotificationstatefor:error:)) zum Abschluss des Abonnements.
+
+| Zweck | UUID |
+| --- | --- |
+| Dienst | `00000001-0000-1000-8000-00805f9b34fb` |
+| Schreibzugriff | `00000002-0000-1000-8000-00805f9b34fb` |
+| Benachrichtigen | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## Geordnete Ein-/Ausgabe [#ordered-io]
+
+- `send` erhält vom SDK vorbereitetes Hex. Lehnen Sie fehlerhaftes Hex oder Hex mit ungerader Länge ab; verwerfen Sie ungültige Bytes nicht stillschweigend.
+- Beachten Sie den angeforderten Schreibmodus und die Schreibkapazität des Peripherals. Beachten Sie bei Schreibvorgängen ohne Antwort die CoreBluetooth-Flusskontrolle; ein eingereihter Schreibvorgang beweist nicht, dass das Gerät eine SDK-Anfrage abgeschlossen hat.
+- Reihen Sie rohe Benachrichtigungsblöcke pro Peripheral ein und geben Sie bei jedem `receive(uuid)`-Aufruf einen unveränderten Hex-Block zurück. Parsen Sie keine V1-Header und füllen Sie Blöcke nicht auf die USB-Paketgröße auf.
+- Lehnen Sie bei Trennung ausstehende Vorgänge ab und löschen Sie wartende Benachrichtigungen der alten Verbindung. Eine neue Verbindung darf keine veralteten Daten der vorherigen erhalten.
+- Stellen Sie `getProtocolV2PacketCapacity` mit der nativen Schreibkapazität bereit. Siehe die [Plugin-Schnittstelle](/de/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface).
+
+## SDK und Wallet-Identität [#sdk-and-wallet-identity]
+
+Initialisieren Sie das SDK mit `env: 'lowlevel'` und Ihrem Bridge-Plugin. Prüfen Sie den Initialisierungserfolg. Verwenden Sie `searchDevices()` zum Auswählen von `connectId`, dann `getDeviceState(connectId)` zum Lesen von `identity.deviceId`.
+
+Die iOS-Peripheral-UUID leitet die Verbindung; sie ist nicht die Seed-Identität. Lesen Sie nach Wiederverbindung den Status erneut und stoppen Sie, wenn sich die erwartete Wallet geändert hat. Siehe [Kennungen](/de/hardware-sdk/concepts/identifiers).
+
+## PIN, Passphrase und Bestätigung [#pin-passphrase-and-confirmation]
+
+Binden Sie [UI-Ereignisse](/de/hardware-sdk/core-api-guide#events-ui) vor geschützten Aufrufen an. Native Dialoge können Eingaben erfassen oder Anweisungen anzeigen, aber der JS-Handler muss die Antwortzuordnung der ursprünglichen Anfrage beibehalten.
+
+Antworten Sie nur auf Eingabeanfragen. `REQUEST_BUTTON`, `REQUEST_PASSPHRASE_ON_DEVICE` und reine Geräte-PIN-Ereignisse sind Benachrichtigungen. Ein Host-Callback mit „OK“ genehmigt den Vorgang nicht auf dem Gerät. Wenn der Nutzer abbricht, brechen Sie den ausgewählten SDK-Aufruf ab und machen Sie ausstehende UI-Callbacks ungültig.
+
+Verwenden Sie für Adressbestätigung und Signieren dieselbe ausdrückliche Standard-/Versteckte-Wallet-Bindung. Halten Sie auf dem Host eingegebene PIN-/Passphrase-Werte aus Protokollen und dauerhaftem Speicher heraus.
+
+## Prüfen und wiederherstellen [#verify-and-recover]
+
+Testen Sie Berechtigungsablehnung, ausgeschaltetes Bluetooth, fehlende Characteristics, fehlgeschlagene Benachrichtigungsabonnements, Geräteeingabe, Abbruch und Wiederverbindung. Bestätigen Sie eine Adresse auf dem physischen Gerät, bevor Sie die Bridge als funktionsfähig betrachten.
+
+Wiederholen Sie Signieren oder Firmware-Updates nach einer Zeitüberschreitung nicht automatisch. Folgen Sie [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect).

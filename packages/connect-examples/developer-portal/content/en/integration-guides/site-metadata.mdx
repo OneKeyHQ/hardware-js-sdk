@@ -1,0 +1,19 @@
+---
+title: "Site metadata"
+description: "Provide a favicon so wallets and browsers can identify your site. Put an icon link in the document's `<head>` and use a publicly accessible image URL:"
+---
+
+# Site metadata
+
+Provide a favicon so wallets and browsers can identify your site. Put an icon link in the document's `<head>` and use a publicly accessible image URL:
+
+```html
+<head>
+  <link rel="icon" href="https://example.com/icon.png" type="image/png" />
+  <link rel="shortcut icon" href="https://example.com/icon.png" />
+</head>
+```
+
+Use your actual application name, origin, and icon in wallet connection library metadata. Metadata identifies the requesting site; it does not prove the site is trustworthy.
+
+Wallet versions may retrieve or cache metadata differently. Check the actual connection prompt after deployment; a favicon update may not immediately change an existing wallet session.

@@ -1,0 +1,27 @@
+---
+title: "getRelays"
+---
+
+# getRelays
+
+## Méthode [#method]
+
+```typescript
+declare function getRelays(): Promise<Record<string, { read: boolean; write: boolean }>>;
+```
+
+## Réponse [#response]
+
+Renvoie une table simple associant les URL de relais à leurs politiques.
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const relays = await provider.getRelays();
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/vYbzmoJ)

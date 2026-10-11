@@ -1,0 +1,44 @@
+---
+description: "Bootloader-Modus auf einem Protocol-V1-Gerät anfordern und seine Verbindung vor Firmware-Vorgängen erneut erkennen."
+title: "deviceUpdateReboot"
+---
+
+# deviceUpdateReboot
+
+## Gerät neu starten [#reboot-device]
+
+Bootloader-Modus auf **Protocol V1**-Geräten als Teil eines ausdrücklichen Firmware-Update-Ablaufs anfordern. Diese Methode deklariert keine Protocol-V2-Unterstützung; verwenden Sie den [Protocol-V2-Firmware-Update-Ablauf](/de/hardware-sdk/device-api/firmwareupdatev4) für Pro 2 und Neo.
+
+Das Gerät kann die Verbindung trennen und unter einer anderen Verbindungs-ID erneut erscheinen. Erkennen Sie es erneut und prüfen Sie seinen Zustand, bevor Sie fortfahren.
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## Parameter [#params]
+
+* leer
+
+## Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## Ergebnis [#result]
+
+Ein erfolgreiches SDK-Ergebnis bestätigt die Anfrage. Leiten Sie den neuen Modus nicht aus einem fest codierten Nutzlastformat ab; lesen Sie den Gerätestatus nach der Wiederverbindung erneut.
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,29 @@
+---
+title: "getNetwork"
+---
+
+# getNetwork
+
+現在のアカウントのネットワークを取得
+
+## メソッド [#method]
+
+```typescript
+declare function getNetwork(): Promise<string>;
+```
+
+## レスポンス [#response]
+
+ネットワーク。 `livenet` および `testnet`
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const network = await provider.getNetwork()
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/xxMaLqz)

@@ -1,0 +1,143 @@
+---
+description: "順序を保ったチャンク処理、書き込み容量、SDK が管理するプロトコルフレーミングを備えたネイティブ BLE プラグインを実装します。"
+title: "低レベルのトランスポートプラグイン"
+---
+
+<span id="low-level-transport-plugin" />
+
+# 低レベルのトランスポートプラグイン
+
+> WebUSB / React Native BLE / 公式ネイティブアダプターで要件を満たせない場合にのみ使用してください。ネイティブ BLE のライフサイクルと順序付き I/O を自分で管理するため、保守コストが高くなります。
+
+> **注記:** `lowlevel` 環境と `LowlevelTransportSharedPlugin` は **BLE (Bluetooth)** 通信専用です。Node.js/CLI 環境で **USB** 通信を行う場合は、`NodeUsbTransport` (環境 `node-usb`) を使用してください。プラグインを介さず、libusb を通じてプロトコルのエンコードと USB I/O を直接処理します。
+
+Bluetooth SDK は React Native で開発されています。アプリケーションでは React Native を使わず、Swift、Kotlin、Flutter などを使っているかもしれません。その場合、プロジェクトに React Native の依存関係を追加することが適切とは限りません。
+
+LowlevelTransportSharedPlugin でハードウェアと通信できる新しい方法を提供しています。任意の技術スタックを使用できます。デバイスの接続、切断、データの送受信のプロトコルを実装する必要があります。
+
+## クイックリファレンス [#quick-reference]
+
+### OneKey BLE の UUID [#onekey-ble-uuids]
+
+| 目的 | UUID |
+|---------|------|
+| サービス | `00000001-0000-1000-8000-00805f9b34fb` |
+| 書き込み特性 | `00000002-0000-1000-8000-00805f9b34fb` |
+| 通知特性 | `00000003-0000-1000-8000-00805f9b34fb` |
+
+### Protocol V1 BLE ヘッダーデータの例 [#protocol-v1-ble-header-data-example]
+
+以下のヘッダーは Protocol V1 固有です。Protocol V2 の通知の解析に使わないでください。
+
+```
+Raw data: 3F 23 23 00 02 00 00 00 0A 12 08 ...
+          │  │  │  │  │  │        │  └─ Protobuf payload starts
+          │  │  │  │  │  └────────┴─ Payload length: 0x0000000A = 10 bytes
+          │  │  │  └──┴─ Message type: 0x0002
+          └──┴──┴─ Magic: 0x3F 0x23 0x23 (fixed identifier)
+```
+
+ヘッダーパケットの検出: **先頭の 3 バイトは `3F 23 23`**
+
+ネイティブの例 (すべて低レベルトランスポートプラグインを使用):
+
+- [Android ネイティブ](/ja/hardware-sdk/transport/android) — WebView + JSBridge + Nordic BLE
+- [iOS ネイティブ](/ja/hardware-sdk/transport/ios) — WebView + JSBridge + CoreBluetooth
+- [Flutter ネイティブ](/ja/hardware-sdk/transport/flutter) — WebView + プラットフォームチャネル + BLE
+
+## LowlevelTransportSharedPlugin インターフェース [#lowleveltransportsharedplugin-interface]
+
+```typescript
+import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
+
+export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
+export type LowlevelTransportSharedPlugin = {
+  enumerate: () => Promise<LowLevelDevice[]>;
+  send: (uuid: string, data: string, options?: { withoutResponse?: boolean }) => Promise<void>;
+  receive: (uuid?: string) => Promise<string>;
+  connect: (uuid: string) => Promise<void>;
+  disconnect: (uuid: string) => Promise<void>;
+  getProtocolV2PacketCapacity?: (uuid: string) => number | undefined | Promise<number | undefined>;
+  init: () => Promise<void>;
+  version: string;
+};
+```
+
+## WebUSB と BLE: Protocol V1 のフレーミング [#webusb-vs-ble-protocol-v1-framing]
+
+以下は Protocol V1 のトランスポートの詳細です。低レベルプラグインは BLE アダプターであり、プロトコルの検出、エンコード、再構成は SDK が担当します。
+
+| | WebUSB (デスクトップ) | BLE (ネイティブモバイル) |
+|---|---|---|
+| パケットサイズ | 固定 64 バイト | 可変 (MTU に依存) |
+| パケットのプレフィックス | `0x3F` すべてのパケットに付加 | `0x3F 0x23 0x23` ヘッダーのみに付加 |
+| パディング | 64 バイトになるようゼロ埋め | パディング不要 |
+| `receive()` の戻り値 | 1 回に 1 つの 64 バイトフレーム | 生の BLE 通知チャンク (16 進数) |
+
+---
+
+## WebUSB Protocol V1 (デスクトップ) [#webusb-protocol-v1-desktop]
+
+トランスポートは固定 64 バイトのフレームを使い、SDK がメッセージを組み立てます。
+
+> **マジックバイト:** `0x3F 0x23 0x23` はパケット境界の検出に使う固定のプロトコル識別バイトです。
+
+**最初のパケット:**
+
+| オフセット | 長さ | 内容 |
+|--------|--------|---------|
+| 0 | 3 | マジック: `0x3F 0x23 0x23` |
+| 3 | 2 | メッセージタイプ (BE uint16) |
+| 5 | 4 | ペイロード長 (BE uint32) |
+| 9 | 55 | protobuf の先頭 55 バイト (ゼロ埋め) |
+
+**後続パケット:**
+
+| オフセット | 長さ | 内容 |
+|--------|--------|---------|
+| 0 | 1 | マジック: `0x3F` |
+| 1 | 63 | protobuf の残りのバイト (ゼロ埋め) |
+
+---
+
+## BLE プロトコル (ネイティブモバイル) [#ble-protocol-native-mobile]
+
+`receive(uuid)` の各呼び出しで、キューにある変更していない BLE 通知チャンクを 1 つ、16 進数で返してください。通知の順序を保ち、読み取り待機前に届いたチャンクも保持します。プラグイン内でプロトコルヘッダーを除去したり、USB の 64 バイトパケットに合わせて埋めたり、protobuf をデコードしたりしないでください。
+
+- **プロトコル V1:** SDK は次の `3F2323` ヘッダーを認識し、ペイロード長を読み取って後続チャンクを収集します。V1 互換性のため、従来の組み立て済み `type + length + payload` メッセージも受け付けます。
+- **プロトコル V2:** SDK が生チャンクをフレームに組み立て、CRC、シーケンス、メッセージの再構成を処理します。V1 専用のヘッダー検出器や組み立て処理で、このデータを処理してはいけません。
+- `send(uuid, data, options)` は SDK が準備した 16 進数を受け取ります。バイトを順に書き込み、I/O エラーを伝播し、`withoutResponse` が指定されている場合はそれに従ってください。
+- 1 回の BLE 特性書き込みで実際に受け付ける最大バイト数を `getProtocolV2PacketCapacity` で報告してください。SDK は 192 バイトのフォールバック値を使い、V2 パケットを最大 244 バイトに制限します。オーバーヘッドを含む ATT MTU ではなく、書き込み容量を返してください。
+- 切断時は保留中の読み取りを拒否し、古い接続のキュー内通知を破棄してください。再接続後に渡してはいけません。
+
+## 初期化の例 [#initialization-example]
+
+このアダプターのコードは、上記のインターフェースを実装するネイティブブリッジに処理を委譲します。メソッドは、対応する操作が完了した後にのみ解決し、失敗した場合は拒否する必要があります。
+
+```typescript
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+
+// Implement these methods in your native BLE bridge before initialization.
+declare const nativeBle: LowlevelTransportSharedPlugin;
+
+const plugin: LowlevelTransportSharedPlugin = {
+  enumerate: () => nativeBle.enumerate(),
+  send: (uuid, data, options) => nativeBle.send(uuid, data, options),
+  receive: uuid => nativeBle.receive(uuid),
+  connect: uuid => nativeBle.connect(uuid),
+  disconnect: uuid => nativeBle.disconnect(uuid),
+  getProtocolV2PacketCapacity: uuid => nativeBle.getProtocolV2PacketCapacity?.(uuid),
+  init: () => nativeBle.init(),
+  version: nativeBle.version,
+};
+
+const result = await HardwareSDK.init({ env: 'lowlevel', debug: false }, undefined, plugin);
+if (!result) throw new Error('SDK initialization failed');
+```
+
+## 次の手順 [#next-steps]
+
+- [Android ガイド](/ja/hardware-sdk/transport/android) — ボンディング、権限、接続の完了
+- [iOS ガイド](/ja/hardware-sdk/transport/ios) — CoreBluetooth の実装
+- [Flutter ガイド](/ja/hardware-sdk/transport/flutter) — プラットフォームチャネルのブリッジ

@@ -1,0 +1,157 @@
+---
+title: "eth_signTypedData_v4"
+description: "Signer des données structurées typées (EIP-712)"
+---
+
+# eth_signTypedData_v4
+
+Signe des données structurées typées conformément à EIP-712. Le domaine et le schéma explicitent le contexte de signature ; le vérificateur doit tout de même les contrôler et assurer la protection contre le rejeu.
+
+---
+
+## Paramètres [#parameters]
+
+| Indice | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Adresse à utiliser pour signer |
+| 1 | `string` | Chaîne JSON des données typées |
+
+---
+
+## Valeur de retour [#returns]
+
+`string` - La signature (chaîne hexadécimale de 65 octets)
+
+---
+
+## Structure des données typées [#typed-data-structure]
+
+```typescript
+interface TypedData {
+  types: {
+    EIP712Domain: Array<{ name: string; type: string }>
+    [typeName: string]: Array<{ name: string; type: string }>
+  }
+  primaryType: string
+  domain: {
+    name?: string
+    version?: string
+    chainId?: number
+    verifyingContract?: string
+    salt?: string
+  }
+  message: Record<string, any>
+}
+```
+
+---
+
+## Exemple [#example]
+
+```typescript
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' }
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' }
+    ]
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'My dApp',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
+  },
+  message: {
+    from: {
+      name: 'Alice',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+    },
+    contents: 'Hello, Bob!'
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(typedData)]
+})
+
+console.log('Signature:', signature)
+```
+
+### Signature Permit (ERC-2612) [#permit-signature-erc-2612]
+
+```typescript
+const permitData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Permit: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' }
+    ]
+  },
+  primaryType: 'Permit',
+  domain: {
+    name: 'USD Coin',
+    version: '2',
+    chainId: 1,
+    verifyingContract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+  },
+  message: {
+    owner: accounts[0],
+    spender: '0xSpenderAddress...',
+    value: '1000000000', // 1000 USDC
+    nonce: tokenNonce, // Read the current permit nonce for this owner.
+    deadline: Math.floor(Date.now() / 1000) + 3600
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(permitData)]
+})
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | L’utilisateur a rejeté la demande | L’utilisateur a refusé la demande de signature |
+| -32602 | Paramètres non valides | Structure de données typées non valide |
+
+---
+
+## Remarques [#notes]
+
+- Les données typées doivent être une chaîne JSON valide
+- `chainId` dans le domaine doit correspondre à la chaîne connectée
+- L’utilisateur verra une représentation lisible des données
+- Défini par [EIP-712](https://eips.ethereum.org/EIPS/eip-712)
+
+L’exemple permit nécessite le domaine EIP-712 réel du contrat de jeton, le nonce actuel, le bénéficiaire autorisé prévu, le montant et l’échéance. Remplacez les valeurs fictives et récupérez `tokenNonce` avant de demander la signature.

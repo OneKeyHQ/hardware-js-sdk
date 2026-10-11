@@ -1,0 +1,45 @@
+---
+title: "CryptoKeypath"
+---
+
+# CryptoKeypath
+
+La clase `CryptoKeypath` representa una ruta de clave criptográfica (ruta de derivación BIP-44).
+
+## Parámetros [#parameters]
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `components` | `PathComponent[]` | Matriz de componentes de la ruta (predeterminada: vacía) |
+| `sourceFingerprint` | `Buffer` | La huella digital de origen (opcional) |
+| `depth` | `number` | La profundidad (opcional) |
+
+## PathComponent [#pathcomponent]
+
+La clase `PathComponent` representa un componente individual de una ruta de clave.
+
+### Parámetros [#parameters-1]
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `index` | `number` | El índice del componente (opcional) |
+| `hardened` | `boolean` | Si usa derivación reforzada |
+
+## Ejemplo [#example]
+
+```ts
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+
+// BIP44: m/44'/60'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 60, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+```
+
+## Tipo UR [#ur-type]
+
+El tipo UR es `crypto-keypath`. Genera el payload codificado con el codificador del registro.

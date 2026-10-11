@@ -1,0 +1,63 @@
+---
+title: "makeInvoice"
+---
+
+# makeInvoice
+
+Web アプリで使用するインボイスの作成をユーザーに要求します。次の [BOLT-11](https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding.md) インボイスを返します。インボイスはいくつかの形式で要求できます:
+
+* `amount` を明示的に指定すると、ユーザーのプロバイダーは指定金額のインボイスのみ作成できるようにする必要があります。
+* `minimumAmount` および/または `maximumAmount` を指定すると、ユーザーのプロバイダーは金額フィールドをその範囲内に制限する必要があります。
+* `amount` を明示的に指定しない場合、ユーザーは指定された範囲内で金額を選択できます。
+
+金額の単位は satoshi です。JavaScript の数値が整数を正確に表現できるのは次までです: `Number.MAX_SAFE_INTEGER` (`2^53 - 1`)。この範囲を超える値は 10 進数文字列を使用してください。API は文字列と数値の両方を受け付けます。
+
+## メソッド [#method]
+
+```typescript
+declare function makeInvoice(args: RequestInvoiceArgs): Promise<RequestInvoiceResponse>;
+```
+
+## パラメーター [#params]
+
+* `args` — _必須_ `object`
+  * `amount` — _任意_ `string|number`  送信する satoshi の数量
+  * `defaultAmount` — _任意_ `string|number`
+  * `minimumAmount` — _任意_ `string|number`
+  * `maximumAmount` — _任意_ `string|number`
+  * `defaultMemo` — _任意_ `string`
+
+```typescript
+interface RequestInvoiceArgs {
+  amount?: string | number; // unit is sats
+  defaultAmount?: string | number; // unit is sats
+  minimumAmount?: string | number; // unit is sats
+  maximumAmount?: string | number; // unit is sats
+  defaultMemo?: string;
+}
+```
+
+## レスポンス [#response]
+
+```typescript
+interface RequestInvoiceResponse {
+  paymentRequest: string;
+  paymentHash: string;
+  rHash: string;
+}
+```
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const invoice = await provider.makeInvoice({
+  amount: 1000,
+});
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/ZEwMKvw)

@@ -1,0 +1,100 @@
+---
+description: "接続 ID、物理シリアル番号、シード識別情報、隠しウォレットのフィンガープリント、内部セッションを区別します。"
+title: "識別子"
+---
+
+<span id="identifiers" />
+
+# 識別子
+
+`connectId` でリクエストをルーティングし、 `deviceId` でデバイスの現在のシードに関連付け、 `passphraseState` で隠しウォレットに関連付けます。これらの値は相互に置き換えられません。
+
+## 識別子のリファレンス [#identifier-reference]
+
+| フィールド | 目的 | 取得場所 | 使用方法 |
+| --- | --- | --- | --- |
+| `connectId` | トランスポートのルーティングキー | 成功した `searchDevices().payload` エントリー | デバイスおよびウォレットメソッドの第 1 引数。再接続後は再列挙してください。 |
+| `serialNo` | 取得可能な場合の物理ハードウェア識別情報 | 初期化後の検出結果; `getDeviceState().payload.identity.serialNo` | USB/BLE に依存せず機器を表示・照合します。ルーティングキーには使わないでください。 |
+| `deviceId` | 現在のシードの存続期間に対応する識別情報 | `getDeviceState().payload.identity.deviceId`; 成功した `openWalletSession` | ウォレットメソッドの第 2 引数。リセット、復元、異なるウォレットを検出します。 |
+| `passphraseState` | 隠しウォレットのフィンガープリント | 成功した隠しウォレットの `openWalletSession` 結果 | その隠しウォレットのアドレス取得/署名リクエストに毎回渡します。`deviceId` とともに永続化します。 |
+| `uuid` | 非推奨の互換識別子 | 一部のデバイス/検索結果 | ハードウェアの識別には `serialNo`、ルーティングには `connectId` を優先してください。初期化前は空の場合があります。 |
+| ファームウェア `session_id` | 内部のロック解除ハンドル | SDK Core 内で管理 | 読み取り、ログ記録、永続化、公開 API 呼び出しへの送信を行わないでください。 |
+| `name`, `label`, `deviceType` | 表示と機能に関する情報 | 検出/デバイス状態 | 一意の識別子ではなく、プロトコルやウォレットの識別情報の証拠にもなりません。 |
+
+## `connectId` — ルーティングキー [#connectid--the-routing-key]
+
+<div id="connectid" />
+
+同じ物理機器でも USB 接続と BLE 接続では異なる `connectId` 値を使います。接続情報はトランスポートごとに分けて保持してください。接続 ID が物理シリアル番号であるとは限りません。USB 記述子は、ハードウェア識別情報の取得前にルーティングパスを提供する場合があります。
+
+この値の内部構造は解釈しないでください。BLE の形式はホストプラットフォームによって異なります (Android のアドレスや iOS の peripheral UUID など)。別のトランスポートの形式へ変換したり、デバイスの真正性の証拠にしたりしてはいけません。
+
+`searchDevices` は `connectId: null` を返す場合があります。デバイスを呼び出す前に、有効な接続 ID を持つ候補を選択してください。
+
+## `deviceId` — ウォレット識別情報の確認 [#deviceid--the-wallet-identity-check]
+
+```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+同じシードの標準ウォレットと隠しウォレットは、シードの存続期間に対応する同じ `deviceId` を共有します。隠しウォレットには、さらに `passphraseState` が必要です。
+
+`DeviceCheckDeviceIdError` が発生した場合は、操作を停止してデバイス状態を更新してください。既存の関連付けを更新する前に、目的のウォレットをユーザーに確認します。キャッシュされた ID を黙って置き換えると、後のリクエストが別のウォレットに送られるおそれがあります。
+
+### `device_id` と `deviceId` [#device_id-versus-deviceid]
+
+`device_id` は Protocol V1 の従来のフィールドで、`getFeatures()` の結果に含まれます。新しいコードでは、両方のプロトコルファミリーに対応する `getDeviceState()` から、正規化された `identity.deviceId` を読み取ってください。初期化前の検出では `deviceId: null` が返る場合があります。
+
+## 隠しウォレットの関連付け [#hidden-wallet-binding]
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
+  throw new Error('A hidden wallet was not opened');
+}
+
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: opened.payload.passphraseState,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+関連付けはレスポンスの成功後にのみ永続化してください。ウォレット関連のアプリケーションデータとして保護し、パスフレーズ自体やファームウェアのセッションハンドルは永続化してはいけません。
+
+`passphraseState` を省略すると、呼び出しは目的の隠しウォレットに関連付けられません。隠しウォレットには検証済みのフィンガープリント、標準ウォレットには `useEmptyPassphrase: true` を使用し、両方を併用してはいけません。
+
+関連付けの不一致が発生した場合は停止し、ユーザーに目的のウォレットを再選択してもらってください。関連付けを上書きして署名リクエストを自動再実行してはいけません。
+
+## メソッドシグネチャ [#method-signatures]
+
+| パターン | 例 |
+| --- | --- |
+| SDK ライフサイクル。接続引数なし | `init`, `searchDevices`, `on`/`off`, `dispose` |
+| デバイスまたはウォレットの選択、 `connectId` | `getDeviceState`, `openWalletSession`, `deviceSettings`, `deviceVerify` |
+| ウォレット操作、 `connectId` + `deviceId` | `evmGetAddress`, `btcSignTransaction`, `solSignTransaction` |
+| 隠しウォレット操作 | ウォレット操作のパラメーターに `passphraseState` を追加 |
+
+互換性のため識別子の省略を許すメソッドもあります。各メソッドの公開シグネチャに従い、複数デバイスを扱うアプリケーションでは対象を明示してください。UI 応答の関連付けには別のリクエスト識別情報を使用します。イベントから `responseCorrelation` をコピーしてください。詳細は [UI イベント](/ja/hardware-sdk/core-api-guide#events-ui)を参照してください。
+
+## 関連項目 [#related]
+
+- [デバイスを検索](/ja/hardware-sdk/basic-api/search-devices)
+- [デバイス状態を取得](/ja/hardware-sdk/basic-api/get-device-state)
+- [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)
+- [共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+- [再接続と破棄](/ja/hardware-sdk/transport/reconnect)

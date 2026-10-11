@@ -1,0 +1,67 @@
+---
+title: "Signature de données"
+---
+
+<span id="signing-data" />
+
+# Signature de données
+
+Utilisez `personal_sign` pour un message lisible ou `eth_signTypedData_v4` pour des données structurées décrites par [EIP-712](https://eips.ethereum.org/EIPS/eip-712). Demandez des signatures après connexion d’un compte et expliquez ce que l’utilisateur autorise avant d’ouvrir la demande du portefeuille.
+
+## Messages personnels [#personal-messages]
+
+`personal_sign` accepte d’abord le message encodé en hexadécimal, puis l’adresse du signataire. La valeur renvoyée est une chaîne de signature. Une demande de signature ne soumet pas de transaction et ne paie pas de frais réseau.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [address] = await provider.request({ method: 'eth_requestAccounts' });
+const message = 'Sign in to example.com. Nonce: <SERVER_GENERATED_NONCE>';
+const bytes = new TextEncoder().encode(message);
+const data = '0x' + Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+try {
+  const signature = await provider.request({
+    method: 'personal_sign',
+    params: [data, address],
+  });
+  // Verify the signature and one-time challenge on your server.
+  console.log(signature);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Pour la connexion, remplacez la valeur fictive par un défi à usage unique généré par le serveur et validez le domaine prévu, l’expiration et le signataire. Ne considérez jamais la simple présence d’une signature comme une authentification sans vérification.
+
+## Données typées v4 [#typed-data-v4]
+
+Appelez `eth_signTypedData_v4` avec `[address, JSON.stringify(typedData)]`. L’objet `typedData` contient `types`, `primaryType`, `domain`, et `message`. Chaque champ du message doit correspondre à son type déclaré.
+
+| Champ du domaine | Rôle |
+| --- | --- |
+| `name` | Nom lisible de l’application ou du protocole |
+| `version` | Version du domaine de signature |
+| `chainId` | Chaîne à laquelle la signature est destinée |
+| `verifyingContract` | Adresse du contrat qui vérifie la signature ; il s’agit d’une adresse, pas d’une URL |
+| `salt` | Séparateur de domaine facultatif lorsque le protocole l’exige |
+
+La séparation des domaines aide à distinguer les contextes de signature. L’application ou le contrat vérificateur doit tout de même valider le domaine et appliquer sa propre protection contre le rejeu ; EIP-712 ne fournit pas cette protection à lui seul.
+
+```javascript
+// `typedData` must be built from your protocol's complete EIP-712 schema.
+const signature = await provider.request({
+  method: 'eth_signTypedData_v4',
+  params: [address, JSON.stringify(typedData)],
+});
+```
+
+## Méthodes de signature historiques [#legacy-signing-methods]
+
+Les intégrations existantes peuvent utiliser `eth_signTypedData` ou `eth_signTypedData_v3`. Leurs encodages diffèrent de v4 ; changer la méthode RPC nécessite aussi de modifier et de tester le vérificateur. Les noms des méthodes RPC incluent le préfixe `eth_`.
+
+Évitez `eth_sign` pour la connexion aux applications. Cette méthode signe des données opaques et peut rendre l’intention de l’utilisateur difficile à vérifier. La prise en charge des méthodes peut varier selon le type de compte, le modèle matériel, le micrologiciel et la version du portefeuille ; gérez les erreurs de méthode non prise en charge au lieu de supposer que chaque compte connecté peut signer tous les formats.
+
+## Exemple [#example]
+
+[Ouvrir l’exemple](https://codesandbox.io/embed/ethereum-provider-signdata-demo-67nn3q?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

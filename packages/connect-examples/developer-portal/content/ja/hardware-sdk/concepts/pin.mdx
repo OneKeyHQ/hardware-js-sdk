@@ -1,0 +1,69 @@
+---
+description: "デバイス上の PIN 通知を処理し、PIN の値を公開せずにホストのブラインド PIN 入力を完了します。"
+title: "PIN"
+---
+
+# PIN
+
+推奨 UX に沿って OneKey デバイスの PIN 入力を処理する方法。
+
+## 基本事項 [#essentials]
+
+- デバイスがロックされている場合、保護された呼び出しは `UI_REQUEST.REQUEST_PIN` を発生させます。
+- Pro/Touch/Pro 2/Neo はデバイス上での PIN 入力が必須です。他のモデルでは `inputPinOnSoftware.support` を確認してください。ホストのブラインド PIN 対応はファームウェアによります。利用可能ならデバイス入力を優先してください。
+- `UI_REQUEST.CLOSE_UI_PIN_WINDOW` / `CLOSE_UI_WINDOW` を受信したとき、または元の操作が完了したときにプロンプトを閉じます。保留中の送信コールバックを無効にしてください。
+
+## 対応表 (ソフトウェアのブラインド PIN) [#support-matrix-software-blind-pin]
+
+| デバイス | ソフトウェアのブラインド PIN | デバイスのみの入力 |
+| --- | --- | --- |
+| OneKey Classic / 1s / 1s Pure / Mini | ファームウェアに依存。次を確認: `inputPinOnSoftware.support` | ホスト入力フローでデバイス入力を選べる場合があります |
+| OneKey Touch | 未対応 | はい |
+| OneKey Pro | 未対応 | はい |
+| OneKey Pro 2 / Neo | 未対応 | はい |
+
+## UI 設計の注意事項 [#ui-design-notes]
+
+- 現在のデバイス、ファームウェア、UI リクエストが対応する入力方法のみを提示します。両方使える場合は、1 つのダイアログで **デバイスで入力** をデフォルトにし、 **ここで入力 (ブラインド PIN)** を別の選択肢として用意します。
+- ブラインド PIN キーパッドは固定の 3x3 配列です。実際の数字は決して表示しないでください。
+
+### ブラインド PIN の対応関係の例 [#blind-pin-mapping-example]
+
+```ts
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Completed sequence of host keypad positions, numbered 1..9.
+declare const selectedPositions: number[];
+// Copy this from the current REQUEST_PIN event.
+declare const responseCorrelation: { interactionId: string; deviceId: string } | undefined;
+const BLIND_KEYBOARD_MAP = ['7','8','9','4','5','6','1','2','3'];
+if (!selectedPositions.length || selectedPositions.some(position =>
+  !Number.isInteger(position) || position < 1 || position > 9
+)) throw new Error('Invalid PIN keypad sequence');
+
+HardwareSDK.uiResponse({
+  ...responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: selectedPositions.map(position => BLIND_KEYBOARD_MAP[position - 1]).join(''),
+});
+```
+
+## イベントと応答の対応 [#events-to-responses]
+
+```ts
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (msg.type === UI_REQUEST.REQUEST_PIN) {
+    if (msg.payload.deviceOnly || msg.payload.type === 'ButtonRequest_PinEntry' || msg.payload.type === 'ButtonRequest_AttachPin') {
+      // Show the device prompt and wait; this notification does not need a reply.
+      return;
+    }
+    HardwareSDK.uiResponse({
+      ...msg.payload.responseCorrelation,
+      type: UI_RESPONSE.RECEIVE_PIN,
+      payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+    });
+  }
+});
+```

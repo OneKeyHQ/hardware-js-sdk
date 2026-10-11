@@ -1,0 +1,49 @@
+---
+title: "Ethereum & EVM"
+---
+
+# Ethereum & EVM
+
+Unterstützung für Air-Gap-Signieren auf Ethereum und EVM-kompatiblen Chains.
+
+## Kontoeinrichtung [#account-setup]
+
+Um ein ETH-Konto zu erhalten, verwenden Sie [CryptoHDKey](../basic-api/cryptohdkey), um den erweiterten öffentlichen Schlüssel vom Gerät abzurufen.
+
+## Unterstützte Vorgänge [#supported-operations]
+
+| Vorgang | DataType | Beschreibung |
+|-----------|----------|-------------|
+| EIP-1559-Transaktion | `typedTransaction (4)` | Modernes Transaktionsformat |
+| Legacy-Transaktion | `transaction (1)` | Klassisches Transaktionsformat |
+| EIP-712-TypedData | `typedData (2)` | Signieren strukturierter Daten |
+| Persönliche Nachricht | `personalMessage (3)` | Signieren von Nachrichten |
+
+## Ablauf [#flow]
+
+1. Signieranfrage erstellen mit [EthSignRequest](./ethsignrequest)
+2. Als UR kodieren und als animierten QR-Code anzeigen
+3. Das Gerät scannt, prüft und signiert offline
+4. Antwort dekodieren mit [EthSignature](./ethsignature)
+5. Die Anfrage-ID der Antwort abgleichen, den Signierenden prüfen, dann die Signatur an die ursprüngliche Transaktion anhängen und diese übertragen
+
+## Kurzes Beispiel [#quick-example]
+
+```ts
+import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
+
+const eth = new KeystoneEthereumSDK();
+
+// Generate sign request
+const ur = eth.generateSignRequest({
+  requestId: globalThis.crypto.randomUUID(),
+  signData: unsignedTxHex,    // hex without 0x
+  dataType: 4,                // EIP-1559
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+
+// Encode and display QR
+```

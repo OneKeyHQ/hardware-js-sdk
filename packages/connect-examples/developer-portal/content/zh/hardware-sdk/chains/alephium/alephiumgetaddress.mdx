@@ -6,12 +6,12 @@ title: alephiumGetAddress
 
 ### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.10.0
 
 ### Alephium：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 ```typescript
 const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
@@ -28,10 +28,10 @@ const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
 
 **导出单个地址**
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 3
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。
 * `group` - _必需_ `number | undefined | null`。传 `undefined` 使用组 0，传 `null` 不指定目标组。
 * `includePublicKey` - _可选_ `boolean` 返回 `pub` 及其 `publicKey` 别名，默认 `false`。
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示地址，默认为 `true`。
 
 **导出批量地址**
 
@@ -40,14 +40,14 @@ const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
 #### 示例
 
 ```typescript
-// 获取单个地址
+// Get single address
 const response = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
     path: "m/44'/1234'/0'/0/0",
     showOnOneKey: true,
     group: undefined
 });
 
-// 获取多个地址
+// Get multiple addresses
 const batchResponse = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
     bundle: [
         {
@@ -66,29 +66,30 @@ const batchResponse = await HardwareSDK.alephiumGetAddress(connectId, deviceId, 
 
 **返回结果**
 
-仅返回一个地址的结果
+单个地址响应
 
 ```typescript
 {
     success: true,
     payload: {
-        address: string,     // 显示的地址
+        address: string,     // displayed address
         derivedPath: string,
+        pub?: string,
         publicKey?: string,
-        path: string // 序列化 BIP32 路径
+        path: string // serialized BIP32 path
     }
 }
 ```
 
-返回批量地址的结果（按 FIFO 排序）
+批量响应，顺序与请求一致
 
 ```typescript
 {
     success: true,
     payload: [
-        { address: string, derivedPath: string, publicKey?: string, path: string }, // 账户 1
-        { address: string, derivedPath: string, publicKey?: string, path: string }, // 账户 2
-        { address: string, derivedPath: string, publicKey?: string, path: string }  // 账户 3
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }, // account 1
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }, // account 2
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }  // account 3
     ]
 }
 ```
@@ -99,8 +100,8 @@ const batchResponse = await HardwareSDK.alephiumGetAddress(connectId, deviceId, 
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

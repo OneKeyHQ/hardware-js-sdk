@@ -1,0 +1,32 @@
+---
+title: "ネイティブ BLE"
+description: "共通 Hardware SDK API を維持し、Android、iOS、Flutter 用のネイティブ BLE ブリッジを選択します。"
+---
+
+<span id="native-ble" />
+
+# ネイティブ BLE
+
+ネイティブモバイル環境で `@onekeyfe/hd-common-connect-sdk` を使い、ハードウェアのトランスポート呼び出しを BLE 経由で転送します。SDK の JavaScript は WebView または JS エンジンで実行し、ネイティブ Bluetooth 通信はホストアプリで行います。
+
+## ネイティブ BLE を選ぶ場面 [#when-to-choose-native-ble]
+
+- ネイティブアプリ全体 (Android、iOS、Flutter) を制御でき、`send`/`receive` を BLE 経由で転送する WebView または JS 実行環境を用意できる場合。
+- OS レベルの BLE 権限やペアリングフローを細かく制御したい場合、または React Native より Swift/Kotlin や Flutter で作りやすい独自 UI が必要な場合。
+- `@onekeyfe/hd-common-connect-sdk` を再利用して JavaScript API を維持し、ネイティブ BLE スタックは自分で管理したい場合。
+
+## プラットフォーム別ガイド [#platform-guides]
+
+| プラットフォーム | 主な内容 | ガイド |
+| --- | --- | --- |
+| Android | Nordic BLE ブリッジ、ペアリング、権限、JS ブリッジの接続 | [Android (ネイティブ)](/ja/hardware-sdk/transport/android) |
+| iOS | CoreBluetooth の設定、ペアリングヘルパー、JS イベントの接続 | [iOS (ネイティブ)](/ja/hardware-sdk/transport/ios) |
+| Flutter | Flutter プラグインの接続 + ネイティブホストブリッジの例 | [Flutter (ネイティブ)](/ja/hardware-sdk/transport/flutter) |
+
+クロスプラットフォームの React Native が必要な場合は、次の [React Native BLE](/ja/hardware-sdk/transport/react-native-ble) ガイドを使用してください。
+
+## 基本概念 [#core-concepts]
+
+- ネイティブ BLE を接続する前に、[低レベルトランスポートプラグインとプロトコル](/ja/hardware-sdk/concepts/low-level-plugin)を読み、生 BLE 通知の転送と SDK が担う V1/V2 フレーミングを理解してください。
+- 早い段階で `UI_EVENT` を購読し、PIN/パスフレーズの確認やプロンプトでリクエストキューが停止しないようにします。
+- Web ガイドと同じ `HardwareSDK` アダプターを再利用します。ネイティブコードは WebUSB の代わりに BLE パケットを転送するだけです。

@@ -1,0 +1,69 @@
+---
+description: "非推奨の隠しウォレットのフィンガープリント API を理解し、openWalletSession に移行します。"
+title: "パスフレーズ状態を取得"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="get-passphrase-state" />
+
+# パスフレーズ状態を取得
+
+<Callout type="warning">
+  **非推奨。** Protocol V1 と V2 には [`openWalletSession`](/ja/hardware-sdk/basic-api/open-wallet-session) を使用してください。このメソッドは既存のアプリでは引き続き動作します。
+</Callout>
+
+## デバイスの passphraseState を取得 [#get-the-passphrasestate-of-the-device]
+
+ユーザーにパスフレーズ入力を求め (デバイス上またはソフトウェア経由)、公開の隠しウォレットフィンガープリントを `passphraseState` 文字列として返します。`deviceId + passphraseState` を永続化してください。ファームウェアの `session_id` は永続化しないでください。
+
+参照: [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session).
+
+以降のアドレス取得 / 署名呼び出しに `passphraseState` を渡し、同じ隠しウォレットを維持します。これは**ウォレットのフィンガープリント**であり、ファームウェアの `session_id` ではありません。`session_id` を永続化しないでください。
+
+```
+  getPassphraseState(connectId)   ← user enters passphrase once
+    → passphraseState = "<fingerprint>"
+
+  evmGetAddress(..., { passphraseState })
+  btcGetAddress(..., { passphraseState })
+```
+
+> **エラー 112 (パスフレーズ状態の不一致)**: 現在ロック解除されているウォレットと関連付けが一致しません (デバイスのロック、シードの変更、古いフィンガープリントなど)。操作を停止し、`openWalletSession` で目的のウォレットを再選択してもらってください。新しいリクエストの前に復元した関連付けを確認してください。チェックを省略したり、署名を自動再実行したりしないでください。
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 例 [#example]
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+結果
+
+```
+{
+    success: true,
+    payload: string | null | undefined
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+隠しウォレットのフィンガープリントは空でない文字列です。互換フローでは次が返る場合があります: `undefined` V1 で保護が無効な場合、または `null` 標準の V2 ウォレットの場合です。これらを隠しウォレットの関連付けとして永続化しないでください。

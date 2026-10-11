@@ -4,29 +4,26 @@ title: getPublicKey
 
 # getPublicKey
 
-Get publicKey of current account.
+Get the public key of the current account.
 
-### Method
-
-```typescript
-async function getPublicKey(): string
-```
-
-### Params
-
-the publicKey.
-
-### Example
+## Method
 
 ```typescript
-const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
-
-const publicKey = async provider.getPublicKey();
-
+declare function getPublicKey(): Promise<string>;
 ```
 
-### Demo
+## Response
 
+The public key as a string.
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/jOdvLLy" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+## Example
 
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const publicKey = await provider.getPublicKey();
+```
+
+## Demo
+
+[Open example](https://codepen.io/OneKeyHQ/pen/jOdvLLy)

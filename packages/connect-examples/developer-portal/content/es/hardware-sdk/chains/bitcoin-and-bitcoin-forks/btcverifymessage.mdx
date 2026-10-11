@@ -1,0 +1,56 @@
+---
+title: "btcVerifyMessage"
+---
+
+# btcVerifyMessage
+
+## Bitcoin: verificar un mensaje [#bitcoin-verify-message]
+
+Verifica un mensaje usando la dirección del firmante y la firma.
+
+```typescript
+const result = await HardwareSDK.btcVerifyMessage(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `address` - _obligatorio_ `string` dirección del firmante,
+* `messageHex` - _obligatorio_ `string` mensaje firmado en hexadecimal,
+* `signature` - _obligatorio_ `string` firma en formato base64,
+* `coin` - _obligatorio_ `string` Determina la definición de red especificada en el archivo coins.json. Puede usarse `shortcut`, `name` o `label` de la moneda.
+
+### Ejemplo [#example]
+
+```typescript
+HardwareSDK.btcVerifyMessage(connectId, deviceId, {
+    address: "3BD8TL6iShVzizQzvo789SuynEKGpLTms9",
+    messageHex: "6578616d706c65206d657373616765",
+    signature: "JO7vL3tOB1qQyfSeIVLvdEw9G1tCvL+lNj78XDAVM4t6UptADs3kXDTO2+2ZeEOLFL4/+wm+BBdSpo3kb3Cnsas=",
+    coin: "btc"
+});
+```
+
+### Resultado [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,45 @@
+---
+title: "CryptoKeypath"
+---
+
+# CryptoKeypath
+
+Die Klasse `CryptoKeypath` stellt einen kryptografischen Schlüsselpfad dar (BIP-44-Ableitungspfad).
+
+## Parameter [#parameters]
+
+| Parameter | Typ | Beschreibung |
+|-----------|------|-------------|
+| `components` | `PathComponent[]` | Array von Pfadkomponenten (Standard: leer) |
+| `sourceFingerprint` | `Buffer` | Der Quellfingerabdruck (optional) |
+| `depth` | `number` | Die Tiefe (optional) |
+
+## PathComponent [#pathcomponent]
+
+Die Klasse `PathComponent` stellt eine einzelne Komponente in einem Schlüsselpfad dar.
+
+### Parameter [#parameters-1]
+
+| Parameter | Typ | Beschreibung |
+|-----------|------|-------------|
+| `index` | `number` | Der Komponentenindex (optional) |
+| `hardened` | `boolean` | Ob die Ableitung gehärtet ist |
+
+## Beispiel [#example]
+
+```ts
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+
+// BIP44: m/44'/60'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 60, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+```
+
+## UR-Typ [#ur-type]
+
+Der UR-Typ ist `crypto-keypath`. Erzeugen Sie die kodierte Nutzlast mit dem Registry-Encoder.

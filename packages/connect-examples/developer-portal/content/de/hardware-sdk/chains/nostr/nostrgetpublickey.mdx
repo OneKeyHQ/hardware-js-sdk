@@ -1,0 +1,98 @@
+---
+title: "nostrGetPublicKey"
+---
+
+# nostrGetPublicKey
+
+### Voraussetzungen [#requirements]
+
+* Vom SDK geforderte Mindest-Firmware-Versionen
+  * Touch / Pro (`model_touch`): 4.7.0
+  * Classic / Classic1s / Classic Pure / Mini (`model_mini`): 3.6.0
+
+## Nostr: publicKey abrufen [#nostr-get-publickey]
+
+Gibt den aus dem angegebenen Pfad abgeleiteten öffentlichen Schlüssel zurück. Verwenden Sie `showOnOneKey`, um eine Bestätigung auf dem Gerät anzufordern.
+
+```typescript
+const result = await HardwareSDK.nostrGetPublicKey(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Einzelner öffentlicher Schlüssel [#single-public-key]
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `1`. [Mehr erfahren](/de/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _optional_ `boolean` Ob der öffentliche Schlüssel auf dem Gerät angezeigt werden soll. Standard ist `true`.
+
+#### Mehrere öffentliche Schlüssel [#multiple-public-keys]
+
+* `bundle` - Array von Objekten mit `path`, `showOnOneKey`-Feldern
+
+### Beispiel [#example]
+
+Öffentlichen Schlüssel des ersten Nostr-Schlüssels zurückgeben:
+
+```typescript
+HardwareSDK.nostrGetPublicKey(connectId, deviceId, {
+    path: "m/44'/1237'/0'/0/0",
+    showOnOneKey: true,
+});
+```
+
+Ein Bündel öffentlicher Schlüssel mehrerer Nostr-Schlüssel zurückgeben:
+
+```typescript
+HardwareSDK.nostrGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/1237'/0'/0/0" }, // account 1
+        { path: "m/44'/1237'/0'" }, // account 2
+        { path: "m/44'/1237'/0'/0/1" }  // account 3
+    ]
+});
+```
+
+### Ergebnis [#result]
+
+Antwort für einen einzelnen öffentlichen Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        pub?: string, // public key in hexadecimal
+        publickey?: string, // legacy runtime alias
+        npub?: string,        // npub
+    }
+}
+```
+
+Batch-Antwort für öffentliche Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, pub, publickey, npub }, // account 1
+        { path, pub, publickey, npub }, // account 2
+        { path, pub, publickey, npub }, // account 3
+    ]
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Verwenden Sie `pub` für den öffentlichen Schlüssel. Die Laufzeit gibt außerdem den älteren `publickey`-Alias zurück; die optionale Schreibweise `publicKey` in der aktuellen Deklaration beschreibt diesen Alias nicht.

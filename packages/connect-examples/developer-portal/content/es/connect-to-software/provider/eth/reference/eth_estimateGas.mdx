@@ -1,0 +1,110 @@
+---
+title: "eth_estimateGas"
+description: "Estimar el gas necesario para una transacción"
+---
+
+# eth_estimateGas
+
+Genera y devuelve una estimación del gas necesario para completar la transacción. La transacción no se añade a la cadena de bloques.
+
+---
+
+## Parámetros [#parameters]
+
+| Índice | Tipo | Descripción |
+|-------|------|-------------|
+| 0 | `object` | Objeto de transacción |
+| 1 | `string` | Número o etiqueta de bloque (opcional) |
+
+### Objeto de transacción [#transaction-object]
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|----------|-------------|
+| `from` | `string` | No | Dirección del remitente |
+| `to` | `string` | No | Dirección del destinatario |
+| `data` | `string` | No | Datos de la llamada al contrato |
+| `value` | `string` | No | Valor en wei (hexadecimal) |
+| `gas` | `string` | No | Límite de gas (hexadecimal) |
+| `gasPrice` | `string` | No | Precio del gas (hexadecimal) |
+
+---
+
+## Devuelve [#returns]
+
+`string` - La cantidad estimada de gas (hexadecimal)
+
+---
+
+## Ejemplo [#example]
+
+### Estimar una transferencia de ETH [#estimate-eth-transfer]
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000' // 1 ETH
+  }]
+})
+
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+// Simple ETH transfer: ~21000
+```
+
+### Estimar una llamada a un contrato [#estimate-contract-call]
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...' // transfer(address,uint256)
+  }]
+})
+
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+```
+
+### Añadir un margen de seguridad [#add-safety-buffer]
+
+```typescript
+async function estimateGasWithBuffer(tx, bufferPercent = 20) {
+  const estimate = await window.$onekey.ethereum.request({
+    method: 'eth_estimateGas',
+    params: [tx]
+  })
+
+  const gas = parseInt(estimate, 16)
+  const bufferedGas = Math.ceil(gas * (1 + bufferPercent / 100))
+
+  return '0x' + bufferedGas.toString(16)
+}
+
+const safeGasLimit = await estimateGasWithBuffer({
+  from: accounts[0],
+  to: contractAddress,
+  data: encodedData
+})
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| -32000 | Ejecución revertida | La transacción fallaría |
+| -32000 | Fondos insuficientes | Saldo insuficiente |
+| -32602 | Parámetros no válidos | Parámetros de transacción no válidos |
+
+---
+
+## Notas [#notes]
+
+- La estimación puede no ser exacta; las transacciones pueden usar más o menos gas
+- Añade un margen del 10-20% a la estimación por seguridad
+- Si la estimación falla, es probable que la transacción también falle
+- La estimación tiene en cuenta el estado actual de la cadena de bloques

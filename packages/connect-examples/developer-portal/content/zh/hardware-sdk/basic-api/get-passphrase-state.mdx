@@ -1,5 +1,6 @@
 ---
 title: 获取密码短语状态
+description: 了解已弃用的密码短语状态接口和隐藏钱包绑定迁移。
 ---
 
 import { Callout } from 'nextra/components'
@@ -15,6 +16,10 @@ import { Callout } from 'nextra/components'
 请求此 API 将提示用户输入密码短语，并返回公开的隐藏钱包指纹 `passphraseState`。请持久化 `deviceId + passphraseState`，不要持久化固件 `session_id`。
 
 见 [钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+
+后续地址和签名调用应继续传入 `passphraseState`，以保持同一个隐藏钱包绑定。它是**钱包指纹**，不是固件 `session_id`。
+
+> **错误 112（passphrase state mismatch）**：绑定与当前解锁的钱包不匹配，可能涉及锁定、种子变更或旧指纹。停止操作，让用户通过 `openWalletSession` 重新选择目标钱包。确认恢复后的绑定，再发起新的请求；不要绕过检查或自动重放签名。
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);

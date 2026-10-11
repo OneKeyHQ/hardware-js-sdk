@@ -1,0 +1,20 @@
+---
+title: "Contract metadata"
+description: "Wallets may decode call data to show a method name during confirmation. A function selector is the first four bytes of the Keccak-256 hash of its canonical signature, such as `transfer(address,uint256)`."
+---
+
+# Contract metadata
+
+Wallets may decode call data to show a method name during confirmation. A function selector is the first four bytes of the Keccak-256 hash of its canonical signature, such as `transfer(address,uint256)`.
+
+## Publish verifiable metadata
+
+Publish and verify your contract source and ABI on the relevant block explorer. Keep the ABI available to your application to encode calls correctly. A displayed method name alone is not proof of a contract's identity or behavior; selectors can collide.
+
+## Signature registries
+
+The historical GitBook guide described registering signatures in the Parity on-chain registry. The current provider source does not establish that OneKey uses that registry for transaction decoding. Do not pay for a registry transaction assuming it will change the OneKey confirmation screen.
+
+If a method name is missing, report the chain, contract address, method signature, transaction hash if available, and wallet version through the [OneKey issue tracker](https://github.com/OneKeyHQ/app-monorepo/issues). Never include private keys or recovery phrases.
+
+For hardware integrations, see [Clear Signing](/en/hardware-sdk/signers/evm#clear-signing). Device decoding depends on firmware and calldata; metadata in your application does not override device confirmation.

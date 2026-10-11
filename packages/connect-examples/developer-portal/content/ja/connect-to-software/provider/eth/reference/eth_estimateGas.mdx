@@ -1,0 +1,110 @@
+---
+title: "eth_estimateGas"
+description: "トランザクションに必要なガスを見積もる"
+---
+
+# eth_estimateGas
+
+トランザクションの完了に必要なガス量の見積もりを生成して返します。トランザクションはブロックチェーンに追加されません。
+
+---
+
+## パラメーター [#parameters]
+
+| インデックス | 型 | 説明 |
+|-------|------|-------------|
+| 0 | `object` | トランザクションオブジェクト |
+| 1 | `string` | ブロック番号またはタグ (任意) |
+
+### トランザクションオブジェクト [#transaction-object]
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `from` | `string` | いいえ | 送信者アドレス |
+| `to` | `string` | いいえ | 受取人アドレス |
+| `data` | `string` | いいえ | コントラクト呼び出しデータ |
+| `value` | `string` | いいえ | wei 単位の値 (16 進数) |
+| `gas` | `string` | いいえ | ガスリミット (16 進数) |
+| `gasPrice` | `string` | いいえ | ガス価格 (16 進数) |
+
+---
+
+## 戻り値 [#returns]
+
+`string` - 推定ガス量 (16 進数)
+
+---
+
+## 例 [#example]
+
+### ETH 送金のガスを見積もる [#estimate-eth-transfer]
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000' // 1 ETH
+  }]
+})
+
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+// Simple ETH transfer: ~21000
+```
+
+### コントラクト呼び出しのガスを見積もる [#estimate-contract-call]
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...' // transfer(address,uint256)
+  }]
+})
+
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+```
+
+### 安全のための余裕を追加 [#add-safety-buffer]
+
+```typescript
+async function estimateGasWithBuffer(tx, bufferPercent = 20) {
+  const estimate = await window.$onekey.ethereum.request({
+    method: 'eth_estimateGas',
+    params: [tx]
+  })
+
+  const gas = parseInt(estimate, 16)
+  const bufferedGas = Math.ceil(gas * (1 + bufferPercent / 100))
+
+  return '0x' + bufferedGas.toString(16)
+}
+
+const safeGasLimit = await estimateGasWithBuffer({
+  from: accounts[0],
+  to: contractAddress,
+  data: encodedData
+})
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| -32000 | 実行がリバート | トランザクションが失敗する見込み |
+| -32000 | 資金不足 | 残高不足 |
+| -32602 | 無効なパラメーター | 無効なトランザクションパラメーター |
+
+---
+
+## 注意事項 [#notes]
+
+- 見積もりは正確とは限らず、実際のガス使用量は増減する場合があります
+- 安全のため、見積もりに余裕 (10-20%) を加えてください
+- 見積もりに失敗する場合、トランザクションも失敗する可能性が高いです
+- 見積もりには現在のブロックチェーンの状態が考慮されます

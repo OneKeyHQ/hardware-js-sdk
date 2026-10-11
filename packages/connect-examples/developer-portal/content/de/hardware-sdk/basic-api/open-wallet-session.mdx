@@ -1,0 +1,64 @@
+---
+description: "Die Standard-Wallet oder eine versteckte Wallet auswählen und die vom SDK zurückgegebene öffentliche Identität lesen."
+title: "Wallet-Sitzung öffnen"
+---
+
+<span id="open-wallet-session" />
+
+# Wallet-Sitzung öffnen
+
+Einheitlicher Einstiegspunkt für Protocol V1 / V2, um die Standard-Wallet zu öffnen oder den Nutzer eine versteckte Wallet auswählen zu lassen.
+
+Verwenden Sie dies anstelle des veralteten [`getPassphraseState`](/de/hardware-sdk/basic-api/get-passphrase-state). Adress- und Signieraufrufe akzeptieren weiterhin `deviceId` + `passphraseState` und sollten nicht jedes Mal eine Sitzung erneut öffnen. Es gibt keinen `resume-hidden`-Modus. Core setzt die Sitzung bereits innerhalb der ersten späteren Methode fort, die `passphraseState` erhält.
+
+Siehe [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session) für die Schnittstellenvereinbarung.
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+const res = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+Kombinieren Sie nicht `mode` mit `useEmptyPassphrase` oder `initSession` in diesem Aufruf.
+
+| Parameter | Typ | Erforderlich | Hinweise |
+| --- | --- | --- | --- |
+| `mode` | `'standard' \| 'select-hidden'` | Ja | Verwenden Sie `OpenWalletSessionMode` aus `@onekeyfe/hd-core` |
+
+### Ergebnis [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    deviceId: string,
+    resumed: boolean,
+    walletType: 'standard' | 'hidden',
+    passphraseState: string | null, // null on standard wallet
+  }
+}
+```
+
+Dauerhaft speichern: `deviceId`, `walletType`, und `passphraseState`. Die Firmware-`session_id` wird nicht zurückgegeben.
+
+### Fehler [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+`mode: 'resume-hidden'` und `deviceId` / `passphraseState` führen bei diesem Aufruf zu `CallMethodInvalidParameter`. Setzen Sie eine gebundene versteckte Wallet fort, indem Sie `passphraseState` bei der nächsten Adress-/Signiermethode übergeben. `DeviceCheckUnlockTypeError` bedeutet, dass der aktuelle PIN-/Attach-to-PIN-Kontext die angeforderte Wallet nicht erreichen kann.

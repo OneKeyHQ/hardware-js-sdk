@@ -1,0 +1,25 @@
+---
+title: "getAccounts"
+---
+
+# getAccounts
+
+サイトにすでに公開されている Bitcoin アカウントを取得します。新たに接続を要求する場合は [requestAccounts](/ja/connect-to-software/provider/btc/api-reference/requestaccounts) を使用します。
+
+## メソッド [#method]
+
+```typescript
+declare function getAccounts(): Promise<string[]>;
+```
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const accounts = await provider.getAccounts()
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/qBgMXRM)

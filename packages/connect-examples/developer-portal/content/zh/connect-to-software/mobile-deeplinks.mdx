@@ -1,84 +1,74 @@
 ---
-title: 移动端 & Deeplinks
-description: 使用 deeplinks 在移动端 Web 应用和 WebViews 中集成 OneKey 钱包
+title: 移动端与深层链接
+description: 使用深层链接在移动端 Web 应用和 WebView 中集成 OneKey 钱包
 ---
 
-# 移动端 & Deeplinks
+# 移动端与深层链接
 
-使用 deeplinks 和 universal links 在移动端 Web 应用和 WebViews 中集成 OneKey 钱包。
+使用 WalletConnect 配对 URI，从移动端 dApp 打开 OneKey。深层链接只负责打开钱包；用户批准 WalletConnect 会话后，连接才算建立。
 
 ## 概述
 
-在构建移动端 Web 应用或在 WebViews 中集成时，您可以使用 OneKey 的 deeplink 系统直接连接到钱包应用。
+通过 WalletConnect 集成生成新的配对 URI，并在用户操作后打开下方链接。保持会话提案有效，等待用户批准或拒绝。在 OneKey 内置 dApp 浏览器中，应使用目标链的注入式 provider。
 
-## Deeplink 格式
+<span id="deeplink-格式" />
 
-### 自定义 Scheme
+## 深层链接格式
+
+<span id="自定义-scheme" />
+
+### 自定义 URI Scheme
 
 ```
 onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
 ```
 
-### Universal Link（推荐）
+<span id="universal-link推荐" />
+
+### 通用链接
 
 ```
 https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
 ```
 
-> **提示：** 推荐使用 Universal links，因为它们在不同移动平台和浏览器中工作更可靠。
+> 请在支持的 iOS、Android 版本和浏览器中测试应用唤起及失败后的处理。应用是否安装、系统链接设置和内嵌浏览器的限制都会影响结果。
 
 ## 使用示例
 
 ```javascript
-// 从您的 dApp 生成 WalletConnect URI
-const wcUri = 'wc:a281...' // 您的 WalletConnect URI
+// Generate WalletConnect URI from your dApp
+const wcUri = 'wc:a281...' // Your WalletConnect URI
 
-// 选项 1：自定义 scheme
+// Option 1: Custom scheme
 const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
 
-// 选项 2：Universal link（推荐）
+// Option 2: Universal link (recommended)
 const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
 
-// 打开链接
-window.location.href = universalLink
-```
-
-## 平台特定说明
-
-### iOS
-
-- 当 OneKey 应用已安装时，Universal links 效果最佳
-- 如果应用未安装，universal link 将重定向到 App Store
-
-### Android
-
-- 自定义 scheme 链接需要已安装 OneKey 应用
-- 如果应用不存在，Universal links 会优雅地回退到网页
-
-## 最佳实践
-
-1. **检测移动环境** - 仅在移动设备上显示 deeplink 选项
-2. **提供回退方案** - 如果 deeplinks 失败，提供替代连接方法
-3. **使用 universal links** - 它们比自定义 schemes 提供更好的用户体验
-4. **处理超时** - 如果用户没有返回您的应用，显示重试选项
-
-```javascript
-// 检测移动环境
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-
-if (isMobile) {
-  // 移动端使用 deeplinks
+// Call this from the user's Connect button.
+function openOneKey() {
   window.location.href = universalLink
-} else {
-  // 桌面端使用常规 WalletConnect 二维码
-  showQRCode(wcUri)
 }
 ```
+
+<span id="平台特定说明" />
+
+<span id="ios" />
+
+<span id="android" />
+
+<span id="最佳实践" />
+
+## 连接与失败处理
+
+- 由用户点击“连接”按钮后打开链接。部分浏览器会拦截未经用户操作的应用唤起。
+- 处理 WalletConnect 会话的批准、拒绝、过期和断开事件。用户返回浏览器，不代表会话已经获批。
+- 桌面端提供二维码；应用无法打开时，提供安装或重试入口。不要假定通用链接总会跳转到应用商店。
+- 配对 URI 过期后重新生成。不要将有效的配对 URI 写入分析系统或应用日志。
+- 如果钱包连接库提供移动端连接流程，优先使用它来管理配对和会话生命周期。
 
 ## 相关资源
 
 - [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit/) - 自动处理移动端检测
 - [Web3Modal](/zh/connect-to-software/wallet-ui/web3modal/) - 内置移动端支持
 - [Provider API](/zh/connect-to-software/provider/eth/) - 直接 Provider 集成
-
-

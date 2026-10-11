@@ -1,5 +1,7 @@
 'use client'
 
+import { ui, translateCopy } from '../i18n/ui.mjs'
+
 import Image from 'next/image'
 import { Check, X } from 'lucide-react'
 
@@ -69,19 +71,19 @@ const devices = [
   }
 ]
 
-function SupportBadge({ supported }) {
+function SupportBadge({ supported, locale }) {
   if (supported) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
         <Check className="w-4 h-4" />
-        Supported
+        {ui(locale, 'Supported', '支持')}
       </span>
     )
   }
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500">
       <X className="w-4 h-4" />
-      N/A
+      {ui(locale, 'Not supported', '不支持')}
     </span>
   )
 }
@@ -111,7 +113,7 @@ export function DeviceCompatibilityTable({ locale = 'en' }) {
     }
   }
 
-  const t = labels[isZh ? 'zh' : 'en']
+  const t = translateCopy(locale, labels.en)
 
   return (
     <div className="my-6">
@@ -174,7 +176,7 @@ export function DeviceCompatibilityTable({ locale = 'en' }) {
                         {device.name}
                       </div>
                       <div className="text-sm text-zinc-500">
-                        {device.description[isZh ? 'zh' : 'en']}
+                        {isZh ? device.description.zh : ui(locale, device.description.en)}
                       </div>
                     </div>
                   </div>
@@ -188,17 +190,17 @@ export function DeviceCompatibilityTable({ locale = 'en' }) {
 
                 {/* Bluetooth Support */}
                 <td className="py-4 px-5 text-center">
-                  <SupportBadge supported={device.bluetooth} />
+                  <SupportBadge locale={locale} supported={device.bluetooth} />
                 </td>
 
                 {/* USB Support */}
                 <td className="py-4 px-5 text-center">
-                  <SupportBadge supported={device.usb} />
+                  <SupportBadge locale={locale} supported={device.usb} />
                 </td>
 
                 {/* Air-Gap Support */}
                 <td className="py-4 px-5 text-center">
-                  <SupportBadge supported={device.airGap} />
+                  <SupportBadge locale={locale} supported={device.airGap} />
                 </td>
               </tr>
             ))}

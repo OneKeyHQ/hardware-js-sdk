@@ -1,0 +1,22 @@
+---
+title: "Métadonnées du contrat"
+description: "Les portefeuilles peuvent décoder les données d’appel pour afficher un nom de méthode lors de la confirmation. Un sélecteur de fonction correspond aux quatre premiers octets du hash Keccak-256 de sa signature canonique, comme `transfer(address,uint256)`."
+---
+
+<span id="contract-metadata" />
+
+# Métadonnées du contrat
+
+Les portefeuilles peuvent décoder les données d’appel pour afficher un nom de méthode lors de la confirmation. Un sélecteur de fonction correspond aux quatre premiers octets du hash Keccak-256 de sa signature canonique, comme `transfer(address,uint256)`.
+
+## Publier des métadonnées vérifiables [#publish-verifiable-metadata]
+
+Publiez et vérifiez le code source et l’ABI de votre contrat sur l’explorateur de blocs concerné. Gardez l’ABI accessible à votre application pour encoder correctement les appels. Un nom de méthode affiché ne prouve pas à lui seul l’identité ou le comportement d’un contrat ; des collisions de sélecteurs sont possibles.
+
+## Registres de signatures [#signature-registries]
+
+L’ancien guide GitBook décrivait l’enregistrement des signatures dans le registre Parity sur la chaîne. Le code actuel du fournisseur ne permet pas d’établir que OneKey utilise ce registre pour décoder les transactions. Ne payez pas une transaction d’enregistrement en supposant qu’elle modifiera l’écran de confirmation OneKey.
+
+Si un nom de méthode manque, signalez la chaîne, l’adresse du contrat, la signature de la méthode, le hash de transaction si disponible et la version du portefeuille via le [suivi des issues OneKey](https://github.com/OneKeyHQ/app-monorepo/issues). N’incluez jamais de clés privées ni de phrases de récupération.
+
+Pour les intégrations matérielles, consultez [Clear Signing](/fr/hardware-sdk/signers/evm#clear-signing). Le décodage sur l’appareil dépend du micrologiciel et du calldata ; les métadonnées de votre application ne remplacent pas la confirmation sur l’appareil.

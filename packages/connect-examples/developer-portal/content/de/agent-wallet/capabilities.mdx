@@ -1,0 +1,77 @@
+---
+title: "Funktionen"
+description: "Wallet-, Swap-, Markt- und Sicherheitsanfragen den unterstützten Skills zuordnen."
+---
+
+<span id="capabilities" />
+
+# Funktionen
+
+Verwenden Sie die vier OneKey-Wallet-Skills, um Anfragen an Wallet-, Swap-, Markt- und Sicherheitsbefehle weiterzuleiten. Prüfen Sie das Schema der installierten CLI auf unterstützte Chains, Parameter und Antwortfelder.
+
+## Wallet-Vorgänge [#wallet-operations]
+
+Verwenden Sie diesen Skill, wenn der Nutzer Guthaben, Empfangsadressen, Transaktionsverläufe, BTC-Adresstypen oder Überweisungen anfragt.
+
+| Nutzerabsicht | Natürliche Sprache | Skill-Zuordnung |
+| --- | --- | --- |
+| Aktive Wallet prüfen | `What wallet am I using?` | `onekey-wallet` liest den Status der aktiven Sitzung. |
+| Empfangsadresse anzeigen | `Show my ETH receiving address.` | `onekey-wallet` gibt die aktuelle Empfangsadresse zurück. |
+| Guthaben prüfen | `Show my wallet balance on Ethereum.` | `onekey-wallet` prüft die Guthaben der aktiven Wallet. |
+| Verlauf abfragen | `Show my last 5 BTC transactions.` | `onekey-wallet` ruft den aktuellen Verlauf ab. |
+| BTC-Adresstypen | `Show my BTC taproot address.` | `onekey-wallet` behält den angeforderten BTC-Adresstyp bei. |
+| Geld überweisen | `Send 50 USDC to this address.` | `onekey-wallet` validiert, bereitet vor und fordert eine Bestätigung an. |
+
+Bei Überweisungsanfragen muss vor der Ausführung eine Bestätigung angezeigt werden. Diese sollte Asset, Betrag, Empfänger, Chain, die Gebühr, sofern bekannt, den Guthabenstatus und den nächsten Sicherheitsschritt enthalten.
+
+## Swap und Bridge [#swap-and-bridge]
+
+Verwenden Sie diesen Skill, wenn der Nutzer handeln, kaufen, verkaufen, tauschen, eine Bridge nutzen oder eine BTC-PSBT signieren möchte.
+
+| Nutzerabsicht | Natürliche Sprache | Skill-Zuordnung |
+| --- | --- | --- |
+| Swap-Angebot einholen | `Quote 1 ETH to USDC.` | `onekey-swap` holt ein Angebot ein, ohne es auszuführen. |
+| Transaktion erstellen | `Prepare the swap, but do not submit.` | `onekey-swap` bereitet den Auftrag nach der Prüfung vor. |
+| Nach Bestätigung ausführen | `Yes, execute the swap.` | `onekey-swap` führt ausschließlich den bestätigten Auftrag aus. |
+| Status prüfen | `What happened to this swap?` | `onekey-swap` verfolgt den bestehenden Auftrag. |
+| Bridges ermitteln | `Can I bridge USDC from Ethereum to Base?` | `onekey-swap` prüft vor dem Einholen eines Angebots die Bridge-Unterstützung. |
+| BTC nur signieren | `Swap BTC to USDC using taproot and sign only.` | `onekey-swap` behält Taproot bei und gibt eine signierte PSBT oder eine PSBT-Vorschau zurück. |
+
+Der reguläre Ablauf besteht aus Angebot, Sicherheitsprüfung, Bestätigung, Erstellung und Ausführung. Angebot und Ausführung dürfen nicht in einem einzigen Assistentenbeitrag zusammengefasst werden.
+
+## Markt und Recherche [#market-and-research]
+
+Verwenden Sie diesen Skill, wenn der Nutzer nach Preisen, angesagten Tokens, Token-Informationen, K-Line-Daten, Liquidität, Inhabern oder Recherchen fragt.
+
+| Nutzerabsicht | Natürliche Sprache | Skill-Zuordnung |
+| --- | --- | --- |
+| Einzelpreis | `What is the SOL price?` | `onekey-market` gibt den Preis und den 24h-Kontext zurück. |
+| Angesagte Tokens | `What tokens are trending on Solana?` | `onekey-market` gibt eine kurze Liste angesagter Tokens zurück. |
+| Token-Suche | `Search BONK on Solana.` | `onekey-market` behält den Solana-Kontext bei. |
+| Token-Details | `Show token info for USDC on Ethereum.` | `onekey-market` ermittelt Token-Details. |
+| K-Line | `Show ETH 1H candles.` | `onekey-market` gibt Chartdaten zurück. |
+| Liquidität / Inhaber | `Show liquidity for PEPE.` | `onekey-market` fasst Liquiditäts- oder Inhaberdaten zusammen. |
+
+Marktantworten sollten standardmäßig rein lesend sein. Wenn der Nutzer anschließend kaufen oder tauschen möchte, sollte der Agent zunächst die Recherche abschließen und den Handel dann in einem separaten Bestätigungsablauf vorbereiten.
+
+## Sicherheitsprüfungen [#security-checks]
+
+Verwenden Sie diesen Skill vor Aktionen, die Gelder bewegen oder mit Verträgen interagieren, sowie immer dann, wenn der Nutzer fragt, ob ein Token oder eine Transaktion sicher ist.
+
+| Nutzerabsicht | Natürliche Sprache | Skill-Zuordnung |
+| --- | --- | --- |
+| Token-Prüfung | `Is this token safe?` | `onekey-security` meldet die Risikostufe und die Gründe. |
+| Transaktion simulieren | `What happens if I sign this?` | `onekey-security` simuliert vor dem Signieren. |
+| Freigaberisiko | `Review this unlimited USDC approval.` | `onekey-security` weist auf das Risiko einer unbegrenzten Freigabe hin. |
+| Abweichende Chain | `Send SOL to 0x...` | Bei einer nicht passenden Solana-/EVM-Adresse anhalten und die Abweichung melden |
+| Risiko eines gefälschten Vertrags | `Swap 500 USDC to WETH at 0x...` | Bei einer Abweichung zwischen Token und Vertrag anhalten |
+
+Bei hohem Risiko oder unvollständigen Daten müssen davon abhängige Abläufe, die Gelder bewegen, blockiert werden, bis der Nutzer das Risiko ausdrücklich akzeptiert.
+
+## Gerätesteuerung [#hardware-control]
+
+Verwenden Sie diesen Skill, wenn der Nutzer gerätegestütztes Signieren, eine Geräteprüfung, PIN-/Passphrase-Änderungen oder Clear Signing für sensible Aktionen wünscht.
+
+Der für den Nutzer sichtbare Ablauf erfolgt weiterhin in natürlicher Sprache: Gerät verbinden, prüfen, zu einer hardwaregestützten Sitzung wechseln, bei Bedarf das Passphrase-Verhalten festlegen und sensible Aktionen auf dem Gerät prüfen.
+
+Die Hardware-Anmeldung ändert die aktive Sitzung. Nach der Anmeldung verwenden Wallet-, Überweisungs-, Swap- und Signierbefehle automatisch die hardwaregestützte Sitzung.

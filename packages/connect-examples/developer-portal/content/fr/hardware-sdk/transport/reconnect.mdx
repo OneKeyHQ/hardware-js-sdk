@@ -1,0 +1,72 @@
+---
+description: "Rétablissez les connexions des appareils, préservez les associations de portefeuille et fermez le SDK sans rejouer les effets de bord."
+title: "Reconnexion et libération"
+---
+
+<span id="reconnect-and-dispose" />
+
+# Reconnexion et libération
+
+Les interruptions de transport sont normales : débranchement USB, portée BLE, réinitialisation Bluetooth du système, redémarrage du micrologiciel. Hardware SDK 1.2.0 rétablit la **liaison**. Votre application doit toujours rétablir l’**appel**.
+
+Cette page décrit le contrat de l’intégrateur. Elle ne décrit pas les numéros de séquence Protocol V2 ni la génération du transport.
+
+## Ce que le SDK fait déjà [#what-the-sdk-already-does]
+
+- Une déconnexion / reconnexion ordinaire ne fait **pas** oublier le protocole confirmé `connectProtocol`. Vous ne choisissez pas de nouveau entre V1 et V2 après une interruption.
+- Les appels en cours échouent. Le SDK ne rejoue **pas** la signature, l’effacement ou la mise à jour du micrologiciel.
+- Protocol V2 conserve l’ordre des appels par appareil. Ne lancez pas un deuxième appel métier pendant la récupération du premier.
+
+## Ce que vous devez faire [#what-you-must-do]
+
+1. Abonnez-vous à `DEVICE.CONNECT` / `DEVICE.DISCONNECT` une fois au démarrage de l’application.
+2. En cas de `DISCONNECT`, marquez cette connexion `connectId` comme occupée/non valide et faites échouer le parcours d’interface actuel. Ne réessayez pas la même méthode ayant des effets de bord.
+3. Effectuez une nouvelle recherche (`searchDevices`) lorsque l’utilisateur est prêt. Un rebranchement USB ou un nouvel appairage BLE peut créer un **nouveau** `connectId`. Mettez en cache les ID USB et BLE séparément. Consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers).
+4. Après une nouvelle connexion, actualisez l’état de l’appareil avec [`getDeviceState`](/fr/hardware-sdk/basic-api/get-device-state). Réutilisez les valeurs persistées de `deviceId + passphraseState` ; ne persistez pas les données du micrologiciel `session_id`.
+5. Lors du prochain appel d’adresse / de signature, transmettez la valeur persistée de `passphraseState` ou `useEmptyPassphrase: true`. Core reprend la session du micrologiciel dans cette méthode. Ne rouvrez pas une session de portefeuille uniquement pour reconnecter.
+
+```ts
+import { DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => {
+  markDisconnected(payload);
+  // Fail the open UI flow; do not replay signing or firmware updates.
+});
+HardwareSDK.on(DEVICE.CONNECT, () => {
+  refreshDeviceList();
+});
+```
+
+## Spécificités BLE [#ble-specific]
+
+- Les autorisations (`BLUETOOTH_SCAN` / `CONNECT`, descriptions d’usage Bluetooth iOS, souvent localisation sur Android) doivent rester accordées après l’arrêt du processus. Consultez [BLE React Native](/fr/hardware-sdk/transport/react-native-ble).
+- `retryCount` / `timeout` contrôlent l’établissement de la connexion avant un appel à l’appareil. Ils ne relancent pas la signature et ne remplacent pas la récupération au niveau de l’application.
+- Si l’appairage du système est obsolète, arrêtez les tentatives de connexion en boucle. Demandez à l’utilisateur d’oublier l’appareil dans les paramètres Bluetooth du système, puis de l’appairer de nouveau.
+- Mini n’a pas de BLE. Neo a le BLE mais pas de caméra. Consultez [Appareils](/fr/hardware-sdk/concepts/devices).
+
+## Spécificités USB [#usb-specific]
+
+- WebUSB nécessite une action utilisateur pour afficher de nouveau le sélecteur, sauf si vous transmettez `skipWebDevicePrompt` sur un appareil encore autorisé. Consultez [Paramètres communs](/fr/hardware-sdk/concepts/common-params).
+- Un autre onglet ou Bridge qui détient l’appareil peut provoquer une erreur d’acquisition/d’ouverture. Fermez l’autre connexion propriétaire ; n’effectuez pas `dispose()` en première réaction.
+
+## `dispose()` [#dispose]
+
+```ts
+await HardwareSDK.dispose();
+```
+
+Appelez `dispose()` uniquement lorsque vous fermez le SDK ou changez `env` / la pile de transport (par exemple WebUSB → bas niveau). Cet appel supprime toutes les liaisons et tous les curseurs de transport Protocol V2.
+
+N’appelez **pas** `dispose()` lors d’une interruption BLE habituelle ou d’un débranchement USB. Recherchez et reconnectez-vous sur la même instance `HardwareSDK`.
+
+Après le retour de `dispose()`, vous devez appeler `init()` de nouveau avant `searchDevices`.
+
+## Redémarrage du micrologiciel [#firmware-reboot]
+
+`firmwareUpdateV2` / `V3` / `V4` peuvent entraîner une déconnexion volontaire. Attendez, reconnectez-vous, puis lisez les versions. Ne considérez pas cette interruption comme une mise à jour échouée à rejouer. Consultez [Mise à jour du micrologiciel](/fr/hardware-sdk/firmware-update).
+
+## Suivant [#next]
+
+- [Sélecteur de transport](/fr/hardware-sdk/transport)
+- [Guide de l’API Core](/fr/hardware-sdk/core-api-guide)
+- [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session)

@@ -1,0 +1,181 @@
+---
+title: "React + wagmi"
+description: "Conecta a OneKey desde aplicaciones React con wagmi y el proveedor EIP-1193 inyectado"
+---
+
+# React + wagmi
+
+Esta guía muestra una forma mínima, basada en EIP-1193, de conectar a OneKey desde aplicaciones React con wagmi. Usa el proveedor dedicado de OneKey (`window.$onekey.ethereum`) para que un botón llamado OneKey conecte a OneKey.
+
+## Instalación [#install]
+
+```bash
+npm i wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+wagmi v2 se basa en viem. Esta guía usa el conector Injected para trabajar con carteras inyectadas (OneKey y otros proveedores EIP-1193).
+
+## Crear un conector inyectado de OneKey [#create-a-onekey-injected-connector]
+
+Usa preferentemente la inyección dedicada de OneKey para evitar ambigüedades cuando haya varias carteras instaladas.
+
+```ts
+// onekeyConnector.ts
+import { createConfig, http } from 'wagmi'
+import { mainnet, polygon, arbitrum, base, optimism } from 'wagmi/chains'
+import { injected } from 'wagmi/connectors'
+
+import type { EIP1193Provider } from 'viem'
+
+function getOneKeyProvider(): EIP1193Provider | undefined {
+  if (typeof window === 'undefined') return undefined
+  const walletWindow = window as Window & {
+    $onekey?: { ethereum?: EIP1193Provider }
+  }
+  return walletWindow.$onekey?.ethereum
+}
+
+export const config = createConfig({
+  chains: [mainnet, polygon, arbitrum, base, optimism],
+  connectors: [
+    injected({
+      target() {
+        return {
+          id: 'onekey',
+          name: 'OneKey',
+          provider: getOneKeyProvider(),
+        }
+      },
+      shimDisconnect: true,
+    }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+    [optimism.id]: http(),
+  },
+})
+```
+
+Notas
+
+- Usa preferentemente `window.$onekey.ethereum` para mantener un comportamiento determinista en entornos con varias carteras.
+- Si OneKey no está disponible, muestra una opción de instalación o reintento. Las demás carteras detectadas por wagmi conservan sus propios nombres.
+- Activa `eth_requestAccounts` desde una acción del usuario y gestiona `4001` (rechazado por el usuario), sin reintentar automáticamente.
+
+## Configuración de la aplicación [#app-setup]
+
+```tsx
+// main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { config } from './onekeyConnector'
+import App from './App'
+
+const queryClient = new QueryClient()
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </WagmiProvider>
+  </React.StrictMode>,
+)
+```
+
+## Conectar y consultar la cuenta [#connect-and-read-account]
+
+```tsx
+// App.tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+export default function App() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>Connected: {address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {error && <p role="alert">{error.message}</p>}
+      {connectors.map((c) => (
+        <button key={c.uid} disabled={isPending} onClick={() => connect({ connector: c })}>
+          Connect with {c.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+## Firmar y enviar [#sign-and-send]
+
+Usa la conexión activa de wagmi para firmar. Inicia solicitudes de cartera desde acciones del usuario y muestra las solicitudes rechazadas en tu interfaz.
+
+```tsx
+import { useState } from 'react'
+import { useWalletClient } from 'wagmi'
+
+function SignMessageButton() {
+  const { data: walletClient } = useWalletClient()
+  const [result, setResult] = useState('')
+  const [pending, setPending] = useState(false)
+
+  async function sign() {
+    if (!walletClient) return
+    setPending(true)
+    try {
+      const signature = await walletClient.signMessage({ message: 'Hello from my dApp' })
+      setResult(signature)
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : 'Signature request failed')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return <>
+    <button disabled={!walletClient || pending} onClick={sign}>Sign message</button>
+    <p role="status">{result}</p>
+  </>
+}
+```
+
+Para transacciones, usa `useSendTransaction` de wagmi con un destinatario, importe y cadena seleccionada validados. Un hash de transacción devuelto indica que se envió; espera al recibo para determinar si la ejecución tuvo éxito. Consulta [Enviar transacciones](/es/connect-to-software/provider/eth/sending-transactions).
+
+## Eventos y red [#events-and-network]
+
+- Escucha el evento `accountsChanged` / `chainChanged` y actualiza el estado de la sesión en consecuencia.
+- Cambiar o añadir redes: `wallet_switchEthereumChain` y `wallet_addEthereumChain`.
+
+## Móviles y detección [#mobile-and-discovery]
+
+Para carteras móviles fuera de un navegador con proveedor inyectado, usa un conector WalletConnect o una [biblioteca de interfaz de carteras](/es/connect-to-software/wallet-ui/wallet-kits). Un [enlace profundo](/es/connect-to-software/mobile-deeplinks) abre la cartera; la sesión de WalletConnect establece la conexión.
+
+wagmi puede detectar carteras EIP-6963 mediante `createConfig` y su opción `multiInjectedProviderDiscovery`. Para una implementación directa, consulta [Detección del proveedor](/es/connect-to-software/provider/eth/provider-api).
+
+## Resolución de problemas [#troubleshooting]
+
+- Si falta el proveedor, verifica que OneKey esté instalado y habilitado para este sitio y vuelve a intentarlo desde el botón de conexión.
+- Gestiona el rechazo del usuario (`4001`) permitiendo un nuevo intento iniciado por el usuario.
+- Accede al proveedor del navegador en el cliente. La comprobación `typeof window` anterior evita errores de renderizado en el servidor.
+- Una desconexión simulada borra el estado de conexión de wagmi; no revoca necesariamente los permisos en la cartera.
+
+## Recursos [#resources]
+
+- [Conector inyectado de wagmi](https://wagmi.sh/react/api/connectors/injected)
+- [Cliente de cartera de wagmi](https://wagmi.sh/react/api/hooks/useWalletClient)

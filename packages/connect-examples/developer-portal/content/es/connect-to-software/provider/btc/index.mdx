@@ -1,0 +1,32 @@
+---
+title: "BTC"
+description: "Integración con Bitcoin mediante el proveedor BTC inyectado de OneKey (window.$onekey.btc / window.unisat)"
+slug: /dapp/chains/btc
+---
+
+# BTC
+
+Integra Bitcoin mediante el proveedor BTC inyectado de OneKey. Usa `window.$onekey.btc` para seleccionar OneKey. Un proveedor global de compatibilidad puede pertenecer a otra cartera.
+
+## Enlaces rápidos [#quick-links]
+
+- [Guía](guide)
+- [Referencia de la API](api-reference)
+- [Evento](event)
+
+## Patrón mínimo [#minimal-pattern]
+
+```js
+const provider = window.$onekey?.btc
+if (!provider) throw new Error('OneKey BTC provider not detected')
+await provider.requestAccounts()
+```
+
+## Eventos y red [#events--network]
+
+- `accountsChanged`, `chainChanged` — vuelve a sincronizar el estado de la cuenta y de la red
+
+## Errores habituales [#common-errors]
+
+- Rechazo del usuario: gestiónalo adecuadamente y permite reintentar
+- Parámetros no válidos: comprueba el formato de las direcciones y los importes

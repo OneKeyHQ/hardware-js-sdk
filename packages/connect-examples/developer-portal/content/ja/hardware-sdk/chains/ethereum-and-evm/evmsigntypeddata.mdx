@@ -1,0 +1,186 @@
+---
+title: "evmSignTypedData"
+---
+
+# evmSignTypedData
+
+### Ethereum: 型付きデータに署名 [#ethereum-sign-typed-data]
+
+デバイスに次への署名を要求します: [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 型付きデータメッセージに、指定の BIP32 パスから導出した秘密鍵で署名します。
+
+デバイスはユーザーにリクエストの確認を求めます。表示される詳細は、解析付き署名とハッシュ署名のどちらを使うかによって異なります。
+
+* **EIP-712 (v3 と v4) に対応**
+* **型付き構造化データへの署名には `evmSignTypedData` を使用**
+* **EIP-191 型付きデータへの署名用ではありません**
+* EIP-191 (personal\_sign) への署名には [evmSignMessage](/ja/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) を使用
+
+```typescript
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `data` - _必須_ `Object` 次の型: `EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>`。JSON Schema の定義は EIP-712 仕様にあります。
+* `metamaskV4Compat` - _必須_ `boolean`。[MetaMask の signTypedData\_v4](https://docs.metamask.io/metamask-connect/evm/guides/sign-data/#sign-typed-data-v4) との互換性のために `true` に設定します。
+* `chainId` - _任意_ `number` ETH の ChainId は、特定の Ethereum ネットワークを一意に識別し、ブロックチェーンの異なるバージョンを区別するための識別子です。 [リファレンス](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
+
+### 解析付き署名 [#parsed-signing]
+
+`types.EIP712Domain` を含む完全な EIP-712 オブジェクトを渡し、元のリクエストに合わせて `metamaskV4Compat` を設定します。解析フローでは、デバイスが SDK に型定義とフィールド値を要求します。確認できる詳細はデバイスとファームウェアによって異なります。[Clear Signing ガイド](/ja/hardware-sdk/signers/evm#clear-signing)を参照してください。
+
+### ハッシュ署名へのフォールバック [#hash-signing-fallback]
+
+SDK がハッシュ署名を選択すると、デバイスは構造化メッセージではなく計算済みのハッシュを受け取ります。これはブラインド署名であり、構造化された Clear Signing ではありません。ハッシュは**完全に同一のデータ**から、同じエンコードモードで導出する必要があります。SDK は、渡されたハッシュを計算したり、`data` と照合したりしません。
+
+- `domainHash`: 解析付き署名では任意、フォールバックでは必須。16 進数エンコードされた 32 バイトの EIP-712 ドメインハッシュ。
+- `messageHash`: 公開型では任意ですが、現在の自動フォールバック分岐では必須。16 進数エンコードされた 32 バイトの EIP-712 メッセージ構造体ハッシュで、最終的な `0x1901` 署名ダイジェストではありません。ドメインのみのリクエスト (`primaryType: 'EIP712Domain'`) では解析付き署名時に省略できますが、現在のフォールバック検証では両方のハッシュが必要です。
+
+現在の SDK は以下の場合にフォールバックを選択します:
+
+| 条件 | 範囲 |
+| --- | --- |
+| 解析付き EIP-712 機能がない、または形式の制限を超過 | Classic、Mini、Classic1s、Classic Pure。Classic1s/Pure が常にブラインド署名になるわけではありません |
+| 指定データ内のネストした配列 | すべてのデバイスファミリー |
+| `message.data` の 16 進数バイト列が該当する上限を超過 | Classic1s/Pure と Pro2/Neo は 1,536 バイト。ファームウェア 4.4.0 以降の Touch/Pro は 1,536 バイト。それ以外は 1,024 バイト |
+
+上記のサイズ確認の対象は `message.data`であり、JSON ドキュメント全体ではありません。Classic/Mini ファミリーには形式の制限もあります。構造体あたり 16 フィールド、型名/メンバー名は 63 文字、配列型フィールドは 24 個、アクセスパスの深さは 6、primary type と domain を除くカスタム依存構造体は 8 個、文字列/バイト列の値ごとに 1,536 バイトです。プリミティブ値の配列は 24 要素までで、v4 モードでは構造体配列にもこの制限があります。型の循環依存もフォールバックを引き起こします。
+
+Touch/Pro のハッシュ署名にはファームウェア 4.2.0 以降が必要です。それ以前でこの経路が選択された場合は `CallMethodNeedUpgradeFirmware` が返されます。
+
+解析付き署名が利用可能な場合、ハッシュを渡してもハッシュ経路が強制されるわけではありません。フォールバックが必要なのにハッシュがない場合、呼び出しは失敗します。アプリケーションの署名方針で明示的に処理してください。元のリクエストを黙って置き換えたり、署名の成功が全フィールドの表示を証明すると説明したりしないでください。
+
+### 例 [#example]
+
+このコードは `ethers` v6 を使用して、v4 互換のフォールバックハッシュを準備します。初期化済み SDK と選択済みウォレットを再利用してください。ハッシュを指定しても、デバイス上の確認は省略できません。
+
+```typescript
+import { TypedDataEncoder } from 'ethers';
+
+const eip712Data = {
+    types: {
+        EIP712Domain: [
+            {
+                name: 'name',
+                type: 'string',
+            },
+            { name: 'chainId', type: 'uint256' },
+        ],
+        Message: [
+            {
+                name: "wallet",
+                type: "string"
+            },
+            {
+                name: "number",
+                type: "uint64"
+            }
+        ]
+    },
+    primaryType: 'Message',
+    domain: {
+        name: 'example.onekey.io',
+        chainId: 1,
+    },
+    message: {
+        "wallet": "OneKey Wallet",
+        // be careful with JavaScript numbers: MAX_SAFE_INTEGER is quite low
+        "number": `${2n ** 55n}`,
+    },
+};
+
+const { EIP712Domain, ...messageTypes } = eip712Data.types;
+const domainHash = TypedDataEncoder.hashDomain(eip712Data.domain);
+const messageHash = TypedDataEncoder.from(messageTypes).hash(eip712Data.message);
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    data: eip712Data,
+    metamaskV4Compat: true,
+    domainHash,
+    messageHash,
+    chainId: eip712Data.domain.chainId,
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+### Safe Tx [#safe-tx]
+
+対応ファームウェアで、標準の Safe v1.3.0 の `SafeTx` スキーマを使用します。`domain.verifyingContract` に Safe アドレスを指定し、実際のネットワークを使用して、10 個すべてのメッセージフィールドを提供します。`operation` は CALL の場合は `0`、DELEGATECALL の場合は `1` です。この例はプレースホルダーのアドレスとゼロの Safe nonce を使っています。アプリケーションが提案する正確なトランザクションに置き換えてください。フォールバックハッシュを省略しているため、ハッシュ署名が必要なリクエストでは、ハッシュは自動指定されず、リクエストが失敗します。
+
+```typescript
+const safeTypedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    SafeTx: [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+      { name: 'operation', type: 'uint8' },
+      { name: 'safeTxGas', type: 'uint256' },
+      { name: 'baseGas', type: 'uint256' },
+      { name: 'gasPrice', type: 'uint256' },
+      { name: 'gasToken', type: 'address' },
+      { name: 'refundReceiver', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+    ],
+  },
+  primaryType: 'SafeTx',
+  domain: {
+    chainId: 1,
+    verifyingContract: '0x1111111111111111111111111111111111111111',
+  },
+  message: {
+    to: '0x2222222222222222222222222222222222222222',
+    value: '0',
+    data: '0x',
+    operation: '0',
+    safeTxGas: '0',
+    baseGas: '0',
+    gasPrice: '0',
+    gasToken: '0x0000000000000000000000000000000000000000',
+    refundReceiver: '0x0000000000000000000000000000000000000000',
+    nonce: '0',
+  },
+};
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  data: safeTypedData,
+  metamaskV4Compat: true,
+  chainId: safeTypedData.domain.chainId,
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+戻り値は所有者の署名であり、ブロードキャスト済みトランザクションではありません。署名の検証と収集時に、型付きデータを変更しないでください。参照: [Safe Tx 統合](/ja/hardware-sdk/signers/evm#eip-712-and-safe-tx) でオンチェーンの Safe 呼び出しとの違いを確認してください。
+
+#### 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string, // hexadecimal string without the "0x" prefix
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

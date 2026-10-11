@@ -1,0 +1,55 @@
+---
+title: "btcSignMessage"
+---
+
+# btcSignMessage
+
+## Bitcoin: Nachricht signieren [#bitcoin-sign-message]
+
+Fordert eine Nachrichtensignatur mit dem aus dem angegebenen Pfad abgeleiteten Schlüssel an.
+
+```typescript
+const result = await HardwareSDK.btcSignMessage(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Mindestlänge ist `3`. [Mehr erfahren](/de/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _erforderlich_ `string` Nachricht aus Hex
+* `coin` - _optional_ `string` Bestimmt die Netzwerkdefinition in der Datei coins.json. Coin-`shortcut`, `name` oder `label` kann verwendet werden. Wenn `coin` nicht gesetzt ist, versucht die API, die Netzwerkdefinition abzurufen aus `path`.
+* `noScriptType`- _optional `boolean`_ Für Signaturen ohne Skripttypen.
+
+### Beispiel [#example]
+
+```typescript
+HardwareSDK.btcSignMessage(connectId, deviceId, {
+    path: "m/44'/0'/0'",
+    messageHex: "6578616d706c65206d657373616765"
+});
+```
+
+### Ergebnis [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,   // signer address
+        signature: string, // signature in base64 format
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

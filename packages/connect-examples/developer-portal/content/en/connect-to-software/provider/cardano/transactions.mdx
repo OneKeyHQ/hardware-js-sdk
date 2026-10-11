@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Transactions
 
+Call `enable()` before using the dApp API. Addresses returned by the CIP-30 API are hex-encoded bytes; transaction and value parameters are hex-encoded CBOR. Browser examples using `Buffer` require an explicit `buffer` import or a byte conversion helper.
+
 Learn how to sign and submit transactions on Cardano.
 
 ---
@@ -15,13 +17,13 @@ Learn how to sign and submit transactions on Cardano.
 
 ```typescript
 // transaction should be CBOR-encoded hex string
-const signedTx = await api.signTx(transactionCbor, partialSign)
+const witnessSetCbor = await api.signTx(transactionCbor, partialSign)
 
 // partialSign: boolean
-// - false: sign all inputs owned by wallet
-// - true: sign only inputs explicitly owned (for multi-sig)
+// - false: reject if the wallet cannot provide every required signature
+// - true: return the signatures the wallet can provide
 
-console.log('Signed TX:', signedTx)
+console.log('Witness set:', witnessSetCbor)
 ```
 
 ---
@@ -36,71 +38,21 @@ console.log('Transaction hash:', txHash)
 
 ---
 
-## Complete Transaction Flow
+### Build, sign, and submit
+
+`signTx` returns a witness set, not a complete signed transaction. Build the unsigned transaction with a Cardano transaction library, merge the returned witnesses with its existing witness set, and submit the resulting complete transaction.
 
 ```typescript
-import {
-  TransactionBuilder,
-  TransactionBuilderConfigBuilder,
-  LinearFee,
-  BigNum,
-  Address,
-  TransactionOutput,
-  Value,
-} from '@emurgo/cardano-serialization-lib-browser'
-
-async function sendAda(recipientAddress, amountLovelace) {
-  const api = await window.cardano.onekey.enable()
-
-  // Get UTxOs
-  const utxos = await api.getUtxos()
-  const changeAddress = await api.getChangeAddress()
-
-  // Build transaction
-  const txBuilder = TransactionBuilder.new(
-    TransactionBuilderConfigBuilder.new()
-      .fee_algo(LinearFee.new(
-        BigNum.from_str('44'),
-        BigNum.from_str('155381')
-      ))
-      .pool_deposit(BigNum.from_str('500000000'))
-      .key_deposit(BigNum.from_str('2000000'))
-      .max_value_size(5000)
-      .max_tx_size(16384)
-      .coins_per_utxo_byte(BigNum.from_str('4310'))
-      .build()
-  )
-
-  // Add inputs from UTxOs
-  utxos.forEach(utxo => {
-    // Add UTxO as input...
-  })
-
-  // Add output
-  txBuilder.add_output(
-    TransactionOutput.new(
-      Address.from_bech32(recipientAddress),
-      Value.new(BigNum.from_str(amountLovelace))
-    )
-  )
-
-  // Set change address
-  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
-
-  // Build transaction
-  const tx = txBuilder.build_tx()
-  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
-
-  // Sign
-  const signedTxCbor = await api.signTx(txCbor, false)
-
-  // Submit
-  const txHash = await api.submitTx(signedTxCbor)
-  console.log('TX Hash:', txHash)
-
-  return txHash
-}
+// `unsignedTransactionCbor` is a complete transaction built with current
+// protocol parameters, selected inputs, outputs, fees, and change.
+const witnessSetCbor = await api.signTx(unsignedTransactionCbor, false)
+// Merge witnessSetCbor into the original transaction using your Cardano SDK.
+// Preserve existing witnesses, scripts, datums, redeemers, and auxiliary data.
+// Submit the serialized complete transaction, never witnessSetCbor alone.
+const txHash = await api.submitTx(completeSignedTransactionCbor)
 ```
+
+Use the Lucid or Mesh flow below if your application does not already implement transaction construction and witness merging. These SDK examples are version-specific; follow their documentation for the version you install.
 
 ---
 
@@ -113,7 +65,7 @@ npm install lucid-cardano
 ```
 
 ```typescript
-import { Lucid } from 'lucid-cardano'
+import { Lucid, Blockfrost } from 'lucid-cardano'
 
 // Initialize Lucid with OneKey
 const lucid = await Lucid.new(
@@ -165,4 +117,3 @@ const unsignedTx = await tx.build()
 const signedTx = await wallet.signTx(unsignedTx)
 const txHash = await wallet.submitTx(signedTx)
 ```
-

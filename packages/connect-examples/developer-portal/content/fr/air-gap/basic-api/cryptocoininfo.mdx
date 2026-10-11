@@ -1,0 +1,32 @@
+---
+title: "CryptoCoinInfo"
+---
+
+# CryptoCoinInfo
+
+La classe `CryptoCoinInfo` représente les informations de cryptomonnaie. Cette page décrit l’export historique de `@onekeyfe/onekey-air-gap`, y compris sa valeur d’énumération Ethereum. D’autres paquets de registre peuvent exposer des énumérations différentes ; utilisez le constructeur et les types du même paquet installé.
+
+## Types [#types]
+
+```typescript
+export enum Type {
+  bitcoin = 0,
+  ethereum = 60,
+}
+
+export enum Network {
+  mainnet,
+  testnet,
+}
+```
+
+## Paramètres [#parameters]
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `type` | `Type` | Premier argument du constructeur ; type de devise (par exemple, `bitcoin = 0`, `ethereum = 60`) |
+| `network` | `Network` | Deuxième argument du constructeur ; type de réseau (`mainnet` ou `testnet`) |
+
+## Type UR [#ur-type]
+
+Le type UR est `crypto-coin-info`. Générez les données encodées avec l’encodeur du registre.

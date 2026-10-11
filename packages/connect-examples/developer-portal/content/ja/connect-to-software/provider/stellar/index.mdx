@@ -1,0 +1,36 @@
+---
+title: "Stellar"
+description: "OneKey の Stellar プロバイダーによる Stellar の統合"
+---
+
+import { Callout } from 'nextra/components'
+
+# Stellar
+
+OneKey の Stellar プロバイダーで Stellar を統合します。アクセス先: `window.$onekey.stellar`.
+
+<Callout type="info">
+このプロバイダーは Stellar Wallets Kit の <code>KitActions</code> 形式に合わせて設計されています: <code>getAddress</code>, <code>signTransaction</code>, <code>signAuthEntry</code>, <code>signMessage</code>, <code>getNetwork</code>.
+</Callout>
+
+## クイックリンク [#quick-links]
+
+- [はじめに](getting-started)
+- [署名](signing)
+- [API リファレンス](api-reference)
+
+## 最小限の例 [#minimal-example]
+
+```ts
+const stellar = window.$onekey?.stellar
+if (!stellar?.isOneKey) throw new Error('OneKey Stellar provider not detected')
+
+const { address } = await stellar.getAddress()
+const network = await stellar.getNetwork()
+
+console.log({ address, network })
+```
+
+## 主なエラー [#common-errors]
+
+- `4001`: ユーザーがリクエストを拒否

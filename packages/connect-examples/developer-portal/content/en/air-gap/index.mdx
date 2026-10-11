@@ -56,12 +56,14 @@ If you are integrating OneKey Air-Gap into an existing wallet, you need to ensur
 | Device → App | `crypto-psbt` | BTC signed PSBT |
 | Device → App | `crypto-hdkey` | HD key export on connect |
 | Device → App | `crypto-multi-accounts` | Multi-account export on connect |
-| Device → App | `eth-signature` | ETH signed transaction |
+| Device → App | `eth-signature` | ETH signature response |
 | Device → App | `sol-signature` | SOL signed transaction |
 | Device → App | `btc-signature` | BTC signature (non-PSBT) |
 | App → Device | `eth-sign-request` | ETH sign request |
 | App → Device | `sol-sign-request` | SOL sign request |
 | App → Device | `crypto-psbt` | BTC unsigned PSBT |
+| Device → App | `tron-signature` | TRON signature response |
+| App → Device | `tron-sign-request` | TRON signing request |
 
 ### Common pitfall: UR type routing
 

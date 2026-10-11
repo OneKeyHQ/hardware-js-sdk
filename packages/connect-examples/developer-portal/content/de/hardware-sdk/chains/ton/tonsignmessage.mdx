@@ -1,0 +1,111 @@
+---
+title: "tonSignMessage"
+---
+
+# tonSignMessage
+
+### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.10.0
+  * Pro 2 / Neo: Protocol V2 (dieselbe öffentliche Methode; das SDK ordnet Felder zu)
+
+### TON: Nachricht signieren [#ton-sign-message]
+
+Eine Nachricht oder Transaktion mit dem privaten Schlüssel aus dem angegebenen BIP32-Pfad signieren. Der Nutzer muss die Aktion auf dem OneKey-Gerät bestätigen.
+
+```typescript
+const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_",
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+**Erforderliche Parameter**
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`
+* `destination` - _erforderlich_ `string` Zieladresse
+* `tonAmount` - _erforderlich_ `number | string` Zu übertragender Betrag in Nanoton
+* `seqno` - _erforderlich_ `number` Sequenznummer
+* `expireAt` - _erforderlich_ `number | string` Ablaufzeit der Nachricht in Unix-Sekunden
+
+**Optionale Parameter**
+
+* `walletVersion` - _optional_ `TonWalletVersion` TON-Wallet-Version (Standard: 3)
+* `isBounceable` - _optional_ `boolean` Ob die Nachricht bounceable ist (Standard: false)
+* `isTestnetOnly` - _optional_ `boolean` Ob das Testnet verwendet werden soll (Standard: false)
+* `jettonMasterAddress` - _optional_ `string` Adresse des Jetton-Master-Vertrags
+* `jettonAmount` - _optional_ `number | string` Jetton-Betrag in der kleinsten Einheit des Tokens
+* `fwdFee` - _optional_ `number | string` Weiterleitungsgebühr für einen Jetton-Transfer in Nanoton
+* `comment` - _optional_ `string` Nachrichtenkommentar
+* `mode` - _optional_ `number` Nachrichtenmodus
+* `workchain` - _optional_ `TonWorkChain` TON-Workchain
+* `walletId` - _optional_ `number` Wallet-ID
+
+#### Beispiel [#example]
+
+```typescript
+// Simple TON transfer
+const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_",
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+
+// Multiple native TON transfers
+const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
+    extDestination: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
+    extTonAmount: [100],
+    extPayload: ['48656c6c6f204f6e654b6579'],
+});
+
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        skip_validate: boolean; // Used to skip validation in classic 1s.
+        signature: string;
+        signing_message?: string; // Canonical field. Pro2/Neo return this; the SDK also copies it from the legacy V1 typo.
+        signning_message?: string; // Deprecated Protocol V1 typo. Do not read this in new code.
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,34 @@
+---
+title: "pushTx"
+---
+
+# pushTx
+
+Eine signierte Rohtransaktion übertragen.
+
+## Methode [#method]
+
+```typescript
+declare function pushTx(rawtx: string): Promise<string>;
+```
+
+## Parameter [#params]
+
+* `rawtx` — _erforderlich_ `string`  die zu übertragende rawtx
+
+## Antwort [#response]
+
+`txid` — `string`
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const rawtx = "<SIGNED_RAW_TRANSACTION_HEX>";
+const txid = await provider.pushTx(rawtx);
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/VwgGzxO)

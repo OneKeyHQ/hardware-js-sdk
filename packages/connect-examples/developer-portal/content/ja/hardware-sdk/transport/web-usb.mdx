@@ -1,0 +1,113 @@
+---
+description: "ブラウザーから OneKey USB デバイスを許可し、識別情報を取得して、ウォレットアドレスを確認します。"
+title: "WebUSB 接続"
+---
+
+<span id="webusb-connection" />
+
+# WebUSB 接続
+
+次を使ってブラウザーアプリを OneKey に直接接続します: `@onekeyfe/hd-common-connect-sdk`。この方法には iframe や OneKey Bridge は不要です。
+
+## 要件 [#requirements]
+
+- WebUSB 対応ブラウザーと安全なコンテキスト。`navigator.usb` の有無を確認し、利用できない場合は対応ブラウザーの案内を表示します。
+- USB 選択画面を開くためのユーザー操作。
+- 初期化済みの OneKey デバイスとデータ通信対応 USB ケーブル。
+- [UI イベント処理](/ja/hardware-sdk/core-api-guide#events-ui) で PIN、パスフレーズ、デバイス確認を処理します。
+
+## 1. インストールと初期化 [#1-install-and-initialize]
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+SDK パッケージのバージョンを揃え、アプリ起動付近で一度初期化します:
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+## 2. UI イベントを登録 [#2-register-ui-events]
+
+アドレスの読み取りや署名の前に、完全な [Core API の UI ハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録します。入力リクエストとデバイス通知を区別し、応答の関連付けを維持します。
+
+ダイアログはアプリケーションが提供します。ホストでの PIN 入力にはブラインドキーパッドが必要です。デバイス専用の PIN/ボタン要求には、ホストの承認ボタンではなく案内画面を表示します。ユーザーのキャンセル時は選択中の SDK 操作をキャンセルし、統合の終了時にはリスナーを削除してください。
+
+## 3. ユーザー操作から許可を要求 [#3-authorize-from-a-user-action]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Call directly from the user's Connect button handler.
+async function authorizeUsb() {
+  if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+  await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+}
+```
+
+ボタンハンドラーで選択画面のキャンセルを処理します。選択画面が開いても、デバイスが初期化済みとは限りません。許可済みデバイスは再表示せずに列挙できる場合があります。
+
+## 4. 接続を選択し、識別情報を取得 [#4-select-the-connection-and-read-identity]
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
+
+// This example requires one device. Use a device selector for multiple candidates.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+```
+
+検出結果に `deviceId` が含まれると仮定せず、USB 記述子からプロトコルを推測しないでください。[デバイスを検索](/ja/hardware-sdk/basic-api/search-devices)を参照してください。
+
+## 5. 受取アドレスを確認 [#5-confirm-a-receiving-address]
+
+```ts
+const address = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+
+// Display address.payload.address in your application after device confirmation.
+```
+
+この例は標準ウォレットを明示的に選択します。隠しウォレットでは [`openWalletSession`](/ja/hardware-sdk/basic-api/open-wallet-session) でウォレットを開き、返された `passphraseState` をアドレス取得と署名の両方に渡します。ウォレットコンテキストと導出パスを一致させてください。
+
+## 切断とクリーンアップ [#disconnect-and-cleanup]
+
+- `DEVICE.DISCONNECT` を購読し、UI で現在の接続を無効にします。
+- 再接続後は再列挙し、デバイス状態を読み取ります。
+- デバイスごとに呼び出しを直列化し、タイムアウト後に署名やファームウェア更新を自動で繰り返さないでください。
+- SDK の終了時やトランスポートの切り替え時には `dispose()` を呼び出し、再利用する前に初期化してください。
+
+参照: [再接続と破棄](/ja/hardware-sdk/transport/reconnect).
+
+## トラブルシューティング [#troubleshooting]
+
+| 症状 | 確認項目 |
+| --- | --- |
+| `navigator.usb` がない | ブラウザーの対応状況と安全なコンテキスト。 |
+| 選択画面が開かない | ユーザー操作から直接呼び出してください。 |
+| デバイスを取得できない | 別のタブ、アプリ、Bridge が使用中の可能性があります。再試行前にその接続を閉じてください。 |
+| 呼び出しが入力待ちになる | UI ハンドラーを登録し、通知を区別して、応答の関連付けを保持してください。 |
+| 想定外のアカウント | 確認項目 `deviceId`, パス、明示的な標準/隠しウォレットの関連付け。 |
+
+続いてこちらへ [署名者ガイド](/ja/hardware-sdk/signers) または [エラーコード](/ja/hardware-sdk/core-api-guide#error-codes).

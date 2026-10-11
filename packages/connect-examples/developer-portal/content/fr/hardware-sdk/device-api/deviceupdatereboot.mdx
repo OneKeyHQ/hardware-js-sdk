@@ -1,0 +1,44 @@
+---
+description: "Demandez le mode bootloader sur un appareil Protocol V1 et redécouvrez sa connexion avant les opérations de micrologiciel."
+title: "deviceUpdateReboot"
+---
+
+# deviceUpdateReboot
+
+## Redémarrer l’appareil [#reboot-device]
+
+Demander le mode bootloader sur les appareils **Protocol V1** dans le cadre d’un parcours explicite de mise à jour du micrologiciel. Cette méthode ne déclare pas de prise en charge de Protocol V2 ; utilisez le [parcours de mise à jour du micrologiciel Protocol V2](/fr/hardware-sdk/device-api/firmwareupdatev4) pour Pro 2 et Neo.
+
+L’appareil peut se déconnecter et être énuméré sous un autre ID de connexion. Redécouvrez-le et vérifiez son état avant de poursuivre.
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## Paramètres [#params]
+
+* vide
+
+## Exemple [#example]
+
+```typescript
+const response = await HardwareSDK.deviceUpdateReboot(connectId);
+if (!response.success) throw new Error(response.payload.error);
+```
+
+## Résultat [#result]
+
+Un résultat SDK réussi accuse réception de la demande. Ne déduisez pas le nouveau mode d’une structure de données codée en dur ; relisez l’état de l’appareil après sa reconnexion.
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

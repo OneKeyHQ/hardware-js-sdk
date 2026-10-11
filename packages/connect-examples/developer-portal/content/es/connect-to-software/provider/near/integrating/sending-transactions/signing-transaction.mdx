@@ -1,0 +1,23 @@
+---
+title: "Firma de transacciones"
+---
+
+<span id="signing-transaction" />
+
+# Firma de transacciones
+
+Firmar transacciones sin enviarlas.
+
+El método devuelve una Promise. La estructura de la respuesta requiere verificación para cada versión: la declaración pública del proveedor menciona `transactionHashes`, mientras que el ejemplo público consulta `signatures`. No dependas de ninguno de los dos campos hasta comprobar la versión del proveedor instalado y de la cartera. Esta solicitud solo firma y no difunde la transacción.
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_signTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_signTransactions', res);
+```

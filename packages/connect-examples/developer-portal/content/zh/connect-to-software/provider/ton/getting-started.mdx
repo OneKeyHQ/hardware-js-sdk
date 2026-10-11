@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+发送请求前先连接钱包。将示例地址和 manifest URL 替换为有效值。用于身份验证时，使用服务器生成的一次性挑战，并在服务器验证证明。
+
 了解如何检测、连接和与 TON 进行交互。
 
 <Callout type="info">
-OneKey 实现了 TON Connect 2.0 协议，确保与所有 TON dApp 兼容。
+OneKey 通过 TON Connect 2.0 协议提供本文列出的操作。
 </Callout>
 
 ---
@@ -18,17 +20,17 @@ OneKey 实现了 TON Connect 2.0 协议，确保与所有 TON dApp 兼容。
 ## Provider 检测
 
 ```typescript
-// 检测 OneKey TON provider
+// Detect OneKey TON provider
 const provider = window.$onekey?.tonconnect
 
 if (!provider) {
-  throw new Error('未检测到 OneKey TON provider')
+  throw new Error('OneKey TON provider not detected')
 }
 
-// 检查设备和钱包信息
-console.log('设备:', provider.deviceInfo)
-console.log('钱包:', provider.walletInfo)
-console.log('协议版本:', provider.protocolVersion) // 2
+// Check device and wallet info
+console.log('Device:', provider.deviceInfo)
+console.log('Wallet:', provider.walletInfo)
+console.log('Protocol Version:', provider.protocolVersion) // 2
 ```
 
 ---
@@ -36,16 +38,16 @@ console.log('协议版本:', provider.protocolVersion) // 2
 ## 连接钱包
 
 ```typescript
-// 基本连接
+// Basic connection
 const connectEvent = await provider.connect()
 
 if (connectEvent.event === 'connect') {
   const addressItem = connectEvent.payload.items.find(
     item => item.name === 'ton_addr'
   )
-  console.log('已连接:', addressItem.address)
+  console.log('Connected:', addressItem?.address)
 } else {
-  console.error('连接失败:', connectEvent.payload.message)
+  console.error('Connection failed:', connectEvent.payload.message)
 }
 ```
 
@@ -70,8 +72,8 @@ if (connectEvent.event === 'connect') {
   const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
   const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
 
-  console.log('地址:', addressItem.address)
-  console.log('证明:', proofItem?.proof)
+  console.log('Address:', addressItem?.address)
+  console.log('Proof:', proofItem?.proof)
 }
 ```
 
@@ -101,7 +103,7 @@ if (connectEvent.event === 'connect') {
 const connectEvent = await provider.restoreConnection()
 
 if (connectEvent.event === 'connect') {
-  console.log('会话已恢复')
+  console.log('Session restored')
 }
 ```
 
@@ -119,20 +121,20 @@ await provider.disconnect()
 
 ```typescript
 provider.listen((event) => {
-  console.log('钱包事件:', event)
+  console.log('Wallet event:', event)
 })
 
-// 或使用特定的事件监听器
+// Or use specific event listeners
 provider.on('accountChanged', (address) => {
   if (address) {
-    console.log('账户已变更:', address)
+    console.log('Account changed:', address)
   } else {
-    console.log('已断开连接')
+    console.log('Disconnected')
   }
 })
 
 provider.on('disconnect', () => {
-  console.log('钱包已断开连接')
+  console.log('Wallet disconnected')
 })
 ```
 
@@ -160,4 +162,3 @@ function App() {
 ```
 
 OneKey 会被 TON Connect SDK 自动检测。
-

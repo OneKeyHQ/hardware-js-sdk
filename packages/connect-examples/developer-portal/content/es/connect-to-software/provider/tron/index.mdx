@@ -1,0 +1,358 @@
+---
+title: "TRON"
+description: "Integración con TRON mediante el proveedor de OneKey compatible con TronLink"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# TRON
+
+Integra la cadena de bloques TRON mediante el proveedor de OneKey compatible con TronLink. Accede a través de `window.$onekey.tron` o `window.tronWeb`.
+
+<Callout type="info">
+OneKey ofrece un proveedor compatible con TronLink y una integración con TronWeb. La disponibilidad de funciones depende de la versión de la cartera y de la red seleccionada.
+</Callout>
+
+---
+
+## Enlaces rápidos [#quick-links]
+
+- [Referencia de la API](#api-reference)
+- [Primeros pasos](getting-started)
+- [Transacciones](#transactions)
+- [Firma de mensajes](#message-signing)
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// OneKey injects both the provider and TronWeb instances
+const provider = window.$onekey?.tron
+
+// TronWeb is available globally after connection
+let tronWeb = provider?.tronWeb
+
+if (!provider) {
+  throw new Error('OneKey TRON provider not detected')
+}
+
+// Check if it's TronLink compatible
+console.log('isTronLink:', provider.isTronLink) // true
+```
+
+---
+
+## Inicio rápido [#quick-start]
+
+### Solicitar cuentas [#request-accounts]
+
+```typescript
+// Request connection
+const result = await provider.request({
+  method: 'tron_requestAccounts'
+})
+
+if (result.code === 200) {
+  tronWeb = provider.tronWeb
+  if (!tronWeb) throw new Error('OneKey TronWeb is not ready')
+  console.log('Connected!')
+  const address = tronWeb.defaultAddress.base58
+  console.log('Address:', address)
+} else {
+  console.log('Connection rejected:', result.message)
+}
+```
+
+### Comprobar el estado de conexión [#check-connection-status]
+
+```typescript
+// Check if TronWeb is ready
+if (provider.ready && tronWeb && tronWeb.defaultAddress.base58) {
+  console.log('Connected:', tronWeb.defaultAddress.base58)
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## Uso de TronWeb [#using-tronweb]
+
+Después de conectar, usa `provider.tronWeb` para mantener las solicitudes asociadas a OneKey:
+
+### Obtener el saldo [#get-balance]
+
+```typescript
+const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58)
+console.log('Balance:', tronWeb.fromSun(balance), 'TRX')
+```
+
+### Enviar TRX [#send-trx]
+
+```typescript
+const tx = await tronWeb.trx.sendTransaction(
+  'TRecipientAddress...',
+  tronWeb.toSun(10) // 10 TRX
+)
+
+console.log('Transaction:', tx.txid)
+```
+
+### Enviar un token TRC20 [#send-trc20-token]
+
+```typescript
+const contractAddress = 'TTokenContractAddress...'
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Get decimals
+const decimals = await contract.decimals().call()
+
+// Transfer tokens
+const amount = (100n * 10n ** BigInt(decimals.toString())).toString() // 100 tokens, exact integer
+const tx = await contract.transfer(
+  'TRecipientAddress...',
+  amount
+).send()
+
+console.log('Transaction:', tx)
+```
+
+---
+
+## Transacciones [#transactions]
+
+### Firmar una transacción [#sign-transaction]
+
+Firma una transacción sin difundirla:
+
+```typescript
+// Build transaction
+const tx = await tronWeb.transactionBuilder.sendTrx(
+  'TRecipientAddress...',
+  tronWeb.toSun(10),
+  tronWeb.defaultAddress.base58
+)
+
+// Sign via provider
+const signedTx = await provider.sign(tx)
+
+console.log('Signed transaction:', signedTx)
+
+// Broadcast manually
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+### Interacción con contratos inteligentes [#smart-contract-interaction]
+
+```typescript
+// Call contract method
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Read (view function)
+const result = await contract.someViewFunction().call()
+
+// Write (requires signing)
+const tx = await contract.someWriteFunction(param1, param2).send({
+  feeLimit: 100_000_000, // 100 TRX
+  callValue: 0,
+})
+```
+
+### Ejecutar un contrato inteligente [#trigger-smart-contract]
+
+```typescript
+const tx = await tronWeb.transactionBuilder.triggerSmartContract(
+  contractAddress,
+  'transfer(address,uint256)',
+  { feeLimit: 100_000_000 },
+  [
+    { type: 'address', value: recipientAddress },
+    { type: 'uint256', value: amount }
+  ],
+  tronWeb.defaultAddress.base58
+)
+
+const signedTx = await provider.sign(tx.transaction)
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## Firma de mensajes [#message-signing]
+
+### Firmar un mensaje V1 (hexadecimal) [#sign-message-v1-hex]
+
+Firma mensajes codificados en hexadecimal:
+
+```typescript
+const message = tronWeb.toHex('Hello TRON!')
+const signature = await provider.signMessage(message)
+
+console.log('Signature:', signature)
+```
+
+### Firmar un mensaje V2 (UTF-8) [#sign-message-v2-utf-8]
+
+Firma mensajes UTF-8 directamente:
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+console.log('Signature:', signature)
+```
+
+### Verificar la firma [#verify-signature]
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+// Verify using TronWeb
+const address = await tronWeb.trx.verifyMessageV2(message, signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Gestión de eventos [#event-handling]
+
+### Escuchar cambios de cuenta [#listen-for-account-changes]
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts[0]) {
+    console.log('Account changed:', accounts[0])
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Escuchar cambios de red [#listen-for-network-changes]
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Network changed:', chainId)
+  // Recommend page reload for network changes
+})
+```
+
+### Eventos de ventana (compatibles con TronLink) [#window-events-tronlink-compatible]
+
+```typescript
+// Listen for TronLink initialization
+window.addEventListener('tronLink#initialized', () => {
+  console.log('TronLink initialized')
+})
+
+// Listen for messages
+window.addEventListener('message', (event) => {
+  if (event.source === window && event.data?.isTronLink && event.data?.message) {
+    const { action, data } = event.data.message
+    console.log('TronLink event:', action, data)
+  }
+})
+```
+
+---
+
+## Referencia de la API [#api-reference]
+
+### Métodos del proveedor [#provider-methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `request({ method, params })` | Solicitud JSON-RPC genérica |
+| `sign(transaction)` | Firmar una transacción |
+| `signMessage(hexMessage)` | Firmar un mensaje hexadecimal (V1) |
+| `signMessageV2(message)` | Firmar un mensaje UTF-8 (V2) |
+
+### Métodos de solicitud [#request-methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `tron_requestAccounts` | Solicitar conexión |
+| `tron_getProviderState` | Obtener el estado del proveedor |
+| `tron_signTransaction` | Firmar una transacción |
+| `signMessageV1` | Firmar un mensaje V1 |
+| `signMessageV2` | Firmar un mensaje V2 |
+
+### Códigos de respuesta [#response-codes]
+
+Para `tron_requestAccounts`, consulta el campo `code`. La implementación actual del proveedor devuelve `4001` para una solicitud que ya está pendiente y `4000` cuando no se devuelven cuentas o la solicitud falla. No tienen los significados de los errores JSON-RPC de Ethereum.
+
+| Código | Descripción |
+|------|-------------|
+| 200 | Éxito |
+| 4000 | Rechazado por el usuario |
+| 4001 | Solicitud en cola |
+
+### Eventos [#events]
+
+| Evento | Descripción |
+|-------|-------------|
+| `accountsChanged` | Cuenta cambiada |
+| `chainChanged` | Red cambiada |
+| `connect` | Conectado |
+| `disconnect` | Desconectado |
+
+---
+
+## Uso de SunWeb [#using-sunweb]
+
+Para operaciones DappChain (cadena lateral):
+
+```typescript
+const sunWeb = window.sunWeb
+
+// Main chain to side chain
+await sunWeb.depositTrx(
+  amount,
+  depositFee,
+  feeLimit
+)
+
+// Side chain to main chain
+await sunWeb.withdrawTrx(
+  amount,
+  withdrawFee,
+  feeLimit
+)
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  const result = await provider.request({
+    method: 'tron_requestAccounts'
+  })
+
+  if (result.code === 4001) {
+    console.log('A connection request is already pending')
+  } else if (result.code !== 200) {
+    console.log('Connection was not approved:', result.message)
+  }
+} catch (error) {
+  console.error('Request failed:', error)
+}
+```
+
+---
+
+## Migración desde TronLink [#migration-from-tronlink]
+
+OneKey es compatible con TronLink. Actualiza tu lógica de detección:
+
+```typescript
+// Before (TronLink only)
+const tronWeb = window.tronWeb
+
+// After (OneKey with TronLink fallback)
+const provider = window.$onekey?.tron || window.tronLink
+const tronWeb = window.tronWeb // Compatibility global; verify which wallet owns it
+```

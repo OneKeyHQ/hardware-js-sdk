@@ -6,13 +6,13 @@ title: aptosSignTransaction
 
 ## 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 3.0.0
   * Classic/Mini: 2.6.0
 
 ## Aptos：签名交易
 
-使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定路径派生的密钥请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const result = await HardwareSDK.aptosSignTransaction(connectId, deviceId, params);
@@ -22,8 +22,8 @@ const result = await HardwareSDK.aptosSignTransaction(connectId, deviceId, param
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `rawTx` - _必需_ `string` 序列化交易字符串。
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _必需_ `string`。以十六进制字符串编码的序列化交易。
 
 ### 示例
 
@@ -46,7 +46,7 @@ const response = await HardwareSDK.aptosSignTransaction(
   payload: {
     path: "m/44'/637'/0'/0'/0'",
     public_key: string,
-    signature: string
+    signature: string,
   }
 }
 ```
@@ -57,8 +57,8 @@ const response = await HardwareSDK.aptosSignTransaction(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

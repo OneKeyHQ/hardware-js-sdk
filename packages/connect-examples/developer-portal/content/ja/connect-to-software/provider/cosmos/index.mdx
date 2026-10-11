@@ -1,0 +1,328 @@
+---
+title: "Cosmos"
+description: "OneKey の Keplr 互換プロバイダーによる Cosmos の統合"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Cosmos
+
+OneKey の Keplr 互換プロバイダーで Cosmos エコシステムのチェーンを統合します。アクセス先: `window.$onekey.cosmos`.
+
+<Callout type="info">
+OneKey は Keplr 互換のメソッドを公開しています。アプリケーションが必要とするメソッドとチェーンを、対象ウォレットのバージョンで確認してください。
+</Callout>
+
+---
+
+## クイックリンク [#quick-links]
+
+- [API リファレンス](#api-reference)
+- [チェーン管理](#chain-management)
+- [メッセージへの署名](#signing-messages)
+- [トランザクションの送信](#sending-transactions)
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// Detect OneKey Cosmos provider
+const provider = window.$onekey?.cosmos
+
+if (!provider) {
+  throw new Error('OneKey Cosmos provider not detected')
+}
+
+// Check if it's OneKey
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
+```
+
+---
+
+## クイックスタート [#quick-start]
+
+### チェーンに接続 [#connect-to-chain]
+
+```typescript
+const chainId = 'cosmoshub-4'
+
+// Request access to the chain. Read key information separately with getKey().
+await provider.enable(chainId)
+
+// Or enable multiple chains at once
+await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
+```
+
+### アカウント情報を取得 [#get-account-info]
+
+```typescript
+const chainId = 'cosmoshub-4'
+const key = await provider.getKey(chainId)
+
+console.log({
+  name: key.name,           // Account name
+  algo: key.algo,           // Signing algorithm (secp256k1)
+  pubKey: key.pubKey,       // Public key (Uint8Array)
+  address: key.address,     // Raw address bytes
+  bech32Address: key.bech32Address,  // Bech32 formatted address
+  isNanoLedger: key.isNanoLedger,    // Ledger compatibility flag
+})
+```
+
+---
+
+## チェーン管理 [#chain-management]
+
+### カスタムチェーンを追加 [#add-custom-chain]
+
+`experimentalSuggestChain` で標準対応していないチェーンを追加します:
+
+```typescript
+await provider.experimentalSuggestChain({
+  chainId: 'my-chain-1',
+  chainName: 'My Custom Chain',
+  rpc: 'https://rpc.mychain.io',
+  rest: 'https://lcd.mychain.io',
+  bip44: { coinType: 118 },
+  bech32Config: {
+    bech32PrefixAccAddr: 'mychain',
+    bech32PrefixAccPub: 'mychainpub',
+    bech32PrefixValAddr: 'mychainvaloper',
+    bech32PrefixValPub: 'mychainvaloperpub',
+    bech32PrefixConsAddr: 'mychainvalcons',
+    bech32PrefixConsPub: 'mychainvalconspub',
+  },
+  currencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  }],
+  feeCurrencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+    gasPriceStep: { low: 0.01, average: 0.025, high: 0.04 },
+  }],
+  stakeCurrency: {
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  },
+})
+```
+
+### 切断 [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## メッセージへの署名 [#signing-messages]
+
+### Amino 署名 (従来方式) [#sign-amino-legacy]
+
+従来の Amino エンコードされたトランザクション向け:
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = {
+  chain_id: chainId,
+  account_number: '0',
+  sequence: '0',
+  fee: {
+    amount: [{ denom: 'uatom', amount: '5000' }],
+    gas: '200000',
+  },
+  msgs: [{
+    type: 'cosmos-sdk/MsgSend',
+    value: {
+      from_address: signer,
+      to_address: 'cosmos1...',
+      amount: [{ denom: 'uatom', amount: '1000000' }],
+    },
+  }],
+  memo: '',
+}
+
+const result = await provider.signAmino(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,       // Signed document
+  signature: result.signature, // { pub_key, signature }
+})
+```
+
+### Direct 署名 (Protobuf) [#sign-direct-protobuf]
+
+最新の Protobuf エンコードされたトランザクション向け:
+
+```typescript
+import { makeSignDoc } from '@cosmjs/proto-signing'
+
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = makeSignDoc(
+  bodyBytes,      // Transaction body
+  authInfoBytes,  // Auth info with fee
+  chainId,
+  accountNumber
+)
+
+const result = await provider.signDirect(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,
+  signature: result.signature,
+})
+```
+
+### 任意のデータに署名 [#sign-arbitrary-data]
+
+任意のメッセージに署名する場合 (認証に便利):
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+const data = 'Login to MyApp at 2024-01-01T00:00:00Z'
+
+const signature = await provider.signArbitrary(chainId, signer, data)
+
+// Verify the signature
+const isValid = await provider.verifyArbitrary(chainId, signer, data, signature)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## トランザクションの送信 [#sending-transactions]
+
+### トランザクションをブロードキャスト [#broadcast-transaction]
+
+```typescript
+const chainId = 'cosmoshub-4'
+// `txBytes` is the complete signed transaction as a Uint8Array.
+
+// Broadcast modes: 'block', 'sync', 'async'
+const result = await provider.sendTx(chainId, txBytes, 'sync')
+
+console.log('TX Hash:', result)
+```
+
+---
+
+## オフライン署名者 [#offline-signers]
+
+CosmJS で使用するオフライン署名者を取得します:
+
+```typescript
+import { SigningStargateClient } from '@cosmjs/stargate'
+
+const chainId = 'cosmoshub-4'
+
+// Auto-detect best signer type
+const offlineSigner = await provider.getOfflineSignerAuto(chainId)
+
+// Or use specific signer types
+const aminoSigner = provider.getOfflineSignerOnlyAmino(chainId)
+const directSigner = provider.getOfflineSigner(chainId)
+
+// Use with CosmJS
+const client = await SigningStargateClient.connectWithSigner(
+  'https://rpc.cosmos.network',
+  offlineSigner
+)
+
+// Send tokens
+const result = await client.sendTokens(
+  senderAddress,
+  recipientAddress,
+  [{ denom: 'uatom', amount: '1000000' }],
+  { amount: [{ denom: 'uatom', amount: '5000' }], gas: '200000' }
+)
+```
+
+---
+
+## API リファレンス [#api-reference]
+
+### メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `enable(chainIds)` | チェーンへのアクセスを要求。値を返さずに解決 |
+| `disable(chainIds)` | チェーンを無効化 |
+| `disconnect()` | すべてのチェーンから切断 |
+| `getKey(chainId)` | チェーンのアカウントキーを取得 |
+| `signAmino(chainId, signer, signDoc)` | Amino エンコードされたトランザクションに署名 |
+| `signDirect(chainId, signer, signDoc)` | Protobuf エンコードされたトランザクションに署名 |
+| `sendTx(chainId, tx, mode)` | 署名済みトランザクションをブロードキャスト |
+| `signArbitrary(chainId, signer, data)` | 任意のメッセージに署名 |
+| `verifyArbitrary(chainId, signer, data, signature)` | 署名を検証 |
+| `experimentalSuggestChain(chainInfo)` | カスタムチェーンを追加 |
+| `getOfflineSigner(chainId)` | Direct オフライン署名者を取得 |
+| `getOfflineSignerOnlyAmino(chainId)` | Amino 専用オフライン署名者を取得 |
+| `getOfflineSignerAuto(chainId)` | 最適な署名者タイプを自動検出 |
+
+### 鍵のインターフェース [#key-interface]
+
+```typescript
+interface Key {
+  name: string              // Human-readable name
+  algo: string              // Signing algorithm
+  pubKey: Uint8Array        // Public key bytes
+  address: Uint8Array       // Address bytes
+  bech32Address: string     // Bech32 formatted address
+  isNanoLedger: boolean     // Ledger compatibility flag
+  isKeystone: boolean       // True if Keystone hardware
+}
+```
+
+### 対応チェーン [#supported-chains]
+
+| チェーン | チェーン ID | ウォレットでの利用可否 |
+|-------|----------|----------------|
+| Cosmos Hub | `cosmoshub-4` | 対象のウォレットで確認 |
+| Osmosis | `osmosis-1` | 対象のウォレットで確認 |
+| Juno | `juno-1` | 対象のウォレットで確認 |
+| Stargaze | `stargaze-1` | 対象のウォレットで確認 |
+| Akash | `akashnet-2` | 対象のウォレットで確認 |
+| Secret Network | `secret-4` | 対象のウォレットで確認 |
+| カスタム | チェーン固有 | 次で要求: `experimentalSuggestChain`; 受け入れられる保証はありません |
+
+---
+
+## エラー処理 [#error-handling]
+
+```typescript
+try {
+  await provider.enable('cosmoshub-4')
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.message.includes('not supported')) {
+    console.log('Chain not supported, try experimentalSuggestChain')
+  } else {
+    console.error('Connection failed:', error)
+  }
+}
+```
+
+---
+
+## Keplr からの移行 [#migration-from-keplr]
+
+OneKey の Cosmos プロバイダーは Keplr と互換性があります。プロバイダーの検出処理を変更するだけで利用できます:
+
+```typescript
+// Before (Keplr only)
+const provider = window.keplr
+
+// After (OneKey with Keplr fallback)
+const provider = window.$onekey?.cosmos || window.keplr
+```

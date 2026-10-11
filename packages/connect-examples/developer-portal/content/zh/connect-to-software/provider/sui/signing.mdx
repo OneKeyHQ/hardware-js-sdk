@@ -7,7 +7,17 @@ import { Callout } from 'nextra/components'
 
 # 签名
 
+下方签名示例使用[快速开始](/zh/connect-to-software/provider/sui/getting-started#签名所需的账户上下文)中的 `connectSuiAccount()`，获取 Wallet Standard 账户及其当前链。示例使用 `@mysten/sui@1.28.2`；在 `@mysten/wallet-standard@0.14.7` 中，即使旧版 `*TransactionBlock` 方法也声明接收 `Transaction`。
+
+签名前请求权限、选择已连接账户，并读取当前链。这些示例使用 `@mysten/sui@1.28.2`，与当前 provider 接受的 `@mysten/wallet-standard@0.14.7` 匹配。
+
 了解如何签署消息用于身份验证。
+
+运行下方示例前，先初始化账户上下文：
+
+```typescript
+const { account, chain } = await connectSuiAccount()
+```
 
 ---
 
@@ -17,18 +27,16 @@ import { Callout } from 'nextra/components'
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
 
 const result = await provider.signPersonalMessage({
-  message,
   account,
   chain,
+  message,
 })
 
 console.log({
-  signature: result.signature,   // Base64 编码的签名
-  bytes: result.bytes,           // 已签名的消息字节
+  signature: result.signature,   // Base64 encoded signature
+  bytes: result.bytes,           // Signed message bytes
 })
 ```
 
@@ -38,13 +46,10 @@ console.log({
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
 
 const result = await provider.signMessage({
-  message,
   account,
-  chain,
+  message,
 })
 
 console.log({
@@ -58,18 +63,14 @@ console.log({
 ## 验证签名
 
 ```typescript
-import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
 const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
-const accounts = await provider.getAccounts()
-const publicKey = accounts[0].publicKey
-
-const isValid = await verifyPersonalMessage(message, signature)
-console.log('签名有效:', isValid)
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('Expected signer:', isExpectedSigner)
 ```
 
 ---
@@ -81,9 +82,9 @@ try {
   await provider.requestPermissions()
 } catch (error) {
   if (error.code === 4001) {
-    console.log('用户拒绝了连接请求')
+    console.log('User rejected the connection request')
   } else {
-    console.error('连接错误:', error.message)
+    console.error('Connection error:', error.message)
   }
 }
 ```

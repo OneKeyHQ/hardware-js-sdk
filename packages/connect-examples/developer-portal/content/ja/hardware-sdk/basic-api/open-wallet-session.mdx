@@ -1,0 +1,64 @@
+---
+description: "標準または隠しウォレットを選択し、SDK が返す公開の識別情報を読み取ります。"
+title: "ウォレットセッションを開く"
+---
+
+<span id="open-wallet-session" />
+
+# ウォレットセッションを開く
+
+標準ウォレットを開く、またはユーザーに隠しウォレットを選択させるための、Protocol V1 / V2 共通の入り口です。
+
+非推奨の [`getPassphraseState`](/ja/hardware-sdk/basic-api/get-passphrase-state) の代わりに使用します。アドレス取得と署名の呼び出しは引き続き `deviceId` + `passphraseState` を受け取り、毎回セッションを開き直す必要はありません。`resume-hidden` モードは存在しません。Core は、以降のメソッドで初めて `passphraseState` を受け取ったときに内部で再開します。
+
+参照: [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session) で仕様を確認してください。
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+const res = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+この呼び出しでは、`mode` を `useEmptyPassphrase` または `initSession` と併用しないでください。
+
+| パラメーター | 型 | 必須 | 注意事項 |
+| --- | --- | --- | --- |
+| `mode` | `'standard' \| 'select-hidden'` | はい | `@onekeyfe/hd-core` の `OpenWalletSessionMode` を使用 |
+
+### 結果 [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    deviceId: string,
+    resumed: boolean,
+    walletType: 'standard' | 'hidden',
+    passphraseState: string | null, // null on standard wallet
+  }
+}
+```
+
+永続化します: `deviceId`, `walletType`, および `passphraseState`。ファームウェアの `session_id` は返されません。
+
+### エラー [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+この呼び出しに `mode: 'resume-hidden'` や `deviceId` / `passphraseState` を渡すと、`CallMethodInvalidParameter` が返されます。関連付け済みの隠しウォレットを再開するには、次のアドレス取得 / 署名メソッドに `passphraseState` を渡します。`DeviceCheckUnlockTypeError` は、現在の PIN / Attach-to-PIN のコンテキストでは要求されたウォレットにアクセスできないことを意味します。

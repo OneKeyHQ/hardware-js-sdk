@@ -1,0 +1,56 @@
+---
+title: "starcoinVerifyMessage"
+---
+
+# starcoinVerifyMessage
+
+## Starcoin: メッセージを検証 [#starcoin-verify-message]
+
+署名者の公開鍵と署名を使ってメッセージを検証します。
+
+ES6
+
+```typescript
+const result = await HardwareSDK.starcoinVerifyMessage(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `publicKey` - _必須_ `string` 署名者の publicKey。
+* `messageHex` - _必須_ `string` 16 進数文字列にエンコードされた署名対象メッセージ。
+* `signature` - _必須_ `string` 16 進数形式の署名。
+
+## 例 [#example]
+
+```typescript
+HardwareSDK.starcoinVerifyMessage(connectId, deviceId, {
+    publicKey: "cf90aea8962229869bcba527f0cf0de73ad4c22fe27ad2875007e967db7056f5",
+    messageHex: "0x6578616d706c65206d657373616765",
+    signature: "447d2c3131c32d176106482d8fc780d933f13b37b0f06beee27de5e73a945e8c807f7764d269a196306f53383a26ab632913f4076457e3230b9defafe1c6ba0b",
+});
+```
+
+## 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

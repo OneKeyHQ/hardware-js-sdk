@@ -1,0 +1,95 @@
+---
+title: "stellarSignTransaction"
+---
+
+# stellarSignTransaction
+
+## Stellar : signer une transaction [#stellar-sign-transaction]
+
+Demande une signature de transaction avec la clé dérivée du chemin spécifié. L’utilisateur vérifie et confirme la demande sur l’appareil.
+
+```typescript
+const result = await HardwareSDK.stellarSignTransaction(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` Un chemin de compte Stellar entièrement renforcé, tel que `m/44'/148'/0'`. en savoir plus
+* `networkPassphrase` - _obligatoire_ `string` phrase secrète du réseau
+* `transaction` - _obligatoire_ `Object` de type StellarTransaction
+
+#### Type StellarTransaction [#stellartransaction-type]
+
+```typescript
+export type StellarTransaction = {
+  source: string;
+  fee: number;
+  sequence: string | number;
+  timebounds?: {
+    minTime: number;
+    maxTime: number;
+  };
+  memo?: {
+    type: 0 | 1 | 2 | 3 | 4;
+    id?: string;
+    text?: string;
+    hash?: string | Buffer;
+  };
+  operations: StellarOperation[];
+};
+```
+
+### Exemples [#examples]
+
+```typescript
+const response = await HardwareSDK.stellarSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/148'/0'",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    transaction: {
+        source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+        fee: 200,
+        sequence: 4238497296,
+        memo: {
+            type: 0,
+        },
+        operations: [
+            {
+                type: "payment",
+                source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                amount: "10000"
+            }
+        ]
+    }
+  }
+);
+```
+
+Résultat
+
+```typescript
+{
+  success: true,
+  payload: {
+    public_key: string,
+    signature: string,
+  }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

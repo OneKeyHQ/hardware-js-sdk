@@ -1,0 +1,38 @@
+---
+description: "Comparez les capacités de transport des appareils et utilisez la connexion active pour déterminer la prise en charge du protocole."
+title: "Appareils"
+---
+
+<span id="devices" />
+
+# Appareils
+
+Hardware SDK 1.2.0 prend en charge deux familles de protocoles avec une seule API publique. Choisissez ici les contraintes de l’appareil ; continuez à appeler les mêmes méthodes.
+
+| Appareil | Code | Protocole | USB | BLE | Air-Gap (QR) |
+| --- | --- | --- | --- | --- | --- |
+| OneKey Classic | `classic` | V1 | Oui | Oui | Non |
+| OneKey Classic 1s | `classic1s` | V1 | Oui | Oui | Non |
+| OneKey Classic 1s Pure | `classicpure` | V1 | Oui | Oui | Non |
+| OneKey Mini | `mini` | V1 | Oui | **Non** | Non |
+| OneKey Touch | `touch` | V1 | Oui | Oui | Non |
+| OneKey Pro | `pro` | V1 | Oui | Oui | Oui |
+| OneKey Pro 2 | `pro2` | **V2** | Oui | Oui | Oui |
+| OneKey Neo | `neo` | **V2** | Oui | Oui | **Non** (sans caméra) |
+
+Le SDK indique le protocole connecté dans l’objet appareil sous le champ `connectProtocol` (`'V1'` ou `'V2'`). Cette valeur résulte d’une interrogation active, pas d’une déduction à partir du nom du modèle.
+
+## Comment utiliser le modèle [#what-you-should-do-with-the-model]
+
+- Utilisez le modèle pour **les capacités et l’expérience utilisateur** : Mini n’a pas de BLE, Neo n’a pas de QR Air-Gap, Pro / Pro 2 prennent en charge Air-Gap.
+- N’utilisez **pas** le nom du modèle pour choisir entre Protocol V1 et V2. Lisez le protocole confirmé par la connexion active.
+- L’API de mise à jour du micrologiciel suit la famille de protocole : Pro utilise [`firmwareUpdateV3`](/fr/hardware-sdk/device-api/firmwareupdatev3) ; Pro 2 / Neo utilisent [`firmwareUpdateV4`](/fr/hardware-sdk/device-api/firmwareupdatev4).
+
+## Liste de vérification de l’intégrateur [#integrator-checklist]
+
+1. Mettez en cache `connectId` **par transport**. Les ID USB et BLE d’une même unité sont différents.
+2. Actualisez `deviceId` après effacement / récupération. Consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers).
+3. Sérialisez les appels par appareil. Gardez les parcours de saisie et de signature sérialisés pour que les demandes et résultats restent associés à leur opération.
+4. Ne rejouez jamais une mise à jour du micrologiciel, un effacement ou tout autre appel ayant des effets de bord après une erreur de transport.
+
+Voir aussi : [Prise en charge des chaînes](/fr/hardware-sdk/concepts/chain-support) · [Protocol V1 et V2](/fr/hardware-sdk/concepts/protocol) · [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session)

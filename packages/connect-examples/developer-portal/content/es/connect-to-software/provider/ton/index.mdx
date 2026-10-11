@@ -1,0 +1,493 @@
+---
+title: "TON"
+description: "Integración con TON mediante el proveedor de OneKey compatible con TON Connect"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# TON
+
+Integra la cadena de bloques TON mediante el proveedor de OneKey compatible con TON Connect. Accede a través de `window.$onekey.tonconnect`.
+
+<Callout type="info">
+OneKey implementa el protocolo TON Connect 2.0 para las operaciones documentadas aquí.
+</Callout>
+
+---
+
+## Enlaces rápidos [#quick-links]
+
+- [Referencia de la API](#api-reference)
+- [Primeros pasos](getting-started)
+- [Transacciones](#transactions)
+- [Firma de datos](#data-signing)
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// Detect OneKey TON provider
+const provider = window.$onekey?.tonconnect
+
+if (!provider) {
+  throw new Error('OneKey TON provider not detected')
+}
+
+// Check device and wallet info
+console.log('Device:', provider.deviceInfo)
+console.log('Wallet:', provider.walletInfo)
+console.log('Protocol Version:', provider.protocolVersion) // 2
+```
+
+---
+
+## Inicio rápido [#quick-start]
+
+### Conectar la cartera [#connect-wallet]
+
+```typescript
+// Basic connection
+const connectEvent = await provider.connect()
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(
+    item => item.name === 'ton_addr'
+  )
+  console.log('Connected:', addressItem?.address)
+} else {
+  console.error('Connection failed:', connectEvent.payload.message)
+}
+```
+
+### Conectar con un manifiesto [#connect-with-manifest]
+
+Para aplicaciones de producción, proporciona una URL de manifiesto:
+
+```typescript
+const connectRequest = {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    { name: 'ton_proof', payload: 'your-challenge-string' }
+  ]
+}
+
+const connectEvent = await provider.connect(2, connectRequest)
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  console.log('Address:', addressItem?.address)
+  console.log('Proof:', proofItem?.proof)
+}
+```
+
+### Formato del manifiesto de la aplicación [#app-manifest-format]
+
+Crea `tonconnect-manifest.json` en la raíz de tu aplicación:
+
+```json
+{
+  "url": "https://yourapp.com",
+  "name": "Your App Name",
+  "iconUrl": "https://yourapp.com/icon.png",
+  "termsOfUseUrl": "https://yourapp.com/terms",
+  "privacyPolicyUrl": "https://yourapp.com/privacy"
+}
+```
+
+### Restaurar la conexión [#restore-connection]
+
+Restaura una sesión anterior:
+
+```typescript
+const connectEvent = await provider.restoreConnection()
+
+if (connectEvent.event === 'connect') {
+  console.log('Session restored')
+}
+```
+
+### Desconectar [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Transacciones [#transactions]
+
+### Enviar una transacción [#send-transaction]
+
+Envía TON usando el método `send` con `sendTransaction`:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 min validity
+      messages: [
+        {
+          address: '0:1234...', // Recipient address (raw format)
+          amount: '1000000000', // Amount in nanotons (1 TON = 10^9 nanotons)
+        }
+      ]
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Transaction BOC:', result.result)
+} else {
+  console.error('Transaction failed:', result.error.message)
+}
+```
+
+### Enviar varios mensajes [#send-multiple-messages]
+
+El proveedor anuncia actualmente un máximo de cuatro mensajes. Consulta `deviceInfo.features` para conocer el límite anunciado por la cartera; no lo interpretes como un límite de toda la red:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient1...',
+          amount: '500000000', // 0.5 TON
+        },
+        {
+          address: '0:recipient2...',
+          amount: '300000000', // 0.3 TON
+        }
+      ]
+    })
+  ]
+})
+```
+
+### Enviar con datos asociados [#send-with-payload]
+
+Incluye datos asociados para interactuar con contratos inteligentes:
+
+```typescript
+import { beginCell } from '@ton/core'
+
+// Create a comment cell
+const comment = beginCell()
+  .storeUint(0, 32) // comment op code
+  .storeStringTail('Hello from dApp!')
+  .endCell()
+
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient...',
+          amount: '100000000',
+          payload: comment.toBoc().toString('base64'),
+        }
+      ]
+    })
+  ]
+})
+```
+
+### Enviar con StateInit [#send-with-stateinit]
+
+Despliega un contrato o inicializa el estado:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:contract...',
+          amount: '50000000',
+          stateInit: stateInitBoc.toString('base64'), // Base64 encoded StateInit
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Firma de datos [#data-signing]
+
+### Firmar datos arbitrarios [#sign-arbitrary-data]
+
+Firma celdas de datos para verificarlas fuera de la cadena:
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+### Firmar una prueba (autenticación) [#sign-proof-authentication]
+
+Solicita una prueba de autenticación durante la conexión:
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem && "proof" in proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## Gestión de eventos [#event-handling]
+
+### Escuchar eventos [#listen-for-events]
+
+```typescript
+provider.listen((event) => {
+  console.log('Wallet event:', event)
+})
+
+// Or use specific event listeners
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('Account changed:', address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+
+provider.on('disconnect', () => {
+  console.log('Wallet disconnected')
+})
+```
+
+---
+
+## Referencia de la API [#api-reference]
+
+### Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `connect(version?, request?)` | Conectar la cartera |
+| `restoreConnection()` | Restaurar la sesión anterior |
+| `disconnect()` | Desconectar la cartera |
+| `send(message)` | Enviar una solicitud RPC |
+| `listen(callback)` | Escuchar eventos de la cartera |
+
+### Métodos de envío [#send-methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `sendTransaction` | Enviar TON o interactuar con contratos |
+| `signData` | Firmar celdas de datos arbitrarias |
+| `disconnect` | Desconectar mediante RPC |
+
+### Tipos [#types]
+
+```typescript
+interface AccountInfo {
+  address: string      // Raw address (0:<hex>)
+  network: string      // Network ID (-239 mainnet, -3 testnet)
+  publicKey: string    // Hex public key (no 0x)
+  walletStateInit: string // Base64 encoded state init
+}
+
+interface TransactionRequest {
+  valid_until?: number  // UNIX timestamp for validity
+  network?: string      // Network ID
+  from?: string         // Sender address
+  messages: Message[]   // Respect the wallet-advertised maximum
+}
+
+interface Message {
+  address: string      // Recipient (raw format)
+  amount: string       // Amount in nanotons
+  payload?: string     // Base64 BOC for contract calls
+  stateInit?: string   // Base64 StateInit for deployment
+}
+
+interface SignDataRequest {
+  schema_crc: number   // Schema identifier
+  cell: string         // Base64 encoded cell
+  publicKey?: string   // Optional specific key
+}
+
+interface SignDataResult {
+  signature: string    // Base64 signature
+  timestamp: number    // UNIX timestamp (UTC)
+}
+
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // Wallet version
+  maxProtocolVersion: number // 2
+  features: Array<string | { name: string; maxMessages?: number; [key: string]: unknown }> // Advertised capabilities
+}
+```
+
+### Códigos de error [#error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 0 | Error desconocido |
+| 1 | Solicitud incorrecta |
+| 100 | Aplicación desconocida |
+| 300 | El usuario rechazó la solicitud |
+| 400 | Método no compatible |
+
+---
+
+## Uso con TON Connect SDK [#using-with-ton-connect-sdk]
+
+Para aplicaciones React, usa el SDK oficial de TON Connect:
+
+```bash
+npm install @tonconnect/ui-react
+```
+
+```tsx
+import { TonConnectUIProvider, TonConnectButton } from '@tonconnect/ui-react'
+
+function App() {
+  return (
+    <TonConnectUIProvider manifestUrl="https://yourapp.com/tonconnect-manifest.json">
+      <TonConnectButton />
+      <YourApp />
+    </TonConnectUIProvider>
+  )
+}
+```
+
+TON Connect SDK detecta OneKey automáticamente.
+
+### Enviar una transacción con el SDK [#send-transaction-with-sdk]
+
+```tsx
+import { useTonConnectUI } from '@tonconnect/ui-react'
+
+function SendButton() {
+  const [tonConnectUI] = useTonConnectUI()
+
+  const handleSend = async () => {
+    const result = await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: 'EQA...',
+          amount: '1000000000',
+        }
+      ]
+    })
+    console.log('BOC:', result.boc)
+  }
+
+  return <button onClick={handleSend}>Send 1 TON</button>
+}
+```
+
+---
+
+## Formatos de dirección [#address-formats]
+
+TON usa distintos formatos de dirección:
+
+```typescript
+import { Address } from '@ton/core'
+
+// Raw format (used in provider)
+const raw = '0:1234567890abcdef...'
+
+// User-friendly format (bounceable)
+const friendly = Address.parse(raw).toString()
+// e.g., 'EQASdf...'
+
+// Non-bounceable format
+const nonBounceable = Address.parse(raw).toString({ bounceable: false })
+// e.g., 'UQASdf...'
+
+// Convert from friendly to raw
+const addr = Address.parse('EQASdf...')
+const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```

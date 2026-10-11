@@ -1,0 +1,109 @@
+---
+title: "Référence de l’API"
+description: "Référence complète de l’API du fournisseur Algorand OneKey"
+---
+
+<span id="api-reference" />
+
+# Référence de l’API
+
+Référence des méthodes et types du fournisseur Algorand OneKey.
+
+---
+
+## Méthodes [#methods]
+
+| Méthode | Description |
+|--------|-------------|
+| `connect()` | Connecter le portefeuille (historique) |
+| `disconnect()` | Déconnecter le portefeuille |
+| `enable(opts?)` | Activer le portefeuille (ARC-0001) |
+| `signTxns(transactions)` | Signer des transactions (ARC-0001) |
+| `postTxns(signedTxns)` | Diffuser des transactions |
+| `signAndPostTxns(transactions)` | Signer et diffuser |
+| `signTransaction(txns)` | Signer des transactions (historique) |
+| `signAndSendTransaction(txns)` | Signer et envoyer (historique) |
+| `signMessage(message, encoding?)` | Signer un message arbitraire |
+| `getAlgodv2Client()` | Obtenir le client Algod |
+| `getIndexerClient()` | Obtenir le client Indexer |
+
+---
+
+## Types [#types]
+
+### Options d’activation [#enable-options]
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+```
+
+### Résultat de l’activation [#enable-result]
+
+```typescript
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+```
+
+### Transaction de portefeuille [#wallet-transaction]
+
+```typescript
+interface WalletTransaction {
+  txn: string                  // Base64 encoded unsigned transaction
+  signers?: string[]           // Addresses that should sign (empty = skip)
+  stxn?: string                // Pre-signed transaction
+  message?: string             // Message to display
+  msig?: MultisigMetadata
+  authAddr?: string            // Rekeyed auth address
+}
+```
+
+### Résultat de signature des transactions [#sign-txns-result]
+
+```typescript
+type SignTxnsResult = (string | null)[]; // Base64 signed transactions; null means skipped.
+```
+
+### Résultat de publication des transactions [#post-txns-result]
+
+```typescript
+interface PostTxnsResult {
+  txnIDs: string[]
+}
+```
+
+---
+
+## Propriétés [#properties]
+
+| Propriété | Type | Description |
+|----------|------|-------------|
+| `isConnected` | `boolean` | État de connexion |
+| `address` | `string \| null` | Adresse connectée |
+| `isOneKey` | `boolean` | Identifiant OneKey |
+
+---
+
+## Événements [#events]
+
+| Événement | Paramètres | Description |
+|-------|------------|-------------|
+| `connect` | `{ address }` | Portefeuille connecté |
+| `disconnect` | - | Portefeuille déconnecté |
+| `accountChanged` | `address` | Compte modifié |
+
+---
+
+## Codes d’erreur [#error-codes]
+
+| Code | Description |
+|------|-------------|
+| 4001 | Demande rejetée par l’utilisateur |
+| 4100 | Non autorisé |
+| 4200 | Méthode non prise en charge |
+| -32602 | Paramètres non valides |

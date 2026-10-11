@@ -5,7 +5,7 @@ description: OneKey TON provider 完整 API 参考
 
 # API 参考
 
-OneKey TON provider 方法和类型的完整参考。
+OneKey TON provider 的方法和类型参考。
 
 ---
 
@@ -37,10 +37,10 @@ OneKey TON provider 方法和类型的完整参考。
 
 ```typescript
 interface AccountInfo {
-  address: string      // 原始地址 (0:<hex>)
-  network: string      // 网络 ID (-239 主网, -3 测试网)
-  publicKey: string    // 十六进制公钥（无 0x 前缀）
-  walletStateInit: string // Base64 编码的状态初始化
+  address: string      // Raw address (0:<hex>)
+  network: string      // Network ID (-239 mainnet, -3 testnet)
+  publicKey: string    // Hex public key (no 0x)
+  walletStateInit: string // Base64 encoded state init
 }
 ```
 
@@ -48,10 +48,10 @@ interface AccountInfo {
 
 ```typescript
 interface TransactionRequest {
-  valid_until?: number  // 有效期 UNIX 时间戳
-  network?: string      // 网络 ID
-  from?: string         // 发送者地址
-  messages: Message[]   // 最多 4 条消息
+  valid_until?: number  // UNIX timestamp for validity
+  network?: string      // Network ID
+  from?: string         // Sender address
+  messages: Message[]   // Respect the wallet-advertised maximum
 }
 ```
 
@@ -59,10 +59,10 @@ interface TransactionRequest {
 
 ```typescript
 interface Message {
-  address: string      // 接收者（原始格式）
-  amount: string       // 金额（nanotons）
-  payload?: string     // 合约调用的 Base64 BOC
-  stateInit?: string   // 部署用的 Base64 StateInit
+  address: string      // Recipient (raw format)
+  amount: string       // Amount in nanotons
+  payload?: string     // Base64 BOC for contract calls
+  stateInit?: string   // Base64 StateInit for deployment
 }
 ```
 
@@ -70,9 +70,9 @@ interface Message {
 
 ```typescript
 interface SignDataRequest {
-  schema_crc: number   // Schema 标识符
-  cell: string         // Base64 编码的 cell
-  publicKey?: string   // 可选的特定密钥
+  schema_crc: number   // Schema identifier
+  cell: string         // Base64 encoded cell
+  publicKey?: string   // Optional specific key
 }
 ```
 
@@ -80,8 +80,8 @@ interface SignDataRequest {
 
 ```typescript
 interface SignDataResult {
-  signature: string    // Base64 签名
-  timestamp: number    // UNIX 时间戳 (UTC)
+  signature: string    // Base64 signature
+  timestamp: number    // UNIX timestamp (UTC)
 }
 ```
 
@@ -91,9 +91,9 @@ interface SignDataResult {
 interface DeviceInfo {
   platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
   appName: string      // 'onekey'
-  appVersion: string   // 钱包版本
+  appVersion: string   // Wallet version
   maxProtocolVersion: number // 2
-  features: string[]   // 支持的功能
+  features: Array<string | { name: string; maxMessages?: number; [key: string]: unknown }> // Advertised capabilities
 }
 ```
 
@@ -126,4 +126,3 @@ interface DeviceInfo {
 | 100 | 未知应用 |
 | 300 | 用户拒绝请求 |
 | 400 | 不支持的方法 |
-

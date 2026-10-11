@@ -1,4 +1,5 @@
 ---
+description: "Understand the deprecated hidden-wallet fingerprint API and migrate to openWalletSession."
 title: Get Passphrase State
 ---
 
@@ -26,7 +27,7 @@ Pass `passphraseState` on later address / signing calls so they stay on that hid
   btcGetAddress(..., { passphraseState })
 ```
 
-> **Error 112 (passphrase state mismatch)**: the binding does not match the wallet currently unlocked (device locked, seed changed, or stale fingerprint). Call `getPassphraseState` / `openWalletSession` again, then retry. `skipPassphraseCheck: true` skips this check and emits `REQUEST_PASSPHRASE` instead.
+> **Error 112 (passphrase state mismatch)**: the binding does not match the wallet currently unlocked (device locked, seed changed, or stale fingerprint). Stop the operation and let the user select the intended wallet again with `openWalletSession`. Confirm the recovered binding before a new request; do not bypass the check or automatically replay signing.
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);

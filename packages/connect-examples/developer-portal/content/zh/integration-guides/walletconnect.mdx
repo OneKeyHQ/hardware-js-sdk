@@ -1,0 +1,20 @@
+---
+title: "WalletConnect 会话"
+description: "dApp 需要连接独立钱包应用时，可使用支持 WalletConnect 的连接库。配置项目 ID、应用元信息，以及应用所需的网络、方法和事件。"
+---
+
+# WalletConnect 会话
+
+dApp 需要连接独立钱包应用时，可使用支持 WalletConnect 的连接库。配置项目 ID、应用元信息，以及应用所需的网络、方法和事件。
+
+EVM 连接界面可从 [RainbowKit](/zh/connect-to-software/wallet-ui/rainbowkit) 或 [Web3Modal / AppKit](/zh/connect-to-software/wallet-ui/web3modal) 开始，并遵循对应指南中的版本要求。
+
+## 保持同一会话上下文
+
+连接后，账户访问、请求和事件都使用所选连接器的 Provider。WalletConnect 会话不会注入 `window.$onekey.ethereum`；该命名空间属于浏览器 Provider 集成。
+
+处理会话拒绝、过期、断开，以及账户或网络变化。构造签名请求前重新确认账户和网络，不要自动重试被拒绝的授权提示。
+
+## 历史 Aptos 集成
+
+旧 Aptos 自定义方法流程使用 WalletConnect v1。它的 `@1` URI 和 `sendCustomRequest` 不是当前 WalletConnect 的接入方案。维护旧应用时查阅[历史参考](/zh/legacy/aptos-walletconnect)；浏览器集成使用 [Aptos Wallet Adapter](/zh/connect-to-software/wallet-ui/aptos-wallet-adapter)。

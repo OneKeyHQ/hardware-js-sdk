@@ -1,0 +1,95 @@
+---
+title: "stellarSignTransaction"
+---
+
+# stellarSignTransaction
+
+## Stellar: Transaktion signieren [#stellar-sign-transaction]
+
+Fordert eine Transaktionssignatur mit dem aus dem angegebenen Pfad abgeleiteten Schlüssel an. Der Nutzer prüft und bestätigt die Anfrage auf dem Gerät.
+
+```typescript
+const result = await HardwareSDK.stellarSignTransaction(connectId, deviceId, params);
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Ein vollständig gehärteter Stellar-Kontopfad, etwa `m/44'/148'/0'`. Mehr erfahren
+* `networkPassphrase` - _erforderlich_ `string` Netzwerk-Passphrase
+* `transaction` - _erforderlich_ `Object` Typ von StellarTransaction
+
+#### StellarTransaction-Typ [#stellartransaction-type]
+
+```typescript
+export type StellarTransaction = {
+  source: string;
+  fee: number;
+  sequence: string | number;
+  timebounds?: {
+    minTime: number;
+    maxTime: number;
+  };
+  memo?: {
+    type: 0 | 1 | 2 | 3 | 4;
+    id?: string;
+    text?: string;
+    hash?: string | Buffer;
+  };
+  operations: StellarOperation[];
+};
+```
+
+### Beispiele [#examples]
+
+```typescript
+const response = await HardwareSDK.stellarSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/148'/0'",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    transaction: {
+        source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+        fee: 200,
+        sequence: 4238497296,
+        memo: {
+            type: 0,
+        },
+        operations: [
+            {
+                type: "payment",
+                source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                amount: "10000"
+            }
+        ]
+    }
+  }
+);
+```
+
+Ergebnis
+
+```typescript
+{
+  success: true,
+  payload: {
+    public_key: string,
+    signature: string,
+  }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

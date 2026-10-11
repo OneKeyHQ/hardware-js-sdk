@@ -1,0 +1,37 @@
+---
+title: "sendPayment"
+---
+
+# sendPayment
+
+インボイスへの支払いをユーザーに要求します。アプリケーションは BOLT-11 インボイスを提供する必要があります
+
+## メソッド [#method]
+
+```typescript
+declare function sendPayment(paymentRequest: string): Promise<SendPaymentResponse>;
+```
+
+* `paymentRequest`: ユーザーに支払ってもらうインボイス (lnbc...)
+
+## レスポンス [#response]
+
+```typescript
+interface SendPaymentResponse {
+  preimage: string;
+}
+```
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+const invoice = "<BOLT11_INVOICE>"; // Replace with a complete invoice.
+await provider.enable();
+const info = await provider.sendPayment(invoice);
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/OJdomvO)

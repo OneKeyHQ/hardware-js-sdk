@@ -1,5 +1,7 @@
 'use client'
 
+import { ui } from '../i18n/ui.mjs'
+
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -307,9 +309,9 @@ export function ChainMethodsSidebar({ lang = 'en' }) {
     router.push(`${basePath}/${chain.id}/${firstMethod.id}`)
   }
 
-  const sectionLabel = lang === 'zh' ? '链方法' : 'Chain Methods'
-  const searchPlaceholder = lang === 'zh' ? '搜索链...' : 'Search chains...'
-  const noResults = lang === 'zh' ? '未找到链' : 'No chains found'
+  const sectionLabel = ui(lang, 'Chain Methods', '链方法')
+  const searchPlaceholder = ui(lang, 'Search chains...', '搜索链...')
+  const noResults = ui(lang, 'No chains found', '未找到链')
 
   return (
     <div className="hardware-product-sidebar">
@@ -322,9 +324,11 @@ export function ChainMethodsSidebar({ lang = 'en' }) {
 
       {/* Chain Dropdown */}
       <ChainDropdown
+        locale={lang}
         chains={CHAINS}
         selectedChainId={displayedChainId}
         onSelect={handleChainSelect}
+        placeholder={ui(lang, 'Select a chain', '选择链')}
         searchPlaceholder={searchPlaceholder}
         noResultsText={noResults}
         className="mb-2"

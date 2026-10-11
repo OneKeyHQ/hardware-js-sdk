@@ -1,0 +1,87 @@
+---
+title: "Schnellstart"
+description: "Die OneKey-Wallet-Skills installieren, eine Sitzung verbinden und eine rein lesende Anfrage ausprobieren."
+---
+
+<span id="quickstart" />
+
+# Schnellstart
+
+> Private Beta. Zugriff, unterstützte Befehle und Wallet-Abläufe hängen von Ihren OneKey- und CLI-Versionen ab. Prüfen Sie das Schema der installierten CLI, bevor Sie diese Beispiele verwenden.
+
+Installieren Sie zunächst die OneKey-Wallet-Skills in Ihrem KI-Client. Danach können Nutzer Wallet-Fragen in natürlicher Sprache stellen; die Skills übernehmen im Hintergrund die CLI-Vorprüfung, die Schemaermittlung und die sichere Befehlszuordnung.
+
+Rein lesende Anfragen sollten sofort Ergebnisse liefern. Angebote, Erstellungsvorgänge, Prüfungen und Simulationen erläutern, was geschehen würde, ohne Gelder zu bewegen. Überweisungen, Swap-Ausführung, Freigaben, Übertragungen und Signiervorgänge erfordern einen ausdrücklichen Bestätigungsschritt im Dialog.
+
+## 1. Skills installieren [#1-install-the-skills]
+
+### Claude Code [#claude-code]
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex [#codex]
+
+Sagen Sie Codex:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor [#cursor]
+
+Klonen Sie das Skill-Paket und verweisen Sie Cursor auf das Plugin-Verzeichnis:
+
+```bash
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
+```
+
+### OpenCode und OpenClaw [#opencode-and-openclaw]
+
+Verwenden Sie für jeden Client die Installationsanleitung im Repository [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills). Jeder Client verwendet dieselben vier Skills: Wallet, Swap, Markt und Sicherheit.
+
+## 2. Eine Agent Wallet verbinden [#2-connect-an-agent-wallet]
+
+Bitten Sie Ihren KI-Client:
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+Der Skill koppelt die lokale Sitzung über App Transfer in der OneKey-GUI und fasst die aktive Wallet zusammen. Wenn die CLI `onekey` fehlt, installiert die Vorprüfung des Skills sie, bevor der Ablauf fortgesetzt wird; Nutzer sollten CLI-Befehle nicht manuell einrichten müssen.
+
+## 3. Rein lesende Prompts ausprobieren [#3-try-read-only-prompts]
+
+Beginnen Sie mit Prompts, die keine Gelder bewegen:
+
+| Den KI-Client fragen | Skill-Zuordnung |
+| --- | --- |
+| `Show my wallet balance.` | Wallet |
+| `Show my receiving address for ETH.` | Wallet |
+| `What tokens are trending right now?` | Markt |
+| `What is the price of SOL?` | Markt |
+| `Is this token safe before I buy it?` | Sicherheit |
+
+Die Antwort sollte mit dem Ergebnis beginnen: Wallet-Status, Route, Risiko und ein nützlicher nächster Schritt. Sie sollte keine rohen Terminalausgaben ausgeben.
+
+## 4. Vor dem Handel ein Angebot einholen [#4-quote-before-trading]
+
+Fragen Sie:
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+Der Swap-Skill sollte ein Angebot einholen, die relevanten Sicherheitsprüfungen durchführen, die erwartete Route und den Ausgabebetrag anzeigen und vor der Ausführung anhalten. Eine spätere Bestätigung wie `Yes, execute the swap` sollte nur den bereits geprüften Auftrag ausführen.
+
+## 5. Gerätebestätigung verwenden [#5-use-hardware-confirmation]
+
+Bitten Sie bei riskanteren Aktionen:
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+Der Wallet-Skill wechselt zu einer hardwaregestützten Sitzung, in der unterstützte Signieranfragen vom Nutzer auf dem Gerät geprüft und bestätigt werden müssen. Die verfügbaren Clear-Signing-Details hängen von Chain, Firmware und CLI-Version ab. Nach der Hardware-Anmeldung verwenden Wallet-, Überweisungs-, Swap- und Signierprompts die aktive hardwaregestützte Sitzung; prüfen Sie deren Adresse, bevor Sie eine Aktion vorbereiten, die Gelder bewegt.

@@ -1,0 +1,37 @@
+---
+title: "getBalance"
+---
+
+# getBalance
+
+Guthaben des aktuellen Kontos abrufen.
+
+## Methode [#method]
+
+```typescript
+declare function getBalance(): Promise<BalanceInfo | number>;
+```
+
+## Antwort [#response]
+
+Gibt das Kontoguthaben zurück. Der Provider-Typ erlaubt zur Kompatibilität auch ein numerisches Ergebnis; prüfen Sie das Ergebnisformat, bevor Sie auf Felder zugreifen.
+
+```typescript
+type BalanceInfo = {
+    confirmed: number;
+    unconfirmed: number;
+    total: number
+};
+```
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const balance = await provider.getBalance();
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/qBgMXXJ)

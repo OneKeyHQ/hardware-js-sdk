@@ -1,0 +1,51 @@
+---
+title: "Ethereum と EVM"
+---
+
+<span id="ethereum--evm" />
+
+# Ethereum と EVM
+
+Ethereum と EVM 互換チェーンの Air-Gap 署名サポート。
+
+## アカウントのセットアップ [#account-setup]
+
+ETH アカウントを取得するには、[CryptoHDKey](../basic-api/cryptohdkey) を使用して、デバイスから拡張公開鍵を取得します。
+
+## 対応する操作 [#supported-operations]
+
+| 操作 | DataType | 説明 |
+|-----------|----------|-------------|
+| EIP-1559 トランザクション | `typedTransaction (4)` | 最新のトランザクション形式 |
+| レガシートランザクション | `transaction (1)` | 従来のトランザクション形式 |
+| EIP-712 型付きデータ | `typedData (2)` | 構造化データへの署名 |
+| 個人メッセージ | `personalMessage (3)` | メッセージへの署名 |
+
+## フロー [#flow]
+
+1. [EthSignRequest](./ethsignrequest) を使って署名リクエストを構築
+2. UR にエンコードし、アニメーション QR を表示
+3. デバイスがスキャン、検証し、オフラインで署名
+4. [EthSignature](./ethsignature) を使ってレスポンスをデコード
+5. レスポンスのリクエスト ID を照合し、署名者を検証してから、元のトランザクションに署名を添付してブロードキャスト
+
+## 簡単な例 [#quick-example]
+
+```ts
+import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
+
+const eth = new KeystoneEthereumSDK();
+
+// Generate sign request
+const ur = eth.generateSignRequest({
+  requestId: globalThis.crypto.randomUUID(),
+  signData: unsignedTxHex,    // hex without 0x
+  dataType: 4,                // EIP-1559
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+
+// Encode and display QR
+```

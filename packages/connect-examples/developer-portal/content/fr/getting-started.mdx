@@ -1,0 +1,53 @@
+---
+title: "Choisir une intégration"
+description: "Choisissez l’intégration OneKey adaptée à votre dApp, portefeuille ou application."
+---
+
+<span id="choose-an-integration" />
+
+# Choisir une intégration
+
+Commencez par déterminer à quoi votre application doit se connecter. L’API du fournisseur de portefeuille, le Hardware SDK et le QR SDK correspondent à des parcours d’intégration différents.
+
+| Vous souhaitez… | Utilisez | Commencer ici |
+| --- | --- | --- |
+| Permettre aux utilisateurs de connecter leur portefeuille OneKey à un site web ou une dApp | Un fournisseur de portefeuille propre à une chaîne ou une bibliothèque d’interface de portefeuille | [Démarrage rapide dApp](/fr/connect-to-software) |
+| Connecter votre propre portefeuille ou application directement à un appareil OneKey | Hardware SDK avec un transport adapté à votre environnement d’exécution | [Démarrage rapide du Hardware SDK](/fr/hardware-sdk/getting-started) |
+| Échanger des demandes de signature avec un appareil compatible QR | Air-Gap SDK | [Vue d’ensemble de la signature QR](/fr/air-gap) |
+
+Une intégration dApp demande au portefeuille OneKey de gérer les comptes de l’utilisateur et le processus de signature. Une intégration matérielle directe confie à votre application la découverte des appareils, l’état de connexion, les événements d’interface et la préparation des transactions.
+
+## Connecter une dApp [#connect-a-dapp]
+
+1. Installez [OneKey](https://onekey.so/download/) dans votre environnement de développement.
+2. Suivez le [Démarrage rapide dApp](/fr/connect-to-software) pour détecter le fournisseur et demander les comptes à partir d’une action utilisateur.
+3. Choisissez votre chaîne dans la [référence de l’API du fournisseur](/fr/connect-to-software/provider). Les méthodes et valeurs de retour diffèrent selon la chaîne.
+4. Gérez l’absence de portefeuille, une liste de comptes vide, une demande rejetée et les changements de compte ou de réseau.
+
+Si votre application utilise déjà une [bibliothèque d’interface de portefeuille](/fr/connect-to-software/wallet-ui/web3modal), commencez par son intégration OneKey. Pour le passage au mobile, consultez [Mobile et liens profonds](/fr/connect-to-software/mobile-deeplinks).
+
+## Connecter directement le matériel [#connect-hardware-directly]
+
+Choisissez votre environnement d’exécution avant d’installer un SDK :
+
+| Environnement d’exécution | Guide |
+| --- | --- |
+| Navigateur prenant en charge WebUSB | [WebUSB](/fr/hardware-sdk/transport/web-usb) |
+| React Native avec Bluetooth | [BLE React Native](/fr/hardware-sdk/transport/react-native-ble) |
+| Android, iOS ou Flutter natif | [Intégration mobile native](/fr/hardware-sdk/transport/native-ble) |
+
+Suivez ensuite le [démarrage rapide](/fr/hardware-sdk/getting-started). Initialisez le SDK, gérez ses demandes d’interface, sélectionnez un appareil et récupérez une adresse avant de passer à la signature. Vérifiez la [prise en charge des appareils et chaînes](/fr/hardware-sdk/concepts/chain-support) pour la méthode exacte et l’appareil que vous comptez utiliser.
+
+L’[environnement de test matériel](https://hardware-example.onekey.so/) est utile pour explorer les API. Un émulateur ou une compilation réussie ne remplace pas les tests de votre intégration avec l’appareil, le micrologiciel et l’environnement d’exécution prévus.
+
+## Utiliser la signature QR [#use-qr-signing]
+
+Commencez par la [vue d’ensemble Air-Gap](/fr/air-gap), puis suivez un guide propre à une chaîne, tel que [Ethereum et EVM](/fr/air-gap/ethereum-and-evm). Votre application encode une demande, l’affiche sous forme de données QR, lit la réponse de l’appareil et valide le résultat avant de diffuser via sa propre connexion réseau.
+
+## Avant la mise en production [#before-you-ship]
+
+- Testez les refus, annulations, déconnexions et reconnexions, ainsi que le parcours réussi.
+- Affichez le compte et le réseau utilisés. Préservez la possibilité pour l’utilisateur de vérifier les demandes de signature.
+- Ne collectez jamais de phrases de récupération ni de clés privées. Excluez les PIN, phrases secrètes, jetons et données de session de portefeuille des journaux et rapports de bogues.
+- Fixez et consignez les versions utilisées dans votre intégration. Recommencez les tests après les mises à niveau du SDK, du micrologiciel ou du portefeuille.
+- Utilisez le [guide de dépannage](/fr/troubleshooting) lorsqu’une demande échoue ou reste bloquée.

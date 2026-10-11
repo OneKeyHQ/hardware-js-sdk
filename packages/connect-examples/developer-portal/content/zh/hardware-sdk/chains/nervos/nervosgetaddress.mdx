@@ -6,7 +6,7 @@ title: nervosGetAddress
 
 ### Nervos：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 ```typescript
 const result = await HardwareSDK.nervosGetAddress(connectId, deviceId, params);
@@ -14,9 +14,9 @@ const result = await HardwareSDK.nervosGetAddress(connectId, deviceId, params);
 
 #### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.9.0
-  * mini: 3.7.0
+  * Mini: 3.7.0
 
 #### 参数
 
@@ -43,11 +43,13 @@ const response = await HardwareSDK.nervosGetAddress('connect1', 'device1', {
     network: "ckb"
 });
 
-if (!response.success) throw new Error(response.payload.error);
+if (response.success === false) throw new Error(response.payload.error);
 console.log(response.payload.address);
 ```
 
-#### 返回结果
+<span id="返回结果" />
+
+#### 返回值
 
 返回一个 Promise，解析为：
 
@@ -55,8 +57,8 @@ console.log(response.payload.address);
 {
     success: true,
     payload: {
-        address: string,     // Nervos 地址
-        path: string  // 用于派生的 BIP32 路径
+        address: string,     // Nervos address
+        path: string  // BIP32 path used for derivation
     }
 }
 ```
@@ -67,8 +69,8 @@ console.log(response.payload.address);
 {
     success: false,
     payload: {
-        error: string,  // 错误信息
-        code?: string | number    // 错误码
+        error: string,  // Error message
+        code?: string | number    // Error code
     }
 }
 ```

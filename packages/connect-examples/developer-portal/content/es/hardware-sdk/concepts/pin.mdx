@@ -1,0 +1,69 @@
+---
+description: "Gestiona las notificaciones de PIN en el dispositivo y la entrada completa de PIN ciego en el host sin exponer los valores del PIN."
+title: "PIN"
+---
+
+# PIN
+
+Cómo gestionar la entrada de PIN en los dispositivos OneKey con la experiencia de usuario recomendada.
+
+## Aspectos esenciales [#essentials]
+
+- Las llamadas protegidas activan `UI_REQUEST.REQUEST_PIN` cuando el dispositivo está bloqueado.
+- Pro/Touch/Pro 2/Neo requieren introducir el PIN en el dispositivo. Para otros modelos, consulta `inputPinOnSoftware.support`; la compatibilidad con el PIN ciego en el host depende del firmware. Prioriza la introducción en el dispositivo cuando esté disponible.
+- Cierra el diálogo al recibir `UI_REQUEST.CLOSE_UI_PIN_WINDOW` / `CLOSE_UI_WINDOW` o cuando finalice la operación que lo originó. Invalida su callback de envío pendiente.
+
+## Matriz de compatibilidad (PIN ciego por software) [#support-matrix-software-blind-pin]
+
+| Dispositivo | PIN ciego por software | Introducción solo en el dispositivo |
+| --- | --- | --- |
+| OneKey Classic / 1s / 1s Pure / Mini | Depende del firmware; consulta `inputPinOnSoftware.support` | El flujo de introducción desde el host puede ofrecer la opción de introducirlo en el dispositivo |
+| OneKey Touch | No compatible | Sí |
+| OneKey Pro | No compatible | Sí |
+| OneKey Pro 2 / Neo | No compatible | Sí |
+
+## Notas de diseño de la interfaz [#ui-design-notes]
+
+- Ofrece únicamente los métodos de introducción compatibles con el dispositivo, el firmware y la solicitud de interfaz actuales. Cuando ambos estén disponibles, usa un solo diálogo con **Introducir en el dispositivo** como opción predeterminada y **Introducir aquí (PIN ciego)** como alternativa.
+- El teclado de PIN ciego tiene una disposición fija de 3x3; nunca muestres los dígitos reales.
+
+### Ejemplo de correspondencia del PIN ciego [#blind-pin-mapping-example]
+
+```ts
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Completed sequence of host keypad positions, numbered 1..9.
+declare const selectedPositions: number[];
+// Copy this from the current REQUEST_PIN event.
+declare const responseCorrelation: { interactionId: string; deviceId: string } | undefined;
+const BLIND_KEYBOARD_MAP = ['7','8','9','4','5','6','1','2','3'];
+if (!selectedPositions.length || selectedPositions.some(position =>
+  !Number.isInteger(position) || position < 1 || position > 9
+)) throw new Error('Invalid PIN keypad sequence');
+
+HardwareSDK.uiResponse({
+  ...responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: selectedPositions.map(position => BLIND_KEYBOARD_MAP[position - 1]).join(''),
+});
+```
+
+## De eventos a respuestas [#events-to-responses]
+
+```ts
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (msg.type === UI_REQUEST.REQUEST_PIN) {
+    if (msg.payload.deviceOnly || msg.payload.type === 'ButtonRequest_PinEntry' || msg.payload.type === 'ButtonRequest_AttachPin') {
+      // Show the device prompt and wait; this notification does not need a reply.
+      return;
+    }
+    HardwareSDK.uiResponse({
+      ...msg.payload.responseCorrelation,
+      type: UI_RESPONSE.RECEIVE_PIN,
+      payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+    });
+  }
+});
+```

@@ -1,0 +1,22 @@
+---
+title: "Accès aux comptes"
+---
+
+<span id="accessing-accounts" />
+
+# Accès aux comptes
+
+Une fois la connexion au portefeuille établie, vous pouvez accéder aux comptes connectés au portefeuille OneKey.
+
+Les comptes utilisateur sont utilisés dans divers contextes dans OneKey, notamment comme identifiants et pour signer des transactions.
+
+```javascript
+const res = await provider.request({
+  method: 'near_accounts',
+});
+const accountId = res?.accounts?.[0]?.accountId || '';
+const publicKey = res?.accounts?.[0]?.publicKey || '';
+
+// An empty accounts array means no account is exposed to this site
+console.log('near_accounts', res?.accounts, accountId, publicKey);
+```

@@ -1,0 +1,55 @@
+---
+title: "トランザクションに署名して送信"
+---
+
+<span id="sign-and-send-transaction" />
+
+# トランザクションに署名して送信
+
+トランザクションを作成したら、Web アプリケーションはユーザーの OneKey ウォレットに対し、アカウントの秘密鍵と NEAR JSON RPC 接続を使った署名と送信を要求できます。
+
+**最も簡単な** **推奨される** 方法は、プロバイダーの `requestSignTransactions` メソッドを使用することですが、`request` でも実行できます。
+
+どちらの場合も、呼び出しは `transactionHashes` を含むオブジェクトの [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) を返します。
+
+## requestSignTransactions() [#requestsigntransactions]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.requestSignTransactions({
+  transactions: [transaction], // must be Array type
+});
+console.log('requestSignTransactions', res, res.transactionHashes);
+
+```
+
+## request() [#request]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+また、メソッドの呼び出し前に、トランザクションを次の **`base64`** 文字列へシリアライズすることもできます。
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const transactionSerialized = btoa(String.fromCharCode(...transaction.encode()));
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transactionSerialized], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+拒否されたリクエストは、次の `try`/`catch` ブロックで処理してください。返されたトランザクションハッシュは識別子であり、実行の成功を保証するものではありません。ネットワーク RPC を通じてトランザクションの結果を確認してください。

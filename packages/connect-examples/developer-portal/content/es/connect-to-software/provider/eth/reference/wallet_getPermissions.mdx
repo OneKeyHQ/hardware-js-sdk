@@ -1,0 +1,86 @@
+---
+title: "wallet_getPermissions"
+description: "Obtener los permisos actuales de la dApp"
+---
+
+# wallet_getPermissions
+
+Devuelve los permisos concedidos actualmente a la dApp. Este método no solicita ninguna acción al usuario.
+
+---
+
+## Parámetros [#parameters]
+
+Ninguno
+
+---
+
+## Devuelve [#returns]
+
+`Array` de objetos de permiso:
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `parentCapability` | `string` | El nombre del permiso |
+| `date` | `number` | Marca de tiempo de la concesión |
+| `caveats` | `array` | Restricciones del permiso |
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_getPermissions'
+})
+
+console.log('Current permissions:', permissions)
+
+// Check if connected
+const isConnected = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Is connected:', isConnected)
+```
+
+### Utilidad de comprobación de permisos [#permission-check-utility]
+
+```typescript
+async function checkPermissions() {
+  const permissions = await window.$onekey.ethereum.request({
+    method: 'wallet_getPermissions'
+  })
+
+  return {
+    hasAccounts: permissions.some(p => p.parentCapability === 'eth_accounts'),
+    permissions
+  }
+}
+
+const { hasAccounts } = await checkPermissions()
+if (!hasAccounts) {
+  // Request connection
+  await window.$onekey.ethereum.request({
+    method: 'eth_requestAccounts'
+  })
+}
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| -32603 | Error interno | Error del proveedor |
+
+---
+
+## Notas [#notes]
+
+- Devuelve una matriz vacía si no se ha concedido ningún permiso
+- No solicita ninguna acción al usuario
+- Útil para comprobar el estado de conexión sin abrir una solicitud
+- Definido por [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Gestiona los errores de método no compatible en la versión de cartera de destino. El permiso de cuenta es distinto de la conectividad RPC y no autoriza de antemano firmas ni transacciones. Para una conexión básica, usa `eth_requestAccounts`.

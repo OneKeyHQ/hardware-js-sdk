@@ -1,0 +1,84 @@
+---
+title: "cardanoGetPublicKey"
+---
+
+# cardanoGetPublicKey
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.1.0
+  * Classic/Mini : 3.0.0
+
+## Cardano : obtenir une clé publique [#cardano-get-public-key]
+
+Renvoie la clé publique étendue dérivée du chemin Cardano spécifié.
+
+```typescript
+const result = await HardwareSDK.cardanoGetPublicKey(connectId, deviceId, params);
+```
+
+## Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+### Clé publique unique [#single-public-key]
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _facultatif_ `boolean` Indique s’il faut afficher la clé publique sur l’appareil. Valeur par défaut : `false`.
+* `derivationType` - _facultatif_ énumération `CardanoDerivationType`. Détermine le type de dérivation utilisé. La valeur par défaut est ICARUS=1
+
+#### Plusieurs clés publiques [#multiple-public-keys]
+
+* `bundle` - tableau d’objets contenant les champs `path`, `showOnOneKey`
+
+### Exemple [#example]
+
+Renvoyer la clé publique du premier compte cardano :
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    showOnOneKey: true
+});
+```
+
+Renvoyer un lot de clés publiques de plusieurs comptes cardano :
+
+```typescript
+HardwareSDK.cardanoGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/1852'/1815'/0'/0/0", }, // account 1
+        { path: "m/1852'/1815'/1'/0/0", }, // account 2
+        { path: "m/1852'/1815'/2'/0/0", }  // account 3
+    ]
+});
+```
+
+### Résultat [#result]
+
+Réponse pour une seule clé publique
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // hardened path
+        serializedPath: string,
+        xpub: string,
+        node: HDNodeType,
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

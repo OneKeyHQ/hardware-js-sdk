@@ -2,47 +2,79 @@
 title: evmSignTransaction
 ---
 
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / ETHEREUM &amp; EVM</div>
+
 # evmSignTransaction
 
-### 以太坊：签名交易
+<span id="以太坊签名交易" />
 
-* 使用 `evmSignTransaction` 来签名交易
-* 本页介绍 Legacy 和 EIP-1559（Type 2）交易。请确保 RPC 节点支持所使用的交易类型。
-
-使用指定 BIP32 路径派生的私钥对交易进行签名。设备请求用户确认交易；可解析展示的详情取决于固件与 calldata。
+请求用户在 OneKey 上确认一笔 Legacy 或 EIP-1559（Type 2）交易。设备使用指定 BIP32 路径派生的密钥签名，返回签名结果；应用负责序列化与广播。设备显示的交易详情取决于固件与 calldata。
 
 ```typescript
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
 ```
 
-### 参数
+<div className="doc-method-flow"><span>01 <strong>构造交易</strong></span><span aria-hidden="true">→</span><span>02 <strong>设备确认</strong></span><span aria-hidden="true">→</span><span>03 <strong>序列化与广播</strong></span></div>
+
+## 调用前
+
+- [初始化 SDK 并选择设备](/zh/hardware-sdk/getting-started)。
+- 注册 [UI 事件处理器](/zh/hardware-sdk/core-api-guide#events-ui)，并明确选择标准钱包或目标隐藏钱包。
+- 从目标网络获取当前 Nonce、Gas 和费率。
+
+## 参数
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>必需</b></div><p>设备发现返回的连接标识。</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>必需</b></div><p>getDeviceState 返回的钱包身份标识。</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>必需</b></div><p>BIP32 派生路径。SDK 要求至少三个路径分量。</p></div>
+<div className="doc-parameter"><div><code>params.transaction</code><span>object</span><b>必需</b></div><p>Legacy 或 EIP-1559 交易。数值字段使用十六进制字符串，chainId 使用数字。</p></div>
+</div>
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `transaction` - _必需_ `Object`。本页介绍的类型为 `EVMTransaction`（Legacy）和 `EVMTransactionEIP1559`。交易数值使用十六进制字符串，`transaction.chainId` 使用数字
-* `transaction.chainId` - _必需_ `number`。必须与构造及广播交易的网络一致，不是顶层参数。
-* `transaction.data` - _可选_ `string`。完整的十六进制 calldata；空数据使用 `0x`。
+### 交易字段
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `chainId` | `number` | 目标网络的 Chain ID，位于 transaction 内。 |
+| `to` | `string` | 目标地址；ERC-20 调用时为代币合约。 |
+| `value` | `string` | 以 wei 为单位的十六进制金额；ERC-20 调用时使用 0x0。 |
+| `nonce` | `string` | 发送账户的交易计数，以十六进制表示。 |
+| `gasLimit` | `string` | Gas 上限，以十六进制表示。 |
+| `data` | `string · optional` | 完整的十六进制 calldata，空数据为 0x。 |
+| `maxFeePerGas` | `string · EIP-1559` | 每单位 Gas 的总费用上限，以十六进制 wei 表示。 |
+| `maxPriorityFeePerGas` | `string · EIP-1559` | 每单位 Gas 的优先费上限，以十六进制 wei 表示。 |
+| `gasPrice` | `string · Legacy` | Legacy 交易的 Gas 单价，以十六进制 wei 表示。 |
+
+本页涵盖 `EVMTransaction` 和 `EVMTransactionEIP1559`。路径格式见 [HD 路径](/zh/hardware-sdk/concepts/common-params#hd-path)。请确保目标 RPC 支持所用交易类型。
 
 EIP-1559 必须同时提供两个费率字段，Legacy 使用 `gasPrice`。无需向 SDK 传入 `type: 2`，该类型在序列化已签名交易时指定。
 
-### Clear Signing
+## Clear Signing
 
 原生币转账、ERC-20 转账、授权/撤销和合约调用均使用此方法。ERC-20 调用的 `to` 是代币合约，`value` 为零，calldata 中包含收款人/spender 和代币金额。支持的固件自动解析已识别格式；没有 `clearSigning`、代币元数据或合约标签参数。
 
 输入与展示对照、未知合约行为见 [Clear Signing 指南](/zh/hardware-sdk/signers/evm#clear-signing)。EIP-712 和 Safe owner 签名使用 [evmSignTypedData](/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata)。
 
-### 示例
+## 示例
 
 下列片段假设已初始化 SDK 并选定钱包。签名前请替换示例收款人，并从目标网络获取 Nonce、Gas 和费率。
 
-#### EIP1559（[伦敦升级后](https://ethereum.org/en/developers/docs/gas/#post-london)）
+<span id="eip1559伦敦升级后" />
 
-如果同时定义了 `maxFeePerGas` 和 `maxPriorityFeePerGas` 参数，交易将按照 [EIP1559](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559) 中引入的新类型进行签名。
+EIP-1559 需要同时提供 `maxFeePerGas` 和 `maxPriorityFeePerGas`。Legacy 使用 `gasPrice`。
+
+<Tabs items={['EIP-1559', 'Legacy']} className="doc-example-tabs">
+
+<Tabs.Tab>
 
 ```typescript
-HardwareSDK.evmSignTransaction(connectId, deviceId, {
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
     path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
     transaction: {
         to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
         value: '0xf4240',
@@ -55,13 +87,17 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
     },
 });
 
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
-Legacy
+</Tabs.Tab>
+
+<Tabs.Tab>
 
 ```typescript
-HardwareSDK.evmSignTransaction(connectId, deviceId, {
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
     path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
     transaction: {
         to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
         value: "0xf4240",
@@ -72,9 +108,22 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
         gasPrice: "0xbebc200"
     },
 });
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
-返回结果
+</Tabs.Tab>
+
+</Tabs>
+
+示例明确选择标准钱包。隐藏钱包请传入确认账户时使用的同一组钱包参数。
+
+## 返回结果
+
+使用 payload 前先检查 `success`。成功时返回 `v`、`r`、`s` 签名分量；SDK 不会自动广播交易。
+
+<Tabs items={['成功', '错误']} className="doc-example-tabs">
+
+<Tabs.Tab>
 
 ```typescript
 {
@@ -87,7 +136,9 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 }
 ```
 
-错误
+</Tabs.Tab>
+
+<Tabs.Tab>
 
 ```typescript
 {
@@ -99,11 +150,13 @@ HardwareSDK.evmSignTransaction(connectId, deviceId, {
 }
 ```
 
+</Tabs.Tab>
 
+</Tabs>
 
-### 交易签名和广播示例
+## 交易签名和广播示例
 
-此示例使用 `@ethersproject/*` v5 和已初始化的 SDK，签名并序列化 EIP-1559（Type 2）交易。广播前应恢复签名者并与选定账户核对。
+此示例使用 `@ethersproject/*` v5 和已初始化的 SDK，签名并序列化 EIP-1559（Type 2）交易。广播前应恢复签名者并与选定账户核对。用户签名后，必须保持原始交易字段不变。
 
 ```typescript
 import type { EVMTransactionEIP1559 } from '@onekeyfe/hd-core';
@@ -161,7 +214,7 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
 });
 
 // 3. 构建已签名交易
-if (!result.success) throw new Error(result.payload.error);
+if (result.success === false) throw new Error(result.payload.error);
 
 const baseTx: UnsignedTransaction = {
     to: txParams.to,
@@ -189,3 +242,5 @@ const { rawTx, txid } = buildSignedTxFromSignatureEvm({
 // const receipt = await broadcastedTx.wait();
 // console.log('交易已确认:', receipt);
 ```
+
+Legacy 交易使用 `gasPrice`，不要传入 EIP-1559 的两个费率字段，并应按 Legacy 格式序列化。

@@ -1,0 +1,62 @@
+---
+title: "モバイルとディープリンク"
+description: "ディープリンクを使って、モバイル Web アプリや WebView に OneKey ウォレットを統合"
+---
+
+<span id="mobile--deeplinks" />
+
+# モバイルとディープリンク
+
+WalletConnect のペアリング URI を使い、モバイル dApp から OneKey を開きます。ディープリンクはウォレットアプリを開きますが、接続が成功するのはユーザーが WalletConnect セッションを承認した後です。
+
+## 概要 [#overview]
+
+WalletConnect 統合で新しいペアリング URI を作成し、ユーザー操作をきっかけに以下のいずれかのリンクを開きます。セッション提案を有効なまま保ち、承認または拒否を待ちます。OneKey の dApp ブラウザー内では、対象チェーンに注入されたプロバイダーを使用してください。
+
+## ディープリンクの形式 [#deeplink-formats]
+
+### カスタムスキーム [#custom-scheme]
+
+```
+onekey-wallet://wc?uri={encodeURIComponent(wcUri)}
+```
+
+### ユニバーサルリンク [#universal-link]
+
+```
+https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}
+```
+
+> サポートする iOS/Android のバージョンとブラウザーで、アプリの起動とフォールバックをテストしてください。アプリのインストール状況、OS のリンク設定、埋め込みブラウザーの制限によって結果が異なります。
+
+## 使用例 [#usage-example]
+
+```javascript
+// Generate WalletConnect URI from your dApp
+const wcUri = 'wc:a281...' // Your WalletConnect URI
+
+// Option 1: Custom scheme
+const customSchemeLink = `onekey-wallet://wc?uri=${encodeURIComponent(wcUri)}`
+
+// Option 2: Universal link (recommended)
+const universalLink = `https://app.onekey.so/wc/connect/wc?uri=${encodeURIComponent(wcUri)}`
+
+// Call this from the user's Connect button.
+function openOneKey() {
+  window.location.href = universalLink
+}
+```
+
+## 接続とフォールバックの処理 [#connection-and-fallback-handling]
+
+- 明示的な接続ボタンからリンクを開いてください。ユーザー操作がないとアプリの起動をブロックするブラウザーがあります。
+- WalletConnect セッションの承認、拒否、有効期限切れ、切断イベントを処理してください。ブラウザーに戻っただけでは、セッションが承認された証拠にはなりません。
+- デスクトップでは QR コードを提供し、アプリを開けない場合にはインストールまたは再試行の選択肢を提供してください。ユニバーサルリンクが必ずアプリストアにリダイレクトするとは仮定しないでください。
+- 古いペアリング URI が期限切れになったら、新しい URI を生成してください。有効なペアリング URI を分析データやアプリケーションログに含めないでください。
+- 利用可能であれば、ウォレット接続ライブラリのモバイルフローを優先してください。ペアリングとセッションのライフサイクルを管理できます。
+
+## 関連項目 [#related]
+
+- [RainbowKit](/ja/connect-to-software/wallet-ui/rainbowkit/) - モバイルを自動検出
+- [Web3Modal](/ja/connect-to-software/wallet-ui/web3modal/) - モバイル対応を内蔵
+- [プロバイダー API](/ja/connect-to-software/provider/eth/) - プロバイダーと直接統合

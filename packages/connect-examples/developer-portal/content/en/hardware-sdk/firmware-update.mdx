@@ -1,4 +1,5 @@
 ---
+description: "Choose the correct firmware update API for the detected protocol and handle progress, reboot, and failure."
 title: Firmware Update
 ---
 
@@ -13,6 +14,8 @@ Pick the update API from the **protocol family**, not from the marketing name al
 | OneKey Pro 2, Neo | V2 | [`firmwareUpdateV4`](/en/hardware-sdk/device-api/firmwareupdatev4) | Bootloader, app partitions, coprocessor, resource ZIP |
 
 Confirm the live protocol with `connectProtocol` on the device object or via [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state). Do not branch on USB PID or BLE name. See [Devices](/en/hardware-sdk/concepts/devices) and [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).
+
+Only start an update after the user has selected the target device and approved the operation. Use official release metadata and verified artifacts for that model; an example version must never determine the firmware to install.
 
 ## 1. Check whether an update is needed
 
@@ -48,29 +51,33 @@ HardwareSDK.on(UI_EVENT, (msg) => {
 
 ## 3. Call the matching method
 
-Classic / Mini / Touch:
+Classic / Mini / Touch. Select the target from verified release metadata for the connected model:
 
 ```ts
-await HardwareSDK.firmwareUpdateV2(connectId, {
+declare const targetFirmwareVersion: number[];
+const result = await HardwareSDK.firmwareUpdateV2(connectId, {
   platform: 'web',
   updateType: 'firmware',
-  version: [2, 10, 0],
+  version: targetFirmwareVersion,
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 Pro:
 
 ```ts
-await HardwareSDK.firmwareUpdateV3(connectId, {
+declare const targetFirmwareVersion: number[];
+const result = await HardwareSDK.firmwareUpdateV3(connectId, {
   platform: 'desktop',
-  firmwareVersion: [4, 10, 0],
+  firmwareVersion: targetFirmwareVersion,
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 Pro 2 / Neo — pass binaries you already verified:
 
 ```ts
-await HardwareSDK.firmwareUpdateV4(connectId, {
+const result = await HardwareSDK.firmwareUpdateV4(connectId, {
   platform: 'desktop',
   bootloaderBinary,
   applicationP1Binary,
@@ -78,6 +85,7 @@ await HardwareSDK.firmwareUpdateV4(connectId, {
   coprocessorBinary,
   resourceArchiveBinary,
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 `platform` is required on all three methods: `'native' | 'desktop' | 'ext' | 'web' | 'web-embed'`.

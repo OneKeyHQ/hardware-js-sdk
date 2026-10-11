@@ -1,0 +1,45 @@
+---
+title: "CryptoKeypath"
+---
+
+# CryptoKeypath
+
+この `CryptoKeypath` クラスは暗号鍵のパス (BIP-44 導出パス) を表します。
+
+## パラメーター [#parameters]
+
+| パラメーター | 型 | 説明 |
+|-----------|------|-------------|
+| `components` | `PathComponent[]` | パス構成要素の配列 (デフォルト: 空) |
+| `sourceFingerprint` | `Buffer` | ソースのフィンガープリント (任意) |
+| `depth` | `number` | 深さ (任意) |
+
+## PathComponent [#pathcomponent]
+
+この `PathComponent` クラスは鍵パスの個々の構成要素を表します。
+
+### パラメーター [#parameters-1]
+
+| パラメーター | 型 | 説明 |
+|-----------|------|-------------|
+| `index` | `number` | 構成要素のインデックス (任意) |
+| `hardened` | `boolean` | ハード化されているかどうか |
+
+## 例 [#example]
+
+```ts
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+
+// BIP44: m/44'/60'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 60, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+```
+
+## UR タイプ [#ur-type]
+
+UR タイプは `crypto-keypath`。レジストリエンコーダーでエンコード済みペイロードを生成してください。

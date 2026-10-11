@@ -1,0 +1,77 @@
+---
+title: "personal_sign"
+description: "Firmar un mensaje con una cuenta de Ethereum"
+---
+
+# personal_sign
+
+Firma un mensaje con la cuenta especificada. Al mensaje se le añade el prefijo `"\x19Ethereum Signed Message:\n"` antes de firmar para distinguir las firmas de mensajes de la firma de transacciones en bruto.
+
+---
+
+## Parámetros [#parameters]
+
+| Índice | Tipo | Descripción |
+|-------|------|-------------|
+| 0 | `string` | Mensaje que se va a firmar (codificado en hexadecimal) |
+| 1 | `string` | Dirección con la que firmar |
+
+---
+
+## Devuelve [#returns]
+
+`string` - La firma (cadena hexadecimal de 65 bytes)
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+console.log('Signature:', signature)
+```
+
+### Uso de ethers.js [#using-ethersjs]
+
+```typescript
+import { hashMessage, recoverAddress } from 'ethers'
+
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+// Verify signature
+const recoveredAddress = recoverAddress(hashMessage(message), signature)
+console.log('Verified:', recoveredAddress.toLowerCase() === accounts[0].toLowerCase())
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| 4001 | El usuario rechazó la solicitud | El usuario denegó la solicitud de firma |
+| -32602 | Parámetros no válidos | Mensaje o dirección no válidos |
+
+---
+
+## Notas [#notes]
+
+- El mensaje debe estar codificado en hexadecimal con `0x` como prefijo
+- El mensaje que se firma realmente es: `"\x19Ethereum Signed Message:\n" + len(message) + message`
+- Para firmar datos tipados, usa [eth_signTypedData_v4](/es/connect-to-software/provider/eth/reference/eth_signTypedData_v4) en su lugar
+- Definido por [EIP-191](https://eips.ethereum.org/EIPS/eip-191)
+
+Para autenticación, verifica el dominio previsto, la cuenta, la caducidad y el desafío de un solo uso del servidor. Una firma válida de un mensaje fijo de ejemplo no constituye un flujo de inicio de sesión completo.

@@ -1,0 +1,81 @@
+---
+title: "scdoSignTransaction"
+---
+
+# scdoSignTransaction
+
+#### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.10.0
+
+#### SCDO: firmar transacción [#scdo-sign-transaction]
+
+Firma una transacción con la clave privada derivada de la ruta BIP32 especificada.
+
+```typescript
+const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
+    path: "m/44'/541'/0'/0/0",
+    nonce: "0x0",
+    gasPrice: "0xbebc200",
+    gasLimit: "0x5208",
+    to: "1S0118a02f993fc7a4348fd36b7f7a596948f02b31",
+    value: "0xf4240",
+    timestamp: "0",
+    data: "0x", // optional
+    txType: 0   // optional
+});
+```
+
+**Parámetros**
+
+Parámetros comunes opcionales
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `nonce` - _obligatorio_ `string` nonce de la transacción en hexadecimal
+* `gasPrice` - _obligatorio_ `string` precio del gas de la transacción en hexadecimal
+* `gasLimit` - _obligatorio_ `string` límite de gas de la transacción en hexadecimal
+* `to` - _obligatorio_ `string` dirección de destino
+* `value` - _obligatorio_ `string` valor de la transacción en hexadecimal
+* `timestamp` - _opcional_ `string` marca de tiempo de la transacción
+* `data` - _opcional_ `string` datos de la transacción en hexadecimal
+* `txType` - _opcional_ `number` tipo de transacción
+
+**Ejemplo**
+
+```typescript
+const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
+    path: "m/44'/541'/0'/0/0",
+    nonce: "0x0",
+    gasPrice: "0xbebc200",
+    gasLimit: "0x5208",
+    to: "1S0118a02f993fc7a4348fd36b7f7a596948f02b31",
+    value: "0xf4240",
+    timestamp: "0"
+});
+```
+
+Resultado
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature?: string,
+        data_length?: number,
+        path: string
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number  // error code
+    }
+}
+```

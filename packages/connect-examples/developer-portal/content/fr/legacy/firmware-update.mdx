@@ -1,0 +1,18 @@
+---
+title: "API firmwareUpdate d’origine"
+description: "API historique. Commencez par le [guide actuel de mise à jour du micrologiciel](/fr/hardware-sdk/firmware-update) et utilisez la méthode adaptée au SDK, au transport, à l’appareil et à la version."
+---
+
+<span id="original-firmwareupdate-api" />
+
+# API firmwareUpdate d’origine
+
+> API historique. Commencez par le [guide de mise à jour du micrologiciel](/fr/hardware-sdk/firmware-update) et utilisez la méthode adaptée au SDK, au transport, à l’appareil et à la version.
+
+La référence d’origine de `firmwareUpdate(connectId, params)` acceptait `updateType` (`firmware` ou `ble`), le paramètre facultatif `binary` (`ArrayBuffer`), ainsi qu’un tableau de version facultatif. Elle décrivait soit la sélection de ressources de publication, soit un binaire fourni.
+
+Le tableau de version d’un ancien exemple n’est pas une recommandation de version actuelle. Ne réutilisez pas une cible codée en dur ni un binaire non vérifié. Les méthodes de mise à jour nommées V2, V3 ou V4 désignent des versions d’API, pas une déclaration de compatibilité avec Protocol V2 des appareils.
+
+Utilisez les métadonnées de publication officielles et vérifiez l’appareil, le micrologiciel et le transport choisis. Demandez à l’utilisateur de lancer volontairement la mise à jour, préservez la vérification et la confirmation sur l’appareil, attendez l’opération et gérez les reconnexions. La réussite d’un téléchargement ou d’un appel de transport ne suffit pas à établir que la mise à jour est terminée.
+
+La [source d’origine](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/firmwareupdate.md) est conservée pour la maintenance des anciennes applications.

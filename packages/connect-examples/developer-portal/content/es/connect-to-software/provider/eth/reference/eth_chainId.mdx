@@ -1,0 +1,131 @@
+---
+title: "eth_chainId"
+description: "Obtener el ID de la cadena actual"
+---
+
+# eth_chainId
+
+Devuelve el ID de la red conectada en ese momento. El ID de cadena se usa para evitar ataques de repetición entre redes distintas.
+
+---
+
+## Parámetros [#parameters]
+
+Ninguno
+
+---
+
+## Devuelve [#returns]
+
+`string` - El ID de cadena como cadena hexadecimal
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const chainId = await window.$onekey.ethereum.request({
+  method: 'eth_chainId'
+})
+
+console.log('Chain ID (hex):', chainId)
+console.log('Chain ID (decimal):', parseInt(chainId, 16))
+```
+
+### Comprobar la red [#check-network]
+
+```typescript
+const CHAIN_IDS = {
+  ETHEREUM: '0x1',
+  POLYGON: '0x89',
+  BSC: '0x38',
+  ARBITRUM: '0xa4b1',
+  OPTIMISM: '0xa',
+  BASE: '0x2105'
+}
+
+async function checkNetwork() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  switch (chainId) {
+    case CHAIN_IDS.ETHEREUM:
+      console.log('Connected to Ethereum Mainnet')
+      break
+    case CHAIN_IDS.POLYGON:
+      console.log('Connected to Polygon')
+      break
+    default:
+      console.log('Connected to chain:', parseInt(chainId, 16))
+  }
+
+  return chainId
+}
+```
+
+### Exigir una red específica [#require-specific-network]
+
+```typescript
+async function requireNetwork(requiredChainId) {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  if (chainId !== requiredChainId) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: requiredChainId }]
+      })
+    } catch (error) {
+      if (error.code === 4902) {
+        throw new Error('Please add this network to your wallet')
+      }
+      throw error
+    }
+  }
+}
+
+// Usage
+await requireNetwork('0x1') // Require Ethereum Mainnet
+```
+
+---
+
+## Identificadores de cadena habituales [#common-chain-ids]
+
+| Red | Hexadecimal | Decimal |
+|---------|-----|---------|
+| Red principal de Ethereum | `0x1` | 1 |
+| Red de pruebas Sepolia | `0xaa36a7` | 11155111 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum One | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche C-Chain | `0xa86a` | 43114 |
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| -32603 | Error interno | Error del proveedor |
+
+---
+
+## Notas [#notes]
+
+- El ID de cadena siempre se devuelve como cadena hexadecimal que lleva `0x` como prefijo
+- Escucha el evento `chainChanged` para detectar cambios de red
+- Definido por [EIP-695](https://eips.ethereum.org/EIPS/eip-695)
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('Network changed to:', chainId)
+  // Recommended: reload the page
+  window.location.reload()
+})
+```

@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Connect the provider before signing and confirm the selected network. The direct injected provider and the Aptos Wallet Standard adapter have different argument types; do not interchange their examples. Replace abbreviated addresses and provide an SDK client for read-only calls.
+
 Learn how to sign messages for authentication or verification.
 
 ---
@@ -20,7 +22,7 @@ const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
 
 const response = await provider.signMessage({
   message,
-  nonce: 'abc123',  // Optional nonce for replay protection
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
 })
 
 console.log({
@@ -37,7 +39,7 @@ console.log({
 ```typescript
 const response = await provider.signMessage({
   message: 'Hello Aptos',
-  nonce: 'unique-nonce',
+  nonce: 12345,
   address: true,      // Include address in message
   application: true,  // Include app info
   chainId: true,      // Include chain ID
@@ -53,7 +55,7 @@ import nacl from 'tweetnacl'
 
 const { signature, fullMessage } = await provider.signMessage({
   message: 'Hello Aptos',
-  nonce: 'unique-nonce',
+  nonce: 12345,
 })
 
 const account = await provider.account()
@@ -79,8 +81,8 @@ const signInInput = {
 const result = await provider.signIn(signInInput)
 
 console.log({
-  address: result.address,
-  publicKey: result.publicKey,
+  address: result.account.address,
+  publicKey: result.account.publicKey,
   signature: result.signature,
 })
 ```
@@ -91,14 +93,14 @@ console.log({
 
 ```typescript
 try {
-  await provider.signMessage({ message: 'Hello', nonce: '123' })
+  await provider.signMessage({ message: 'Hello', nonce: 12345 })
 } catch (error) {
   switch (error.code) {
     case 4001:
       console.log('User rejected the request')
       break
     case 4100:
-      console.log('Unauthorized - wallet is locked')
+      console.log('The account or method is not authorized')
       break
     case 4200:
       console.log('Unsupported method')
@@ -109,3 +111,4 @@ try {
 }
 ```
 
+The direct `signMessage` method uses a numeric nonce. `signMessageCompatible` and Wallet Standard integrations use a string nonce. Verify the returned `fullMessage`, signer, and challenge, and invalidate the challenge after use. The sign-in input above is a schematic placeholder; construct the full `AptosSignInInput` required by your adapter version.

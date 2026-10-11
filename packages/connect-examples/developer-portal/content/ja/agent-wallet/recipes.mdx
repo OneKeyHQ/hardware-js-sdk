@@ -1,0 +1,137 @@
+---
+title: "実装例"
+description: "段階的な例に従って、ウォレットの読み取り、スワップの準備、確認後の署名を実行します。"
+---
+
+<span id="recipes" />
+
+# 実装例
+
+これらの例は、ユーザーリクエストの背後で想定される手順を示します。コマンドを実行する前に、次を確認してください: `onekey schema --list` およびインストール済み CLI の該当コマンドのスキーマ。例のアドレスと注文 ID は、検証済みの値に置き換えてください。利用可能な機能はベータ版のバージョンによって異なります。
+
+## ウォレットの状態を確認 [#check-wallet-state]
+
+ユーザー:
+
+```text
+Show my wallet balance and receiving address.
+```
+
+想定されるフロー:
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+```
+
+適切な回答の形式:
+
+```text
+Active wallet: 0x...
+Ethereum balance: ...
+Receiving address: 0x...
+Next: I can show history, quote a swap, or prepare a transfer.
+```
+
+## 購入前に調査 [#research-before-buying]
+
+ユーザー:
+
+```text
+What Solana tokens are trending, and is BONK worth a closer look?
+```
+
+想定されるフロー:
+
+```bash
+onekey token trending --chain sol
+onekey token search --query BONK --chain sol
+onekey token info --chain sol --token BONK
+```
+
+エージェントは、まず市場情報を回答してください。その後のやり取りでユーザーが取引を求めない限り、スワップを開始してはいけません。
+
+## 見積もり、確認、実行 [#quote-confirm-execute]
+
+ユーザー:
+
+```text
+Swap 1 ETH to USDC, but show me the quote before execution.
+```
+
+想定されるフロー:
+
+```bash
+onekey balance --chain eth
+onekey swap quote --chain eth --from ETH --to USDC --amount 1
+onekey security audit --chain eth --token USDC
+onekey swap build --chain eth --from ETH --to USDC --amount 1
+```
+
+確認時には次の内容を表示してください:
+
+| フィールド | 例 |
+| --- | --- |
+| 操作 | スワップ |
+| ルート | Ethereum 上で ETH -&gt; USDC |
+| 金額 | 1 ETH |
+| 推定受取額 | 見積もり結果から取得 |
+| 手数料 | 取得できる場合は見積もり/構築結果から取得 |
+| リスク | 監査またはシミュレーションの状態 |
+| 次の手順 | `Proceed? (yes/no)` |
+
+ユーザーが確認した後にのみ実行します:
+
+```bash
+onekey swap execute --chain eth --order <orderId>
+```
+
+## ハードウェアを利用する送金 [#hardware-backed-transfer]
+
+ユーザー:
+
+```text
+Use my OneKey hardware wallet to send 50 USDC to 0x...
+```
+
+想定されるフロー:
+
+```bash
+onekey device search
+onekey auth login --hardware
+onekey auth status
+onekey balance --chain eth --token USDC
+```
+
+有効なウォレット、受取人の完全なアドレス、チェーン、トークン、金額、推定手数料、デバイス上での確認手順を表示します。ユーザーが送金を確認した後にのみ実行します:
+
+```bash
+onekey transfer --to <verified-full-address> --amount 50 --token USDC --chain eth
+```
+
+送金の確認には、デバイス上での確認手順を必ず含めてください。デバイスがロック中、未接続、PIN/パスフレーズの入力待ち、またはリクエストを拒否した場合、エージェントは停止してその状態を報告してください。
+
+## BTC の署名のみの PSBT [#btc-sign-only-psbt]
+
+ユーザー:
+
+```text
+Swap 0.01 BTC to USDC using taproot and sign only.
+```
+
+想定されるフロー:
+
+```bash
+onekey wallet address --chain btc --address-type taproot
+onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
+onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+```
+
+準備済みの注文、アドレスタイプ、金額、受取額、手数料を表示します。トランザクションをブロードキャストしない場合でも、署名には明示的な確認が必要です。ユーザーが確認した後にのみ実行します:
+
+```bash
+onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
+```
+
+回答には署名済みまたはプレビュー可能な PSBT を返し、ブロードキャスト済みトランザクションのハッシュを返さないでください。

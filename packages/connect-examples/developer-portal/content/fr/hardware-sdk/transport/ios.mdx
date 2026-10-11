@@ -1,0 +1,81 @@
+---
+description: "Connectez OneKey via CoreBluetooth et WKWebView avec des E/S ordonnées et une disponibilité vérifiée des notifications."
+title: "iOS : connexion par Bluetooth"
+---
+
+<span id="ios-connect-via-bluetooth" />
+
+# iOS : connexion par Bluetooth
+
+Exécutez `@onekeyfe/hd-common-connect-sdk` dans WKWebView et reliez son transport de bas niveau à CoreBluetooth. Commencez par l’[exemple iOS natif](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-ios-example) et le contrat du [plugin de transport de bas niveau](/fr/hardware-sdk/concepts/low-level-plugin).
+
+L’hôte natif gère le cycle de vie Bluetooth. Le SDK gère la détection du protocole, le cadrage et le traitement des requêtes/réponses.
+
+## Configurer l’application [#configure-the-app]
+
+- Incluez `NSBluetoothAlwaysUsageDescription` avec une explication de la connectivité au portefeuille matériel. Vérifiez les exigences supplémentaires si vous prenez en charge d’anciennes versions d’iOS.
+- Utilisez CoreBluetooth et la dépendance de pont déclarée par l’exemple natif.
+- Testez sur un appareil iOS physique avec l’autorisation Bluetooth accordée. Gérez les états refusé, restreint et désactivé avant de scanner.
+
+## Construire et charger le bundle JavaScript [#build-and-load-the-javascript-bundle]
+
+Depuis la copie de travail hardware-js-sdk :
+
+```bash
+cd packages/connect-examples/native-ios-example/web
+yarn
+yarn build
+```
+
+Ajoutez l’intégralité du répertoire `web_dist/` aux ressources de la cible de l’application. Préservez les chemins relatifs des ressources. Créez WKWebView et le pont, enregistrez les gestionnaires natifs, puis chargez le HTML embarqué. Ne naviguez pas vers du contenu non fiable dans une WebView ayant accès à l’appareil.
+
+Utilisez l’implémentation complète et les versions de dépendances de l’exemple. Les tableaux ci-dessous définissent les garanties requises d’un pont personnalisé.
+
+## Cycle de vie de la connexion [#connection-lifecycle]
+
+`CBCentralManager.connect()` lance une tentative de connexion. Ne résolvez pas la requête JS `connect` à ce stade.
+
+| Étape | Traitement requis |
+| --- | --- |
+| Scanner | Attendez `.poweredOn` ; filtrez par le service OneKey, dédupliquez les résultats et arrêtez le scan à l’échéance définie. |
+| Sélectionner | Faire correspondre l’UUID du périphérique sélectionné. Si vous scannez pour reconnecter, connectez-vous uniquement à ce périphérique. |
+| Connecter | Attendez `didConnect` ; renvoyer un échec en cas de `didFailToConnect` ou de délai dépassé. |
+| Découvrir | Trouver le service requis et les caractéristiques d’écriture/notification ; gérer les erreurs de découverte et les caractéristiques manquantes. |
+| S’abonner | Activer les notifications, puis attendre `didUpdateNotificationStateFor` sans erreur et avec les notifications activées. |
+| Prêt | Résoudre seulement maintenant la requête JS de connexion en attente. Terminer chaque rappel du pont une seule fois. |
+
+Consultez le [rappel d’état des notifications](https://developer.apple.com/documentation/corebluetooth/cbperipheraldelegate/peripheral(_:didupdatenotificationstatefor:error:)) d’Apple pour la fin de l’abonnement.
+
+| Rôle | UUID |
+| --- | --- |
+| Service | `00000001-0000-1000-8000-00805f9b34fb` |
+| Écriture | `00000002-0000-1000-8000-00805f9b34fb` |
+| Notification | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## E/S ordonnées [#ordered-io]
+
+- `send` reçoit l’hexadécimal préparé par le SDK. Rejetez l’hexadécimal mal formé ou de longueur impaire ; ne supprimez pas silencieusement les octets non valides.
+- Respectez le mode d’écriture demandé et la capacité d’écriture du périphérique. Pour les écritures sans réponse, respectez la régulation de débit de CoreBluetooth ; une écriture mise en file ne prouve pas que l’appareil a terminé une requête SDK.
+- Mettez les blocs bruts de notification en file par périphérique et renvoyez un bloc hexadécimal inchangé à chaque appel `receive(uuid)`. N’analysez pas les en-têtes V1 et ne complétez pas les blocs pour atteindre la taille de paquet USB.
+- À la déconnexion, rejetez les opérations en attente et videz les notifications en file de l’ancienne connexion. Une reconnexion ne doit pas recevoir de données obsolètes de la connexion précédente.
+- Exposez `getProtocolV2PacketCapacity` avec la capacité d’écriture native. Consultez le [plugin](/fr/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface).
+
+## Identité du SDK et du portefeuille [#sdk-and-wallet-identity]
+
+Initialisez le SDK avec `env: 'lowlevel'` et votre plugin de pont. Vérifiez la réussite de l’initialisation. Utilisez `searchDevices()` pour sélectionner `connectId`, puis `getDeviceState(connectId)` pour lire `identity.deviceId`.
+
+L’UUID du périphérique iOS oriente la connexion ; ce n’est pas l’identité de la graine. Relisez l’état après reconnexion et arrêtez-vous si le portefeuille attendu a changé. Consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers).
+
+## PIN, phrase secrète et confirmation [#pin-passphrase-and-confirmation]
+
+Connectez les [événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) avant les appels protégés. Les boîtes de dialogue natives peuvent recueillir des saisies ou afficher des instructions, mais le gestionnaire JS doit préserver la corrélation de réponse de la demande initiale.
+
+Répondez uniquement aux demandes de saisie. `REQUEST_BUTTON`, `REQUEST_PASSPHRASE_ON_DEVICE`, et les événements de PIN uniquement sur l’appareil sont des notifications. Un rappel hôte renvoyant « OK » n’approuve pas l’opération sur l’appareil. Si l’utilisateur annule, annulez l’appel SDK sélectionné et invalidez les rappels d’interface en attente.
+
+Utilisez la même association explicite de portefeuille standard/caché pour la confirmation d’adresse et la signature. Excluez les PIN/phrases secrètes saisis sur l’hôte des journaux et du stockage persistant.
+
+## Vérifier et rétablir [#verify-and-recover]
+
+Testez le refus d’autorisation, le Bluetooth désactivé, les caractéristiques manquantes, l’échec d’abonnement aux notifications, la saisie sur l’appareil, l’annulation et la reconnexion. Confirmez une adresse sur l’appareil physique avant de considérer le pont comme fonctionnel.
+
+Ne rejouez pas automatiquement une signature ou une mise à jour du micrologiciel après un délai dépassé. Suivez [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).

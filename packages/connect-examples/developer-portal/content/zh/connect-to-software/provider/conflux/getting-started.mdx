@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 快速开始
 
+准备交易前，先连接 provider 并读取当前网络。这些示例适用于 Conflux Core Space。请替换省略的地址，并在调用 SDK 方法前初始化客户端。
+
 了解如何检测、连接和与 Conflux 进行交互。
 
 <Callout type="info">
@@ -18,14 +20,14 @@ OneKey 的 Conflux provider 同时兼容 ConfluxPortal 和 Fluent 钱包接口�
 ## Provider 检测
 
 ```typescript
-// 检测 OneKey Conflux provider
+// Detect OneKey Conflux provider
 const provider = window.$onekey?.conflux
 
 if (!provider) {
-  throw new Error('未检测到 OneKey Conflux provider')
+  throw new Error('OneKey Conflux provider not detected')
 }
 
-// 检查兼容性标志
+// Check compatibility flags
 console.log('isConfluxPortal:', provider.isConfluxPortal) // true
 console.log('isFluent:', provider.isFluent) // true
 console.log('isOneKey:', provider.isOneKey) // true
@@ -40,7 +42,7 @@ const accounts = await provider.request({
   method: 'cfx_requestAccounts'
 })
 
-console.log('已连接:', accounts[0])
+console.log('Connected:', accounts[0])
 ```
 
 ---
@@ -50,7 +52,7 @@ console.log('已连接:', accounts[0])
 ```typescript
 if (provider.isConnected()) {
   const accounts = await provider.request({ method: 'cfx_accounts' })
-  console.log('账户:', accounts)
+  console.log('Accounts:', accounts)
 }
 ```
 
@@ -60,7 +62,7 @@ if (provider.isConnected()) {
 
 ```typescript
 const chainId = await provider.request({ method: 'cfx_chainId' })
-console.log('链 ID:', chainId) // 例如 '0x405' 表示主网
+console.log('Chain ID:', chainId) // e.g., '0x405' for mainnet
 ```
 
 ---
@@ -69,7 +71,7 @@ console.log('链 ID:', chainId) // 例如 '0x405' 表示主网
 
 ```typescript
 const networkId = await provider.request({ method: 'net_version' })
-console.log('网络 ID:', networkId) // 例如 '1029' 表示主网
+console.log('Network ID:', networkId) // e.g., '1029' for mainnet
 ```
 
 ---
@@ -82,7 +84,7 @@ const balance = await provider.request({
   params: [address, 'latest_state']
 })
 
-console.log('余额:', balance) // 以 Drip 为单位 (1 CFX = 10^18 Drip)
+console.log('Balance:', balance) // In Drip (1 CFX = 10^18 Drip)
 ```
 
 ---
@@ -94,9 +96,9 @@ console.log('余额:', balance) // 以 Drip 为单位 (1 CFX = 10^18 Drip)
 ```typescript
 provider.on('accountsChanged', (accounts) => {
   if (accounts.length === 0) {
-    console.log('已断开连接')
+    console.log('Disconnected')
   } else {
-    console.log('账户已变更:', accounts[0])
+    console.log('Account changed:', accounts[0])
   }
 })
 ```
@@ -105,8 +107,8 @@ provider.on('accountsChanged', (accounts) => {
 
 ```typescript
 provider.on('chainChanged', (chainId) => {
-  console.log('链已变更:', chainId)
-  // 建议重新加载页面
+  console.log('Chain changed:', chainId)
+  // Recommend reloading the page
   window.location.reload()
 })
 ```
@@ -115,11 +117,11 @@ provider.on('chainChanged', (chainId) => {
 
 ```typescript
 provider.on('connect', ({ chainId, networkId }) => {
-  console.log('已连接到:', chainId, networkId)
+  console.log('Connected to:', chainId, networkId)
 })
 
 provider.on('disconnect', () => {
-  console.log('已断开连接')
+  console.log('Disconnected')
 })
 ```
 
@@ -130,13 +132,13 @@ provider.on('disconnect', () => {
 Conflux 使用 base32 地址 (CIP-37)：
 
 ```typescript
-// 主网: cfx:...
-// 测试网: cfxtest:...
+// Mainnet: cfx:...
+// Testnet: cfxtest:...
 
-// 主网地址示例
+// Example mainnet address
 const address = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91'
 
-// 使用 js-conflux-sdk 在格式之间转换
+// Convert between formats using js-conflux-sdk
 import { format } from 'js-conflux-sdk'
 
 const hexAddress = format.hexAddress(address)
@@ -151,4 +153,3 @@ const base32Address = format.address(hexAddress, 1029) // networkId
 |------|-----------------|---------|
 | 主网 | `0x405` | 1029 |
 | 测试网 | `0x1` | 1 |
-

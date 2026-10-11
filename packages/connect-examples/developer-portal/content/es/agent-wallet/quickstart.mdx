@@ -1,0 +1,87 @@
+---
+title: "Inicio rápido"
+description: "Instala las skills de cartera de OneKey, conecta una sesión y prueba una solicitud de solo lectura."
+---
+
+<span id="quickstart" />
+
+# Inicio rápido
+
+> Beta privada. El acceso, los comandos disponibles y los flujos de cartera dependen de las versiones de OneKey y de la CLI. Consulta el esquema de la CLI instalada antes de usar estos ejemplos.
+
+Empieza por instalar las skills de cartera de OneKey en tu cliente de IA. Después, los usuarios pueden hacer preguntas sobre la cartera en lenguaje natural; las skills se encargan de las comprobaciones previas de la CLI, el descubrimiento de esquemas y la selección segura de comandos.
+
+Las solicitudes de solo lectura deben devolver resultados de inmediato. Las cotizaciones, construcciones, auditorías y simulaciones explican qué ocurriría sin mover fondos. Las transferencias, la ejecución de intercambios, las autorizaciones, la difusión de transacciones y la firma requieren un turno de confirmación explícita.
+
+## 1. Instalar las skills [#1-install-the-skills]
+
+### Claude Code [#claude-code]
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex [#codex]
+
+Indica a Codex:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor [#cursor]
+
+Clona el paquete de skills y configura Cursor para que use el directorio del plugin:
+
+```bash
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
+```
+
+### OpenCode y OpenClaw [#opencode-and-openclaw]
+
+Usa la guía de instalación del repositorio [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) para cada cliente. Todos los clientes usan las mismas cuatro skills: cartera, intercambios, mercado y seguridad.
+
+## 2. Conectar una Agent Wallet [#2-connect-an-agent-wallet]
+
+Pide a tu cliente de IA:
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+La skill vincula la sesión local mediante App Transfer en la interfaz gráfica de OneKey y resume la cartera activa. Si falta la CLI `onekey`, la comprobación previa de la skill la instala antes de continuar; el usuario no debería tener que configurar comandos de la CLI manualmente.
+
+## 3. Probar solicitudes de solo lectura [#3-try-read-only-prompts]
+
+Empieza con instrucciones que no muevan fondos:
+
+| Pide al cliente de IA | Habilidad correspondiente |
+| --- | --- |
+| `Show my wallet balance.` | Cartera |
+| `Show my receiving address for ETH.` | Cartera |
+| `What tokens are trending right now?` | Mercado |
+| `What is the price of SOL?` | Mercado |
+| `Is this token safe before I buy it?` | Seguridad |
+
+La respuesta debe presentar primero el resultado: estado de la cartera, ruta, riesgo y un siguiente paso útil. No debe volcar la salida sin procesar del terminal.
+
+## 4. Obtener una cotización antes de operar [#4-quote-before-trading]
+
+Pregunta:
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+La skill de intercambios debe obtener una cotización, ejecutar las comprobaciones de seguridad pertinentes, mostrar la ruta y el importe de salida previstos y detenerse antes de ejecutar la operación. Una confirmación posterior, como `Yes, execute the swap`, solo debe ejecutar la orden ya revisada.
+
+## 5. Usar la confirmación por hardware [#5-use-hardware-confirmation]
+
+Para acciones de mayor riesgo, pide:
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+La skill de cartera cambia a una sesión respaldada por hardware, en la que las solicitudes de firma compatibles requieren que el usuario revise y confirme en el dispositivo. Los detalles de Clear Signing disponibles dependen de la cadena, el firmware y la versión de la CLI. Tras iniciar sesión con hardware, las solicitudes de cartera, transferencias, intercambios y firma usan la sesión activa respaldada por hardware; verifica su dirección antes de preparar una acción que mueva fondos.

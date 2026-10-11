@@ -1,0 +1,65 @@
+---
+title: "confluxSignMessage"
+---
+
+# confluxSignMessage
+
+## Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 3.0.0
+  * Classic/Mini: 2.4.0
+
+## Conflux: firmar un mensaje <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#conflux-sign-message-]
+
+Solicita una firma de mensaje con la clave derivada de la ruta especificada.
+
+```typescript
+const result = await HardwareSDK.confluxSignMessage(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _obligatorio_ `string` Mensaje que se va a firmar, codificado como cadena hexadecimal.
+
+### Ejemplo [#example]
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.confluxSignMessage(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    messageHex
+});
+```
+
+Resultado
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

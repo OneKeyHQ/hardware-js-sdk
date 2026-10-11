@@ -1,0 +1,158 @@
+---
+title: "Primeros pasos"
+description: "Conéctate a Aptos con el proveedor de OneKey compatible con Petra"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Primeros pasos
+
+Conecta el proveedor antes de firmar y confirma la red seleccionada. El proveedor inyectado directo y el adaptador Aptos Wallet Standard usan tipos de argumentos distintos; no intercambies sus ejemplos. Sustituye las direcciones abreviadas y proporciona un cliente SDK para las llamadas de solo lectura.
+
+Aprende a detectar, conectar e interactuar con Aptos mediante el proveedor de OneKey.
+
+<Callout type="info">
+OneKey ofrece métodos compatibles con Petra y un adaptador Aptos Wallet Standard. Sus firmas de métodos difieren; usa la interfaz documentada para tu integración.
+</Callout>
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// Detect OneKey Aptos provider
+const provider = window.$onekey?.aptos
+
+if (!provider) {
+  throw new Error('OneKey Aptos provider not detected')
+}
+
+// Check provider info
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
+```
+
+---
+
+## Conectar la cartera [#connect-wallet]
+
+```typescript
+// Connect and get account info
+const response = await provider.connect()
+
+console.log({
+  address: response.address,     // Account address
+  publicKey: response.publicKey, // Public key
+})
+```
+
+---
+
+## Comprobar el estado de conexión [#check-connection-status]
+
+```typescript
+const isConnected = await provider.isConnected()
+console.log('Connected:', isConnected)
+```
+
+---
+
+## Obtener la cuenta actual [#get-current-account]
+
+```typescript
+const account = await provider.account()
+
+console.log({
+  address: account.address,
+  publicKey: account.publicKey,
+})
+```
+
+---
+
+## Obtener información de la red [#get-network-info]
+
+```typescript
+const network = await provider.network()
+
+console.log('Network:', network) // 'mainnet', 'testnet', 'devnet'
+
+// For full network info
+const networkInfo = await provider.getNetwork()
+console.log({
+  name: networkInfo.name,
+  chainId: networkInfo.chainId,
+  url: networkInfo.url,
+})
+```
+
+---
+
+## Desconectar [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Escuchadores de eventos [#event-listeners]
+
+### Escuchar cambios de cuenta [#listen-for-account-changes]
+
+```typescript
+provider.onAccountChange((newAccount) => {
+  if (newAccount) {
+    console.log('Account changed:', newAccount)
+  } else {
+    console.log('Wallet disconnected')
+  }
+})
+```
+
+### Escuchar cambios de red [#listen-for-network-changes]
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('Network changed:', network)
+})
+```
+
+---
+
+## Migración desde Petra [#migration-from-petra]
+
+El proveedor de Aptos de OneKey es compatible con Petra. Actualiza la detección del proveedor:
+
+```typescript
+// Before (Petra only)
+const provider = window.petra
+
+// After (OneKey with Petra fallback)
+const provider = window.$onekey?.aptos || window.petra
+```
+
+---
+
+## Uso con Aptos Wallet Adapter [#using-with-aptos-wallet-adapter]
+
+Para aplicaciones React, usa el adaptador oficial Aptos Wallet Adapter:
+
+```bash
+npm install @aptos-labs/wallet-adapter-react
+```
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+Usa una versión del adaptador compatible con Wallet Standard y verifica que OneKey aparezca en su lista de carteras detectadas.

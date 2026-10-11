@@ -1,0 +1,22 @@
+---
+title: "Provider erkennen"
+---
+
+<span id="detecting-the-provider" />
+
+# Provider erkennen
+
+Einige Provider-Methoden können nur aufgerufen werden, wenn die OneKey-Erweiterung im Browser des Nutzers installiert ist.
+
+Um zu erkennen, ob die Erweiterung installiert ist, können Sie die asynchrone Methode aufrufen: `detectWalletInstalled`.
+
+Wenn OneKey nicht installiert ist, empfehlen wir, Ihre Nutzer weiterzuleiten auf [unsere Website](https://www.onekey.so). Insgesamt kann dies wie folgt aussehen.
+
+```javascript
+const installed = await provider.detectWalletInstalled();
+if (installed) {
+  await provider.request({ method: 'near_accounts' });
+} else {
+  window.open('https://www.onekey.so');
+}
+```

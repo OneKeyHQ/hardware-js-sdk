@@ -1,0 +1,21 @@
+---
+title: "Metadatos del sitio"
+description: "Proporciona un favicon para que carteras y navegadores identifiquen tu sitio. Añade un enlace al icono en el `<head>` del documento y usa una URL de imagen pública:"
+---
+
+<span id="site-metadata" />
+
+# Metadatos del sitio
+
+Proporciona un favicon para que carteras y navegadores identifiquen tu sitio. Añade un enlace al icono en el `<head>` del documento y usa una URL de imagen pública:
+
+```html
+<head>
+  <link rel="icon" href="https://example.com/icon.png" type="image/png" />
+  <link rel="shortcut icon" href="https://example.com/icon.png" />
+</head>
+```
+
+Usa el nombre, origen e icono reales de tu aplicación en los metadatos de la biblioteca de conexión. Los metadatos identifican el sitio solicitante; no demuestran que sea fiable.
+
+Las versiones de cartera pueden recuperar o almacenar en caché los metadatos de forma distinta. Revisa el aviso real de conexión después del despliegue; actualizar el favicon puede no modificar inmediatamente una sesión existente.

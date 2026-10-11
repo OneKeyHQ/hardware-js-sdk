@@ -1,5 +1,7 @@
 'use client'
 
+import { ui } from '../../../../i18n/ui.mjs'
+
 import { useMemo } from 'react'
 import { PRO_COLORS, PRO_LAYOUT, PRO_SCREEN } from './constants'
 import { ProDeviceStatusBar } from './ProDeviceStatusBar'
@@ -61,7 +63,7 @@ export function ProTxConfirmScreen({
             color: PRO_COLORS.WHITE
           }}
         >
-          {locale === 'en' ? 'Confirm' : '确认'}
+          {ui(locale, "Confirm", "确认")}
         </div>
 
         <div style={{ marginTop: 40 }}>
@@ -121,7 +123,7 @@ export function ProTxConfirmScreen({
           color: PRO_COLORS.WHITE
         }}
       >
-        {i18n.cancel ?? (locale === 'en' ? 'Cancel' : '取消')}
+        {i18n.cancel ?? (ui(locale, "Cancel", "取消"))}
       </button>
 
       <button
@@ -143,7 +145,7 @@ export function ProTxConfirmScreen({
           color: PRO_COLORS.BLACK
         }}
       >
-        {i18n.confirm ?? (locale === 'en' ? 'Confirm' : '确认')}
+        {i18n.confirm ?? (ui(locale, "Confirm", "确认"))}
       </button>
     </div>
   )

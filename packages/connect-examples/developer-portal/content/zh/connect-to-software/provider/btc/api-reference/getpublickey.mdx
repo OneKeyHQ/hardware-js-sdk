@@ -6,26 +6,24 @@ title: getPublicKey
 
 获取当前账户的公钥。
 
-### 方法
+## 方法
 
 ```typescript
-async function getPublicKey(): string
+declare function getPublicKey(): Promise<string>;
 ```
 
-### 响应
+## 响应
 
-返回公钥。
+字符串形式的公钥。
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const publicKey = async provider.getPublicKey();
-
+const publicKey = await provider.getPublicKey();
 ```
 
-### 演示
+## 演示
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/jOdvLLy" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/jOdvLLy)

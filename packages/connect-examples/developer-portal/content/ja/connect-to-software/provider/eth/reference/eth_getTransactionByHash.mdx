@@ -1,0 +1,109 @@
+---
+title: "eth_getTransactionByHash"
+description: "ハッシュでトランザクションの詳細を取得"
+---
+
+# eth_getTransactionByHash
+
+ハッシュに基づいてトランザクション情報を返します。
+
+---
+
+## パラメーター [#parameters]
+
+| インデックス | 型 | 説明 |
+|-------|------|-------------|
+| 0 | `string` | トランザクションハッシュ (32 バイト) |
+
+---
+
+## 戻り値 [#returns]
+
+`object | null` - トランザクションオブジェクト。見つからない場合は null
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `hash` | `string` | トランザクションハッシュ |
+| `nonce` | `string` | 送信者の nonce (16 進数) |
+| `blockHash` | `string` | ブロックハッシュ (保留中は null) |
+| `blockNumber` | `string` | ブロック番号 (保留中は null) |
+| `transactionIndex` | `string` | ブロック内のインデックス (保留中は null) |
+| `from` | `string` | 送信者アドレス |
+| `to` | `string` | 受取人アドレス (コントラクト作成時は null) |
+| `value` | `string` | 送信する値 (16 進数の wei) |
+| `gasPrice` | `string` | ガス価格 (16 進数) |
+| `gas` | `string` | ガスリミット (16 進数) |
+| `input` | `string` | トランザクションデータ |
+| `v` | `string` | ECDSA リカバリー ID |
+| `r` | `string` | ECDSA 署名 r |
+| `s` | `string` | ECDSA 署名 s |
+
+---
+
+## 例 [#example]
+
+```typescript
+const tx = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionByHash',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (tx) {
+  console.log('From:', tx.from)
+  console.log('To:', tx.to)
+  console.log('Value:', BigInt(tx.value).toString())
+  console.log('Status:', tx.blockHash ? 'Mined' : 'Pending')
+}
+```
+
+### 送信後のトランザクションを追跡 [#track-transaction-after-sending]
+
+```typescript
+async function sendAndTrack(txParams, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
+  // Send transaction
+  const txHash = await window.$onekey.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [txParams]
+  })
+
+  console.log('Transaction sent:', txHash)
+
+  // Poll for transaction details
+  const checkTx = async () => {
+    if (Date.now() >= deadline) throw new Error("Transaction lookup timed out")
+    const tx = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionByHash',
+      params: [txHash]
+    })
+
+    if (tx && tx.blockHash) {
+      console.log('Transaction mined in block:', parseInt(tx.blockNumber, 16))
+      return tx
+    }
+
+    // Still pending, check again
+    await new Promise(r => setTimeout(r, 2000))
+    return checkTx()
+  }
+
+  return checkTx()
+}
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| -32602 | 無効なパラメーター | 無効なトランザクションハッシュ |
+
+---
+
+## 注意事項 [#notes]
+
+- 戻り値 `null` トランザクションが見つからない場合
+- 保留中のトランザクションでは null になります: `blockHash` および `blockNumber`
+- トランザクションの状態 (成功/失敗) には、次を使用します: [eth_getTransactionReceipt](/ja/connect-to-software/provider/eth/reference/eth_getTransactionReceipt)
+- トランザクションデータは、マイニングされた後も残ります

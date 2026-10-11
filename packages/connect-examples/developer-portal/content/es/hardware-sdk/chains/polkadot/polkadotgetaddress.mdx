@@ -1,0 +1,105 @@
+---
+title: "polkadotGetAddress"
+---
+
+# polkadotGetAddress
+
+## Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+* Versiones mínimas de firmware para la cadena Joystream
+  * Touch: 4.7.0
+  * Classic/Mini: 3.6.0
+* Versiones mínimas de firmware para la cadena Manta
+  * Touch: 4.9.0
+  * Classic/Mini: 3.7.0
+
+## Polkadot: obtener dirección [#polkadot-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Usa `showOnOneKey` para solicitar confirmación en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.polkadotGetAddress(connectId, deviceId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+### Una dirección [#single-address]
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `prefix` - _obligatorio_ `number` Prefijo de dirección SS58; usa `0` para Polkadot
+* `network` - _obligatorio_ `string` Nombre de la red, por ejemplo `polkadot`
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la dirección en el dispositivo. El valor predeterminado es `true`.
+
+#### Varias direcciones [#multiple-addresses]
+
+* `bundle` - matriz de objetos que incluyen `path`, `prefix`, `network`, `showOnOneKey` como campos
+
+### Ejemplo [#example]
+
+Devuelve la dirección de la primera cuenta de Polkadot:
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    path: "m/44'/354'/0'/0'/0'",
+    showOnOneKey: true,
+    network: "polkadot",
+    prefix: 0
+});
+```
+
+Devuelve un lote de direcciones de varias cuentas de Polkadot:
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/354'/0'/0'/1'", network: "polkadot", prefix: 0 }, // account 1
+        { path: "m/44'/354'/0'/0'/2'", network: "polkadot", prefix: 0 }, // account 2
+        { path: "m/44'/354'/0'/0'/3'", network: "polkadot", prefix: 0 }  // account 3
+    ]
+});
+```
+
+### Resultado [#result]
+
+Respuesta de una dirección
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+        publicKey: string, // publicKey
+    }
+}
+```
+
+Respuesta por lotes de direcciones
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address, publicKey }, // account 1
+        { path, address, publicKey }, // account 2
+        { path, address, publicKey }, // account 3
+    ]
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

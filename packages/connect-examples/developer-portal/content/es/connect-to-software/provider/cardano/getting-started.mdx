@@ -1,0 +1,164 @@
+---
+title: "Primeros pasos"
+description: "Conéctate a Cardano con el proveedor de OneKey compatible con CIP-30"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Primeros pasos
+
+Llama a `enable()` antes de usar la API para dApps. Las direcciones que devuelve la API CIP-30 son bytes codificados en hexadecimal; los parámetros de transacción y valor son CBOR codificado en hexadecimal. Los ejemplos para navegador que usan `Buffer` requieren una importación explícita de `buffer` o una función auxiliar de conversión de bytes.
+
+Aprende a detectar, conectar e interactuar con Cardano mediante el proveedor de OneKey.
+
+<Callout type="info">
+OneKey implementa CIP-30 (Cardano dApp Connector) para las operaciones documentadas aquí. También ofrece compatibilidad con la cartera Nami.
+</Callout>
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// OneKey provides both onekey and nami interfaces
+const onekey = window.cardano?.onekey
+const nami = window.cardano?.nami
+
+// Check availability
+if (!onekey) {
+  throw new Error('OneKey Cardano provider not detected')
+}
+
+// Get wallet info
+console.log('Name:', onekey.name) // 'OneKey'
+console.log('API Version:', onekey.apiVersion) // '0.1.0'
+console.log('Icon:', onekey.icon)
+```
+
+---
+
+## Habilitar la cartera [#enable-wallet]
+
+```typescript
+// Request wallet access
+const api = await window.cardano.onekey.enable()
+
+// Now you can use the full API
+const networkId = await api.getNetworkId()
+console.log('Network:', networkId === 1 ? 'Mainnet' : 'Testnet')
+```
+
+---
+
+## Comprobar si está habilitada [#check-if-enabled]
+
+```typescript
+const isEnabled = await window.cardano.onekey.isEnabled()
+
+if (isEnabled) {
+  const api = await window.cardano.onekey.enable()
+  // Use API...
+}
+```
+
+---
+
+## Obtener el ID de red [#get-network-id]
+
+```typescript
+const api = await window.cardano.onekey.enable()
+const networkId = await api.getNetworkId()
+
+// 0 = Testnet, 1 = Mainnet
+console.log('Network:', networkId)
+```
+
+---
+
+## Obtener el saldo [#get-balance]
+
+```typescript
+const balance = await api.getBalance()
+// Returns CBOR-encoded value (hex string)
+console.log('Balance (CBOR):', balance)
+
+// Decode using cardano-serialization-lib
+import { Value, BigNum } from '@emurgo/cardano-serialization-lib-browser'
+const value = Value.from_bytes(Buffer.from(balance, 'hex'))
+const lovelace = value.coin().to_str()
+console.log('Balance in lovelace:', lovelace) // Keep the exact integer string.
+```
+
+---
+
+## Obtener direcciones [#get-addresses]
+
+```typescript
+// Get used addresses (addresses with transaction history)
+const usedAddresses = await api.getUsedAddresses()
+console.log('Used addresses:', usedAddresses)
+
+// Get unused addresses (fresh addresses)
+const unusedAddresses = await api.getUnusedAddresses()
+console.log('Unused addresses:', unusedAddresses)
+
+// Get change address
+const changeAddress = await api.getChangeAddress()
+console.log('Change address:', changeAddress)
+
+// Get reward/staking addresses
+const rewardAddresses = await api.getRewardAddresses()
+console.log('Reward addresses:', rewardAddresses)
+```
+
+---
+
+## Obtener UTxO [#get-utxos]
+
+```typescript
+// Get all UTxOs
+const utxos = await api.getUtxos()
+console.log('UTxOs:', utxos)
+
+// Get UTxOs with minimum amount
+const utxosWithAmount = await api.getUtxos(
+  Buffer.from(Value.new(BigNum.from_str('1000000')).to_bytes()).toString('hex')
+  // CBOR-encoded Value for 1 ADA; import Value and BigNum from the serialization SDK.
+)
+
+// With pagination
+const paginatedUtxos = await api.getUtxos(undefined, {
+  page: 0,
+  limit: 10,
+})
+```
+
+---
+
+## Gestión de eventos [#event-handling]
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+// Nami-compatible event API
+api.experimental.on('accountChange', (addresses) => {
+  console.log('Account changed:', addresses)
+})
+```
+
+---
+
+## Compatibilidad con Nami [#nami-compatibility]
+
+El alias de compatibilidad puede pertenecer a otra extensión. Usa `window.cardano.onekey` para seleccionar OneKey explícitamente.
+
+```typescript
+// Access via Nami interface
+const nami = window.cardano.nami
+const api = await nami.enable()
+
+// Same API as OneKey
+const balance = await api.getBalance()
+```

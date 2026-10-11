@@ -4,49 +4,51 @@ title: Provider API
 
 # Provider API
 
-OneKey Browser Extension injects a global API into websites visited by its users at `window.$onekey.ethereum`. This API allows websites to request users' Ethereum accounts, read data from blockchains the user is connected to, and suggest that the user sign messages and transactions. The presence of the provider object indicates an Ethereum user.
+OneKey Browser Extension injects a global API into websites visited by its users at `window.$onekey.ethereum`. This API allows websites to request users' Ethereum accounts, read data from blockchains the user is connected to, and suggest that the user sign messages and transactions. A detected provider does not mean the user has connected an account or authorized a request.
 
-The Ethereum JavaScript provider API is specified by [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193).
+The Ethereum JavaScript provider API is specified by [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193). For modern applications, it is highly recommended to use the [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) standard for discovering multiple wallet providers, which avoids conflicts between different browser extensions.
 
-### Provider detection
+## Provider Detection
 
-Recommended: EIP‑6963 multi‑wallet detection (avoids conflicts when multiple extensions are installed)
+To ensure compatibility and a smooth user experience in a multi-wallet environment, it is highly recommended to detect providers using the **EIP-6963** standard.
 
-```js
-let onekeyProvider = null
-const providers = []
+### Recommended: EIP-6963 for Multi-Wallet Support
 
-function onAnnounceProvider(event) {
-  const { info, provider } = event.detail || {}
-  providers.push({ info, provider })
-  // Prefer OneKey explicitly
-  if (info?.name === 'OneKey' || info?.rdns?.includes('onekey')) {
-    onekeyProvider = provider
-  }
-}
-
-window.addEventListener('eip6963:announceProvider', onAnnounceProvider)
-window.dispatchEvent(new Event('eip6963:requestProvider'))
-
-// Later in your app init, pick a provider
-setTimeout(() => {
-  const picked = onekeyProvider || providers.find(p => p.info?.name)?.provider
-  if (!picked) console.warn('No wallet providers announced via EIP‑6963')
-  // startApp(picked)
-}, 300)
-```
-
-Fallback: OneKey‑first strategy to remain compatible with generic injected providers.
+OneKey fully supports **EIP-6963**, which allows dApps to discover multiple installed wallet providers without conflicts. This is the modern, recommended approach for all dApps.
 
 ```javascript
-const provider = window?.$onekey?.ethereum
-  || window?.ethereum?.providers?.find((p) => p?.isOneKey || p?.onekey)
-  || window?.ethereum;
+// This code snippet demonstrates how to listen for announced providers
+// and store them for your dApp to use.
 
-if (!provider) {
-  throw new Error('OneKey provider not detected');
-}
+let onekeyProvider = null;
+
+const onAnnounceProvider = (event) => {
+  // The event.detail contains the provider info and the provider object itself.
+  // event.detail = { info: { uuid, name, icon, rdns }, provider }
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider;
+  }
+  // You can also store all providers in an array to let users choose.
+};
+
+// Listen for the announcement event from all wallets
+window.addEventListener('eip6963:announceProvider', onAnnounceProvider);
+
+// It's also good practice to dispatch a request event to prompt wallets
+// that may have loaded after the initial page load.
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+// Use the discovered provider when the user selects OneKey and clicks Connect.
+// Announcements are asynchronous; do not treat a fixed timeout as proof that
+// the wallet is not installed. Remove the event listener when your UI unmounts.
 ```
+
+#### Legacy Detection & Provider Objects
+
+For compatibility with older dApps, OneKey also injects its provider into `window.ethereum`.
+
+* `window.ethereum`: This is the commonly used provider object. However, if a user has multiple wallets installed, this variable can be overwritten, leading to conflicts. OneKey injects here to maximize compatibility.
+* `window.$onekey.ethereum`: To avoid conflicts, OneKey also provides its provider via this private, namespaced variable. This ensures a dApp can specifically target OneKey if needed, though using EIP-6963 is preferred.
 
 ### Basic Usage
 
@@ -60,16 +62,14 @@ The provider object is the essential tool for building a full-featured Web3 appl
 
 ### Chain IDs
 
-These are the IDs of the Ethereum chains that OneKey supports by default. Visit [chainlist.org](https://chainlist.org/) for a comprehensive list.
+Query the selected chain instead of hard-coding a wallet support list. Chain IDs returned by the provider are hexadecimal strings.
 
-| Hex      | Decimal  | Network                       | Status |
-| -------- | -------- | ----------------------------- | ------ |
-| 0x1      | 1        | Ethereum Main Network         | Live   |
-| 0x38     | 56       | Binance Smart Chain (Mainnet) | Live   |
-| 0x80     | 128      | Huobi Eco Chain (Mainnet)     | Live   |
-| 0x89     | 137      | Polygon (Matic) Mainnet       | Live   |
-| 0xfa     | 250      | Fantom Main Network           | Live   |
-| 0xaa36a7 | 11155111 | Sepolia Testnet               | Active |
+```javascript
+const chainId = await provider.request({ method: 'eth_chainId' });
+console.log(chainId); // For example, '0x1' for Ethereum mainnet.
+```
+
+Validate the chain against your application's supported networks before constructing a transaction. See [RPC API](/en/connect-to-software/provider/eth/reference) for adding a network.
 
 ### Methods
 
@@ -95,7 +95,9 @@ try {
 > You may often encounter the word "connected" in reference to whether a web3 site can access the user's accounts. In the provider interface, however, "connected" and "disconnected" refer to whether the provider can make RPC requests to the current chain.
 
 ```typescript
-window.$onekey.ethereum.isConnected(): boolean;
+interface EthereumProvider {
+  isConnected(): boolean;
+}
 ```
 
 Returns `true` if the provider is connected to the current chain, and `false` otherwise.
@@ -110,7 +112,9 @@ interface RequestArguments {
   params?: unknown[] | object;
 }
 
-window.$onekey.ethereum.request(args: RequestArguments): Promise<unknown>;
+interface EthereumProvider {
+  request(args: RequestArguments): Promise<unknown>;
+}
 ```
 
 Use `request` to submit RPC requests to Ethereum via OneKey Browser Extension. It returns a `Promise` that resolves to the result of the RPC method call.
@@ -121,32 +125,25 @@ If the request fails for any reason, the `Promise` will reject with an Ethereum 
 
 OneKey Browser Extension supports most standardized Ethereum RPC methods, in addition to a number of methods that may not be supported by other wallets.
 
-See the [RPC API](/en/connect-to-software/provider/eth/reference) for details.
+See [RPC API](/en/connect-to-software/provider/eth/reference) for method details.
 
 **Example**
 
 ```javascript
-const params = [  
-    {    
-        from: '0xb60e8dd61c5d32be8058bb8eb970870f0java7233155',    
-        to: '0xd46e8dd67c5d32be8058bb8eb970870f07244567',    
-        gas: '0x76c0', // 30400    
-        gasPrice: '0x9184e72a000', // 10000000000000    
-        value: '0x9184e72a', // 2441406250    
-        data: '0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675',  
-     },
- ];
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [from] = await provider.request({ method: 'eth_requestAccounts' });
+const to = '<RECIPIENT_EVM_ADDRESS>'; // Replace with a valid 20-byte address.
 
-window.$onekey.ethereum.request({    
-    method: 'eth_sendTransaction',    
-    params,  
-}).then((result) => {    
-    // The result varies by by RPC method.    
-    // For example, this method will return a transaction hash hexadecimal string on success.  
-    })  
-    .catch((error) => {    
-        // If the request fails, the Promise will reject with an error.  
-    });
+try {
+  const transactionHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{ from, to, value: '0x0' }],
+  });
+  console.log('Submitted transaction:', transactionHash);
+} catch (error) {
+  console.error(error.code, error.message);
+}
 ```
 
 ### Events
@@ -176,7 +173,10 @@ interface ConnectInfo {
   chainId: string;
 }
 
-window.$onekey.ethereum.on('connect', handler: (connectInfo: ConnectInfo) => void);
+const handler = (connectInfo: ConnectInfo) => {
+  console.log(connectInfo);
+};
+window.$onekey.ethereum.on('connect', handler);
 ```
 
 The OneKey Browser Extension provider emits this event when it first becomes able to submit RPC requests to a chain.
@@ -186,7 +186,10 @@ We recommend using a `connect` event handler and the `window.$onekey.ethereum.is
 #### `disconnect`
 
 ```typescript
-window.$onekey.ethereum.on('disconnect', handler: (error: ProviderRpcError) => void);
+const handler = (error: ProviderRpcError) => {
+  console.log(error);
+};
+window.$onekey.ethereum.on('disconnect', handler);
 ```
 
 The OneKey provider emits this event if it becomes unable to submit RPC requests to any chain. In general, this will only happen due to network connectivity issues or some unforeseen error.
@@ -196,23 +199,26 @@ Once `disconnect` has been emitted, the provider will not accept any new request
 #### `accountsChanged`
 
 ```typescript
-window.$onekey.ethereum.on('accountsChanged', handler: (accounts: Array<string>) => void);
+const handler = (accounts: Array<string>) => {
+  console.log(accounts);
+};
+window.$onekey.ethereum.on('accountsChanged', handler);
 ```
 
-The OneKey provider emits this event whenever the return value of the `eth_accounts` RPC method changes. `eth_accounts` returns an array that is either empty or contains a single account address. The returned address, if any, is the address of the most recently used account that the caller is permitted to access. Callers are identified by their URL origin, which means that all sites with the same origin share the same permissions.
+The OneKey provider emits this event whenever the return value of the `eth_accounts` RPC method changes. `eth_accounts` returns an array of exposed account addresses, which can be empty. Each returned address is an account the caller is permitted to access. Callers are identified by their URL origin, which means that all sites with the same origin share the same permissions.
 
 This means that `accountsChanged` will be emitted whenever the user's exposed account address changes.
-
-> **Tip**\
-> We plan to allow the `eth_accounts` array to be able to contain multiple addresses in the near future.
 
 #### `chainChanged`
 
 > **Tip**\
-> See the Chain IDs section for OneKey Browser Extension's default chains and their chain IDs.
+> Query `eth_chainId` to read the selected chain.
 
 ```typescript
-window.$onekey.ethereum.on('chainChanged', handler: (chainId: string) => void);
+const handler = (chainId: string) => {
+  console.log(chainId);
+};
+window.$onekey.ethereum.on('chainChanged', handler);
 ```
 
 The OneKey Browser Extension provider emits this event when the currently connected chain changes.
@@ -233,12 +239,15 @@ interface ProviderMessage {
   data: unknown;
 }
 
-window.$onekey.ethereum.on('message', handler: (message: ProviderMessage) => void);
+const handler = (message: ProviderMessage) => {
+  console.log(message);
+};
+window.$onekey.ethereum.on('message', handler);
 ```
 
 The OneKey provider emits this event when it receives some message that the consumer should be notified of. The kind of message is identified by the `type` string.
 
-RPC subscription updates are a common use case for the `message` event. For example, if you create a subscription using `eth_subscribe`, each subscription update will be emitted as a `message` event with a type of `eth_subscription`.
+EIP-1193 defines `message` for provider notifications. Do not assume that an injected provider supports `eth_subscribe`; verify the requested method in your target wallet and network.
 
 ### Errors
 
@@ -252,7 +261,7 @@ interface ProviderRpcError extends Error {
 }
 ```
 
-The `window.$onekey.ethereum.request(args)` method throws errors eagerly. You can often use the `code` property to determine why the request failed.
+The `request(args)` promise rejects when a request fails. You can often use the `code` property to determine why the request failed.
 
 Common codes and their meaning include:
 

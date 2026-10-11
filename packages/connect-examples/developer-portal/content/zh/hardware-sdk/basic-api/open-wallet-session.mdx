@@ -1,5 +1,6 @@
 ---
 title: 打开钱包会话
+description: 解锁并打开标准或隐藏钱包，保存成功返回的钱包绑定。
 ---
 
 # 打开钱包会话
@@ -16,6 +17,7 @@ import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 const res = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
 
 ### 参数

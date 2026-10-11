@@ -1,0 +1,93 @@
+---
+title: "Referencia de la API"
+description: "Referencia completa de la API del proveedor de Polkadot de OneKey"
+---
+
+<span id="api-reference" />
+
+# Referencia de la API
+
+Referencia de los métodos y tipos del proveedor de Polkadot de OneKey.
+
+---
+
+## Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `web3Enable(dappName)` | Habilitar la extensión para la dApp |
+| `web3Accounts(anyType?)` | Obtener todas las cuentas |
+| `web3AccountsSubscribe(callback)` | Suscribirse a cambios de cuenta |
+| `web3SignPayload(payload)` | Firmar los datos de la transacción |
+| `web3SignRaw(payload)` | Firmar un mensaje en bruto |
+| `web3RpcSend(request)` | Enviar una solicitud RPC |
+| `web3RpcSubscribe(request, callback)` | Suscribirse a eventos RPC |
+| `web3RpcUnSubscribe()` | Cancelar todas las suscripciones |
+| `web3RpcListProviders()` | Enumerar los proveedores RPC |
+| `web3RpcStartProvider(key)` | Iniciar un proveedor específico |
+
+---
+
+## Tipos [#types]
+
+### Cuenta inyectada [#injected-account]
+
+```typescript
+interface InjectedAccount {
+  address: string          // Substrate address
+  name?: string            // Account name
+  type?: 'sr25519' | 'ed25519' | 'ecdsa'
+  genesisHash?: string     // Optional chain restriction
+}
+```
+
+### Datos JSON para el firmante [#signer-payload-json]
+
+```typescript
+interface SignerPayloadJSON {
+  address: string
+  blockHash: string
+  blockNumber: string
+  era: string
+  genesisHash: string
+  method: string
+  nonce: string
+  specVersion: string
+  tip: string
+  transactionVersion: string
+  signedExtensions: string[]
+  version: number
+}
+```
+
+### Datos en bruto para el firmante [#signer-payload-raw]
+
+```typescript
+interface SignerPayloadRaw {
+  address: string
+  data: string             // Hex-encoded data
+  type: 'bytes' | 'payload'
+}
+```
+
+### Resultado del firmante [#signer-result]
+
+```typescript
+interface SignerResult {
+  id: number
+  signature: string        // Hex signature
+}
+```
+
+---
+
+## Cadenas compatibles [#supported-chains]
+
+| Cadena | Descripción |
+|-------|-------------|
+| Polkadot | Cadena de retransmisión principal |
+| Kusama | Red canaria |
+| Acala | Centro DeFi |
+| Moonbeam | Compatible con EVM |
+| Astar | Plataforma de contratos inteligentes |
+| Otras cadenas de Substrate | Verifica la compatibilidad de la cartera y del entorno de ejecución antes de usar |

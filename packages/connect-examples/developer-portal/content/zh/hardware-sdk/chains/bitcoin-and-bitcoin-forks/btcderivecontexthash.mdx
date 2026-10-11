@@ -1,10 +1,48 @@
 ---
 title: btcDeriveContextHash
+description: "在 Classic 1s 或 Classic 1s Pure 上派生 Babylon 上下文哈希，并明确选择钱包、应用和网络。"
 ---
+
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / 比特币 / BABYLON</div>
 
 # btcDeriveContextHash
 
-在设备上为当前连接的 Bitcoin 密钥、应用、上下文和网络派生 32 字节的 Babylon context hash。要求 **Classic 1s / Classic 1s Pure 固件 3.21.0 或更高版本**，使用 **Protocol V1**。此方法暂不支持其他设备系列或 Protocol V2。
+在设备上为选定的比特币密钥、应用、上下文和网络派生 32 字节的 Babylon 上下文哈希。响应中的 `secret` 是供应用使用的敏感值。
+
+SDK `1.2.8-alpha.6` 已提供此方法。需要 **Classic 1s 或 Classic 1s Pure 固件 3.21.0 及以上版本**，且使用 **Protocol V1**。其他设备系列和 Protocol V2 不支持此方法。
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, params);
+```
+
+<div className="doc-method-flow"><span>01 <strong>准备上下文</strong></span><span aria-hidden="true">→</span><span>02 <strong>在设备上确认</strong></span><span aria-hidden="true">→</span><span>03 <strong>使用派生值</strong></span></div>
+
+## 调用前准备 [#before-you-call]
+
+- [初始化 SDK 并选择设备](/zh/hardware-sdk/getting-started)。
+- 注册 [UI 事件处理器](/zh/hardware-sdk/core-api-guide#events-ui)，并明确选择目标[钱包会话](/zh/hardware-sdk/concepts/wallet-session)。
+- 调用前，获得用户对请求应用及其来源的授权。`appName` 由调用方传入；应用需要确认是哪个网站或应用在请求访问。
+
+<span id="参数" />
+
+## 参数 [#params]
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>必填</b></div><p>设备发现返回的连接标识。</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>必填</b></div><p>getDeviceState 或 openWalletSession 返回的钱包标识。</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>必填</b></div><p>已连接比特币密钥的 BIP32 路径，至少包含 3 个路径分量。脚本类型由路径推断。使用已连接密钥的路径，不要使用内部 IKM 派生路径。</p></div>
+<div className="doc-parameter"><div><code>params.appName</code><span>string</span><b>必填</b></div><p>1–64 个 ASCII 字符，匹配 [a-z0-9-]。</p></div>
+<div className="doc-parameter"><div><code>params.context</code><span>string</span><b>必填</b></div><p>小写、偶数长度且不带 0x 前缀的十六进制字符串，表示 1–1024 字节。上下文不能为空。SDK 将解码后的字节发送给设备。</p></div>
+<div className="doc-parameter"><div><code>params.network</code><span>string</span><b>必填</b></div><p>只能是 bitcoin-mainnet、bitcoin-testnet、bitcoin-signet 或 bitcoin-regtest。Testnet3 和 testnet4 均使用 bitcoin-testnet。网络不会从路径推断。</p></div>
+</div>
+
+[**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
+
+## 调用示例 [#example]
+
+此代码片段假定 SDK 已初始化，并已选择标准钱包。请将示例中的 `path`、`appName`、`context` 和 `network` 替换为用户授权的值。下方上下文仅为十六进制编码数据的示例。
 
 ```typescript
 const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
@@ -12,24 +50,62 @@ const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
   appName: 'babylon-example',
   context: '48656c6c6f',
   network: 'bitcoin-mainnet',
+  useEmptyPassphrase: true,
 });
+
+if (result.success === false) throw new Error(result.payload.error);
+const secret = result.payload.secret;
+// Use only for the approved application and context. Do not log or persist it.
 ```
 
-## 参数
+示例通过 `useEmptyPassphrase: true` 明确选择标准钱包。对于隐藏钱包，请传入确认已连接比特币账户时使用的同一个 `passphraseState`。正常的 PIN、passphrase 和设备确认流程仍然适用。
 
-[可选通用参数](/zh/hardware-sdk/concepts/common-params)
+<span id="返回值" />
 
-| 参数      | 类型                 | 说明                                                                                                                                                          |
-| --------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `path`    | `string \| number[]` | 必填。当前连接的 Bitcoin 密钥的 BIP32 路径，至少包含三段索引。脚本类型由路径推导。应传入当前连接密钥的路径，而非内部 IKM 派生路径。                           |
-| `appName` | `string`             | 必填。1–64 个 ASCII 字符，仅允许 `[a-z0-9-]`。                                                                                                                |
-| `context` | `string`             | 必填。无 `0x` 前缀、长度为偶数的小写十六进制字符串，解码后为 1–1024 字节。SDK 向设备发送解码后的字节。                                                        |
-| `network` | `string`             | 必填。仅接受 `bitcoin-mainnet`、`bitcoin-testnet`、`bitcoin-signet` 或 `bitcoin-regtest`。Testnet3 和 testnet4 均使用 `bitcoin-testnet`。网络不会从路径推断。 |
+## 响应 [#result]
 
-## 返回值
+读取 payload 前，先检查 `success`。成功时，`payload.secret` 是 64 个字符的小写十六进制字符串（32 字节）。下方标签页展示的是响应类型，并非真实敏感值。
 
-成功时，`result.success` 为 `true`，`result.payload.secret` 为 64 位小写十六进制字符串（32 字节）。用户在设备上取消时，返回 SDK 标准失败响应。
+<Tabs items={["成功", "错误"]} className="doc-example-tabs">
 
-调用前应取得用户对请求应用及来源的授权。SDK 保留正常的 PIN、passphrase 和设备确认流程。返回的 `secret` 属于敏感数据，不应记录日志或持久化。派生由设备执行，SDK 不导出或派生内部钱包密钥。
+<Tabs.Tab>
 
-参见 [Babylon derive-context-hash 规范](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md)。
+```typescript
+type SuccessResponse = {
+  success: true;
+  payload: {
+    secret: string; // 64 lowercase hexadecimal characters (32 bytes)
+  };
+};
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+type ErrorResponse = {
+  success: false;
+  payload: {
+    error: string;
+    code?: string | number;
+  };
+};
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## 错误与敏感值处理 [#errors-and-secret-handling]
+
+无效的 `path`、`appName`、`context` 或 `network` 会在发送派生命令前返回 `CallMethodInvalidParameter`（`405`）。不支持的设备系列或 Protocol V2 返回 `DeviceNotSupportMethod`（`415`）；低于 3.21.0 的固件需要升级。
+
+在设备上取消会返回标准的 `success: false` 响应。停止当前请求，处理 `payload.error` 和 `payload.code` 后，再决定是否重新调用。
+
+SDK 会向应用返回真实的 `secret`。请将其作为敏感值处理，不要写入日志、遥测、剪贴板或持久化存储。派生在设备上执行，内部钱包密钥不会被导出。
+
+## 后续步骤 [#next-steps]
+
+- [钱包会话与 passphrase 绑定](/zh/hardware-sdk/concepts/wallet-session)
+- [Babylon 上下文哈希派生规范](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md)

@@ -1,36 +1,45 @@
 ---
 title: firmwareUpdateV3
+description: 按目标设备的更新流程安装系统资源与固件。
 ---
 
 # firmwareUpdateV3
 
 ## 固件更新 (V3)
 
-全新的更新流程（仅限 Pro 系列）。支持在单个流程中根据需要更新引导加载程序、主固件、蓝牙固件和资源包。
+适用于 OneKey Pro 的 Protocol V1 更新流程。支持在单个流程中根据需要更新引导加载程序、主固件、蓝牙固件和资源包。
 
 - 设备：仅限 OneKey Pro（Protocol V1）
 - 引导要求：Boot 版本 >= 4.8.0
 - Pro 2 / Neo：使用 [firmwareUpdateV4](/zh/hardware-sdk/device-api/firmwareupdatev4)
 
 ```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+declare const targetBleVersion: number[];
+declare const targetBootloaderVersion: number[];
+
 const res = await HardwareSDK.firmwareUpdateV3(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
 
-  // 方式 A：指定版本号（可选择任意子集）
-  firmwareVersion: [4, 10, 0],
-  bleVersion: [4, 10, 0],
-  bootloaderVersion: [4, 8, 0],
+  // Option A: specify versions (pick any subset)
+  firmwareVersion: targetFirmwareVersion,
+  bleVersion: targetBleVersion,
+  bootloaderVersion: targetBootloaderVersion,
 
-  // 方式 B：自定义二进制文件（按需使用）
+  // Option B: custom binaries (as needed)
   // firmwareBinary: ArrayBuffer,
   // bleBinary: ArrayBuffer,
   // bootloaderBinary: ArrayBuffer,
   // resourceBinary: ArrayBuffer,
 
-  // 可选：强制更新资源包
+  // Optional: force updating resource package
   forcedUpdateRes: false,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
+
+示例假定用户已经选择目标设备并批准本次升级。目标版本应来自该设备的已验证发布元数据，不要硬编码从文档复制的版本号。
 
 ### 参数
 

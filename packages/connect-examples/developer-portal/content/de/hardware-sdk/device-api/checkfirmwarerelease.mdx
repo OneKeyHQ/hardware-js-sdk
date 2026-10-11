@@ -1,0 +1,49 @@
+---
+description: "Releasestatus der Hauptfirmware prüfen, bevor ein Update für das verbundene Gerät angeboten wird."
+title: "checkFirmwareRelease"
+---
+
+# checkFirmwareRelease
+
+## Firmware-Release prüfen [#check-firmware-release]
+
+Den aktuellen Versionsstatus der Hauptfirmware des Geräts prüfen.
+
+```typescript
+const response = await HardwareSDK.checkFirmwareRelease(connectId);
+```
+
+### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.checkFirmwareRelease(connectId);
+```
+
+Ergebnis
+
+```typescript
+import type { FirmwareReleaseCheckResult } from '@onekeyfe/hd-core';
+
+type ReleaseResult = {
+  success: true;
+  payload: FirmwareReleaseCheckResult | null;
+};
+```
+
+`payload` kann `null` sein. Andernfalls enthält es `status`, optional `shouldUpdate`, optional `changelog` und `release` (das möglicherweise `undefined` ist). Prüfen Sie vor der Verwendung, ob sowohl Ergebnis als auch Release-Daten vorhanden sind. Das Release-Format variiert je nach Firmware/Komponente.
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -18,23 +18,29 @@ import { Callout } from 'nextra/components'
 现代多钱包检测，避免冲突：
 
 ```typescript
-const providers: any[] = []
-
-window.addEventListener('eip6963:announceProvider', (e: any) => {
-  providers.push(e.detail)
-})
+let onekeyProvider = null
+const onAnnounce = (event) => {
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider
+  }
+}
+window.addEventListener('eip6963:announceProvider', onAnnounce)
 window.dispatchEvent(new Event('eip6963:requestProvider'))
 
-// 通过 rdns 找到 OneKey
-const onekey = providers.find(p => p.info.rdns === 'so.onekey.app.wallet')
-const accounts = await onekey.provider.request({ method: 'eth_requestAccounts' })
+// Call from your Connect button after the user selects OneKey.
+async function connectOneKey() {
+  if (!onekeyProvider) throw new Error('OneKey has not announced a provider yet')
+  return onekeyProvider.request({ method: 'eth_requestAccounts' })
+}
+// On component cleanup:
+// window.removeEventListener('eip6963:announceProvider', onAnnounce)
 ```
 
 ### 直接访问（回退方案）
 
 ```typescript
 const provider = window.$onekey?.ethereum
-if (!provider) throw new Error('未检测到 OneKey')
+if (!provider) throw new Error('OneKey not detected')
 
 const accounts = await provider.request({ method: 'eth_requestAccounts' })
 ```
@@ -44,20 +50,20 @@ const accounts = await provider.request({ method: 'eth_requestAccounts' })
 ## 事件
 
 ```typescript
-// 账户变更
+// Account changed
 provider.on('accountsChanged', (accounts) => {
-  console.log('账户:', accounts[0])
+  console.log('Account:', accounts[0])
 })
 
-// 网络变更
+// Network changed
 provider.on('chainChanged', (chainId) => {
-  console.log('链:', chainId)
-  window.location.reload() // 推荐
+  console.log('Chain:', chainId)
+  window.location.reload() // Recommended
 })
 
-// 已连接
+// Connected
 provider.on('connect', (info) => {
-  console.log('已连接到链:', info.chainId)
+  console.log('Connected to chain:', info.chainId)
 })
 ```
 

@@ -1,0 +1,34 @@
+---
+title: "pushPsbt"
+---
+
+# pushPsbt
+
+ファイナライズ済みの PSBT をブロードキャストします。
+
+## メソッド [#method]
+
+```typescript
+declare function pushPsbt(psbtHex: string): Promise<string>;
+```
+
+## パラメーター [#params]
+
+* `psbtHex` — _必須_ `string`  送信する PSBT の 16 進数文字列
+
+## レスポンス [#response]
+
+`txid` — `string`
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const psbtHex = "<FINALIZED_PSBT_HEX>"; // Supply a complete finalized PSBT
+const txid = await provider.pushPsbt(psbtHex);
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/dyaqzgE)

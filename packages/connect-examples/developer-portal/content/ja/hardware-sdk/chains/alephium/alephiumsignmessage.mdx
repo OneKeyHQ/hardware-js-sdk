@@ -1,0 +1,76 @@
+---
+title: "alephiumSignMessage"
+---
+
+# alephiumSignMessage
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.10.0
+
+### Alephium: メッセージに署名 [#alephium-sign-message]
+
+指定の BIP32 パスから導出した秘密鍵でメッセージに署名します。ユーザーは OneKey デバイス上で操作を確認する必要があります。
+
+```typescript
+// Original message
+const message = "Hello Alephium";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+const result = await HardwareSDK.alephiumSignMessage(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    messageHex,  // "Hello Alephium" in hex
+    messageType: "alephium"
+});
+```
+
+#### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`
+* `messageHex` - _必須_ `string` 署名するメッセージ (16 進数形式)
+* `messageType` - _必須_ `"alephium" | "sha256" | "blake2b" | "identity"`。メッセージ署名モード。
+
+#### 例 [#example]
+
+```typescript
+// Original message
+const message = "Hello Alephium";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+const response = await HardwareSDK.alephiumSignMessage(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    messageHex,
+    messageType: "alephium"
+});
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

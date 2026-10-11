@@ -1,67 +1,58 @@
 ---
+description: "Discover connection candidates, handle optional identity fields, and read initialized device state."
 title: Search Devices
 ---
 
 # Search Devices
 
-## Search device
+Discover connection candidates. `searchDevices()` returns a result object; the device list is in `payload` only when `success` is `true`.
 
-Searches for connected devices and returns the search results to the developer as an array. \
-\
-In the case of USB connections, the returned data already contains device details. \
-\
-In the case of Bluetooth device search, the data returned contains only the device name and device connectId, and the developer selects the device that needs to be paired before getting the device information.
+Discovery is not proof that a device is initialized or that its wallet is unlocked. BLE discovery can return an advertised name and connection ID before a connection exists. USB discovery may also return a descriptor without initialized identity fields.
 
-```typescript
-const response = await HardwareSDK.searchDevices();
+## Method
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
+
+// For this example, select the only connected device.
+// In an app, ask the user to choose when multiple devices are present.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
 ```
 
-### Params
+WebUSB authorization belongs in a user-initiated flow. BLE scanning requires the platform's Bluetooth permissions. See [WebUSB](/en/hardware-sdk/transport/web-usb) or [React Native BLE](/en/hardware-sdk/transport/react-native-ble).
 
-* empty
+## Parameters
 
-### Example
+The parameter object is optional. See the [`searchDevices` type](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/searchDevices.ts) and [Common Params](/en/hardware-sdk/concepts/common-params) for the installed SDK version.
 
-```typescript
-HardwareSDK.searchDevices().then(result => {
-    console.log(`device list: ${result}`)
-});
-```
+## Result fields
 
-Result
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `connectId` | `string \| null` | Transport routing key. Pass a non-null value to later device calls. |
+| `connectProtocol` | `'V1' \| 'V2' \| undefined` | Available after an active protocol probe; do not infer it from the advertised name. |
+| `serialNo` | `string \| null \| undefined` | Physical serial when available after initialization. |
+| `deviceId` | `string \| null` | Seed-lifetime identity when available; refresh using `getDeviceState`. |
+| `uuid` | `string` | Deprecated compatibility field. It can be empty before initialization; prefer `serialNo` for physical identity. |
+| `deviceType` | `IDeviceType` | Detected model, or unknown before initialization. |
+| `name` | `string` | Display name; not a unique identifier. |
+| `commType` | `OneKeyDeviceCommType` | Communication type reported by the transport. |
 
-```typescript
-{
-    success: true,
-    payload: [
-        {
-            "connectId": string, // device connection id (stable for the same device; reset does not change it).
-                                  // Format depends on transport:
-                                  //   WebUSB/Bridge  → device serial, e.g. "PRC10J0017A"
-                                  //   Android BLE    → MAC address, e.g. "AA:BB:CC:DD:EE:FF"
-                                  //   iOS BLE        → CoreBluetooth UUID, e.g. "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
-                                  //   Desktop BLE (Electron/Noble, macOS)   → 32-char hex UUID, e.g. "1f6dad0b8782aab31d2f7ae2b11e5b6c"
-                                  //   Desktop BLE (Electron/Noble, Windows) → 12-char lowercase hex (MAC w/o colons), e.g. "e4e65539cf33"
-                                  //   Desktop BLE (Electron/Noble, Linux)   → MAC address
-                                  // ⚠️ USB and BLE connectIds for the same device are different values.
-            "uuid": string, // device unique id 
-            "deviceType": string, // device type, 'classic' | 'mini' | 'touch' | 'pro'
-            "deviceId": string, // device id; changes after reset/wipe/recovery; only returned when using the webusb transport of @onekeyfe/hd-common-connect-sdk.
-            "path": string, // device serial number when USB is connected via WebUSB
-            "name": string, // bluetooth name for the device
-        },
-    ]
-}
-```
+The exact public shape is [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts). Do not depend on additional internal fields such as `path`.
 
-Error
+USB and BLE use different `connectId` values for the same physical device. Re-enumerate after reconnect and refresh state before reusing a wallet binding. See [Identifiers](/en/hardware-sdk/concepts/identifiers).
 
-```typescript
-{
-    success: false,
-    payload: {
-        error: string, // error message
-        code?: string | number // error code
-    }
-}
-```
+## Failure handling
+
+On failure, `payload` contains `error` and an optional `code`. Handle the code rather than matching error text. An empty successful list means no candidates were found; it is not an SDK failure.
+
+Do not log the complete device list or device objects. Keep diagnostics to the operation status and non-sensitive counts.

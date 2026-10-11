@@ -1,8 +1,11 @@
 ---
 title: OneKey Agent Wallet
+description: 选择 Agent Wallet 接入方式，理解活动会话与签名确认边界。
 ---
 
 # OneKey Agent Wallet
+
+> 当前为私有测试版。访问资格、支持的命令与钱包流程取决于 OneKey 和 CLI 版本。使用示例前，先检查已安装 CLI 的 schema。
 
 OneKey Agent Wallet 是面向 AI Agent 的钱包能力层：Agent 可以执行真实链上动作、读取行情上下文，并把关键签名控制权交还给用户。Agent 能读取钱包状态、生成收款地址、查询历史、研究 token、报价和准备 swap、执行安全检查，并将高风险操作交给 OneKey GUI 或硬件钱包确认。
 
@@ -12,12 +15,12 @@ OneKey Agent Wallet 是面向 AI Agent 的钱包能力层：Agent 可以执行�
 
 | 范围 | Agent 能力 | 用户会怎么说 |
 | --- | --- | --- |
-| Wallet | 查余额、展示收款地址、查询历史、准备转账、派生 BTC 地址类型 | `Show my ETH balance and receiving address.` |
-| Swap & bridge | 报价、构建、执行、跟踪 swap，处理 BTC sign-only PSBT，发现跨链网络 | `Swap 1 ETH to USDC after showing me the quote.` |
-| Market & research | 搜索 token、价格、trending、K 线、流动性、持仓、快速或深度研究 | `What Solana tokens are trending right now?` |
-| Security | Token audit、交易模拟、授权风险、链和地址不匹配、假合约识别 | `Is this token safe before I buy it?` |
-| Hardware control | 连接 OneKey 设备、验证真伪、使用 passphrase mode、敏感操作 clear signing | `Use my hardware wallet for this transfer.` |
-| Session control | 通过 App Transfer 配对 GUI 管理的 Agent Wallet，或切换到硬件会话 | `Connect my OneKey Agent Wallet.` |
+| Wallet | 查余额、展示收款地址、查询历史、准备转账、派生 BTC 地址类型 | `显示我的 ETH 余额和收款地址。` |
+| Swap & bridge | 报价、构建、执行、跟踪 swap，处理 BTC sign-only PSBT，发现跨链网络 | `先给我报价，确认后将 1 ETH 兑换为 USDC。` |
+| Market & research | 搜索 token、价格、trending、K 线、流动性、持仓、快速或深度研究 | `Solana 现在有哪些热门代币？` |
+| Security | 代币风险检查、交易模拟、授权风险、链和地址不匹配，以及代币风险信号 | `买入前，先检查这个代币的风险。` |
+| Hardware control | 连接 OneKey 设备、验证真伪、选择密码短语模式，在设备上审阅支持的签名请求 | `使用我的硬件钱包处理这笔转账。` |
+| Session control | 通过 App Transfer 配对 GUI 管理的 Agent Wallet，或切换到硬件会话 | `连接我的 OneKey Agent Wallet。` |
 
 ## 工作方式
 
@@ -28,10 +31,10 @@ flowchart LR
   CLI --> GUI["OneKey GUI Agent Wallet"]
   CLI --> Market["Market / swap / security APIs"]
   CLI --> Hardware["OneKey hardware wallet"]
-  Hardware --> Confirm["Clear signing + physical confirmation"]
+  Hardware --> Confirm["设备审阅与物理确认"]
 ```
 
-Agent 通过 `onekey-wallet-skills` 和 `onekey` CLI 调用 OneKey 能力。用户通过 OneKey GUI、keyless 账号绑定，以及可选的硬件确认保持控制权。
+Agent 通过 `onekey-wallet-skills` 和 `onekey` CLI 调用 OneKey 能力。App Transfer 与硬件登录选择不同的会话类型；使用钱包命令前先检查活动会话。硬件确认只适用于使用硬件会话的签名请求。
 
 ## 从这里开始
 

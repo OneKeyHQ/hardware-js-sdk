@@ -1,0 +1,181 @@
+---
+title: "トランザクション"
+description: "OneKey で Algorand のトランザクションを送信"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# トランザクション
+
+署名前にプロバイダーに接続してください。トランザクションの例では、algosdk 2 形式の `from`/`to` フィールドを使用しています。インストールする SDK のメジャーバージョンに合わせてください。 `algodClient`, アドレス、グループ化したトランザクションは、スニペットの実行前に準備する必要があります。`Buffer` を使用するブラウザーの例には、明示的な `buffer` インポート、または同等の base64 エンコーダーが必要です。
+
+Algorand でトランザクションに署名して送信する方法を説明します。
+
+---
+
+## トランザクションに署名 (ARC-0001) [#sign-transactions-arc-0001]
+
+1 つ以上のトランザクションに署名します:
+
+```typescript
+import algosdk from 'algosdk'
+
+// Create transaction
+const suggestedParams = await algodClient.getTransactionParams().do()
+
+const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+  from: senderAddress,
+  to: recipientAddress,
+  amount: 1000000, // 1 ALGO (microAlgos)
+  suggestedParams,
+})
+
+// Prepare for signing
+const walletTxns = [{
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}]
+
+// Sign
+const signedTxns = await provider.signTxns(walletTxns)
+
+console.log('Signed transactions:', signedTxns)
+```
+
+---
+
+## 複数のトランザクションに署名 [#sign-multiple-transactions]
+
+```typescript
+// Group transactions
+const txns = [txn1, txn2, txn3]
+algosdk.assignGroupID(txns)
+
+// Prepare for signing
+const walletTxns = txns.map(txn => ({
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}))
+
+// Sign all
+const signedTxns = await provider.signTxns(walletTxns)
+```
+
+---
+
+## 部分署名 (マルチシグ) [#partial-signing-multi-sig]
+
+```typescript
+// Only sign specific transactions in a group
+const walletTxns = [
+  { txn: encodedTxn1 },
+  { txn: encodedTxn2, signers: [] }, // Skip this one
+  { txn: encodedTxn3 },
+]
+
+const signedTxns = await provider.signTxns(walletTxns)
+// signedTxns[1] will be null
+```
+
+---
+
+## トランザクションを送信 [#post-transactions]
+
+署名済みトランザクションをブロードキャストします:
+
+```typescript
+const completeTxns = signedTxns.filter((txn) => txn !== null)
+if (completeTxns.length !== signedTxns.length) {
+  throw new Error('Complete all required signatures before broadcasting the group')
+}
+const result = await provider.postTxns(completeTxns)
+console.log('Transaction IDs:', result.txnIDs)
+```
+
+---
+
+## 署名して送信 [#sign-and-post]
+
+1 回の操作で署名とブロードキャストを行います:
+
+```typescript
+const result = await provider.signAndPostTxns(walletTxns)
+console.log('Transaction IDs:', result.txnIDs)
+```
+
+---
+
+## 従来のトランザクション API [#legacy-transaction-api]
+
+### トランザクションに署名 (従来方式) [#sign-transaction-legacy]
+
+```typescript
+// Create transaction as Uint8Array
+const txnBytes = algosdk.encodeUnsignedTransaction(txn)
+
+// Sign
+const signedTxnBytes = await provider.signTransaction([txnBytes])
+
+// Send
+const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
+```
+
+### 署名して送信 (従来方式) [#sign-and-send-legacy]
+
+```typescript
+const result = await provider.signAndSendTransaction([txnBytes])
+console.log('Transaction ID:', result.txId)
+```
+
+---
+
+## 完全な例 [#complete-example]
+
+```typescript
+import algosdk from 'algosdk'
+
+async function sendAlgo() {
+  // Connect
+  const provider = window.$onekey?.algo
+  if (!provider) throw new Error("OneKey Algorand provider is unavailable")
+  const { address } = await provider.connect()
+
+  // Setup client
+  const algodClient = new algosdk.Algodv2(
+    '',
+    'https://mainnet-api.algonode.cloud',
+    ''
+  )
+
+  // Get params
+  const suggestedParams = await algodClient.getTransactionParams().do()
+
+  // Create transaction
+  const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: address,
+    to: 'RECIPIENT_ADDRESS',
+    amount: 1000000, // 1 ALGO
+    suggestedParams,
+  })
+
+  // Sign
+  const walletTxns = [{
+    txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+  }]
+
+  const signedTxns = await provider.signTxns(walletTxns)
+
+  if (!signedTxns[0]) throw new Error("The transaction was not signed")
+
+  // Send
+  const { txId } = await algodClient.sendRawTransaction(
+    Buffer.from(signedTxns[0], 'base64')
+  ).do()
+
+  console.log('Transaction ID:', txId)
+
+  // Wait for confirmation
+  await algosdk.waitForConfirmation(algodClient, txId, 4)
+  console.log('Confirmed!')
+}
+```

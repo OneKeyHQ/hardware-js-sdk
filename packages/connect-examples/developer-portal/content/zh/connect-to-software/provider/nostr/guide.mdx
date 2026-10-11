@@ -12,33 +12,33 @@ OneKey Provider API 遵循 [NIP-07](https://github.com/nostr-protocol/nips/blob/
 
 ## 安装
 
-#### 1. 下载 OneKey 钱包
+### 1. 下载 OneKey 钱包
 
-下载 [OneKey 钱包](https://onekey.so/zh_CN/download?client=browserExtension)。安装 OneKey 浏览器扩展。
+下载 [OneKey 钱包](https://onekey.so/download?client=browserExtension)。安装 OneKey 浏览器扩展。
 
-#### 2. API 注入说明
+### 2. API 注入说明
 
 * OneKey 浏览器扩展会将 `Provider API` 注入到访问的网站中。
 * 提供两种类型的 API：`window.nostr` 和 `window.$onekey.nostr`。
 * 推荐使用 `window.$onekey.nostr`。
 
-> 两种 API 功能相同，只是名称不同。
+> 使用 `window.$onekey.nostr` 明确选择 OneKey。安装多个扩展时，全局 `window.nostr` 可能属于其他钱包。
 
 ### 检测 Provider API 支持
 
-在开始使用 Nostr 协议之前，需要检查浏览器是否支持，通过检查 `window.nostr` 变量是否定义：
+发起请求前，请检查 provider 是否存在：
 
 ```javascript
 const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
 
 if (!provider) {
-  alert("Provider 不可用。");
+  throw new Error("No provider is available.");
 }
 ```
 
 ## API
 
-识别所需功能，调用相关接口
+根据应用需要执行的操作，选择对应 API。
 
 **更多接口**：[查看详情](/zh/connect-to-software/provider/nostr/api-reference)
 
@@ -46,3 +46,7 @@ if (!provider) {
 
 * **关键操作**：如账户切换
 * **更多信息**：[查看更多](/zh/connect-to-software/provider/nostr/event)
+
+## 请求处理
+
+在 async 函数或 ES 模块中发起钱包请求。捕获 Promise 拒绝，并在应用中显示错误。连接、签名和付款请求应由用户操作触发；等待请求完成期间，禁用触发按钮。

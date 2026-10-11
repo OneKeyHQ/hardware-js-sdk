@@ -4,33 +4,31 @@ title: pushPsbt
 
 # pushPsbt
 
-推送交易
+广播已完成最终化的 PSBT。
 
-### 方法
+## 方法
 
 ```typescript
-async function pushPsbt(psbtHex: string): string
+declare function pushPsbt(psbtHex: string): Promise<string>;
 ```
 
-### 参数
+## 参数
 
-* `rawtx` — _必填_ `string` 要推送的 PSBT 十六进制字符串
+* `psbtHex` — _必填_ `string`，待广播 PSBT 的十六进制字符串。
 
-### 响应
+## 响应
 
 `txid` — `string`
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const psbtHex = "010203"
-const txid = async provider.pushPsbt(psbtHex);
-
+const psbtHex = "<FINALIZED_PSBT_HEX>"; // Supply a complete finalized PSBT
+const txid = await provider.pushPsbt(psbtHex);
 ```
 
-### 演示
+## 演示
 
-<iframe src="https://codepen.io/OneKeyHQ/pen/dyaqzgE" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/dyaqzgE)

@@ -6,7 +6,7 @@ title: nemSignTransaction
 
 ### NEM: Sign transaction <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
 
-Asks device to sign given transaction. User is asked to confirm all transaction details on OneKey.
+Requests a transaction signature. The user reviews and confirms the request on the device.
 
 ```typescript
 const response = await HardwareSDK.nemSignTransaction(connectId, deviceId, params)
@@ -16,7 +16,7 @@ const response = await HardwareSDK.nemSignTransaction(connectId, deviceId, param
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. read more
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
 * `transaction` - _required_ `NEMTransaction` type
 
 #### NEMTransaction Type

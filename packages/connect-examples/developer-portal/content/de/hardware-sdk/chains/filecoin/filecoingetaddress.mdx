@@ -1,0 +1,96 @@
+---
+title: "filecoinGetAddress"
+---
+
+# filecoinGetAddress
+
+### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 3.5.0
+  * Classic/Mini: 2.10.0
+
+## Filecoin: Adresse abrufen [#filecoin-get-address]
+
+Leitet die Adresse am angegebenen Pfad ab und gibt sie zurück. Verwenden Sie `showOnOneKey`, um eine Bestätigung auf dem Gerät anzufordern.
+
+```typescript
+const result = await HardwareSDK.filecoinGetAddress(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Einzelne Adresse [#single-address]
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Mehr erfahren](/de/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _optional_ `boolean` Ob die Adresse auf dem Gerät angezeigt werden soll. Standard ist `true`.
+* `isTestnet` - _optional_ `boolean` Ob das Testnet verwendet werden soll.
+
+#### Mehrere Adressen [#multiple-addresses]
+
+* `bundle` - Array von Objekten mit `path`, `showOnOneKey`, und `isTestnet`-Feldern
+
+### Beispiel [#example]
+
+Adresse des ersten Filecoin-Kontos zurückgeben:
+
+```typescript
+HardwareSDK.filecoinGetAddress(connectId, deviceId, {
+    path: "m/44'/461'/0'/0/0",
+    showOnOneKey: true,
+    isTestnet: false
+});
+```
+
+Ein Bündel von Adressen mehrerer Filecoin-Konten zurückgeben:
+
+```typescript
+HardwareSDK.filecoinGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/461'/0'/0/0" }, // account 1
+        { path: "m/44'/461'/0'" }, // account 2
+        { path: "m/44'/461'/0'/0/1" }  // account 3
+    ]
+});
+```
+
+### Ergebnis [#result]
+
+Antwort für eine einzelne Adresse
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+    }
+}
+```
+
+Batch-Antwort für Adressen
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address }, // account 1
+        { path, address }, // account 2
+        { path, address }, // account 3
+    ]
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

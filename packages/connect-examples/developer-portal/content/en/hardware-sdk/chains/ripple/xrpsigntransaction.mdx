@@ -4,9 +4,9 @@ title: xrpSignTransaction
 
 # xrpSignTransaction
 
-### Ripple: Sign transaction <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
+### Ripple: sign transaction
 
-Asks device to sign given transaction. User is asked to confirm all transaction details on OneKey.
+Requests a transaction signature. The user reviews and confirms the request on the device.
 
 ```typescript
 const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
@@ -16,7 +16,7 @@ const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, param
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` SDK minimum length is `5`. read more
+* `path` - _required_ `string | Array<number>` SDK minimum length is `5`. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
 * `transaction` - _required_ `XrpTransaction` type
 
 #### XrpTransaction Type
@@ -37,13 +37,13 @@ type XrpPayment = {
 }
 ```
 
-### Example
+The current SDK runtime expects `{ path, transaction }` and validates `transaction.payment.amount` as a number. Its exported TypeScript declaration is inconsistent with that runtime shape. The example below follows the runtime contract; check the declaration in your installed SDK version before compiling the integration. Amounts are in drops.
 
-The call below describes the current runtime contract. The current SDK TypeScript declaration incorrectly flattens the transaction fields and types `payment.amount` as a string; it does not match this runtime shape. Do not move `transaction` fields to the top level to satisfy that declaration.
+### Example
 
 ```typescript
 HardwareSDK.xrpSignTransaction(connectId, deviceId, {
-    path: "m/44'/144'/0'/0'/0",
+    path: "m/44'/144'/0'/0/0",
     transaction: {
         fee: '12',
         flags: 0,

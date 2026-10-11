@@ -6,55 +6,50 @@ title: Signing a Message
 
 When a web application is connected to OneKey, it can also request that the user signs a given message. Applications are free to write their own messages which will be displayed to users from within OneKey's signature prompt. Message signatures do not involve network fees and are a convenient way for apps to verify ownership of an address.
 
-In order to send a message for the user to sign, a web application must:&#x20;
+In order to send a message for the user to sign, a web application must:
 
-1. Provide a **hex** or **UTF-8** encoded string as a Uint8Array.
+1. Provide the message bytes as a `Uint8Array`; use `TextEncoder` for UTF-8 text.
 2. Request that the encoded message is signed via the user's OneKey wallet.
 
-
-### signMessage
+## signMessage
 ```javascript
 const provider = getProvider();
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
 const message = `To avoid digital dognappers, sign below to authenticate with CryptoCorgis`;
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await provider.signMessage(encodedMessage, "utf8");
 ```
 
-
-### request
+## request
 ```javascript
 const provider = getProvider();
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
 const message = `To avoid digital dognappers, sign below to authenticate with CryptoCorgis`;
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await provider.request({
     method: "signMessage",
     params: {
-         message: encodedMessage,
-         display: "hex",
+         message: bs58.encode(encodedMessage),
+         display: "utf8",
     },
 });
 ```
 
----
+The `request` example requires `import bs58 from "bs58"`. Both forms resolve to an object with a `Uint8Array` `signature` and a `PublicKey` `publicKey`. The display option controls presentation; it does not change the bytes being signed. For authentication, verify the signature against the exact message and use a single-use challenge.
 
-## Sign Off-chain Message
+## Off-chain Message Signing
 
-For signing off-chain messages with version support (useful for authentication and verification):
+The current provider source supports version 1 and requires the intended signer list. Use the helper to encode the request and return the exact signed bytes. Older wallets may not support this method; handle a rejected request.
 
-### solSignOffchainMessage
 ```javascript
 const provider = getProvider();
-const message = "Sign this message to verify your identity";
-const signedMessage = await provider.request({
-    method: "solSignOffchainMessage",
-    params: {
-         message: message,
-         version: 0, // Optional version number
-    },
-});
-
-console.log({
-    signature: signedMessage.signature,
-    publicKey: signedMessage.publicKey,
-});
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const { publicKey } = await provider.connect();
+const result = await provider.solSignOffchainMessage(
+  'Sign in to example.com. Nonce: <SERVER_GENERATED_NONCE>',
+  [publicKey],
+);
+// Verify result.signature against result.signedOffchainMessage and result.publicKey.
 ```
+
+Do not reuse the older version 0 request format. Check method availability and the response shape in the wallet version your application supports.

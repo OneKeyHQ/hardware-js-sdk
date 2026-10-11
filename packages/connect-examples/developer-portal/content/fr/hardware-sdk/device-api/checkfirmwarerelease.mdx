@@ -1,0 +1,49 @@
+---
+description: "Vérifiez l’état de publication du micrologiciel principal avant de proposer une mise à jour à l’appareil connecté."
+title: "checkFirmwareRelease"
+---
+
+# checkFirmwareRelease
+
+## Vérifier la version du micrologiciel [#check-firmware-release]
+
+Vérifier le statut de la version actuelle du micrologiciel principal de l’appareil.
+
+```typescript
+const response = await HardwareSDK.checkFirmwareRelease(connectId);
+```
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+### Exemple [#example]
+
+```typescript
+const response = await HardwareSDK.checkFirmwareRelease(connectId);
+```
+
+Résultat
+
+```typescript
+import type { FirmwareReleaseCheckResult } from '@onekeyfe/hd-core';
+
+type ReleaseResult = {
+  success: true;
+  payload: FirmwareReleaseCheckResult | null;
+};
+```
+
+`payload` peut être `null`. Sinon, il contient `status`, les champs facultatifs `shouldUpdate` et `changelog`, ainsi que `release` (qui peut être `undefined`). Vérifiez que le résultat et les données de version existent avant de les utiliser. La structure des données de version varie selon le micrologiciel/composant.
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

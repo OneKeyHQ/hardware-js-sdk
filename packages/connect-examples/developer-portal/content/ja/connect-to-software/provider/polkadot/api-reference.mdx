@@ -1,0 +1,93 @@
+---
+title: "API リファレンス"
+description: "OneKey の Polkadot プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Polkadot プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `web3Enable(dappName)` | dApp 用に拡張機能を有効化 |
+| `web3Accounts(anyType?)` | すべてのアカウントを取得 |
+| `web3AccountsSubscribe(callback)` | アカウント変更を購読 |
+| `web3SignPayload(payload)` | トランザクションペイロードに署名 |
+| `web3SignRaw(payload)` | 生のメッセージに署名 |
+| `web3RpcSend(request)` | RPC リクエストを送信 |
+| `web3RpcSubscribe(request, callback)` | RPC イベントを購読 |
+| `web3RpcUnSubscribe()` | すべての購読を解除 |
+| `web3RpcListProviders()` | RPC プロバイダーを一覧表示 |
+| `web3RpcStartProvider(key)` | 特定のプロバイダーを開始 |
+
+---
+
+## 型 [#types]
+
+### 注入されたアカウント [#injected-account]
+
+```typescript
+interface InjectedAccount {
+  address: string          // Substrate address
+  name?: string            // Account name
+  type?: 'sr25519' | 'ed25519' | 'ecdsa'
+  genesisHash?: string     // Optional chain restriction
+}
+```
+
+### 署名者の JSON ペイロード [#signer-payload-json]
+
+```typescript
+interface SignerPayloadJSON {
+  address: string
+  blockHash: string
+  blockNumber: string
+  era: string
+  genesisHash: string
+  method: string
+  nonce: string
+  specVersion: string
+  tip: string
+  transactionVersion: string
+  signedExtensions: string[]
+  version: number
+}
+```
+
+### 署名者の生ペイロード [#signer-payload-raw]
+
+```typescript
+interface SignerPayloadRaw {
+  address: string
+  data: string             // Hex-encoded data
+  type: 'bytes' | 'payload'
+}
+```
+
+### 署名者の結果 [#signer-result]
+
+```typescript
+interface SignerResult {
+  id: number
+  signature: string        // Hex signature
+}
+```
+
+---
+
+## 対応チェーン [#supported-chains]
+
+| チェーン | 説明 |
+|-------|-------------|
+| Polkadot | メインリレーチェーン |
+| Kusama | カナリアネットワーク |
+| Acala | DeFi ハブ |
+| Moonbeam | EVM 互換 |
+| Astar | スマートコントラクトプラットフォーム |
+| その他の Substrate チェーン | 使用前にウォレットとランタイムの対応状況を確認 |

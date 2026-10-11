@@ -6,13 +6,13 @@ title: kaspaGetAddress
 
 ### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.3.0
   * Classic/Mini: 3.0.0
 
 ## Kaspa：获取地址
 
-显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
+派生并返回指定路径的地址。`showOnOneKey` 为 `true` 时，用户必须在设备上确认地址。
 
 ```typescript
 const result = await HardwareSDK.kaspaGetAddress(connectId, deviceId, params);
@@ -22,67 +22,69 @@ const result = await HardwareSDK.kaspaGetAddress(connectId, deviceId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-### 导出单个公钥
+<span id="导出单个公钥" />
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+### 导出单个地址
+
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _可选_ `boolean`。是否在设备上显示地址，默认为 `true`。
 * `prefix` - _可选_ `string` 地址前缀。默认设置为 `kaspa`
-* `scheme` - _可选_ `string` 加密算法模式。默认设置为 `schnorr`
+* `scheme` - _可选_ `string`。签名算法，默认为 `schnorr`。
 
+<span id="导出批量公钥" />
 
+#### 导出批量地址
 
-#### 导出批量公钥
-
-* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+* `bundle` - 对象数组，每个对象包含 `path`、`showOnOneKey`、`prefix`、`scheme` 字段。
 
 ### 示例
 
-返回第一个 Kaspa 账户的公钥：
+返回第一个 Kaspa 账户的地址：
 
 ```typescript
 HardwareSDK.kaspaGetAddress(connectId, deviceId, {
     path: "m/44'/111111'/0'/0/0",
     showOnOneKey: true,
-    prefix: "prefix",
+    prefix: "kaspa",
     scheme: "schnorr",
 });
 ```
 
-返回多个 Kaspa 账户的批量公钥：
+批量返回多个 Kaspa 账户的地址：
 
 ```typescript
 HardwareSDK.kaspaGetAddress(connectId, deviceId, {
     bundle: [
-        { path: "m/44'/111111'/0'/0/0" }, // 账户 1
-        { path: "m/44'/111111'/0'" }, // 账户 2
-        { path: "m/44'/111111'/0'/0/1" }  // 账户 3
+        { path: "m/44'/111111'/0'/0/0" }, // account 1
+        { path: "m/44'/111111'/0'" }, // account 2
+        { path: "m/44'/111111'/0'/0/1" }  // account 3
     ]
 });
 ```
 
 ### 返回结果
 
-只有一个公钥的结果
+单个地址响应
 
 ```typescript
 {
     success: true,
     payload: {
-        path: string, // 序列化 BIP32 路径
-        address: string,   // 地址
+        path: string, // serialized BIP32 path
+        address: string,   // address
     }
 }
 ```
 
-批量公钥的结果
+批量地址响应
 
 ```typescript
 {
     success: true,
     payload: [
-        { path, address }, // 账户 1
-        { path, address }, // 账户 2
-        { path, address }, // 账户 3
+        { path, address }, // account 1
+        { path, address }, // account 2
+        { path, address }, // account 3
     ]
 }
 ```
@@ -93,8 +95,8 @@ HardwareSDK.kaspaGetAddress(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

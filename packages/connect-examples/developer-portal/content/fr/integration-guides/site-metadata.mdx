@@ -1,0 +1,21 @@
+---
+title: "Métadonnées du site"
+description: "Fournissez un favicon pour que les portefeuilles et navigateurs identifient votre site. Ajoutez un lien d’icône dans le `<head>` du document avec une URL d’image accessible publiquement :"
+---
+
+<span id="site-metadata" />
+
+# Métadonnées du site
+
+Fournissez un favicon pour que les portefeuilles et navigateurs identifient votre site. Ajoutez un lien d’icône dans la section `<head>` et utilisez une URL d’image accessible publiquement :
+
+```html
+<head>
+  <link rel="icon" href="https://example.com/icon.png" type="image/png" />
+  <link rel="shortcut icon" href="https://example.com/icon.png" />
+</head>
+```
+
+Utilisez le nom, l’origine et l’icône réels de votre application dans les métadonnées de la bibliothèque de connexion. Les métadonnées identifient le site demandeur ; elles ne prouvent pas qu’il est digne de confiance.
+
+Les versions de portefeuille peuvent récupérer ou mettre en cache les métadonnées différemment. Vérifiez la demande de connexion réelle après le déploiement ; une mise à jour du favicon ne modifie pas forcément immédiatement une session existante.

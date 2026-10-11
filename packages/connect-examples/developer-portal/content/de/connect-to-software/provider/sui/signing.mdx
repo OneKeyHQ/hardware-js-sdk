@@ -1,0 +1,102 @@
+---
+title: "Signieren"
+description: "Nachrichten auf Sui mit OneKey signieren"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signieren
+
+Die folgenden Signierbeispiele verwenden `connectSuiAccount()` aus [Erste Schritte](/de/connect-to-software/provider/sui/getting-started#account-context-for-signing). Die Hilfsfunktion gibt ein Wallet-Standard-Konto und dessen aktive Chain zurück. Die Beispiele verwenden `@mysten/sui@1.28.2`. Auch die älteren `*TransactionBlock`-Methoden deklarieren nun `Transaction`-Eingaben in `@mysten/wallet-standard@0.14.7`.
+
+Fordern Sie vor dem Signieren eine Berechtigung an, wählen Sie ein verbundenes Konto aus und lesen Sie die aktive Chain. Diese Beispiele verwenden `@mysten/sui@1.28.2`, passend zu `@mysten/wallet-standard@0.14.7`, das der aktuelle Provider akzeptiert.
+
+Erfahren Sie, wie Sie Nachrichten zur Authentifizierung signieren.
+
+Initialisieren Sie den Kontokontext vor den folgenden Beispielen:
+
+```typescript
+const { account, chain } = await connectSuiAccount()
+```
+
+---
+
+## Persönliche Nachricht signieren [#sign-personal-message]
+
+Beliebige Nachrichten zur Authentifizierung signieren:
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+
+const result = await provider.signPersonalMessage({
+  account,
+  chain,
+  message,
+})
+
+console.log({
+  signature: result.signature,   // Base64 encoded signature
+  bytes: result.bytes,           // Signed message bytes
+})
+```
+
+---
+
+## Nachricht signieren (Legacy) [#sign-message-legacy]
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+
+const result = await provider.signMessage({
+  account,
+  message,
+})
+
+console.log({
+  signature: result.signature,
+  messageBytes: result.messageBytes,
+})
+```
+
+---
+
+## Signatur prüfen [#verify-signature]
+
+```typescript
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
+
+const message = new TextEncoder().encode('Hello, Sui!')
+const { signature } = await provider.signPersonalMessage({ message, account, chain })
+
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('Expected signer:', isExpectedSigner)
+```
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+try {
+  await provider.requestPermissions()
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the connection request')
+  } else {
+    console.error('Connection error:', error.message)
+  }
+}
+```
+
+---
+
+## Häufige Fehlercodes [#common-error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| 4100 | Nicht autorisiert |
+| -32603 | Interner Fehler |

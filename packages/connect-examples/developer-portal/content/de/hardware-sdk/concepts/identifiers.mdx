@@ -1,0 +1,100 @@
+---
+description: "Verbindungs-IDs, physische Seriennummern, Seed-Identität, Fingerabdrücke versteckter Wallets und interne Sitzungen unterscheiden."
+title: "Kennungen"
+---
+
+<span id="identifiers" />
+
+# Kennungen
+
+Verwenden Sie `connectId` zum Weiterleiten einer Anfrage, `deviceId` zum Binden an den aktuellen Seed des Geräts und `passphraseState` zum Binden an eine versteckte Wallet. Diese Werte sind nicht austauschbar.
+
+## Kennungsreferenz [#identifier-reference]
+
+| Feld | Zweck | Wo abrufen | Wie verwenden |
+| --- | --- | --- | --- |
+| `connectId` | Transport-Routingschlüssel | Erfolgreicher `searchDevices().payload`-Eintrag | Erstes Argument für Geräte- und Wallet-Methoden. Nach Wiederverbindung erneut erfassen. |
+| `serialNo` | Physische Hardware-Identität, sofern verfügbar | Erkennung nach Initialisierung; `getDeviceState().payload.identity.serialNo` | Das Gerät unabhängig von USB/BLE anzeigen oder zuordnen. Nicht als Routingschlüssel verwenden. |
+| `deviceId` | Aktuelle Identität für die Seed-Lebensdauer | `getDeviceState().payload.identity.deviceId`; erfolgreiches `openWalletSession` | Zweites Argument für Wallet-Methoden. Zurücksetzen, Wiederherstellung oder eine andere Wallet erkennen. |
+| `passphraseState` | Fingerabdruck einer versteckten Wallet | Erfolgreiches verstecktes `openWalletSession`-Ergebnis | Bei jeder Adress-/Signieranfrage für diese versteckte Wallet übergeben. Dauerhaft speichern mit `deviceId`. |
+| `uuid` | Veraltete Kompatibilitätskennung | Einige Geräte-/Suchergebnisse | Bevorzugen Sie `serialNo` für Hardware-Identität und `connectId` für das Routing. Kann vor der Initialisierung leer sein. |
+| Firmware `session_id` | Internes Entsperr-Handle | Innerhalb von SDK Core verwaltet | Nicht lesen, protokollieren, dauerhaft speichern oder in öffentlichen Aufrufen senden. |
+| `name`, `label`, `deviceType` | Anzeige- und Funktionsinformationen | Erkennung/Gerätestatus | Keine eindeutigen Kennungen und kein Nachweis für Protokoll oder Wallet-Identität. |
+
+## `connectId` — der Routingschlüssel [#connectid--the-routing-key]
+
+<div id="connectid" />
+
+USB- und BLE-Verbindungen zum selben physischen Gerät haben unterschiedliche `connectId`-Werte. Halten Sie Verbindungsdatensätze nach Transport getrennt. Eine Verbindungs-ID ist nicht zwingend die physische Seriennummer: Ein USB-Deskriptor kann einen Routingpfad bereitstellen, bevor die Hardware-Identität verfügbar ist.
+
+Behandeln Sie den Wert als undurchsichtig. BLE-Formate hängen von der Host-Plattform ab (etwa eine Android-Adresse oder eine iOS-Peripheral-UUID). Wandeln Sie ihn niemals in das Format eines anderen Transports um und verwenden Sie ihn nicht als Echtheitsnachweis des Geräts.
+
+`searchDevices` kann zurückgeben: `connectId: null`. Wählen Sie vor einem Geräteaufruf einen Kandidaten mit verwendbarer Verbindungs-ID.
+
+## `deviceId` — die Prüfung der Wallet-Identität [#deviceid--the-wallet-identity-check]
+
+```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+Die Standard-Wallet und versteckte Wallets desselben Seeds teilen die für die Seed-Lebensdauer gültige `deviceId`. Eine versteckte Wallet benötigt zusätzlich ihren `passphraseState`.
+
+Bei `DeviceCheckDeviceIdError` stoppen Sie den Vorgang und aktualisieren den Gerätestatus. Lassen Sie den Nutzer die vorgesehene Wallet bestätigen, bevor Sie eine bestehende Bindung aktualisieren; das stille Ersetzen der gespeicherten ID könnte eine spätere Anfrage an eine andere Wallet leiten.
+
+### `device_id` gegenüber `deviceId` [#device_id-versus-deviceid]
+
+`device_id` ist das ältere Feld in Protocol-V1- `getFeatures()`-Ergebnissen. Neuer Code liest das vereinheitlichte `identity.deviceId` aus `getDeviceState()`, das beide Protokollfamilien unterstützt. Die Erkennung kann `deviceId: null` vor der Initialisierung zurückgeben.
+
+## Bindung einer versteckten Wallet [#hidden-wallet-binding]
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
+  throw new Error('A hidden wallet was not opened');
+}
+
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: opened.payload.passphraseState,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+Speichern Sie die Bindung erst nach einer erfolgreichen Antwort dauerhaft. Schützen Sie sie als Wallet-bezogene Anwendungsdaten; speichern Sie niemals die Passphrase selbst oder Firmware-Sitzungshandles.
+
+Das Weglassen von `passphraseState` bindet einen Aufruf nicht an die vorgesehene versteckte Wallet. Verwenden Sie entweder einen geprüften Fingerabdruck einer versteckten Wallet oder `useEmptyPassphrase: true` für die Standard-Wallet, niemals beides.
+
+Bei einer abweichenden Bindung halten Sie an und lassen den Nutzer die vorgesehene Wallet erneut auswählen. Überschreiben Sie die Bindung nicht und wiederholen Sie nicht automatisch eine Signieranfrage.
+
+## Methodensignaturen [#method-signatures]
+
+| Muster | Beispiele |
+| --- | --- |
+| SDK-Lebenszyklus, ohne Verbindungsargument | `init`, `searchDevices`, `on`/`off`, `dispose` |
+| Geräte- oder Wallet-Auswahl, `connectId` | `getDeviceState`, `openWalletSession`, `deviceSettings`, `deviceVerify` |
+| Wallet-Vorgang, `connectId` + `deviceId` | `evmGetAddress`, `btcSignTransaction`, `solSignTransaction` |
+| Vorgang mit versteckter Wallet | Der Wallet-Vorgang plus `passphraseState` in seinen Parametern |
+
+Einige Methoden erlauben aus Kompatibilitätsgründen fehlende Kennungen. Beachten Sie die öffentliche Signatur jeder Methode und wählen Sie in Anwendungen mit mehreren Geräten ein bestimmtes Gerät aus. Die Zuordnung von UI-Antworten verwendet eine separate Anfrageidentität; kopieren Sie `responseCorrelation` aus dem Ereignis wie beschrieben unter [UI-Ereignisse](/de/hardware-sdk/core-api-guide#events-ui).
+
+## Verwandte Themen [#related]
+
+- [Geräte suchen](/de/hardware-sdk/basic-api/search-devices)
+- [Gerätestatus abrufen](/de/hardware-sdk/basic-api/get-device-state)
+- [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session)
+- [Gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+- [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect)

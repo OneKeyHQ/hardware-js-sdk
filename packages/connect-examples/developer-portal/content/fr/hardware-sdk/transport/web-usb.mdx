@@ -1,0 +1,113 @@
+---
+description: "Autorisez un appareil USB OneKey depuis le navigateur, lisez son identité et confirmez une adresse de portefeuille."
+title: "Connexion WebUSB"
+---
+
+<span id="webusb-connection" />
+
+# Connexion WebUSB
+
+Connectez directement une application de navigateur à OneKey avec `@onekeyfe/hd-common-connect-sdk`. Ce parcours ne nécessite ni iframe ni OneKey Bridge.
+
+## Exigences [#requirements]
+
+- Un navigateur compatible WebUSB et un contexte sécurisé. Détectez la disponibilité de `navigator.usb` ; affichez un message sur les navigateurs pris en charge en cas d’absence.
+- Une action utilisateur pour ouvrir le sélecteur USB.
+- Un appareil OneKey initialisé et un câble USB prenant en charge les données.
+- [Gestion des événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) pour le PIN, la phrase secrète et la confirmation sur l’appareil.
+
+## 1. Installer et initialiser [#1-install-and-initialize]
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+Gardez les paquets SDK à la même version. Initialisez une seule fois au démarrage de l’application :
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+## 2. Enregistrer les événements d’interface [#2-register-ui-events]
+
+Utilisez le [gestionnaire d’interface complet de l’API Core](/fr/hardware-sdk/core-api-guide#events-ui) avant de lire une adresse ou de signer. Il distingue les demandes de saisie des notifications de l’appareil et préserve la corrélation des réponses.
+
+Votre application fournit les boîtes de dialogue. La saisie du PIN sur l’hôte nécessite un clavier à l’aveugle ; les demandes de PIN et de bouton uniquement sur l’appareil nécessitent un écran d’instructions, pas un bouton d’approbation sur l’hôte. Annulez l’opération SDK sélectionnée lorsque l’utilisateur annule et supprimez les écouteurs lors de la fermeture de votre intégration.
+
+## 3. Autoriser depuis une action utilisateur [#3-authorize-from-a-user-action]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Call directly from the user's Connect button handler.
+async function authorizeUsb() {
+  if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+  await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+}
+```
+
+Gérez l’annulation du sélecteur dans le gestionnaire du bouton. L’ouverture du sélecteur ne prouve pas que l’appareil est initialisé. Les appareils déjà autorisés peuvent être énumérés sans le rouvrir.
+
+## 4. Sélectionner la connexion et lire l’identité [#4-select-the-connection-and-read-identity]
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
+
+// This example requires one device. Use a device selector for multiple candidates.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+```
+
+Ne supposez pas que la découverte inclut `deviceId`, et ne déduisez pas le protocole des descripteurs USB. Consultez [Rechercher des appareils](/fr/hardware-sdk/basic-api/search-devices).
+
+## 5. Confirmer une adresse de réception [#5-confirm-a-receiving-address]
+
+```ts
+const address = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+
+// Display address.payload.address in your application after device confirmation.
+```
+
+Cet exemple sélectionne explicitement le portefeuille standard. Pour un portefeuille caché, ouvrez-le avec [`openWalletSession`](/fr/hardware-sdk/basic-api/open-wallet-session) et transmettez son `passphraseState` aux appels d’adresse comme de signature. Gardez le contexte de portefeuille et le chemin de dérivation cohérents.
+
+## Déconnexion et nettoyage [#disconnect-and-cleanup]
+
+- Abonnez-vous à `DEVICE.DISCONNECT` et invalidez la connexion actuelle dans l’interface.
+- Réénumérez et lisez l’état de l’appareil après reconnexion.
+- Sérialisez les appels par appareil. Ne répétez pas automatiquement une demande de signature ou de mise à jour du micrologiciel après un délai dépassé.
+- Appelez `dispose()` lors de la fermeture du SDK ou d’un changement de transport, puis initialisez avant toute réutilisation.
+
+Voir [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).
+
+## Dépannage [#troubleshooting]
+
+| Symptôme | Vérification |
+| --- | --- |
+| `navigator.usb` est absent | Prise en charge du navigateur et contexte sécurisé. |
+| Le sélecteur ne s’ouvre pas | Appelez-le directement à partir d’une action utilisateur. |
+| Impossible d’acquérir l’appareil | Un autre onglet, une application ou Bridge peut le détenir. Fermez cette connexion avant de réessayer. |
+| L’appel attend une saisie | Enregistrez les gestionnaires d’interface, distinguez les notifications et préservez la corrélation des réponses. |
+| Compte inattendu | Vérifiez `deviceId`, le chemin et l’association explicite au portefeuille standard/caché. |
+
+Poursuivre avec [Guides de signature](/fr/hardware-sdk/signers) ou [Codes d’erreur](/fr/hardware-sdk/core-api-guide#error-codes).

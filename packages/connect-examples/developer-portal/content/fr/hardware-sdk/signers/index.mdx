@@ -1,0 +1,32 @@
+---
+description: "Préparez et vérifiez les signatures EVM, Bitcoin et Solana avec une association explicite au portefeuille matériel."
+title: "Guides de signature"
+---
+
+<span id="signer-guides" />
+
+# Guides de signature
+
+Guides étape par étape, de l’initialisation à la transaction signée pour chaque chaîne. Lisez [Principes de base des requêtes](/fr/hardware-sdk/core-api-guide#request-basics) d’abord.
+
+## Structure [#structure]
+
+- Prérequis : versions du micrologiciel/SDK, transport requis, confirmation sur l’appareil
+- Étapes : connecter → choisir le chemin de compte → construire la demande → confirmer sur l’appareil → vérifier le résultat
+- Fragments d’intégration : paramètres de requête et validation du résultat ; l’interface, les données réseau et les entrées de transaction sont fournies par l’hôte
+- FAQ : chemin incorrect, refus/délai dépassé, problèmes de réseau ou de données
+
+## Liste de vérification rapide (à lire avant toute signature) [#quick-checklist-read-before-any-signer]
+
+- Environnement et versions : micrologiciel récent + SDK/Bridge alignés ; choisissez le guide de transport de votre plateforme.
+- Chemins : utilisez les chemins HD propres à la chaîne ; vérifiez le renforcement ou non des composants (voir chaque page de signature).
+- Session et portefeuille : la plupart des méthodes de chaîne nécessitent `connectId + deviceId` (BLE nécessite `deviceId`) ; `deviceId` change après réinitialisation ; incluez `passphraseState` pour les portefeuilles cachés.
+- Interface : abonnez-vous à `UI_EVENT` ; gérez les demandes PIN/phrase secrète avec `uiResponse`.
+- Vérification du résultat : vérifiez toujours `success` puis validez l’adresse/la signature renvoyée avec les bibliothèques de la chaîne.
+- Sécurité : rejetez les demandes inattendues et échouez rapidement si l’appareil est en mode Bootloader.
+
+## Guides disponibles [#available-guides]
+
+- [Signature EVM](./evm) — chemins, paramètres EIP-1559 et historiques, demandes sur l’appareil, diffusion après signature ; [Clear Signing](./evm#clear-signing) — transfert, autorisation/révocation, jeton/contrat, EIP-712, Safe Tx
+- [Signature BTC](./btc) — matrice scripts/chemins, exhaustivité des refTx, vérification de la monnaie rendue/des sorties, sérialisation
+- [Signature Solana](./solana) — chemin renforcé fixe, préparation de message/transaction bruts, assemblage de signature

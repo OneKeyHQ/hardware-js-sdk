@@ -1,0 +1,86 @@
+---
+title: "Air-Gap (signature QR hors ligne)"
+---
+
+<span id="air-gap-offline-qr-signing" />
+
+# Air-Gap (signature QR hors ligne)
+
+Créez une boucle de signature où l’appareil reste hors ligne, à l’aide de QR codes encodés au format UR.
+
+## Fonctionnement [#how-it-works]
+
+1. **Construire la demande** : Créer les données UR d’une demande de signature (par chaîne), puis les afficher sous forme d’images QR animées
+2. **Scan par l’appareil** : L’appareil scanne le QR code, vérifie les détails à l’écran et signe hors ligne
+3. **Obtenir la signature** : L’appareil affiche l’UR de signature sous forme de QR code animé
+4. **Diffusion** : L’application scanne la réponse, la vérifie et la diffuse via votre réseau
+
+## Démarrage rapide par chaîne [#quick-start-by-chain]
+
+| Chaîne | Type de requête (application → appareil) | Type de réponse (appareil → application) |
+|-------|-------------|---------------|
+| [Ethereum et EVM](./ethereum-and-evm) | `eth-sign-request` | `eth-signature` |
+| [Bitcoin (PSBT)](./bitcoin) | `crypto-psbt` | `crypto-psbt` |
+| [Solana](./solana) | `sol-sign-request` | `sol-signature` |
+| [Tron](./tron) | `tron-sign-request` | `tron-signature` |
+
+### Types d’export de compte (appareil → application) [#account-export-types-device--app]
+
+Ces types UR sont utilisés lorsque l’appareil exporte les informations de compte vers l’application lors de la configuration initiale :
+
+| Type UR | Description |
+|---------|-------------|
+| `crypto-hdkey` | Export d’une clé HD unique ([BCR-2020-007](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-007-hdkey.md)) |
+| `crypto-multi-accounts` | Export d’un ensemble de comptes multichaînes |
+
+## Référence de l’API [#api-reference]
+
+- [API de base](./basic-api) – Types UR fondamentaux : `CryptoHDKey`, `CryptoCoinInfo`, `CryptoKeypath`
+
+## Paquets [#packages]
+
+```bash
+# Keystone SDK & UR registries
+npm install @keystonehq/keystone-sdk @keystonehq/bc-ur-registry-eth
+
+# UR primitives
+npm install @ngraveio/bc-ur
+```
+
+## Intégration dans un portefeuille tiers [#third-party-wallet-integration]
+
+Si vous intégrez OneKey Air-Gap à un portefeuille existant, assurez-vous que votre scanner QR transmet ces types UR à un **Décodeur BC-UR v2** (avec codage fontaine), et non à un ancien décodeur v1.
+
+### Types UR que votre scanner doit accepter [#ur-types-your-scanner-must-accept]
+
+| Sens | Type UR | Quand |
+|-----------|---------|------|
+| Appareil → application | `crypto-psbt` | PSBT BTC signée |
+| Appareil → application | `crypto-hdkey` | Export de clé HD à la connexion |
+| Appareil → application | `crypto-multi-accounts` | Export multicomptes à la connexion |
+| Appareil → application | `eth-signature` | Réponse de signature ETH |
+| Appareil → application | `sol-signature` | Transaction SOL signée |
+| Appareil → application | `btc-signature` | Signature BTC (hors PSBT) |
+| Application → appareil | `eth-sign-request` | Demande de signature ETH |
+| Application → appareil | `sol-sign-request` | Demande de signature SOL |
+| Application → appareil | `crypto-psbt` | PSBT BTC non signée |
+| Appareil → application | `tron-signature` | Réponse de signature TRON |
+| Application → appareil | `tron-sign-request` | Demande de signature TRON |
+
+### Piège courant : orientation des types UR [#common-pitfall-ur-type-routing]
+
+Certains portefeuilles utilisent une **liste d’autorisation** pour déterminer quels types UR sont décodés par le décodeur moderne BC-UR v2 (codes fontaine via `@ngraveio/bc-ur`). Les types absents de la liste d’autorisation peuvent être transmis à un ancien décodeur v1 qui utilise un encodage complètement différent, ce qui bloque le scanner.
+
+**Si votre scanner affiche « veuillez continuer à scanner » sans jamais terminer**, vérifiez que le type UR figure dans votre liste d’autorisation v2.
+
+### `onekey-app-call-device` (protocole privé) [#onekey-app-call-device-private-protocol]
+
+Le type UR `onekey-app-call-device` est un **protocole interne à OneKey** utilisé pour les opérations de gestion de l’appareil (par exemple, `getMultiAccounts`, `verifyAddress`). Les portefeuilles tiers **ne doivent PAS implémenter ce type** — il peut changer sans préavis. Utilisez plutôt les méthodes standard du Keystone SDK.
+
+## Démonstration et exemples [#demo--examples]
+
+- **Démonstration React Native** : [Démonstration Air-Gap sur GitHub](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap)
+  - Scanner : [AirGapScanner.tsx](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/connect-examples/react-native-demo/air-gap/src/components/AirGapScanner.tsx)
+  - Utilitaires de chaîne : [sdk/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap/sdk)
+
+> **Remarque** : Air-Gap fonctionne hors ligne par conception. Il n’existe aucun environnement de test en ligne dans un navigateur.

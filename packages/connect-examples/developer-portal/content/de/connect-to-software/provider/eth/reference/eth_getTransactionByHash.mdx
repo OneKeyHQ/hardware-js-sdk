@@ -1,0 +1,109 @@
+---
+title: "eth_getTransactionByHash"
+description: "Transaktionsdetails anhand des Hashs abrufen"
+---
+
+# eth_getTransactionByHash
+
+Gibt Informationen zu einer Transaktion anhand ihres Hashs zurück.
+
+---
+
+## Parameter [#parameters]
+
+| Index | Typ | Beschreibung |
+|-------|------|-------------|
+| 0 | `string` | Transaktionshash (32 Bytes) |
+
+---
+
+## Rückgabe [#returns]
+
+`object | null` - Transaktionsobjekt oder null, wenn nicht gefunden
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `hash` | `string` | Transaktionshash |
+| `nonce` | `string` | Nonce des Absenders (hex) |
+| `blockHash` | `string` | Blockhash (null, wenn ausstehend) |
+| `blockNumber` | `string` | Blocknummer (null, wenn ausstehend) |
+| `transactionIndex` | `string` | Index im Block (null, wenn ausstehend) |
+| `from` | `string` | Absenderadresse |
+| `to` | `string` | Empfängeradresse (null bei Vertragserstellung) |
+| `value` | `string` | Übertragener Wert (hexadezimale Wei) |
+| `gasPrice` | `string` | Gaspreis (hex) |
+| `gas` | `string` | Gaslimit (hex) |
+| `input` | `string` | Transaktionsdaten |
+| `v` | `string` | ECDSA-Recovery-ID |
+| `r` | `string` | ECDSA-Signatur r |
+| `s` | `string` | ECDSA-Signatur s |
+
+---
+
+## Beispiel [#example]
+
+```typescript
+const tx = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionByHash',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (tx) {
+  console.log('From:', tx.from)
+  console.log('To:', tx.to)
+  console.log('Value:', BigInt(tx.value).toString())
+  console.log('Status:', tx.blockHash ? 'Mined' : 'Pending')
+}
+```
+
+### Transaktion nach dem Senden verfolgen [#track-transaction-after-sending]
+
+```typescript
+async function sendAndTrack(txParams, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
+  // Send transaction
+  const txHash = await window.$onekey.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [txParams]
+  })
+
+  console.log('Transaction sent:', txHash)
+
+  // Poll for transaction details
+  const checkTx = async () => {
+    if (Date.now() >= deadline) throw new Error("Transaction lookup timed out")
+    const tx = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionByHash',
+      params: [txHash]
+    })
+
+    if (tx && tx.blockHash) {
+      console.log('Transaction mined in block:', parseInt(tx.blockNumber, 16))
+      return tx
+    }
+
+    // Still pending, check again
+    await new Promise(r => setTimeout(r, 2000))
+    return checkTx()
+  }
+
+  return checkTx()
+}
+```
+
+---
+
+## Fehler [#errors]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| -32602 | Ungültige Parameter | Ungültiger Transaktionshash |
+
+---
+
+## Hinweise [#notes]
+
+- Gibt `null` zurück, wenn die Transaktion nicht gefunden wird
+- Ausstehende Transaktionen haben null für `blockHash` und `blockNumber`
+- Für den Transaktionsstatus (Erfolg/Fehlschlag) verwenden Sie [eth_getTransactionReceipt](/de/connect-to-software/provider/eth/reference/eth_getTransactionReceipt)
+- Transaktionsdaten bleiben auch nach Aufnahme der Transaktion in einen Block erhalten

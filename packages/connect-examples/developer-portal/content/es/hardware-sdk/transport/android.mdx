@@ -1,0 +1,80 @@
+---
+description: "Conecta el SDK de OneKey a Android BLE con gestión de permisos y flujos completos de conexión GATT y notificaciones."
+title: "Android: Conectar mediante Bluetooth"
+---
+
+<span id="android-connect-via-bluetooth" />
+
+# Android: Conectar mediante Bluetooth
+
+Ejecuta `@onekeyfe/hd-common-connect-sdk` en una WebView y conecta su transporte de bajo nivel a BLE nativo. Empieza por el [ejemplo nativo de Android](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example) y el contrato del [Plugin de transporte de bajo nivel](/es/hardware-sdk/concepts/low-level-plugin).
+
+La capa nativa gestiona permisos, vinculación, conexión GATT, E/S de características y limpieza. El SDK gestiona detección de protocolo, tramas y firma. No añadas otro decodificador V1/V2 a la conexión nativa.
+
+## Permisos [#permissions]
+
+Para una aplicación dirigida a Android 12 o posterior, solicita `BLUETOOTH_SCAN` y `BLUETOOTH_CONNECT` en tiempo de ejecución. `BLUETOOTH_ADVERTISE` no es necesario para un cliente que solo busca y conecta.
+
+Usa `neverForLocation` solo si la aplicación no deduce la ubicación a partir de búsquedas BLE. Las versiones antiguas de Android requieren los permisos heredados de Bluetooth y ubicación correspondientes. No solicites incondicionalmente permisos exclusivos de Android 12 en dispositivos antiguos. Sigue la [guía de permisos de Bluetooth de Android](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions) para tu SDK de destino y uso de ubicación.
+
+No inicies búsquedas mientras el permiso esté pendiente. Devuelve un error de permiso al llamador JS si el usuario lo rechaza y permite un nuevo intento posterior iniciado por el usuario.
+
+## Compilar y cargar el bundle JavaScript [#build-and-load-the-javascript-bundle]
+
+Desde el checkout de hardware-js-sdk:
+
+```bash
+cd packages/connect-examples/native-android-example/web
+yarn
+yarn build
+```
+
+Copia `web_dist/` a `app/src/main/assets/web_dist/`. Registra los controladores del puente nativo antes de cargar `file:///android_asset/web_dist/index.html`. Conserva intactas las rutas de los recursos y carga únicamente el bundle de confianza de tu aplicación en una WebView con acceso al puente del dispositivo.
+
+La demo incluye sus dependencias y la implementación de la conexión. Usa su configuración de paquetes/Gradle como punto de partida en vez de combinar fragmentos de versiones distintas de la biblioteca Nordic BLE.
+
+## Completar la conexión BLE antes de resolver [#complete-the-ble-connection-before-resolving]
+
+Una espera fija no demuestra que la vinculación, la conexión GATT, el descubrimiento o la suscripción a notificaciones hayan funcionado. Usa callbacks o las API suspendibles de finalización de la biblioteca BLE:
+
+1. Completa la vinculación necesaria e informa del rechazo del usuario o tiempo agotado.
+2. Espera a que se establezca la conexión GATT.
+3. Descubre el servicio OneKey y las dos características requeridas.
+4. Habilita notificaciones y espera a que se complete el descriptor o la suscripción.
+5. Resuelve la llamada `connect` de la conexión solo cuando pueda enviar y recibir.
+
+Android expone resultados de operaciones mediante [`BluetoothGattCallback`](https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback). Que una llamada inicie una operación correctamente no significa que esta haya finalizado. Limita cada operación pendiente con un tiempo de espera; si falla, cierra la conexión y rechaza sus llamadas pendientes al puente.
+
+| Finalidad | UUID |
+| --- | --- |
+| Servicio | `00000001-0000-1000-8000-00805f9b34fb` |
+| Escritura | `00000002-0000-1000-8000-00805f9b34fb` |
+| Notificar | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## Contrato de la conexión [#bridge-contract]
+
+| Método | Condición de finalización |
+| --- | --- |
+| `enumerate()` | Devuelve una instantánea sin duplicados de los candidatos; detén la búsqueda y completa la solicitud una sola vez. |
+| `connect(uuid)` | Conexión, características y notificaciones listas. |
+| `send(uuid, data, options)` | Valida el hexadecimal, escribe los bytes en orden, respeta `withoutResponse` y propaga los errores de escritura. |
+| `receive(uuid)` | Devuelve como hexadecimal el siguiente bloque de notificación en cola, incluidos los recibidos antes de que hubiera un lector esperando. |
+| `disconnect(uuid)` | Cancela suscripciones, cierra la conexión seleccionada, rechaza lecturas pendientes y descarta notificaciones antiguas. |
+
+Mantén colas y callbacks por conexión. Rechaza una característica ausente en vez de considerar correcta una escritura que puede no realizarse. Envía los callbacks de la conexión WebView en el hilo de interfaz apropiado.
+
+Expón la capacidad real de escritura BLE mediante `getProtocolV2PacketCapacity` al implementar Protocol V2. No devuelvas la MTU ATT con su sobrecarga incluida. Consulta la [interfaz completa del plugin](/es/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface).
+
+## Ciclo de vida del SDK y la interfaz [#sdk-and-ui-lifecycle]
+
+El bundle inicializa `env: 'lowlevel'` con tu plugin. Comprueba el resultado de inicialización, descubre una conexión y llama a `getDeviceState(connectId)` para obtener el identificador del ciclo de vida de la semilla `deviceId`.
+
+Registra los [controladores de eventos de interfaz](/es/hardware-sdk/core-api-guide#events-ui) antes de las llamadas protegidas. Responde solo a solicitudes de entrada y copia su correlación de respuesta. `REQUEST_BUTTON` y los avisos de PIN exclusivo del dispositivo son notificaciones; un botón nativo «Aceptar» no puede confirmar la operación en el hardware.
+
+Pasa `useEmptyPassphrase: true` para la cartera estándar o el `passphraseState` de la cartera oculta seleccionada en llamadas de dirección y firma. Ejecútalas en serie por dispositivo.
+
+## Verificar la integración [#verify-the-integration]
+
+Prueba denegación de permisos, cancelación de vinculación, fallos de descubrimiento y notificaciones, entrada con dispositivo bloqueado, desconexión y reconexión en un dispositivo físico. Confirma una dirección en el dispositivo e inspecciona el resultado del SDK. Encontrar un anuncio BLE no basta para superar una prueba completa.
+
+No repitas automáticamente firmas ni actualizaciones de firmware tras un tiempo agotado. Consulta [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect).

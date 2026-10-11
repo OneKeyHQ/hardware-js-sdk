@@ -1,0 +1,98 @@
+---
+title: "Ethereum / EVM"
+description: "Integración con Ethereum y EVM mediante el proveedor EIP-1193 inyectado de OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+# Ethereum / EVM
+
+Usa el proveedor EIP-1193 inyectado para crear dApps EVM con OneKey. Todas las cadenas compatibles con EVM (Ethereum, Polygon, BSC, Arbitrum, Optimism, Base, etc.) comparten el mismo proveedor.
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+### EIP-6963 (recomendado) [#eip-6963-recommended]
+
+Detección moderna de varias carteras que evita conflictos:
+
+```typescript
+let onekeyProvider = null
+const onAnnounce = (event) => {
+  if (event.detail.info.rdns === 'so.onekey.app.wallet') {
+    onekeyProvider = event.detail.provider
+  }
+}
+window.addEventListener('eip6963:announceProvider', onAnnounce)
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// Call from your Connect button after the user selects OneKey.
+async function connectOneKey() {
+  if (!onekeyProvider) throw new Error('OneKey has not announced a provider yet')
+  return onekeyProvider.request({ method: 'eth_requestAccounts' })
+}
+// On component cleanup:
+// window.removeEventListener('eip6963:announceProvider', onAnnounce)
+```
+
+### Acceso directo (alternativa) [#direct-access-fallback]
+
+```typescript
+const provider = window.$onekey?.ethereum
+if (!provider) throw new Error('OneKey not detected')
+
+const accounts = await provider.request({ method: 'eth_requestAccounts' })
+```
+
+---
+
+## Eventos [#events]
+
+```typescript
+// Account changed
+provider.on('accountsChanged', (accounts) => {
+  console.log('Account:', accounts[0])
+})
+
+// Network changed
+provider.on('chainChanged', (chainId) => {
+  console.log('Chain:', chainId)
+  window.location.reload() // Recommended
+})
+
+// Connected
+provider.on('connect', (info) => {
+  console.log('Connected to chain:', info.chainId)
+})
+```
+
+---
+
+## Códigos de error [#error-codes]
+
+| Código | Descripción | Solución |
+|------|-------------|----------|
+| 4001 | Rechazado por el usuario | Gestiona el rechazo adecuadamente |
+| 4902 | Cadena desconocida | Añade la cadena con `wallet_addEthereumChain` |
+| -32602 | Parámetros no válidos | Usa `0x` como prefijo de las cadenas hexadecimales |
+| -32603 | Error interno | Comprueba el formato de la solicitud |
+
+---
+
+## Identificadores de cadena [#chain-ids]
+
+| Red | ID de cadena | Hexadecimal |
+|---------|----------|-----|
+| Red principal de Ethereum | 1 | 0x1 |
+| Polygon | 137 | 0x89 |
+| BSC | 56 | 0x38 |
+| Arbitrum One | 42161 | 0xa4b1 |
+| Optimism | 10 | 0xa |
+| Base | 8453 | 0x2105 |
+
+Consulta [chainlist.org](https://chainlist.org) para ver más cadenas.
+
+<Callout type="info">
+Para una integración rápida con componentes de interfaz, usa [RainbowKit](/es/connect-to-software/wallet-ui/rainbowkit) o [Web3Modal](/es/connect-to-software/wallet-ui/web3modal).
+</Callout>

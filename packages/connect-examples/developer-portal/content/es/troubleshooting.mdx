@@ -1,0 +1,66 @@
+---
+title: "Resolución de problemas"
+description: "Diagnostica problemas de conexión de cartera, descubrimiento de hardware, firma e integración QR."
+---
+
+<span id="troubleshooting" />
+
+# Resolución de problemas
+
+Identifica primero la capa que falla: proveedor de cartera OneKey, transporte de hardware o codificación/decodificación QR. Registra método, código de error, versión de SDK o cartera y paso fallido.
+
+## Una dApp no encuentra OneKey [#a-dapp-cannot-find-onekey]
+
+- Confirma que OneKey esté instalado y habilitado en el perfil de navegador que pruebas. Recarga la dApp tras instalarlo.
+- Detecta el proveedor en código del navegador una vez disponible la página. No accedas a `window` durante el renderizado del servidor.
+- Usa el proveedor de tu cadena. No supongas que un proveedor inyectado de otra cartera pertenece a OneKey.
+- Sigue [Inicio rápido para dApps](/es/connect-to-software) o la [guía de tu biblioteca de interfaz de cartera](/es/connect-to-software/wallet-ui/web3modal).
+
+## Se rechaza el acceso a cuentas o la firma [#account-access-or-signing-is-rejected]
+
+El rechazo es una decisión válida del usuario. Limpia el estado pendiente y permite que reintente explícitamente; no sigas abriendo avisos de permisos o firmas.
+
+Si cambia la cuenta o red, actualiza el estado antes de crear la siguiente solicitud. Para Ethereum, consulta [Acceder a cuentas](/es/connect-to-software/provider/eth/accessing-accounts) y la [API del proveedor](/es/connect-to-software/provider/eth).
+
+## Un dispositivo USB no aparece en la lista [#a-usb-device-is-not-listed]
+
+1. Comprueba que tu navegador admita WebUSB y que la página se sirva en un contexto seguro.
+2. Abre el selector USB desde una acción del usuario, como un botón Conectar, y elige el dispositivo previsto.
+3. Revisa el cable y cierra otra aplicación o pestaña que pueda estar usando el dispositivo.
+4. Repite el descubrimiento y gestiona un resultado vacío antes de llamar a un método del dispositivo.
+
+Sigue [Guía de WebUSB](/es/hardware-sdk/transport/web-usb). Los requisitos difieren para [móvil nativo](/es/hardware-sdk/transport/native-ble) y [React Native BLE](/es/hardware-sdk/transport/react-native-ble); las instrucciones USB del navegador no se aplican a todos los transportes.
+
+## Una solicitud espera indefinidamente [#a-request-waits-indefinitely]
+
+Comprueba si el SDK espera una respuesta de interfaz, como una elección de PIN o frase de contraseña, o una confirmación en el dispositivo. Registra los controladores antes de llamar y responde a la solicitud concreta según la [guía de la API Core](/es/hardware-sdk/core-api-guide).
+
+Ejecuta las operaciones del dispositivo en serie. Si el usuario cancela o se desconecta el transporte, limpia el estado pendiente de la interfaz e informa del resultado. No repitas automáticamente una firma ni una operación que modifique el dispositivo después de un resultado incierto.
+
+## Un método no es compatible [#a-method-is-unsupported]
+
+Verifica el método en la [referencia de compatibilidad de dispositivos y cadenas](/es/hardware-sdk/concepts/chain-support) y después revisa las versiones de SDK y firmware. La compatibilidad con una cadena, dispositivo o transporte no implica que todos sus métodos sean compatibles.
+
+## Una respuesta QR no se decodifica [#a-qr-response-does-not-decode]
+
+Comprueba que uses el tipo de registro esperado y que hayas recibido todos los fragmentos de la respuesta QR multipartes. Asocia la respuesta con la solicitud original si el formato incluye un identificador. Consulta la [guía QR de Ethereum y EVM](/es/air-gap/ethereum-and-evm).
+
+## Informar de un problema [#report-an-issue]
+
+Elige el repositorio responsable de la integración que falla:
+
+| Problema | Dónde comunicarlo |
+| --- | --- |
+| Hardware SDK, transportes o este portal para desarrolladores | [Incidencias del Hardware SDK](https://github.com/OneKeyHQ/hardware-js-sdk/issues) |
+| Proveedor de cartera inyectado | [Incidencias de Cross-inpage provider](https://github.com/OneKeyHQ/cross-inpage-provider/issues) |
+| Comportamiento de la aplicación o extensión OneKey | [Incidencias de la aplicación](https://github.com/OneKeyHQ/app-monorepo/issues) |
+| Ayuda para usar un producto OneKey | [Centro de ayuda de OneKey](https://help.onekey.so/) |
+
+Incluye:
+
+- El comportamiento esperado y el real.
+- Una reproducción mínima con datos de prueba y pasos exactos.
+- Versión de SDK/paquete, entorno, sistema operativo, transporte y, si corresponde, modelo y firmware del dispositivo.
+- Nombre del método, código de error y mensaje sin datos sensibles.
+
+No publiques frases de recuperación, claves privadas, PIN, frases de contraseña, credenciales, identificadores de sesión ni registros de cartera sin censurar. Ante una posible vulnerabilidad, sigue la política de seguridad del repositorio afectado en vez de divulgar detalles de explotación en una incidencia pública.

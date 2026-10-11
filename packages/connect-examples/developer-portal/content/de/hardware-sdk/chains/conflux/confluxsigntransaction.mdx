@@ -1,0 +1,79 @@
+---
+title: "confluxSignTransaction"
+---
+
+# confluxSignTransaction
+
+## Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 3.0.0
+  * Classic/Mini: 2.4.0
+
+### Conflux: Transaktion signieren <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a> [#conflux-sign-transaction-]
+
+Fordert eine Transaktionssignatur an. Der Nutzer prüft und bestätigt die Anfrage auf dem Gerät.
+
+```typescript
+const response = await HardwareSDK.confluxSignTransaction(connectId, deviceId, params)
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _erforderlich_ `ConfluxTransaction`-Typ
+  * `to` - _erforderlich  `string`_ Adresse als Hex-Zeichenfolge
+  * `value` - _erforderlich  `string`_ Betrag, in eine BigInt-Hex-Zeichenfolge umgewandelt
+  * `gasLimit` - _erforderlich  `string`_ Gaslimit, in eine BigInt-Hex-Zeichenfolge umgewandelt
+  * `gasPrice` - _erforderlich  `string`_ Gaspreis, in eine BigInt-Hex-Zeichenfolge umgewandelt
+  * `nonce` - _erforderlich  `string`_ Nonce, in eine BigInt-Hex-Zeichenfolge umgewandelt
+  * `epochHeight` - _erforderlich  `string`_ Epochenhöhe, in eine BigInt-Hex-Zeichenfolge umgewandelt
+  * `storageLimit` - _erforderlich  `string`_ Speicherlimit, in eine BigInt-Hex-Zeichenfolge umgewandelt
+  * `chainId` - _optional  `number`_ ID der Chain
+  * `data` - _optional  `string`_ Hexdaten
+
+### Beispiel [#example]
+
+```typescript
+HardwareSDK.confluxSignTransaction(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    transaction: {
+        to: "0x1386b4185a223ef49592233b69291bbe5a80c527",
+        value: "0xf4240",
+        data: "0x01",
+        chainId: 1,
+        nonce: "0x00",
+        epochHeight: "0x00",
+        gasPrice: "0xbebc200",
+        gasLimit: "0x5208",
+        storageLimit: "0x5208",
+    }
+});
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string;
+        r: string;
+        s: string;
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

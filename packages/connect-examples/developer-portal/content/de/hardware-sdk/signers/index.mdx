@@ -1,0 +1,32 @@
+---
+description: "EVM-, Bitcoin- und Solana-Signaturen mit ausdrücklicher Hardware-Wallet-Bindung vorbereiten und prüfen."
+title: "Anleitungen zum Signieren"
+---
+
+<span id="signer-guides" />
+
+# Anleitungen zum Signieren
+
+Schrittweise Anleitungen von der Initialisierung bis zur signierten Transaktion für jede Chain. Lesen Sie [Grundlagen der Anfrage](/de/hardware-sdk/core-api-guide#request-basics) zuerst.
+
+## Aufbau [#structure]
+
+- Voraussetzungen: Firmware-/SDK-Versionen, erforderlicher Transport, Gerätebestätigung
+- Schrittfolge: verbinden → Kontopfad wählen → Anfrage erstellen → auf dem Gerät bestätigen → Ergebnis prüfen
+- Integrationsfragmente: Anfrageparameter und Ergebnisvalidierung; Anwendungsoberfläche, Netzwerkdaten und Transaktionseingaben werden vom Host bereitgestellt
+- FAQ: falscher Pfad, Ablehnung/Zeitüberschreitung, Netzwerk- oder Datenprobleme
+
+## Kurze Checkliste (vor jedem Signierer lesen) [#quick-checklist-read-before-any-signer]
+
+- Umgebung &amp; Versionen: aktuelle Firmware + abgestimmtes SDK/Bridge; Transportanleitung Ihrer Plattform wählen.
+- Pfade: chainspezifische HD-Pfade verwenden; gehärtet/nicht gehärtet genau prüfen (siehe jeweilige Signierseite).
+- Sitzung &amp; Wallet: Die meisten Chain-Methoden benötigen `connectId + deviceId` (BLE erfordert `deviceId`); `deviceId` ändert sich nach Zurücksetzen; einschließen: `passphraseState` für versteckte Wallets.
+- UI: abonnieren Sie `UI_EVENT`; PIN-/Passphrase-Aufforderungen behandeln mit `uiResponse`.
+- Ergebnis prüfen: immer zuerst prüfen: `success` und dann zurückgegebene Adresse/Signatur mit Chain-Bibliotheken validieren.
+- Sicherheit: Bei unerwarteten Aufforderungen ablehnen und sofort fehlschlagen, wenn sich das Gerät im Bootloader befindet.
+
+## Verfügbare Anleitungen [#available-guides]
+
+- [EVM-Signierer](./evm) — Pfade, EIP-1559-/Legacy-Parameter, Geräteaufforderungen, Übertragung nach dem Signieren; [Clear Signing](./evm#clear-signing) — Transfer, Freigeben/Widerrufen, Token/Vertrag, EIP-712, Safe Tx
+- [BTC-Signierer](./btc) — Skript-/Pfadmatrix, Vollständigkeit der refTxs, Wechselgeld-/Ausgabeprüfung, Serialisierung
+- [Solana-Signierer](./solana) — fester gehärteter Pfad, Vorbereitung roher Nachrichten/Transaktionen, Zusammensetzen der Signatur

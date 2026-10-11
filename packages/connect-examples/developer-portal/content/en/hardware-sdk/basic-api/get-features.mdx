@@ -1,4 +1,5 @@
 ---
+description: "Maintain legacy Protocol V1 features reads and migrate new integrations to getDeviceState."
 title: Get Features
 ---
 
@@ -12,13 +13,13 @@ import { Callout } from 'nextra/components'
 
 ## Get device features
 
-Get all attributes of the device. New code should read [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`payload.identity.deviceId`).
+Read the legacy Protocol V1 features projection. New code should read [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`payload.identity.deviceId`).
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
 ```
 
-> If the screen is displaying other content, you can also call this method to return to the home page.
+This method reads a legacy features projection. Do not use it as a navigation or unlock API, and do not depend on it to return the device to its home screen.
 
 ### Params
 

@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 签名
 
+签名前先连接 provider，并确认所选网络。直接注入的 provider 与 Aptos Wallet Standard 适配器使用不同的参数类型，请勿混用示例。请替换省略的地址，并为只读请求初始化 SDK 客户端。
+
 了解如何签署消息用于身份验证或验证。
 
 ---
@@ -16,17 +18,17 @@ import { Callout } from 'nextra/components'
 签署任意消息用于身份验证或验证：
 
 ```typescript
-const message = '欢迎来到 MyApp！\n\n点击签名登录。\n\nNonce: abc123'
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
 
 const response = await provider.signMessage({
   message,
-  nonce: 'abc123',  // 可选的 nonce，用于防重放
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
 })
 
 console.log({
-  signature: response.signature,   // 十六进制编码的签名
-  fullMessage: response.fullMessage, // 完整的已签名消息
-  prefix: response.prefix,         // 使用的消息前缀
+  signature: response.signature,   // Hex-encoded signature
+  fullMessage: response.fullMessage, // Full signed message
+  prefix: response.prefix,         // Message prefix used
 })
 ```
 
@@ -37,10 +39,10 @@ console.log({
 ```typescript
 const response = await provider.signMessage({
   message: 'Hello Aptos',
-  nonce: 'unique-nonce',
-  address: true,      // 在消息中包含地址
-  application: true,  // 包含应用信息
-  chainId: true,      // 包含链 ID
+  nonce: 12345,
+  address: true,      // Include address in message
+  application: true,  // Include app info
+  chainId: true,      // Include chain ID
 })
 ```
 
@@ -53,7 +55,7 @@ import nacl from 'tweetnacl'
 
 const { signature, fullMessage } = await provider.signMessage({
   message: 'Hello Aptos',
-  nonce: 'unique-nonce',
+  nonce: 12345,
 })
 
 const account = await provider.account()
@@ -62,7 +64,7 @@ const signatureBytes = Buffer.from(signature.slice(2), 'hex')
 const messageBytes = Buffer.from(fullMessage)
 
 const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
-console.log('签名有效:', isValid)
+console.log('Signature valid:', isValid)
 ```
 
 ---
@@ -73,14 +75,14 @@ console.log('签名有效:', isValid)
 
 ```typescript
 const signInInput = {
-  // 登录参数
+  // Sign-in parameters
 }
 
 const result = await provider.signIn(signInInput)
 
 console.log({
-  address: result.address,
-  publicKey: result.publicKey,
+  address: result.account.address,
+  publicKey: result.account.publicKey,
   signature: result.signature,
 })
 ```
@@ -91,21 +93,22 @@ console.log({
 
 ```typescript
 try {
-  await provider.signMessage({ message: 'Hello', nonce: '123' })
+  await provider.signMessage({ message: 'Hello', nonce: 12345 })
 } catch (error) {
   switch (error.code) {
     case 4001:
-      console.log('用户拒绝了请求')
+      console.log('User rejected the request')
       break
     case 4100:
-      console.log('未授权 - 钱包已锁定')
+      console.log('The account or method is not authorized')
       break
     case 4200:
-      console.log('不支持的方法')
+      console.log('Unsupported method')
       break
     default:
-      console.error('错误:', error.message)
+      console.error('Error:', error.message)
   }
 }
 ```
 
+直接调用 `signMessage` 时，nonce 使用数值类型；`signMessageCompatible` 和 Wallet Standard 集成使用字符串 nonce。验证返回的 `fullMessage`、签名者和挑战值，并在使用后使挑战值失效。上方登录参数仅作示意，请按适配器版本构造完整的 `AptosSignInInput`。

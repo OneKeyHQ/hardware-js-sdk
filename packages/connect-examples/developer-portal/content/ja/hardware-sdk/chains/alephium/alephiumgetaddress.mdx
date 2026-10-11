@@ -1,0 +1,107 @@
+---
+title: "alephiumGetAddress"
+---
+
+# alephiumGetAddress
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.10.0
+
+### Alephium: アドレスを取得 [#alephium-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` が `true` の場合は、 ユーザーがデバイス上でアドレスを確認する必要があります。
+
+```typescript
+const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    showOnOneKey: false,
+    group: 0,
+    includePublicKey: true
+});
+```
+
+#### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+**単一のアドレス**
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`
+* `group` - _必須_ `number | undefined | null`。グループ 0 には `undefined` を渡し、対象グループを省略するには `null` を渡します。
+* `includePublicKey` - _任意_ `boolean` 戻り値 `pub` とその `publicKey` エイリアス。デフォルトは `false`.
+* `showOnOneKey` - _任意_ `boolean` アドレスをデバイスに表示するかどうか。デフォルトは `true`.
+
+**複数のアドレス**
+
+* `bundle` - `path` および `showOnOneKey` および `group` フィールドを持つオブジェクトの配列
+
+#### 例 [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    showOnOneKey: true,
+    group: undefined
+});
+
+// Get multiple addresses
+const batchResponse = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
+    bundle: [
+        {
+            path: "m/44'/1234'/0'/0/0",
+            showOnOneKey: false,
+            group: undefined
+        },
+        {
+            path: "m/44'/1234'/1'/0/0",
+            showOnOneKey: false,
+            group: undefined
+        }
+    ]
+});
+```
+
+**結果**
+
+単一アドレスのレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        derivedPath: string,
+        pub?: string,
+        publicKey?: string,
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+リクエストと同じ順序のバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }, // account 1
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }, // account 2
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }  // account 3
+    ]
+}
+```
+
+エラー
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

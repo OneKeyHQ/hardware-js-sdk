@@ -1,0 +1,83 @@
+---
+title: "Glossar"
+description: "Diese Begriffe erscheinen in den Wallet- und Hardware-Integrationsanleitungen von OneKey. Formate und Verhalten können je Blockchain variieren; folgen Sie der Referenz der integrierten Chain."
+---
+
+<span id="glossary" />
+
+# Glossar
+
+Diese Begriffe erscheinen in den Wallet- und Hardware-Integrationsanleitungen von OneKey. Formate und Verhalten können je Blockchain variieren; folgen Sie der Referenz der integrierten Chain.
+
+## Wallet [#wallet]
+
+Eine Anwendung oder ein Gerät, das Schlüssel verwaltet und Nutzern hilft, Konten einzusehen und Vorgänge zu autorisieren. Assets und Transaktionszustände werden auf der Blockchain aufgezeichnet, nicht in der Wallet-Anwendung gespeichert.
+
+## Konto [#account]
+
+Eine Blockchain-Identität mit zugehörigem Zustand. Auf Ethereum werden extern kontrollierte Konten durch private Schlüssel gesteuert, Vertragskonten durch Code. Nicht jedes Konto ist ein öffentliches/privates Schlüsselpaar.
+
+## Adresse [#address]
+
+Eine Kennung zum Empfangen von Assets oder zur Interaktion mit einem Konto oder Vertrag. Eine Ethereum-Adresse hat 20 Bytes und wird üblicherweise geschrieben als `0x` gefolgt von 40 hexadezimalen Zeichen. Eine Adresse ist nicht dasselbe wie ein öffentlicher Schlüssel.
+
+## Öffentlicher Schlüssel [#public-key]
+
+Der öffentliche Teil eines kryptografischen Schlüsselpaars. Er dient zum Prüfen von Signaturen und je nach Chain zum Ableiten von Adressen. Kodierung und Länge hängen von Signaturschema und Format ab.
+
+## Privater Schlüssel [#private-key]
+
+Geheimes Material zum Autorisieren von Vorgängen durch Signieren. Fordern Sie Nutzer niemals auf, einen privaten Schlüssel in eine dApp, ein Integrationsformular, ein Protokoll oder einen Fehlerbericht einzufügen.
+
+## Wiederherstellungsphrase [#recovery-phrase]
+
+Eine Wortfolge zur Sicherung des Materials, aus dem eine Wallet Schlüssel ableitet. BIP-39 definiert mnemonische Phrasen und deren Umwandlung in einen Seed. Behandeln Sie die Phrase als Geheimnis; fordern Sie sie nicht in einem Integrationsablauf an.
+
+## Seed [#seed]
+
+Eingabe für die hierarchische Schlüsselableitung. Nach BIP-39 wird ein Seed aus der mnemonischen Phrase und einer optionalen Passphrase abgeleitet. Er ist nicht mit dem privaten Schlüssel eines einzelnen Kontos austauschbar.
+
+## Ableitungspfad [#derivation-path]
+
+Eine Folge von Indizes, die einen Schlüssel in einer hierarchischen Wallet identifiziert. Chain, Konto, Adresstyp und Wechselgeldzweig können den Pfad beeinflussen. Verwenden Sie den von der integrierten Methode und Chain erwarteten Pfad.
+
+## Passphrase [#passphrase]
+
+Ein optionaler Wert, der zusammen mit einer Wiederherstellungsphrase eine andere Wallet ableitet. Eine andere Passphrase kann eine andere Wallet erzeugen; sie ist nicht einfach eine andere Bezeichnung für die Geräte-PIN.
+
+## PIN [#pin]
+
+Ein Code zum Schutz des Zugriffs auf ein Hardwaregerät. Er unterscheidet sich von Wiederherstellungsphrase und Passphrase. Folgen Sie dem gerätespezifischen PIN-Ablauf des SDKs.
+
+## Provider [#provider]
+
+Eine JavaScript-Schnittstelle, über die eine dApp Konten, Blockchain-Informationen oder Signiervorgänge von einer Wallet anfordert. Ethereum-Provider folgen üblicherweise EIP-1193. Andere Chains verwenden andere Provider-Schnittstellen.
+
+## Transport [#transport]
+
+Die Verbindung zum Datenaustausch mit einem Gerät, etwa USB oder Bluetooth. Ein funktionierender Transport gewährt allein weder Kontozugriff noch eine Signierberechtigung.
+
+## Signatur und Übertragung [#signature-and-broadcast]
+
+Signieren autorisiert eine Nachricht oder Transaktion mit einem Schlüssel. Übertragen sendet eine signierte Transaktion an ein Netzwerk. Dies sind getrennte Vorgänge; prüfen Sie, ob die jeweilige API nur signiert oder auch überträgt.
+
+## Air-Gap [#air-gap]
+
+Ein Kommunikationsablauf ohne direkte Kabel- oder Funkverbindung zwischen Signiergerät und Anwendung. Bei der QR-Integration werden Anfragen und Antworten als QR-Daten ausgetauscht. Zum Übertragen von Transaktionen benötigt die Anwendung weiterhin eine Netzwerkverbindung.
+
+## Keystore [#keystore]
+
+Eine verschlüsselte Darstellung von Schlüsselmaterial und den zu seiner Entschlüsselung benötigten Parametern. Der Schutz eines Keystores hängt von seinen Verschlüsselungseinstellungen und seinem Passwort ab; verschlüsselte Daten haben keine allgemein feste Länge.
+
+## Hexadezimal [#hexadecimal]
+
+Notation zur Basis 16 mit den Ziffern `0–9` und Buchstaben `a–f`. APIs können ein `0x`-Präfix verlangen, es weglassen oder stattdessen Bytes akzeptieren. Beachten Sie die dokumentierte Kodierung jedes Parameters.
+
+## Referenzen [#references]
+
+- [Ethereum-Konten](https://ethereum.org/en/developers/docs/accounts/)
+- [EIP-1193-Provider-Standard](https://eips.ethereum.org/EIPS/eip-1193)
+- [BIP-32-Hierarchische-Wallets](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
+- [BIP-39-Mnemonik-Codes](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+
+Das frühere Glossar wurde adaptiert von [MyCrypto](https://support.mycrypto.com/getting-started/ethereum-glossary.html).

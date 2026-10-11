@@ -1,0 +1,169 @@
+---
+description: "Confirmez une adresse Solana et signez des messages sérialisés avec un chemin de dérivation renforcé et une association explicite au portefeuille."
+title: "Signature Solana"
+---
+
+<span id="solana-signer" />
+
+# Signature Solana
+
+Guide de signature matérielle Solana. Couvre la confirmation d’adresse et la signature de messages/transactions avec un chemin renforcé pris en charge et des données sérialisées `rawTx`. Aligné sur hardware-js-sdk (réponses Promise + événements d’interface).
+
+## Sommaire [#index]
+
+1. [Fonctionnement](#how-it-works)
+2. [Installation](#installation)
+3. [Initialisation](#initialization)
+4. [Scénarios courants](#common-scenarios)
+   - [Obtenir une adresse](#scenario-1-get-address)
+   - [Signer une transaction](#scenario-2-sign-transaction)
+5. [Interaction et état](#interaction--status)
+6. [Exemple](#example)
+7. [Validation et dépannage](#validation--troubleshooting)
+
+## Fonctionnement [#how-it-works]
+
+Le signataire Solana OneKey utilise `HardwareSDK` pour communiquer avec l’appareil. Vous transmettez les octets d’un message Solana encodés en hexadécimal dans `rawTx` ; l’appareil affiche la source/destination, le montant et le récapitulatif des frais, puis renvoie une signature. L’hôte associe la signature avec `@solana/web3.js` et la vérifie avec la clé publique décodée depuis la valeur base58 `address` renvoyée par `solGetAddress`.
+
+- Utilisez un chemin renforcé pris en charge par le micrologiciel, par exemple : `m/44'/501'/account'/0'`.
+- Assurez-vous que le message/la transaction contient un blockhash récent à jour.
+
+## Installation [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## Initialisation [#initialization]
+
+Les exemples utilisent le **portefeuille standard** de façon cohérente. Pour un portefeuille caché, remplacez `useEmptyPassphrase: true` par la valeur vérifiée de `passphraseState` sur chaque appel d’adresse et de signature. Enregistrez les [gestionnaires d’interface](/fr/hardware-sdk/core-api-guide#events-ui) avant les appels protégés, et vérifiez `success` avant d’utiliser toute donnée renvoyée. Les exemples contenant des entrées de transaction déclarées sont des fragments de préparation, pas des applications autonomes exécutables.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+## Scénarios courants [#common-scenarios]
+
+### Scénario 1 : obtenir une adresse [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/501'/0'/0'",
+  showOnOneKey: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
+```
+
+**Paramètres**
+
+- `path` : obligatoire ; un chemin recommandé est `44'/501'/account'/0'`.
+- `showOnOneKey?` : facultatif ; afficher et confirmer sur l’appareil.
+
+**Valeur de retour**
+
+```ts
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+---
+
+### Scénario 2 : signer une transaction [#scenario-2-sign-transaction]
+
+```ts
+const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  rawTx,
+  useEmptyPassphrase: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature is hex; res.payload.path is the serialized path.
+```
+
+**Paramètres**
+
+- `path` : obligatoire ; la longueur minimale du SDK est 3, sous réserve de la politique de chemins du micrologiciel.
+- `rawTx` : obligatoire ; octets de message sérialisé encodés en hexadécimal, sans l’enveloppe de signatures de transaction. Ce champ est requis à l’exécution.
+- `useEmptyPassphrase?` : facultatif ; forcer le portefeuille standard. Portefeuille caché : transmettre `passphraseState`.
+
+**Valeur de retour**
+
+```ts
+type SignResult =
+  | { success: true; payload: { signature: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+## Interaction et état [#interaction--status]
+
+- Les API se résolvent à la fin ; les demandes utilisateur arrivent via `UI_REQUEST` (déverrouiller l’appareil, confirmer la transaction).
+- Exécutez les appels en série par appareil. Réutilisez `passphraseState` ou `useEmptyPassphrase: true`. `keepSession` maintient toujours le transport ; ce n’est pas une association de portefeuille.
+
+## Exemple [#example]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const path = "m/44'/501'/0'/0'";
+const confirmedAddress = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
+
+// Obtain these bytes from Transaction.serializeMessage() or
+// VersionedTransaction.message.serialize(), with a fresh recent blockhash.
+declare const messageBytes: Uint8Array;
+const rawTx = Array.from(messageBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+
+const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path,
+  rawTx,
+  useEmptyPassphrase: true,
+});
+
+if (!success) throw new Error(payload.error);
+// Attach the signature and verify it against the confirmed address before broadcasting.
+```
+
+## Validation et dépannage [#validation--troubleshooting]
+
+- Chemin : le SDK vérifie un minimum de 3 composants ; le micrologiciel impose les chemins de dérivation pris en charge. Les exemples utilisent `m/44'/501'/account'/0'`.
+- Message/transaction : incluez une valeur récente de `recentBlockhash`, les bons comptes et le bon ordre d’instructions.
+- Vérification sur l’appareil : chemin/compte, destination, montant et récapitulatif des frais doivent correspondre à votre interface.
+- Vérification sur l’hôte : associer la signature avec `@solana/web3.js`, confirmer que le signataire correspond au résultat de `solGetAddress`.
+- Messages trop volumineux ou instructions non prises en charge : signalez l’erreur et arrêtez la demande actuelle. Diviser ou ajuster une transaction nécessite de la reconstruire et d’obtenir une nouvelle vérification de l’utilisateur. Sérialisez les appels par appareil ; proposez de réessayer ou d’annuler en cas de refus ou de délai dépassé, sans rejeu automatique.
+
+Voir la documentation de la méthode : [solSignTransaction](/fr/hardware-sdk/chains/solana/solsigntransaction).

@@ -1,0 +1,55 @@
+---
+title: "btcSignMessage"
+---
+
+# btcSignMessage
+
+## Bitcoin: メッセージに署名 [#bitcoin-sign-message]
+
+指定パスから導出した鍵でメッセージの署名を要求します。
+
+```typescript
+const result = await HardwareSDK.btcSignMessage(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` 最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _必須_ `string` 16 進数のメッセージ
+* `coin` - _任意_ `string` coins.json ファイルで指定されたネットワーク定義を決定します。コインの `shortcut`, `name` または `label` を使用できます。`coin` が設定されていない場合、API は `path` からネットワーク定義の取得を試みます。
+* `noScriptType`- _任意 `boolean`_ スクリプトタイプを含まない署名用。
+
+### 例 [#example]
+
+```typescript
+HardwareSDK.btcSignMessage(connectId, deviceId, {
+    path: "m/44'/0'/0'",
+    messageHex: "6578616d706c65206d657373616765"
+});
+```
+
+### 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,   // signer address
+        signature: string, // signature in base64 format
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

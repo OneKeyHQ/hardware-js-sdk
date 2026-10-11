@@ -1,0 +1,70 @@
+---
+title: "lnurl"
+---
+
+# lnurl
+
+Solicita ejecutar una solicitud [LNURL](https://github.com/lnurl/luds). La aplicación debe pasar una cadena [LNURL](https://github.com/lnurl/luds/blob/luds/01.md) proporcionada, por ejemplo, por su backend. La función lnurl también puede aceptar un identificador estático [LUD-16](https://github.com/lnurl/luds/blob/luds/16.md) (p. ej., user@example.com) en lugar de una cadena LNURL.
+
+El método devuelve una promesa que se resuelve al completar el flujo LNURL. Devuelve la última respuesta del servidor LNURL. Para solicitudes LNURL-pay, también contiene información del pago (preimagen, hash del pago); para solicitudes LNURL-auth, contiene información de autenticación (mensaje, firma)
+
+## Método [#method]
+
+```typescript
+declare function lnurl(lnurl: string): Promise<LNURLResponse>;;
+```
+
+## Respuesta [#response]
+
+```typescript
+type LNURLResponse =
+  | {
+      status: "OK";
+      data?: unknown
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Respuesta LNURL-pay [#lnurl-pay-response]
+
+```typescript
+type LNURLPayResponse =
+  | {
+      status: "OK";
+      data: {
+        preimage: string,
+        paymentHash: string,
+        paymentRequest: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Respuesta LNURL-auth [#lnurl-auth-response]
+
+```typescript
+type LNURLAuthResponse =
+  | {
+      status: "OK";
+      data: {
+        message: string,
+        signature: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Ejemplo [#example]
+
+```typescript
+const lnurl = "<LNURL_OR_LIGHTNING_ADDRESS>";
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+if (!provider || typeof provider.lnurl !== "function") {
+  throw new Error("LNURL is not supported by this provider.");
+}
+
+await provider.enable();
+const result = await provider.lnurl(lnurl); // promise resolves once the LNURL process is finished (e.g. a payment is sent or the login is complete)
+```
+
+Comprueba `result.status`: una respuesta `ERROR` contiene un `reason`. Captura también las promesas rechazadas, incluidos los fallos de conexión o de aprobación del usuario. El campo opcional `data` depende del flujo LNURL; no supongas una estructura fija sin comprobarla.

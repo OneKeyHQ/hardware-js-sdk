@@ -1,0 +1,97 @@
+---
+title: "cosmosGetPublicKey"
+---
+
+# cosmosGetPublicKey
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.0.0
+  * Classic/Mini : 2.10.0
+
+## Cosmos : obtenir une clé publique [#cosmos-get-public-key]
+
+Renvoie la clé publique dérivée du chemin spécifié. Utilisez `showOnOneKey` pour demander confirmation sur l’appareil.
+
+```typescript
+const result = await HardwareSDK.cosmosGetPublicKey(connectId, deviceId, params);
+```
+
+## Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+### Clé publique unique [#single-public-key]
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`.
+* `curve` - _facultatif_ `string` algorithme de courbe elliptique, la valeur par défaut est `secp256k1`
+* `showOnOneKey` - _facultatif_ `boolean` Indique s’il faut afficher la clé publique sur l’appareil. Valeur par défaut : `true`.
+
+#### Plusieurs clés publiques [#multiple-public-keys]
+
+* `bundle` - tableau d’objets contenant les champs `path`, `showOnOneKey`, `curve`
+
+### Exemple [#example]
+
+Renvoyer la clé publique du premier compte Cosmos :
+
+```typescript
+HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
+    path: "m/44'/118'/0'/0/0",
+    curve: 'secp256k1',
+    showOnOneKey: true
+});
+```
+
+Renvoyer un lot de clés publiques de plusieurs comptes cosmos :
+
+```typescript
+HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/118'/0'/0/0" }, // account 1
+        { path: "m/44'/118'/1'/0/0" }, // account 2
+        { path: "m/44'/118'/2'/0/0" }, // account 3
+    ]
+});
+```
+
+### Résultat [#result]
+
+Réponse pour une seule clé publique
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        pub: string
+    }
+}
+```
+
+
+Réponse de clés publiques par lot
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path: serializedPath, pub }, // account 1
+        { path: serializedPath, pub }, // account 2
+        { path: serializedPath, pub }, // account 3
+    ]
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

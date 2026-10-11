@@ -1,0 +1,97 @@
+---
+title: "dnxGetAddress"
+---
+
+# dnxGetAddress
+
+### Dynex: Adresse abrufen [#dynex-get-address]
+
+Leitet die Adresse am angegebenen Pfad ab und gibt sie zurück. Wenn `showOnOneKey` gleich `true` ist, muss der Nutzer die Adresse auf dem Gerät bestätigen.
+
+```typescript
+const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
+```
+
+#### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * classic: 3.8.0
+
+#### Parameter [#parameters]
+
+connectId: `string`
+
+* Eindeutige Kennung der Verbindung
+
+deviceId: `string`
+
+* Eindeutige Kennung des Hardwaregeräts
+
+params: `object`
+
+* path: `string` - BIP32-Pfad (z. B. "m/44'/29538'/0'/0/0") \[erforderlich\]
+* showOnOneKey: `boolean` - Ob die Adresse auf dem Gerät angezeigt werden soll (Standard: true)
+
+Für Adress-Batches:
+
+* bundle: Array von Objekten mit den obigen Parametern
+
+#### Beispiel [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    path: "m/44'/29538'/0'/0/0",
+    showOnOneKey: true
+});
+
+// Get multiple addresses
+const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    bundle: [
+        { path: "m/44'/29538'/0'/0/0", showOnOneKey: false },
+        { path: "m/44'/29538'/0'/0/1", showOnOneKey: false }
+    ]
+});
+```
+
+#### Rückgabe [#returns]
+
+Erfolgsantwort für eine einzelne Adresse:
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Dynex address
+        path: string        // BIP32 path used
+    }
+}
+```
+
+Erfolgsantwort für mehrere Adressen:
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string },
+        { address: string, path: string }
+    ]
+}
+```
+
+Fehlerantwort:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code?: string | number
+    }
+}
+```
+
+#### Firmware-Anforderungen [#firmware-requirements]
+
+* Mindest-Firmware-Version: 3.8.0

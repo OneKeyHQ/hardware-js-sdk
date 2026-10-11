@@ -1,0 +1,60 @@
+---
+title: "Near Web Wallet からの移行"
+---
+
+<span id="migrate-from-near-web-wallet" />
+
+# Near Web Wallet からの移行
+
+新しいアプリケーションでは、この統合ガイドのプロバイダーメソッドを使用してください。以下の互換メソッドは、既存の NEAR Web Wallet 統合からの移行に役立ちます。次で説明する従来の near-api-js API を使用します: [Provider SDK をインストール](/ja/connect-to-software/provider/near/integrating/install-the-provider-sdk).
+
+```javascript
+import * as nearAPI from "near-api-js";
+import { OneKeyNearProvider } from "@onekeyfe/onekey-near-provider";
+
+const config = {
+  networkId: 'mainnet',
+  nodeUrl: 'https://rpc.mainnet.near.org',
+  // networkId: 'testnet',
+  // nodeUrl: 'https://rpc.testnet.near.org',
+  headers: {},
+  keyStore: new nearAPI.keyStores.BrowserLocalStorageKeyStore(),
+}
+const near = new nearAPI.Near(config);
+const connection = near.connection;
+
+const provider = new OneKeyNearProvider({
+  connection,
+  networkId: 'mainnet', // `mainnet` or `testnet`
+  // reloading page after signIn or signTransaction that likes web wallet callback url working
+  enablePageReload: true,
+});
+
+provider.requestSignIn({
+  successUrl,
+  failureUrl,
+  // contractId: optionalContractId,
+});
+
+provider.getAccountId();
+
+provider.isSignedIn();
+
+provider.signOut();
+
+provider.requestSignTransactions({
+  transactions: [],
+  callbackUrl,
+  // meta: optionalMetadata,
+});
+
+provider.account().signAndSendTransaction({
+  receiverId,
+  actions: [],
+  walletCallbackUrl,
+  // walletMeta: optionalMetadata,
+});
+
+```
+
+> 従来の互換メソッドのテスト範囲は限られています。統合ガイドのプロバイダーメソッドを優先し、移行時には既存のコールバックやリダイレクトの動作を検証してください。

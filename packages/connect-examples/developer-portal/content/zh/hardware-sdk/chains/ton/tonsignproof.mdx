@@ -6,7 +6,7 @@ title: tonSignProof
 
 ### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.10.0
 
 ### TON：签名证明
@@ -27,9 +27,9 @@ const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
 
 #### 参数
 
-[**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
+[可选通用参数](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 3
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。
 * `appdomain` - _必需_ `string` 请求证明的 dApp 域名
 * `comment` - _可选_ `string` 十六进制格式的消息备注
 * `expireAt` - _必需_ `number` Unix 秒单位的签名时间戳；虽然字段名为 expireAt，固件实际将其放入 TON proof 的 timestamp 字段
@@ -76,8 +76,8 @@ const response = await HardwareSDK.tonSignProof(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

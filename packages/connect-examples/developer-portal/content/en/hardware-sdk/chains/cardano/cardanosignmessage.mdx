@@ -4,15 +4,16 @@ title: cardanoSignMessage
 
 # cardanoSignMessage
 
-## Use requirement
+## Requirements
 
-* Firmware version required
-  * Touch: 4.1.0
-  * Classic/Mini: 3.0.0
+* SDK minimum firmware versions
+  * Touch / Pro (`model_touch`): 4.10.0
+
+This method does not declare a minimum firmware version for Classic/Mini. The absence of an SDK version guard does not establish firmware support.
 
 ## Cardano: sign message <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
 
-Asks device to sign a message using the private key derived by given BIP32 path.
+Requests a message signature using the key derived from the specified path.
 
 ```typescript
 const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params);
@@ -22,10 +23,10 @@ const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params)
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. read more
-* `message` - _required_ `string` message to sign in hex text
+* `path` - _required_ `string` BIP32 path with at least `3` components. This method does not accept a number array. [Path format](/en/hardware-sdk/concepts/common-params#hd-path)
+* `message` - _required_ `string` Message to sign, encoded as a hexadecimal string.
 * `networkId` - _required_ `Integer` 1 for Mainnet, 0 for Testnet
-* `derivationType` - _required_ `CardanoDerivationType` enum. determines used derivation type. Default is set to ICARUS=1
+* `derivationType` - _required_ `CardanoDerivationType` enum. Selects the derivation algorithm. The runtime defaults to `ICARUS` (`1`).
 
 The current TypeScript API requires `derivationType` explicitly even though the runtime defaults to ICARUS.
 

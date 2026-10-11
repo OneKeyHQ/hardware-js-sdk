@@ -248,6 +248,9 @@ export class Device extends EventEmitter {
   /** Canonical device-state cache; legacy Features is a compatibility projection. */
   private stateStore = new DeviceStateStore();
 
+  /** Retain the old public identity only for disconnect notifications after wipe. */
+  private deviceBeforeWipe: DeviceTyped | null = null;
+
   /** Force the next initialization to reload DeviceInfo after reconnect or reboot. */
   private protocolV2StateNeedsReload = false;
 
@@ -351,6 +354,8 @@ export class Device extends EventEmitter {
   toMessageObject(): DeviceTyped | null {
     if (this.isUnacquired() || !this.features) return null;
 
+    this.deviceBeforeWipe = null;
+
     const env = DataManager.getSettings('env');
     const deviceType = this.getCurrentDeviceType();
 
@@ -393,6 +398,10 @@ export class Device extends EventEmitter {
       bleFirmwareVersion: this.getBLEFirmwareVersion(),
       unavailableCapabilities: this.unavailableCapabilities,
     };
+  }
+
+  toDisconnectMessageObject(): DeviceTyped | null {
+    return this.toMessageObject() ?? this.deviceBeforeWipe;
   }
 
   /**
@@ -1364,6 +1373,7 @@ export class Device extends EventEmitter {
   }
 
   invalidateAfterWipe() {
+    this.deviceBeforeWipe = this.toMessageObject() ?? this.deviceBeforeWipe;
     const deviceId = this.getCurrentDeviceId();
     if (deviceId) {
       deviceWalletSessionStore.deleteDevice(deviceId);
