@@ -1,0 +1,102 @@
+---
+description: "OneKey Bridge durch WebUSB ersetzen und dabei eine Iframe-basierte Hardware-Web-SDK-Integration beibehalten."
+title: "Zu web-sdk + WebUSB migrieren"
+---
+
+<span id="migrate-to-web-sdk--webusb" />
+
+# Zu web-sdk + WebUSB migrieren
+
+Bridge durch WebUSB ersetzen und dabei `@onekeyfe/hd-web-sdk` als SDK-Einstieg beibehalten.
+
+---
+
+## Voraussetzungen [#requirements]
+
+- Chromium-Browser (Chrome/Edge auf dem Desktop)
+- Node.js 18+ (LTS empfohlen)
+
+---
+
+## Änderungen auf einen Blick [#what-changed-at-a-glance]
+
+- SDK initialisieren mit `env: 'webusb'`
+  - (Bridge (env: `web`) → WebUSB (env: `webusb`).)
+- Lassen Sie vorzugsweise `connectSrc` weg, damit `@onekeyfe/hd-web-sdk` Folgendes ausfüllt: `https://jssdk.onekey.so/<installed-version>/`. Überschreiben Sie dies nur, wenn Sie den Iframe selbst hosten.
+- Nutzerautorisierung anfordern über `navigator.usb.requestDevice()` mit offiziellen OneKey-Filtern — muss wegen Chrome-Sicherheitsbeschränkungen durch eine Nutzeraktion (z. B. Schaltflächenklick) ausgelöst werden; eine neue Autorisierung erfordert eine Nutzeraktion; bereits autorisierte Geräte können ohne erneute Auswahl aufgelistet werden
+- Bridge-spezifische Prüfungen sind veraltet (z. B. `checkBridgeStatus()`)
+- Alle übrige SDK-Nutzung bleibt gleich
+
+---
+
+## Initialisieren (hd-web-sdk + WebUSB) [#initialize-hd-web-sdk--webusb]
+
+```ts
+import HdWebSdk from '@onekeyfe/hd-web-sdk';
+
+// Same pattern as expo-example: default export → .HardwareWebSdk
+const HardwareSDK = HdWebSdk.HardwareWebSdk;
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-hd-web-sdk-version>/
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+---
+
+## Autorisierung (WebUSB-Auswahl + offizieller Filter) [#authorization-webusb-picker--official-filter]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Important: must be triggered by a user gesture (e.g., button click)
+// Previously authorized devices can be enumerated without opening the chooser again.
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## Geräte auflisten und erster Aufruf [#enumerate-devices-and-first-call]
+
+```ts
+// 1) Enumerate
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = list.payload[0] ?? {};
+if (!connectId) throw new Error("No device connection");
+
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
+
+// 3) Example: BTC address
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (r.success) {
+  console.log('BTC address:', r.payload.address);
+} else {
+  console.error('Error:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## Bereinigung und Checkliste [#cleanup-and-checklist]
+
+- Bridge-spezifische Prüfungen/Aktionsaufforderungen entfernen (z. B. `checkBridgeStatus()`)
+- Weglassen: `connectSrc`, sofern Sie den Iframe nicht hosten; es muss zur installierten `@onekeyfe/hd-web-sdk`-Version passen
+- Verfügbarkeit prüfen: `navigator.usb` und bei fehlender Unterstützung einen verständlichen Hinweis anzeigen
+- Alle übrigen SDK-Methoden und UI-Abläufe bleiben unverändert

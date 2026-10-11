@@ -1,0 +1,181 @@
+---
+title: "Transaktionen"
+description: "Transaktionen auf Algorand mit OneKey senden"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# Transaktionen
+
+Verbinden Sie den Provider vor dem Signieren. Die Transaktionsbeispiele verwenden Felder im Stil von algosdk 2: `from`/`to`; beachten Sie die installierte SDK-Hauptversion. `algodClient`, Adressen und gruppierte Transaktionen müssen vor der Ausführung der Ausschnitte vorbereitet werden. Browserbeispiele mit `Buffer` benötigen einen ausdrücklichen Import von `buffer` oder einen gleichwertigen Base64-Encoder.
+
+Erfahren Sie, wie Sie Transaktionen auf Algorand signieren und senden.
+
+---
+
+## Transaktionen signieren (ARC-0001) [#sign-transactions-arc-0001]
+
+Eine oder mehrere Transaktionen signieren:
+
+```typescript
+import algosdk from 'algosdk'
+
+// Create transaction
+const suggestedParams = await algodClient.getTransactionParams().do()
+
+const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+  from: senderAddress,
+  to: recipientAddress,
+  amount: 1000000, // 1 ALGO (microAlgos)
+  suggestedParams,
+})
+
+// Prepare for signing
+const walletTxns = [{
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}]
+
+// Sign
+const signedTxns = await provider.signTxns(walletTxns)
+
+console.log('Signed transactions:', signedTxns)
+```
+
+---
+
+## Mehrere Transaktionen signieren [#sign-multiple-transactions]
+
+```typescript
+// Group transactions
+const txns = [txn1, txn2, txn3]
+algosdk.assignGroupID(txns)
+
+// Prepare for signing
+const walletTxns = txns.map(txn => ({
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}))
+
+// Sign all
+const signedTxns = await provider.signTxns(walletTxns)
+```
+
+---
+
+## Teilweise signieren (Multi-Sig) [#partial-signing-multi-sig]
+
+```typescript
+// Only sign specific transactions in a group
+const walletTxns = [
+  { txn: encodedTxn1 },
+  { txn: encodedTxn2, signers: [] }, // Skip this one
+  { txn: encodedTxn3 },
+]
+
+const signedTxns = await provider.signTxns(walletTxns)
+// signedTxns[1] will be null
+```
+
+---
+
+## Transaktionen übertragen [#post-transactions]
+
+Signierte Transaktionen übertragen:
+
+```typescript
+const completeTxns = signedTxns.filter((txn) => txn !== null)
+if (completeTxns.length !== signedTxns.length) {
+  throw new Error('Complete all required signatures before broadcasting the group')
+}
+const result = await provider.postTxns(completeTxns)
+console.log('Transaction IDs:', result.txnIDs)
+```
+
+---
+
+## Signieren und übertragen [#sign-and-post]
+
+In einem Schritt signieren und übertragen:
+
+```typescript
+const result = await provider.signAndPostTxns(walletTxns)
+console.log('Transaction IDs:', result.txnIDs)
+```
+
+---
+
+## Legacy-Transaktions-API [#legacy-transaction-api]
+
+### Transaktion signieren (Legacy) [#sign-transaction-legacy]
+
+```typescript
+// Create transaction as Uint8Array
+const txnBytes = algosdk.encodeUnsignedTransaction(txn)
+
+// Sign
+const signedTxnBytes = await provider.signTransaction([txnBytes])
+
+// Send
+const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
+```
+
+### Signieren und senden (Legacy) [#sign-and-send-legacy]
+
+```typescript
+const result = await provider.signAndSendTransaction([txnBytes])
+console.log('Transaction ID:', result.txId)
+```
+
+---
+
+## Vollständiges Beispiel [#complete-example]
+
+```typescript
+import algosdk from 'algosdk'
+
+async function sendAlgo() {
+  // Connect
+  const provider = window.$onekey?.algo
+  if (!provider) throw new Error("OneKey Algorand provider is unavailable")
+  const { address } = await provider.connect()
+
+  // Setup client
+  const algodClient = new algosdk.Algodv2(
+    '',
+    'https://mainnet-api.algonode.cloud',
+    ''
+  )
+
+  // Get params
+  const suggestedParams = await algodClient.getTransactionParams().do()
+
+  // Create transaction
+  const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: address,
+    to: 'RECIPIENT_ADDRESS',
+    amount: 1000000, // 1 ALGO
+    suggestedParams,
+  })
+
+  // Sign
+  const walletTxns = [{
+    txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+  }]
+
+  const signedTxns = await provider.signTxns(walletTxns)
+
+  if (!signedTxns[0]) throw new Error("The transaction was not signed")
+
+  // Send
+  const { txId } = await algodClient.sendRawTransaction(
+    Buffer.from(signedTxns[0], 'base64')
+  ).do()
+
+  console.log('Transaction ID:', txId)
+
+  // Wait for confirmation
+  await algosdk.waitForConfirmation(algodClient, txId, 4)
+  console.log('Confirmed!')
+}
+```

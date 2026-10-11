@@ -1,0 +1,13 @@
+---
+title: "Événement"
+---
+
+<span id="webln-events" />
+
+# Événements WebLN
+
+Ne vous fiez pas aux événements de compte ou de réseau pour déterminer si une requête WebLN a réussi. Attendez chaque appel de méthode et gérez son résultat ou son rejet.
+
+Les types du fournisseur déclarent `accountChanged` (au singulier) et `disconnect`, mais l’implémentation WebLN actuelle n’établit pas d’abonnement aux changements de compte. Les intégrations ne doivent pas dépendre de ces notifications sans vérifier leur comportement dans la version cible du portefeuille.
+
+Pour le processus de connexion requis, consultez [Premiers pas](/fr/connect-to-software/provider/webln/guide).

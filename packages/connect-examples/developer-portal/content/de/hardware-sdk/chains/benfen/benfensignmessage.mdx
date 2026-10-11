@@ -1,0 +1,71 @@
+---
+title: "benfenSignMessage"
+---
+
+# benfenSignMessage
+
+**Voraussetzungen**
+
+* Mindest-Firmware-Versionen
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
+
+### Benfen: Nachricht signieren [#benfen-sign-message]
+
+Eine Nachricht mit dem privaten Schlüssel signieren, der aus dem angegebenen BIP32-Pfad abgeleitet wird. Der Nutzer muss die Aktion auf dem OneKey-Gerät bestätigen.
+
+```typescript
+const result = await HardwareSDK.benfenSignMessage(connectId, deviceId,{
+  path: "m/44'/728'/0'/0'/0'",
+  messageHex: "68656c6c6f" // "hello" in hex
+});
+```
+
+#### Parameter [#params]
+
+**Optionale gemeinsame Parameter**
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _erforderlich_ `string` Zu signierende Nachricht im Hexformat
+
+#### Rückgabe [#returns]
+
+* `success` - _boolean_ True bei Erfolg
+* `payload`
+  * `signature` - _string_ Signatur im Hexformat
+  * `address` - _string_ Zum Signieren verwendete Adresse im BFC-Format
+
+Beispiel:
+
+```typescript
+const params = {
+  path: "m/44'/728'/0'/0'/0'",
+  messageHex: "68656c6c6f" // "hello" in hex
+};
+
+const response = await HardwareSDK.benfenSignMessage(connectId, deviceId, params);
+```
+
+Ergebnis
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+    address: string,
+  }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

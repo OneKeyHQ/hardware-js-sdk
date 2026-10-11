@@ -1,0 +1,37 @@
+---
+title: "Token vorschlagen"
+description: "Verwenden Sie `wallet_watchAsset`, um die Wallet zu bitten, einen Token zu verfolgen. Der Nutzer entscheidet, ob er ihn hinzufügt. Dies überträgt keine Tokens und belegt nicht die Vertrauenswürdigkeit eines Tokens."
+---
+
+<span id="suggest-a-token" />
+
+# Token vorschlagen
+
+Verwenden Sie `wallet_watchAsset`, um die Wallet zu bitten, einen Token zu verfolgen. Der Nutzer entscheidet, ob er ihn hinzufügt. Dies überträgt keine Tokens und belegt nicht die Vertrauenswürdigkeit eines Tokens.
+
+Bestätigen Sie das ausgewählte Netzwerk und prüfen Sie Vertragsadresse, Symbol und Dezimalstellen. Rufen Sie die Methode über eine Nutzeraktion auf.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const wasAdded = await provider.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address: '<TOKEN_CONTRACT_ADDRESS>',
+        symbol: 'TOKEN',
+        decimals: 18, // Replace with the token's actual decimals.
+        image: 'https://example.com/token.png',
+      },
+    },
+  });
+  console.log(wasAdded ? 'Token added.' : 'Token was not added.');
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Ersetzen Sie sämtliche Beispielmetadaten. Behandeln Sie nicht unterstützte Methoden und Nutzerablehnungen in Ihrer Oberfläche. Siehe die [Methodenreferenz](/de/connect-to-software/provider/eth/reference/wallet_watchAsset).

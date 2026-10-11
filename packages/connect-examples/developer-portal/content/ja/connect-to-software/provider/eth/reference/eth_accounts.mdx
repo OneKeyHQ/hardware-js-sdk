@@ -1,0 +1,54 @@
+---
+title: "eth_accounts"
+description: "接続済みの Ethereum アカウントを取得"
+---
+
+# eth_accounts
+
+呼び出し元にアクセスが許可された、ウォレットが公開するアドレスの一覧を返します。`eth_requestAccounts` とは異なり、このメソッドは接続ポップアップを表示しません。
+
+---
+
+## パラメーター [#parameters]
+
+なし
+
+---
+
+## 戻り値 [#returns]
+
+`string[]` - Ethereum アドレスの配列。サイトに公開されたアカウントがない場合は空の配列。
+
+---
+
+## 例 [#example]
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_accounts'
+})
+
+if (accounts.length > 0) {
+  console.log('Connected:', accounts[0])
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## 注意事項 [#notes]
+
+- ユーザーが接続していない場合は空の配列 `[]` を返します
+- `eth_requestAccounts` で接続を開始
+- `accountsChanged` イベントを監視してアカウント変更を検出します
+
+```typescript
+window.$onekey.ethereum.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('Disconnected')
+  } else {
+    console.log('Account changed:', accounts[0])
+  }
+})
+```

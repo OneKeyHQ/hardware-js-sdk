@@ -1,0 +1,83 @@
+---
+title: "Referencia de la API"
+description: "Referencia completa de la API del proveedor de TRON de OneKey"
+---
+
+<span id="api-reference" />
+
+# Referencia de la API
+
+Referencia de los métodos y tipos del proveedor de TRON de OneKey.
+
+---
+
+## Métodos del proveedor [#provider-methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `request({ method, params })` | Solicitud JSON-RPC genérica |
+| `sign(transaction)` | Firmar una transacción |
+| `signMessage(hexMessage)` | Firmar un mensaje hexadecimal (V1) |
+| `signMessageV2(message)` | Firmar un mensaje UTF-8 (V2) |
+| `getNodeInfo(callback)` | Obtener información del nodo |
+
+---
+
+## Métodos de solicitud [#request-methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `tron_requestAccounts` | Solicitar conexión |
+| `tron_getProviderState` | Obtener el estado del proveedor |
+| `tron_signTransaction` | Firmar una transacción |
+| `signMessageV1` | Firmar un mensaje V1 |
+| `signMessageV2` | Firmar un mensaje V2 |
+
+---
+
+## Códigos de respuesta [#response-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 200 | Éxito |
+| 4000 | Rechazado por el usuario |
+| 4001 | Solicitud en cola |
+
+---
+
+## Eventos [#events]
+
+| Evento | Descripción |
+|-------|-------------|
+| `accountsChanged` | Cuenta cambiada |
+| `chainChanged` | Red cambiada |
+| `connect` | Conectado |
+| `disconnect` | Desconectado |
+
+---
+
+## Métodos de TronWeb [#tronweb-methods]
+
+Después de conectar, usa `window.tronWeb`:
+
+| Método | Descripción |
+|--------|-------------|
+| `tronWeb.trx.getBalance(address)` | Obtener el saldo TRX |
+| `tronWeb.trx.sendTransaction(to, amount)` | Enviar TRX |
+| `tronWeb.trx.sendRawTransaction(signedTx)` | Difundir una transacción firmada |
+| `tronWeb.trx.verifyMessageV2(msg, sig)` | Verificar la firma |
+| `tronWeb.contract().at(address)` | Obtener una instancia del contrato |
+| `tronWeb.toSun(trx)` | Convertir TRX a Sun |
+| `tronWeb.fromSun(sun)` | Convertir Sun a TRX |
+| `tronWeb.toHex(string)` | Convertir a hexadecimal |
+
+---
+
+## Propiedades [#properties]
+
+| Propiedad | Tipo | Descripción |
+|----------|------|-------------|
+| `isTronLink` | `boolean` | Compatible con TronLink |
+| `isOneKey` | `boolean` | Identificador de OneKey |
+| `tronWeb.ready` | `boolean` | Estado de disponibilidad de TronWeb |
+| `tronWeb.defaultAddress.base58` | `string` | Dirección actual |

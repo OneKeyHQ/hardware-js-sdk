@@ -1,0 +1,159 @@
+---
+title: "Verbindung herstellen"
+---
+
+<span id="establishing-a-connection" />
+
+# Verbindung herstellen
+
+Sobald eine Anwendung den [Provider erkannt hat](/de/connect-to-software/provider/solana/detecting-the-provider), kann sie eine Verbindung zu OneKey anfordern. Diese Anfrage bittet den Nutzer um Erlaubnis, seinen öffentlichen Schlüssel zu teilen, und signalisiert seine Bereitschaft zu weiteren Interaktionen. Nutzer müssen eine Verbindungsanfrage genehmigen, bevor die App weitere Anfragen stellen kann, etwa zum [Signieren einer Nachricht](/de/connect-to-software/provider/solana/signing-a-message) oder [Senden einer Transaktion](/de/connect-to-software/provider/solana/sending-a-transaction).
+
+Nachdem die Berechtigung erstmals erteilt wurde, wird die Domain der Webanwendung für künftige Verbindungsanfragen in die Positivliste aufgenommen. Nach dem Verbindungsaufbau kann die Verbindung sowohl von der Anwendung als auch vom Nutzer beendet werden.
+
+## Verbinden [#connecting]
+
+Der **empfohlene** und **einfachste** Weg zur Verbindung mit OneKey ist der Aufruf von `window.$onekey.solana.connect()`. Der Provider stellt jedoch auch eine JSON-RPC-Schnittstelle über `request` bereit.
+
+### Verbinden [#connect]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+try {
+    const resp = await provider.connect();
+    console.log(resp.publicKey.toString());
+    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo
+} catch (err) {
+    // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+### Anfrage [#request]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+try {
+    const resp = await provider.request({ method: "connect" });
+    console.log(resp.publicKey.toString());
+    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo
+} catch (err) {
+    // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+Der `connect()`-Aufruf gibt ein [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) zurück, das aufgelöst wird, wenn der Nutzer die Verbindungsanfrage annimmt, und abgelehnt wird (bei await wird ein Fehler ausgelöst), wenn der Nutzer die Anfrage ablehnt oder das Popup schließt. Behandeln Sie abgelehnte Promises und zeigen Sie deren `code` und `message` an; bei einer Nutzerablehnung wird üblicherweise der Code verwendet: `4001`.
+
+Wenn der Nutzer die Verbindungsanfrage annimmt, löst der Provider außerdem ein `connect`-Ereignis aus.
+
+```javascript
+provider.on("connect", () => console.log("connected!"));
+```
+
+Sobald die Webanwendung mit OneKey verbunden ist, kann sie den öffentlichen Schlüssel des verbundenen Kontos lesen und den Nutzer zu weiteren Transaktionen auffordern. Außerdem wird ein praktischer boolescher Wert bereitgestellt: `isConnected`.
+
+```javascript
+console.log(provider.publicKey.toString());
+console.log(provider.isConnected);
+// true
+```
+
+### Automatisches Wiederverbinden [#eagerly-connecting]
+
+Nachdem eine Webanwendung erstmals eine Verbindung zu OneKey hergestellt hat, gilt sie als vertrauenswürdig. Danach kann sie sich bei späteren Besuchen oder beim Neuladen automatisch mit OneKey verbinden, ohne erneut um Erlaubnis zu bitten. Dies wird als „Eager Connecting“ bezeichnet.
+
+Dazu sollten Anwendungen eine `onlyIfTrusted`-Option an den `connect()`-Aufruf übergeben.
+
+### Verbinden [#connect-1]
+```javascript
+provider.connect({ onlyIfTrusted: true });
+```
+
+### Anfrage [#request-1]
+```javascript
+window.$onekey.solana.request({ method: "connect", params: { onlyIfTrusted: true }});
+```
+
+Wenn dieses Flag gesetzt ist, verbindet sich OneKey nur dann automatisch und löst ein `connect`-Ereignis aus, wenn die Anwendung vertrauenswürdig ist. Andernfalls löst OneKey einen `4001`-Fehler aus und bleibt getrennt, bis der Nutzer ohne ein `onlyIfTrusted`-Flag zur Verbindung aufgefordert wird. In beiden Fällen öffnet OneKey kein Popup, sodass sich dies bequem bei jedem Laden der Seite verwenden lässt.
+
+Der folgende Effekt wird innerhalb einer React-Komponente ausgeführt, nachdem `provider` verfügbar ist.
+
+```javascript
+import { useEffect } from "react";
+
+useEffect(() => {
+    // Will either automatically connect to OneKey, or do nothing.
+    provider.connect({ onlyIfTrusted: true })
+        .then(({ publicKey }) => {
+            // Handle successful eager connection
+        })
+        .catch(() => {
+            // Handle connection failure as usual
+        })
+}, [provider]);
+```
+
+Eine Live-Demo finden Sie im Abschnitt `handleConnect` unserer Sandbox.
+
+Wenn eine Wallet die Verbindung zu einer vertrauenswürdigen App trennt und sich später erneut verbindet, verbindet OneKey weiterhin automatisch. Bei einer vertrauenswürdigen App verlangt OneKey nur dann erneut eine Genehmigung der Verbindungsanfrage, wenn der Nutzer der App in den Einstellungen für vertrauenswürdige Apps den Zugriff entzieht.
+
+## Trennen [#disconnecting]
+
+Das Trennen folgt demselben Ablauf wie das Verbinden. Die Trennung kann jedoch auch von der Wallet selbst ausgehen, statt von der Anwendung.
+
+### disconnect [#disconnect]
+```javascript
+await provider.disconnect();
+```
+
+### request [#request-2]
+```javascript
+await provider.request({ method: "disconnect" });
+```
+
+Das folgende Beispiel zeigt, wie eine React-Anwendung angemessen mit einem `disconnect`-Ereignis umgeht.
+
+```javascript
+import { useState, useEffect } from "react";
+
+// Inside a React component:
+const [pubKey, setPubKey] = useState(null);
+
+useEffect(() => {
+  const onConnect = (publicKey) => setPubKey(publicKey);
+  const onDisconnect = () => setPubKey(null);
+  provider.on("connect", onConnect);
+  provider.on("disconnect", onDisconnect);
+  return () => {
+    provider.off("connect", onConnect);
+    provider.off("disconnect", onDisconnect);
+  };
+}, [provider]);
+```
+
+## Konten wechseln [#changing-accounts]
+
+OneKey ermöglicht Nutzern die nahtlose Verwaltung mehrerer Konten (d. h. [Schlüsselpaare](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/Keypair.html)) innerhalb einer einzigen Erweiterung oder mobilen App. Immer wenn der Nutzer das Konto wechselt, löst OneKey ein `accountChanged`-Ereignis aus.
+
+Wenn ein Nutzer bei bestehender Verbindung zu einer Anwendung das Konto wechselt und das neue Konto die Anwendung bereits freigegeben hat, bleibt der Nutzer verbunden und OneKey übergibt den [PublicKey](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/PublicKey.html) des neuen Kontos:
+
+```javascript
+provider.on('accountChanged', (publicKey) => {
+    if (publicKey) {
+        // Set new public key and continue as usual
+        console.log(`Switched to account ${publicKey.toBase58()}`);
+    }
+});
+```
+
+Wenn OneKey den öffentlichen Schlüssel des neuen Kontos nicht übergibt, kann eine Anwendung entweder nichts tun oder versuchen, sich erneut zu verbinden:
+
+```javascript
+provider.on('accountChanged', (publicKey) => {
+    if (publicKey) {
+      // Set new public key and continue as usual
+      console.log(`Switched to account ${publicKey.toBase58()}`);
+    } else {
+      // Attempt to reconnect to OneKey
+      provider.connect().catch((error) => {
+        // Handle connection failure
+      });
+    }
+});
+```

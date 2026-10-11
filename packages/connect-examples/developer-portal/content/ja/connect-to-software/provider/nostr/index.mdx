@@ -1,0 +1,35 @@
+---
+title: "Nostr"
+description: "OneKey プロバイダーによる Nostr の統合 — getPublicKey、signEvent、signSchnorr など"
+slug: /dapp/chains/nostr
+---
+
+# Nostr
+
+OneKey のプロバイダーで Nostr の機能を統合します。
+
+## クイックリンク [#quick-links]
+
+- [ガイド](guide)
+- [API リファレンス](api-reference)
+- [イベント](event)
+
+## 最小構成 [#minimal-pattern]
+
+```js
+const provider = window.$onekey?.nostr
+if (!provider) throw new Error('OneKey Nostr provider not detected')
+
+const pubkey = await provider.getPublicKey()
+// Example: sign an event (fill your own event fields)
+// const signed = await provider.signEvent(event)
+```
+
+## イベント [#events]
+
+- `accountChanged` 通知については[イベント](event)を参照
+
+## 主なエラー [#common-errors]
+
+- 4001: ユーザーが拒否
+- 無効なパラメーター: NIP-07 の要件に合わせてください

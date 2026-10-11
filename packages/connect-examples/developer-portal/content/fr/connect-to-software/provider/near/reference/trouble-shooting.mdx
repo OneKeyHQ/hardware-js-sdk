@@ -1,0 +1,29 @@
+---
+title: "Dépannage"
+---
+
+<span id="troubleshooting" />
+
+# Dépannage
+
+Lors de requêtes à OneKey dans [Établissement d’une connexion](/fr/connect-to-software/provider/near/integrating/establishing-a-connection), [Envoi de transactions](/fr/connect-to-software/provider/near/integrating/sending-transactions), [Signature de messages](/fr/connect-to-software/provider/near/integrating/signing-messages), ou [Appels RPC](/fr/connect-to-software/provider/near/integrating/rpc-api-calling), OneKey peut répondre par une erreur. Voici les codes d’erreur et leur signification. Ils sont basés sur les erreurs correspondantes de [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474#error-codes) et [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors) sur Ethereum.
+
+| **Code** | **Titre**             | **Description**                                                          |
+| -------- | --------------------- | ------------------------------------------------------------------------ |
+| 4001     | Demande rejetée par l’utilisateur | L’utilisateur a rejeté la demande via OneKey.                                |
+| 4100     | Non autorisé          | La méthode et/ou le compte demandés n’ont pas été autorisés par l’utilisateur. |
+| 4500     | Délai de requête dépassé       | Le délai de la requête au fournisseur a été dépassé.                            |
+| -32603   | Erreur interne        | Une erreur s’est produite dans OneKey.                                      |
+| -32000   | Entrée non valide         | Paramètres manquants ou non valides.                                           |
+| -32601   | Méthode introuvable      | OneKey ne reconnaît pas la méthode.                                    |
+
+Ces erreurs sont généralement faciles à analyser et comportent un code et une explication. Par exemple :
+
+```javascript
+try {
+  await provider.requestSignTransactions({ transactions: [transaction] });
+} catch (err) {
+  //  {code: 4100, message: 'The requested method and/or account has not been authorized by the user.'}
+}
+
+```

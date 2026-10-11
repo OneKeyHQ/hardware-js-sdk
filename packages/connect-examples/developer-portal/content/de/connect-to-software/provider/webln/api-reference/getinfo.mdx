@@ -1,0 +1,41 @@
+---
+title: "getInfo"
+---
+
+# getInfo
+
+Knoteninformationen und unterstützte Methoden abrufen.
+
+## Methode [#method]
+
+```typescript
+declare function getInfo(): Promise<GetInfoResponse>;
+```
+
+## Antwort [#response]
+
+```typescript
+interface GetInfoResponse {
+  node: {
+    alias: string;
+    pubkey: string;
+    color?: string;
+  };
+  // "request.*" methods are not supported by all connectors
+  // (see webln.request for more info)
+  methods: string[]; // e.g. "makeInvoice", "sendPayment", "request.openchannel", ...
+}
+```
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const info = await provider.getInfo();
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/QWYVvya)

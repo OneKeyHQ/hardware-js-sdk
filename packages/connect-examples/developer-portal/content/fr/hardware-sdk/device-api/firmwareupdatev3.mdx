@@ -1,0 +1,81 @@
+---
+description: "Mettez à jour les composants du micrologiciel OneKey Pro avec le parcours firmwareUpdateV3 de Protocol V1."
+title: "firmwareUpdateV3"
+---
+
+# firmwareUpdateV3
+
+## Mise à jour du micrologiciel (V3) [#firmware-update-v3]
+
+Parcours de mise à jour Protocol V1 pour OneKey Pro. Permet de mettre à jour le bootloader, le micrologiciel principal, le micrologiciel BLE et le paquet de ressources en un seul parcours selon les besoins.
+
+- Appareil : OneKey Pro (Protocol V1) uniquement
+- Exigence de démarrage : version Boot ≥ 4.8.0
+- Pro 2 / Neo : utiliser [firmwareUpdateV4](/fr/hardware-sdk/device-api/firmwareupdatev4)
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+declare const targetBleVersion: number[];
+declare const targetBootloaderVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+
+  // Option A: specify versions (pick any subset)
+  firmwareVersion: targetFirmwareVersion,
+  bleVersion: targetBleVersion,
+  bootloaderVersion: targetBootloaderVersion,
+
+  // Option B: custom binaries (as needed)
+  // firmwareBinary: ArrayBuffer,
+  // bleBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // resourceBinary: ArrayBuffer,
+
+  // Optional: force updating resource package
+  forcedUpdateRes: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+L’exemple suppose que l’utilisateur a sélectionné cet appareil et approuvé la mise à jour. Déterminez les versions cibles à partir de métadonnées de publication vérifiées ; ne codez pas en dur une version copiée depuis la documentation.
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+- `platform` - obligatoire `"native" | "desktop" | "ext" | "web" | "web-embed"` environnement d’exécution
+- `firmwareVersion` - facultatif `number[]` version cible du micrologiciel principal
+- `firmwareBinary` - facultatif `ArrayBuffer` micrologiciel principal personnalisé
+- `bleVersion` - facultatif `number[]` version cible du micrologiciel BLE
+- `bleBinary` - facultatif `ArrayBuffer` micrologiciel BLE personnalisé
+- `bootloaderVersion` - facultatif `number[]` version cible du bootloader
+- `bootloaderBinary` - facultatif `ArrayBuffer` bootloader personnalisé
+- `resourceBinary` - facultatif `ArrayBuffer` binaire du paquet de ressources
+- `forcedUpdateRes` - facultatif `boolean` forcer la mise à jour du paquet de ressources
+
+### Résultat [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### Erreur [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

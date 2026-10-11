@@ -1,0 +1,74 @@
+---
+description: "Cambia un ajuste del dispositivo seleccionado por el usuario respetando las restricciones de parámetros y capacidades de su protocolo."
+title: "deviceSettings"
+---
+
+# deviceSettings
+
+## Ajustes del dispositivo [#device-settings]
+
+Se recomienda modificar una sola propiedad cada vez, ya que el cambio requiere confirmación en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.deviceSettings(connectId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+| Parámetro | Tipo | Disponibilidad / significado |
+| --- | --- | --- |
+| `language` | `string` | Código de idioma compatible con el dispositivo; consulta las capacidades de configuración del SDK instalado. |
+| `label` | `string` | Nombre visible del dispositivo. |
+| `usePassphrase` | `boolean` | Solicita cambiar la protección mediante passphrase con confirmación en el dispositivo. |
+| `autoLockDelayMs` | `number` | Tiempo hasta el bloqueo automático; Protocol V2 acepta opciones enumeradas, no cualquier valor en milisegundos. |
+| `autoShutdownDelayMs` | `number` | Tiempo hasta el apagado automático; Protocol V2 acepta opciones enumeradas. |
+| `hapticFeedback`, `bluetoothEnabled` | `boolean` | Ajustes de respuesta háptica y Bluetooth que dependen del dispositivo. |
+| `homescreen` | `string` | Payload de la pantalla de inicio de Protocol V1. |
+| `passphraseSource` | `number` | Ajuste del origen de la passphrase en Protocol V1. |
+| `passphraseAlwaysOnDevice` | `boolean` | Política de introducción en el dispositivo de Protocol V1. |
+| `displayRotation` | `number` | Rotación de pantalla de Protocol V1. |
+| `safetyChecks` | `Enum_SafetyCheckLevel` | Política de seguridad de Protocol V1. Mantén las comprobaciones estrictas salvo que el usuario solicite expresamente un cambio compatible. |
+| `experimentalFeatures` | `boolean` | Compatibilidad con mensajes experimentales de Protocol V1. |
+| `changeBrightness` | `boolean` | Flujo de brillo en el dispositivo de Protocol V1. |
+| `brightness` | `number` | Brillo de Protocol V2, dentro del intervalo admitido. |
+| `airgapMode` | `boolean` | Flujo de configuración de Air-Gap en el dispositivo de Protocol V2. |
+| `animationEnabled`, `tapToWake`, `deviceNameDisplayEnabled` | `boolean` | Ajustes de pantalla e interacción de Protocol V2. |
+| `fidoEnabled`, `usbLockEnabled`, `randomKeypad` | `boolean` | Ajustes relacionados con la seguridad de Protocol V2. |
+
+El tipo actual [`DeviceSettingsParams` (tipo)](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/deviceSettings.ts) define las claves públicas. Los campos específicos de un protocolo no admitidos se rechazan. Lee los ajustes y capacidades del dispositivo conectado antes de ofrecer un control; que un campo figure en el tipo no demuestra que todos los modelos lo admitan.
+
+Cambia únicamente el ajuste seleccionado por el usuario. Los cambios de protección mediante passphrase o conectividad pueden alterar el flujo activo; actualiza el estado después y no deduzcas que la operación se completó solo porque se cerró un diálogo del host.
+
+## Ejemplo [#example]
+
+```typescript
+const result = await HardwareSDK.deviceSettings(connectId, {
+    label: 'My OneKey Wallet'
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+## Resultado [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: string
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

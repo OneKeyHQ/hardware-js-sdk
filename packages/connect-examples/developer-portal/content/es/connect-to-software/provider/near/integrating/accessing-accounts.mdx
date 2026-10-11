@@ -1,0 +1,22 @@
+---
+title: "Acceso a cuentas"
+---
+
+<span id="accessing-accounts" />
+
+# Acceso a cuentas
+
+Una vez establecida la conexión con la cartera, puedes acceder a las cuentas conectadas a la cartera OneKey.
+
+Las cuentas de usuario se usan en distintos contextos en OneKey, como identificadores y para firmar transacciones.
+
+```javascript
+const res = await provider.request({
+  method: 'near_accounts',
+});
+const accountId = res?.accounts?.[0]?.accountId || '';
+const publicKey = res?.accounts?.[0]?.publicKey || '';
+
+// An empty accounts array means no account is exposed to this site
+console.log('near_accounts', res?.accounts, accountId, publicKey);
+```

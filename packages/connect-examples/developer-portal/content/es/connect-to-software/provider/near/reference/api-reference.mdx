@@ -1,0 +1,24 @@
+---
+title: "Referencia de la API"
+---
+
+<span id="near-api-reference" />
+
+# Referencia de la API de NEAR
+
+Crea una instancia de `OneKeyNearProvider` como se muestra en [Instalar el SDK](/es/connect-to-software/provider/near/integrating/install-the-provider-sdk). El proveedor expone métodos auxiliares y `request({ method, params })`.
+
+| Operación | Método | Resultado |
+| --- | --- | --- |
+| Detectar la extensión | `detectWalletInstalled()` | `Promise<boolean>` |
+| Solicitar acceso a cuentas | `requestSignIn()` / `near_requestAccounts` | `{ accounts: NearAccountInfo[] }` |
+| Consultar las cuentas expuestas | `near_accounts` | `{ accounts: NearAccountInfo[] }` |
+| Consultar la red seleccionada | `near_networkInfo` | `{ networkId: string, nodeUrls?: string[] }` |
+| Desconectar | `signOut()` / `near_signOut` | Espera a que termine antes de actualizar el estado de conexión |
+| Construir una transacción | `createTransaction({ receiverId, actions, nonceOffset })` | Una transacción sin firmar |
+| Firmar y enviar | `requestSignTransactions({ transactions })` / `near_sendTransactions` | `{ transactionHashes: string[] }` |
+| Firmar mensajes | `near_signMessages` | `{ signatures: string[] }` |
+
+`NearAccountInfo` contiene `accountId` y `publicKey`, con el campo opcional `allKeys`. Los resultados de tipo array pueden estar vacíos cuando no se expone ninguna cuenta.
+
+Consulta [Firma de transacciones](/es/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction) para la solicitud de solo firma, [Eventos](/es/connect-to-software/provider/near/integrating/watch-accounts-and-network-status) para los cambios de estado y [Resolución de problemas](/es/connect-to-software/provider/near/reference/trouble-shooting) para los errores. El endpoint RPC y la versión de la cartera determinan qué métodos adicionales están disponibles.

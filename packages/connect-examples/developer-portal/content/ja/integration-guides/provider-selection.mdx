@@ -1,0 +1,36 @@
+---
+title: "ウォレットプロバイダーを選択"
+description: "既存の EIP-1193 リクエストフローを再利用し、OneKey を明示的に選択します。複数ウォレットの選択 UI には [EIP-6963 の検出](/en/connect-to-software/provider/eth/provider-api)、OneKey 専用の接続ボタンには `window.$onekey.ethereum` を使用してください。"
+---
+
+<span id="select-a-wallet-provider" />
+
+# ウォレットプロバイダーを選択
+
+既存の EIP-1193 リクエストフローを再利用し、OneKey を明示的に選択します。複数ウォレットの選択 UI には [EIP-6963 の検出](/ja/connect-to-software/provider/eth/provider-api)、OneKey 専用の接続ボタンには `window.$onekey.ethereum` を使用します。
+
+```javascript
+// Run from a user-initiated Connect action.
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  // Update your application's selected account from accounts.
+} catch (error) {
+  // Show a recoverable error; do not automatically repeat the prompt.
+  console.error(error.code, error.message);
+}
+```
+
+## 既存の統合を移行 [#migrating-an-existing-integration]
+
+- アカウント、署名、トランザクション、イベントリスナーに選択済みのプロバイダーを使い続けます。
+- 非推奨の `enable()` 呼び出しを `request({ method: 'eth_requestAccounts' })` に置き換えます。
+- `isOneKey` をブール値のプロパティとして扱います。`isMetaMask` だけでは、互換環境でウォレットを一意に識別できません。
+- `accountsChanged`、`chainChanged`、Promise の拒否を処理します。ビューのアンマウント時にリスナーを削除してください。
+- すべての MetaMask メソッドに対応すると仮定せず、対象バージョンでウォレット固有のメソッドを確認してください。
+
+## 従来のプロバイダー切り替え [#historical-provider-switching]
+
+古い統合では `window.onekey` と `window.ethereum.switchProvider()` を使用していました。`switchProvider` は EIP-1193 の一部ではありません。新しいコードでは検出または名前空間付きのプロバイダーを使用してください。古い統合の保守では、従来のメソッドを呼び出す前に存在を確認します。

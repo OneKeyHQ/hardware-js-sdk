@@ -1,0 +1,107 @@
+---
+title: "alephiumGetAddress"
+---
+
+# alephiumGetAddress
+
+### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.10.0
+
+### Alephium: Adresse abrufen [#alephium-get-address]
+
+Leitet die Adresse am angegebenen Pfad ab und gibt sie zurück. Wenn `showOnOneKey` gleich `true` ist, muss der Nutzer die Adresse auf dem Gerät bestätigen.
+
+```typescript
+const result = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    showOnOneKey: false,
+    group: 0,
+    includePublicKey: true
+});
+```
+
+#### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+**Einzelne Adresse**
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`
+* `group` - _erforderlich_ `number | undefined | null`. Übergeben Sie `undefined` für Gruppe 0 oder `null`, um die Zielgruppe wegzulassen.
+* `includePublicKey` - _optional_ `boolean` Rückgabe `pub` und sein `publicKey`-Alias; Standard `false`.
+* `showOnOneKey` - _optional_ `boolean` Ob die Adresse auf dem Gerät angezeigt werden soll. Standard ist `true`.
+
+**Mehrere Adressen**
+
+* `bundle` - Array von Objekten mit `path` und `showOnOneKey` und `group`-Feldern
+
+#### Beispiel [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    showOnOneKey: true,
+    group: undefined
+});
+
+// Get multiple addresses
+const batchResponse = await HardwareSDK.alephiumGetAddress(connectId, deviceId, {
+    bundle: [
+        {
+            path: "m/44'/1234'/0'/0/0",
+            showOnOneKey: false,
+            group: undefined
+        },
+        {
+            path: "m/44'/1234'/1'/0/0",
+            showOnOneKey: false,
+            group: undefined
+        }
+    ]
+});
+```
+
+**Ergebnis**
+
+Antwort für eine einzelne Adresse
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        derivedPath: string,
+        pub?: string,
+        publicKey?: string,
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+Batch-Antwort in derselben Reihenfolge wie die Anfrage
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }, // account 1
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }, // account 2
+        { address: string, derivedPath: string, pub?: string, publicKey?: string, path: string }  // account 3
+    ]
+}
+```
+
+Fehler
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

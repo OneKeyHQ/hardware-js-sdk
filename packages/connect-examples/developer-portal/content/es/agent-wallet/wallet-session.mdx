@@ -1,0 +1,71 @@
+---
+title: "Sesión de Agent Wallet"
+description: "Conecta, consulta y finaliza una sesión de App Transfer o de cartera física."
+---
+
+<span id="agent-wallet-session" />
+
+# Sesión de Agent Wallet
+
+Una sesión de Agent Wallet es el contexto de cartera activo que un agente de IA usa mediante la CLI `onekey`. En el código actual de la CLI, este flujo se ofrece como inicio de sesión de App Transfer / App Bot Wallet.
+
+## Qué permite hacer [#what-it-unlocks]
+
+Una vez activa la sesión, el agente puede usar el mismo contexto de cartera en los flujos de lectura y escritura:
+
+| Capacidad | Ejemplo |
+| --- | --- |
+| Estado de la cartera | `onekey balance --chain eth` |
+| Dirección de recepción | `onekey get-address` |
+| Historial | `onekey history --chain eth --detail` |
+| Información de mercado | `onekey token trending --chain sol` |
+| Preparación de intercambios | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| Comprobaciones de seguridad | `onekey security audit --chain eth --token 0x...` |
+
+Por eso el usuario no necesita pegar claves privadas ni proporcionar manualmente una dirección en cada solicitud. El agente debe consultar la sesión activa y explicar qué cartera está usando.
+
+## Inicio de sesión [#login]
+
+```bash
+onekey auth login --app-transfer
+```
+
+La interfaz gráfica de OneKey proporciona los datos de vinculación. La CLI importa la sesión al almacén local de OneKey CLI y usa el almacén de credenciales del sistema operativo para el material protegido.
+
+La CLI también ofrece el parámetro `payload` para automatización. Trata los datos de App Transfer como una credencial: no los pegues en el chat del agente, documentación, registros ni historiales compartidos del intérprete de comandos. Consulta `onekey schema auth-login` y las indicaciones actuales de la CLI antes de automatizar la importación de credenciales.
+
+## Estado [#status]
+
+Usa `auth status` antes de cada grupo de operaciones:
+
+```bash
+onekey auth status
+```
+
+El esquema actual informa de lo siguiente:
+
+| Campo | Significado |
+| --- | --- |
+| `authStatus` | `authenticated` o `unauthenticated` |
+| `loginMethod` | `app_transfer` o `hardware` |
+| `walletKind` | `hd` para sesiones de App Transfer, `hw` para sesiones de hardware |
+| `displayAddress` | Dirección de la cartera activa que se muestra al usuario |
+| `storageBackend` | Almacén de credenciales del sistema operativo que usa la CLI |
+
+## Ciclo de vida [#lifecycle]
+
+| Paso | Comportamiento del agente |
+| --- | --- |
+| Antes de cualquier acción | Ejecuta `onekey auth status` e informa claramente si la sesión no está autenticada. |
+| Antes de acciones de solo lectura | Usa la dirección activa y la cadena predeterminada; pregunta solo por el contexto de cadena o token que falte. |
+| Antes de acciones que muevan fondos | Muestra la dirección activa, la cadena, el importe, el destinatario, la comisión y el estado de riesgo, y solicita confirmación. |
+| Después de cambiar de sesión | Vuelve a ejecutar `onekey auth status`; no des por hecho que la dirección anterior sigue siendo válida. |
+| Al cerrar sesión | Deja de usar inmediatamente el contexto de la cartera anterior. |
+
+## Cerrar sesión [#logout]
+
+```bash
+onekey auth logout
+```
+
+Los agentes solo deben cerrar sesión cuando el usuario pida explícitamente finalizar la sesión activa.

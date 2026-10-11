@@ -1,0 +1,74 @@
+---
+description: "プロトコルのパラメーターと機能の制約に従い、ユーザーが選んだデバイス設定を変更します。"
+title: "deviceSettings"
+---
+
+# deviceSettings
+
+## デバイス設定 [#device-settings]
+
+デバイス上で確認が必要なため、使用時は 1 つのプロパティだけを変更することを推奨します。
+
+```typescript
+const result = await HardwareSDK.deviceSettings(connectId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+| パラメーター | 型 | 利用可否 / 意味 |
+| --- | --- | --- |
+| `language` | `string` | 対応するデバイスの言語コード。インストール済み SDK の設定機能を確認してください。 |
+| `label` | `string` | デバイスの表示名。 |
+| `usePassphrase` | `boolean` | デバイス上での確認を伴うパスフレーズ保護設定の変更を要求。 |
+| `autoLockDelayMs` | `number` | 自動ロックまでの時間。Protocol V2 は列挙された選択肢を受け付け、任意のミリ秒値は不可。 |
+| `autoShutdownDelayMs` | `number` | 自動シャットダウンまでの時間。Protocol V2 は列挙された選択肢を受け付けます。 |
+| `hapticFeedback`, `bluetoothEnabled` | `boolean` | デバイスごとの触覚フィードバックと Bluetooth の設定。 |
+| `homescreen` | `string` | Protocol V1 のホーム画面ペイロード。 |
+| `passphraseSource` | `number` | Protocol V1 のパスフレーズ入力元設定。 |
+| `passphraseAlwaysOnDevice` | `boolean` | Protocol V1 のデバイス入力ポリシー。 |
+| `displayRotation` | `number` | Protocol V1 の画面回転。 |
+| `safetyChecks` | `Enum_SafetyCheckLevel` | Protocol V1 の安全ポリシー。ユーザーが対応する変更を明示的に求めない限り、厳格なチェックを維持してください。 |
+| `experimentalFeatures` | `boolean` | Protocol V1 の実験的メッセージへの対応。 |
+| `changeBrightness` | `boolean` | Protocol V1 のデバイス上の明るさ設定フロー。 |
+| `brightness` | `number` | Protocol V2 の明るさ。対応範囲内で指定。 |
+| `airgapMode` | `boolean` | Protocol V2 のデバイス上の Air-Gap 設定フロー。 |
+| `animationEnabled`, `tapToWake`, `deviceNameDisplayEnabled` | `boolean` | Protocol V2 の表示/操作設定。 |
+| `fidoEnabled`, `usbLockEnabled`, `randomKeypad` | `boolean` | Protocol V2 のセキュリティ関連設定。 |
+
+現在の [`DeviceSettingsParams` 型](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/deviceSettings.ts) に公開キーが定義されています。未対応のプロトコル固有フィールドは拒否されます。操作 UI を提供する前に接続中デバイスの設定/機能を読み取ってください。型にフィールドがあっても、すべてのモデルの対応を意味しません。
+
+ユーザーが選んだ設定だけを変更してください。パスフレーズ保護や接続設定の変更は有効なフローに影響するため、変更後に状態を更新し、ホスト側ダイアログが閉じたことだけで成功と判断しないでください。
+
+## 例 [#example]
+
+```typescript
+const result = await HardwareSDK.deviceSettings(connectId, {
+    label: 'My OneKey Wallet'
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+## 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: string
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,37 @@
+---
+title: "inscribeTransfer (obsoleto)"
+---
+
+<span id="inscribetransfer-deprecated" />
+
+# inscribeTransfer (obsoleto)
+
+Método heredado para crear una inscripción de transferencia de tokens. Esta página se conserva para integraciones existentes; no la consideres una recomendación para nuevas integraciones.
+
+## Método [#method]
+
+```typescript
+declare function inscribeTransfer(
+    ticker: string,
+    amount: string,
+): Promise<string>;
+```
+
+## Parámetros [#params]
+
+* `ticker` — _obligatorio_ `string`  el símbolo del token
+* `amount` — _obligatorio_ `string`
+
+## Respuesta [#response]
+
+`txid` — `string`
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const ticker = "<TOKEN_TICKER>";
+const amount = "100"
+const txid = await provider.inscribeTransfer(ticker, amount);
+```

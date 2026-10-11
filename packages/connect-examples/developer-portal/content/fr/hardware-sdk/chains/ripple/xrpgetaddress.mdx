@@ -1,0 +1,88 @@
+---
+title: "xrpGetAddress"
+---
+
+# xrpGetAddress
+
+## Ripple : obtenir une adresse [#ripple-get-address]
+
+Dérive et renvoie l’adresse au chemin spécifié. Lorsque `showOnOneKey` vaut `true`, l’utilisateur doit confirmer l’adresse sur l’appareil.
+
+```typescript
+const response = await HardwareSDK.xrpGetAddress(connectId, deviceId, params)
+```
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+**Adresse unique**
+
+* `path` - _obligatoire_ `string | Array<number>`  La longueur minimale du SDK est `3`. [plus d’informations](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _facultatif_ `boolean` Indique s’il faut afficher l’adresse sur l’appareil. Valeur par défaut : `true`.
+
+**Plusieurs adresses**
+
+* `bundle` - tableau d’objets contenant les champs `path` et `showOnOneKey`
+
+#### Exemple [#example]
+
+Afficher l’adresse du premier compte ripple :
+
+```typescript
+HardwareSDK.xrpGetAddress(connectId, deviceId, {
+    path: "m/44'/144'/0'/0/0"
+});
+```
+
+Renvoyer un lot d’adresses ripple sans les afficher sur l’appareil :
+
+```typescript
+HardwareSDK.xrpGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/144'/0'/0/0", showOnOneKey: false }, // account 1
+        { path: "m/44'/144'/1'/0/0", showOnOneKey: false }, // account 2
+        { path: "m/44'/144'/2'/0/0", showOnOneKey: false }  // account 3
+    ]
+});
+```
+
+#### Résultat [#result]
+
+Réponse pour une seule adresse
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        publicKey: string,   // account public key
+        path: string  // serialized BIP32 path
+    }
+}
+```
+
+Réponse par lot, dans le même ordre que la requête
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, publicKey: string, path: string }, // account 1
+        { address: string, publicKey: string, path: string }, // account 2
+        { address: string, publicKey: string, path: string }  // account 3
+    ]
+}
+```
+
+Erreur
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

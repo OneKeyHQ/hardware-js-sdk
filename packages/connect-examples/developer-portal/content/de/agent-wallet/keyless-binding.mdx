@@ -1,0 +1,49 @@
+---
+title: "Schlüssellose Verknüpfung"
+description: "Über GUI verwaltete Konten und die Grenzen der CLI-Sitzung verstehen."
+---
+
+<span id="keyless-binding" />
+
+# Schlüssellose Verknüpfung
+
+Die schlüssellose Verknüpfung bildet die Produktgrenze, die Nutzern ermöglicht, eine Agent Wallet in der OneKey-GUI zu verwalten, ohne sich private Schlüssel merken, sie exportieren oder in eine Agentenlaufzeit einfügen zu müssen.
+
+Die CLI erhält eine App-Transfer-Sitzung. Sie sollte dem Agenten kein ungeschütztes Schlüsselmaterial, keine entschlüsselten Zugangsdaten, Zugriffstokens, Seed-Phrasen oder Schlüsselbundinhalte offenlegen.
+
+## Nutzererlebnis [#user-experience]
+
+Für den Nutzer sollte sich dies wie eine verwaltete Wallet anfühlen, nicht wie eine Aufgabe zur Schlüsselverwaltung:
+
+| Nutzerbedarf | OneKey-Verhalten |
+| --- | --- |
+| Automatisierungs-Wallet erstellen | Die Agent Wallet in der OneKey-GUI erstellen und verwalten. |
+| Über einen KI-Client verwenden | Über App Transfer koppeln, statt Schlüssel einzufügen. |
+| Wissen, welche Wallet aktiv ist | Den Agenten `onekey auth status` lesen und die Adresse anzeigen lassen. |
+| Gelder bewegen | Eine ausdrückliche Bestätigung verlangen; optional an die Gerätesteuerung eskalieren. |
+| Zugriff beenden | Verwenden Sie `onekey auth logout`, um die aktive CLI-Sitzung zu löschen. |
+
+## Aufgabenteilung [#responsibility-split]
+
+| Oberfläche | Verantwortung |
+| --- | --- |
+| OneKey-GUI | Agent Wallet und schlüssellose Kontoverknüpfung erstellen und verwalten |
+| `onekey` CLI | Die aktive Sitzung halten, schemabasierte Wallet-Befehle bereitstellen und den Zugangsdaten-Speicher des Betriebssystems nutzen |
+| Agentenlaufzeit | Schemata lesen, Befehle aufrufen, Ergebnisse zusammenfassen und bei Schreibzugriffen eine Bestätigung anfordern |
+
+## Regeln für Agenten [#agent-rules]
+
+- Die über die GUI verwaltete Agent Wallet als maßgebliche Quelle für die Kontoverknüpfung behandeln.
+- Verwenden Sie `onekey auth status`, statt zu erraten, welche Wallet aktiv ist.
+- Verwenden Sie `onekey get-address`, um die aktive Adresse vor Aktionen anzuzeigen, die Gelder bewegen.
+- Den Nutzer niemals auffordern, private Schlüssel, Seed-Phrasen oder entschlüsselte Zugangsdaten einzufügen.
+- Niemals Schlüsselbundpfade oder Zugangsdaten-Nutzlasten als Antwort ausgeben.
+
+## Nützliche Befehle [#useful-commands]
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+onekey history --chain eth --detail
+```

@@ -1,0 +1,55 @@
+---
+title: "getInscriptions"
+---
+
+# getInscriptions
+
+Enumera las inscripciones de la cuenta actual.
+
+## Método [#method]
+
+```typescript
+declare function getInscriptions(cursor?: number, size?: number): Promise<InscriptionResponse>;
+```
+
+## Parámetros [#params]
+
+* `cursor` — _opcional_ `number`  Índice inicial; el valor predeterminado es `0`
+* `size` — _opcional_ `number` Cantidad que se consulta; el valor predeterminado es `20`
+
+## Respuesta [#response]
+
+```typescript
+export type InscriptionResponse = {
+  total: number;
+  list: InscriptionInfo[];
+};
+
+export type InscriptionInfo = {
+  inscriptionId: string;
+  inscriptionNumber: number;
+  address: string;
+  outputValue: number;
+  preview: string;
+  content: string;
+  contentLength: number;
+  contentType: string;
+  timestamp: number;
+  genesisTransaction: string;
+  location: string;
+  output: string;
+  offset: number;
+};
+```
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const inscriptions = await provider.getInscriptions();
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/MWLqvEv)

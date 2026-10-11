@@ -1,0 +1,74 @@
+---
+title: "cardanoSignMessage"
+---
+
+# cardanoSignMessage
+
+## Voraussetzungen [#requirements]
+
+* Vom SDK geforderte Mindest-Firmware-Versionen
+  * Touch / Pro (`model_touch`): 4.10.0
+
+Diese Methode legt keine Mindest-Firmware-Version für Classic/Mini fest. Ein fehlender Versionscheck im SDK ist kein Nachweis dafür, dass die Firmware diese Methode unterstützt.
+
+## Cardano: Nachricht signieren <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#cardano-sign-message-]
+
+Fordert eine Nachrichtensignatur mit dem aus dem angegebenen Pfad abgeleiteten Schlüssel an.
+
+```typescript
+const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params);
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string` BIP32-Pfad mit mindestens `3` Komponenten. Diese Methode akzeptiert kein Zahlenarray. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `message` - _erforderlich_ `string` Zu signierende Nachricht als hexadezimale Zeichenfolge kodiert.
+* `networkId` - _erforderlich_ `Integer` 1 für Mainnet, 0 für Testnet
+* `derivationType` - _erforderlich_ `CardanoDerivationType`-Enum. Wählt den Ableitungsalgorithmus. Die Laufzeit verwendet standardmäßig `ICARUS` (`1`).
+
+Die aktuelle TypeScript-API verlangt `derivationType` ausdrücklich, obwohl die Laufzeit standardmäßig ICARUS verwendet.
+
+### Beispiel [#example]
+
+```typescript
+import { PROTO } from "@onekeyfe/hd-core";
+
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.cardanoSignMessage(connectId, deviceId, {
+    path: "m/1852'/1815'/0'/0/0",
+    message: messageHex,
+    networkId: 1,
+    derivationType: PROTO.CardanoDerivationType.ICARUS
+});
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        key: string;
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

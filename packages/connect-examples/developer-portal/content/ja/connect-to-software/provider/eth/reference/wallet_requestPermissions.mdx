@@ -1,0 +1,78 @@
+---
+title: "wallet_requestPermissions"
+description: "dApp の権限を要求"
+---
+
+# wallet_requestPermissions
+
+dApp が特定のメソッドにアクセスする権限を要求します。EIP-2255 ウォレット権限システムの一部です。
+
+---
+
+## パラメーター [#parameters]
+
+`Array` 権限リクエストオブジェクトを含みます:
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `eth_accounts` | `object` | ユーザーアカウントへのアクセスを要求 |
+
+---
+
+## 戻り値 [#returns]
+
+`Array` 権限オブジェクトの配列:
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `parentCapability` | `string` | 権限名 |
+| `date` | `number` | 付与された時刻のタイムスタンプ |
+| `caveats` | `array` | 権限に対する制限 |
+
+---
+
+## 例 [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+console.log('Granted permissions:', permissions)
+// [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
+```
+
+### 特定の権限を確認 [#check-specific-permission]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+const hasAccountsPermission = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Has accounts permission:', hasAccountsPermission)
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーが権限リクエストを拒否 |
+| -32602 | 無効なパラメーター | 無効な権限リクエスト |
+
+---
+
+## 注意事項 [#notes]
+
+- 現在は次の `eth_accounts` 権限のみに対応しています
+- 未接続の場合、このメソッドを呼び出すと接続プロンプトが表示されます
+- 権限はユーザーが取り消すまで保持されます
+- 次で規定されています: [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+対象ウォレットのバージョンで、未対応メソッドのエラーを処理してください。アカウントへの権限は RPC 接続とは別であり、署名やトランザクションの事前承認にはなりません。基本的な接続には次を使用します: `eth_requestAccounts`.

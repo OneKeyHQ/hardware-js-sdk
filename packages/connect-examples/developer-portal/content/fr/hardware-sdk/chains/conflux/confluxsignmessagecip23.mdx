@@ -1,0 +1,57 @@
+---
+title: "confluxSignMessageCIP23"
+---
+
+# confluxSignMessageCIP23
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 3.0.0
+  * Classic/Mini : 2.4.0
+
+## Conflux : signer un message CIP23 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#conflux-sign-message-cip23-]
+
+Demande une signature de message avec la clé dérivée du chemin spécifié. Cette méthode suit la spécification [CIP23](https://github.com/Conflux-Chain/CIPs/blob/master/CIPs/cip-23.md).
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `messageHash` - _obligatoire_ `string` Message à signer, encodé sous forme de chaîne hexadécimale.
+* `domainHash` - _obligatoire_ `string` hash de 32 octets du domaine CIP-23, encodé en hexadécimal.
+
+### Exemple [#example]
+
+```typescript
+HardwareSDK.confluxSignMessageCIP23(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    messageHash: "0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644",
+    domainHash: "7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373"
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

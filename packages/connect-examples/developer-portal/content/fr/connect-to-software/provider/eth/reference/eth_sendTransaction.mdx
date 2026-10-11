@@ -1,0 +1,100 @@
+---
+title: "eth_sendTransaction"
+description: "Envoyer une transaction au réseau"
+---
+
+# eth_sendTransaction
+
+Crée une nouvelle transaction et demande à l’utilisateur de la confirmer. Renvoie le hash de transaction en cas de réussite.
+
+---
+
+## Paramètres [#parameters]
+
+`Array` contenant un seul objet de transaction :
+
+| Champ | Type | Obligatoire | Description |
+|-------|------|----------|-------------|
+| `from` | `string` | Oui | Adresse de l’expéditeur |
+| `to` | `string` | Non | Adresse du destinataire (omettre pour la création d’un contrat) |
+| `value` | `string` | Non | Valeur à envoyer en wei (hex) |
+| `data` | `string` | Non | Données d’appel du contrat ou bytecode |
+| `gas` | `string` | Non | Limite de gas (hex) |
+| `gasPrice` | `string` | Non | Prix du gas en wei (hex), pour les transactions historiques |
+| `maxFeePerGas` | `string` | Non | Frais maximaux par unité de gas (hex), pour EIP-1559 |
+| `maxPriorityFeePerGas` | `string` | Non | Frais de priorité maximaux (hex), pour EIP-1559 |
+| `nonce` | `string` | Non | Nonce de transaction (hex) |
+
+---
+
+## Valeur de retour [#returns]
+
+`string` - Le hash de transaction (chaîne hexadécimale de 32 octets)
+
+---
+
+## Exemples [#examples]
+
+### Envoyer des ETH [#send-eth]
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000', // 1 ETH in wei
+  }]
+})
+
+console.log('Transaction hash:', txHash)
+```
+
+### Appeler une fonction de contrat [#call-contract-function]
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...', // Encoded function call
+  }]
+})
+```
+
+### Transaction EIP-1559 [#eip-1559-transaction]
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000',
+    maxFeePerGas: '0x2540BE400',      // 10 Gwei
+    maxPriorityFeePerGas: '0x3B9ACA00', // 1 Gwei
+  }]
+})
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | L’utilisateur a rejeté la demande | L’utilisateur a refusé la transaction |
+| -32000 | Fonds insuffisants | Solde insuffisant |
+| -32602 | Paramètres non valides | Paramètres de transaction non valides |
+
+---
+
+## Remarques [#notes]
+
+- Utilisez toujours des chaînes hexadécimales avec `0x` comme préfixe pour les valeurs numériques
+- Si `gas` n’est pas fourni, le portefeuille l’estime
+- Pour les chaînes EIP-1559, privilégiez `maxFeePerGas` plutôt que `gasPrice`
+- Le champ `from` est une adresse qui doit correspondre à un compte connecté par l’utilisateur
+
+Ne définissez pas la limite de gas d’un appel de contrat sur la valeur de base de 21,000 gas d’un transfert natif. Laissez le portefeuille l’estimer ou utilisez `eth_estimateGas`. Les adresses et données d’appel d’exemple sont fictives. Un hash renvoyé ne confirme pas l’exécution ; vérifiez le reçu sur le même réseau.

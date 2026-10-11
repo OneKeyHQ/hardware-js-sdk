@@ -1,0 +1,81 @@
+---
+description: "Protocol V1 の firmwareUpdateV3 フローで OneKey Pro のファームウェアコンポーネントを更新します。"
+title: "firmwareUpdateV3"
+---
+
+# firmwareUpdateV3
+
+## ファームウェア更新 (V3) [#firmware-update-v3]
+
+OneKey Pro 用の Protocol V1 更新フロー。必要に応じて Bootloader、メインファームウェア、BLE ファームウェア、リソースパッケージを 1 つのフローで更新できます。
+
+- デバイス: OneKey Pro (Protocol V1) のみ
+- 起動要件: Boot バージョン ≥ 4.8.0
+- Pro 2 / Neo: 次を使用: [firmwareUpdateV4](/ja/hardware-sdk/device-api/firmwareupdatev4)
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+declare const targetBleVersion: number[];
+declare const targetBootloaderVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+
+  // Option A: specify versions (pick any subset)
+  firmwareVersion: targetFirmwareVersion,
+  bleVersion: targetBleVersion,
+  bootloaderVersion: targetBootloaderVersion,
+
+  // Option B: custom binaries (as needed)
+  // firmwareBinary: ArrayBuffer,
+  // bleBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // resourceBinary: ArrayBuffer,
+
+  // Optional: force updating resource package
+  forcedUpdateRes: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+この例は、ユーザーがデバイスを選択して更新を承認済みであることを前提とします。対象バージョンは検証済みリリースメタデータから取得し、ドキュメントからコピーしたバージョンをハードコードしないでください。
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+- `platform` - 必須 `"native" | "desktop" | "ext" | "web" | "web-embed"` 実行環境
+- `firmwareVersion` - 任意 `number[]` 対象のメインファームウェアバージョン
+- `firmwareBinary` - 任意 `ArrayBuffer` カスタムメインファームウェア
+- `bleVersion` - 任意 `number[]` 対象の BLE ファームウェアバージョン
+- `bleBinary` - 任意 `ArrayBuffer` カスタム BLE ファームウェア
+- `bootloaderVersion` - 任意 `number[]` 対象の Bootloader バージョン
+- `bootloaderBinary` - 任意 `ArrayBuffer` カスタム Bootloader
+- `resourceBinary` - 任意 `ArrayBuffer` リソースパッケージのバイナリ
+- `forcedUpdateRes` - 任意 `boolean` リソースパッケージの更新を強制
+
+### 結果 [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### エラー [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

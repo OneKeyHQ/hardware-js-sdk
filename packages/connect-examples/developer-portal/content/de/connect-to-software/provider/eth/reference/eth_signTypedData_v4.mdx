@@ -1,0 +1,157 @@
+---
+title: "eth_signTypedData_v4"
+description: "Typisierte strukturierte Daten signieren (EIP-712)"
+---
+
+# eth_signTypedData_v4
+
+Signiert typisierte strukturierte Daten gemäß EIP-712. Domain und Schema machen den Signierkontext ausdrücklich sichtbar; die prüfende Instanz muss sie dennoch kontrollieren und Replay-Schutz durchsetzen.
+
+---
+
+## Parameter [#parameters]
+
+| Index | Typ | Beschreibung |
+|-------|------|-------------|
+| 0 | `string` | Zum Signieren zu verwendende Adresse |
+| 1 | `string` | JSON-Zeichenfolge der typisierten Daten |
+
+---
+
+## Rückgabe [#returns]
+
+`string` - Die Signatur (Hex-Zeichenfolge mit 65 Bytes)
+
+---
+
+## Struktur typisierter Daten [#typed-data-structure]
+
+```typescript
+interface TypedData {
+  types: {
+    EIP712Domain: Array<{ name: string; type: string }>
+    [typeName: string]: Array<{ name: string; type: string }>
+  }
+  primaryType: string
+  domain: {
+    name?: string
+    version?: string
+    chainId?: number
+    verifyingContract?: string
+    salt?: string
+  }
+  message: Record<string, any>
+}
+```
+
+---
+
+## Beispiel [#example]
+
+```typescript
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' }
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' }
+    ]
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'My dApp',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC'
+  },
+  message: {
+    from: {
+      name: 'Alice',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+    },
+    contents: 'Hello, Bob!'
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(typedData)]
+})
+
+console.log('Signature:', signature)
+```
+
+### Permit-Signatur (ERC-2612) [#permit-signature-erc-2612]
+
+```typescript
+const permitData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' }
+    ],
+    Permit: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' }
+    ]
+  },
+  primaryType: 'Permit',
+  domain: {
+    name: 'USD Coin',
+    version: '2',
+    chainId: 1,
+    verifyingContract: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+  },
+  message: {
+    owner: accounts[0],
+    spender: '0xSpenderAddress...',
+    value: '1000000000', // 1000 USDC
+    nonce: tokenNonce, // Read the current permit nonce for this owner.
+    deadline: Math.floor(Date.now() / 1000) + 3600
+  }
+}
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'eth_signTypedData_v4',
+  params: [accounts[0], JSON.stringify(permitData)]
+})
+```
+
+---
+
+## Fehler [#errors]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt | Nutzer hat die Signaturanfrage abgelehnt |
+| -32602 | Ungültige Parameter | Ungültige Struktur typisierter Daten |
+
+---
+
+## Hinweise [#notes]
+
+- Die typisierten Daten müssen eine gültige JSON-Zeichenfolge sein
+- `chainId` in der Domain sollte der verbundenen Chain entsprechen
+- Der Nutzer sieht eine für Menschen lesbare Darstellung der Daten
+- Spezifiziert durch [EIP-712](https://eips.ethereum.org/EIPS/eip-712)
+
+Das Permit-Beispiel benötigt die tatsächliche EIP-712-Domain des Token-Vertrags, die aktuelle Nonce, die vorgesehene ausgabeberechtigte Adresse (Spender), Betrag und Ablaufzeitpunkt. Ersetzen Sie Platzhalter und rufen Sie `tokenNonce` ab, bevor Sie die Signatur anfordern.

@@ -1,0 +1,41 @@
+---
+title: "solSignOffchainMessage"
+---
+
+# solSignOffchainMessage
+
+Firma un mensaje de Solana fuera de la cadena. El SDK implementa este método para **Protocol V1 y V2** mediante la misma API pública. Confirma la compatibilidad del firmware en los modelos de dispositivos usados por tu integración.
+
+```ts
+const response = await HardwareSDK.solSignOffchainMessage(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  messageHex: '68656c6c6f', // hex of the off-chain payload
+});
+```
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | number[]` Ruta de Solana, completamente endurecida
+* `messageHex` - _obligatorio_ `string` mensaje fuera de la cadena codificado en hexadecimal
+* `messageVersion` - _opcional_ `SolanaOffChainMessageVersion` enumeración
+* `messageFormat` - _opcional_ `SolanaOffChainMessageFormat` enumeración
+* `applicationDomainHex` - _opcional_ `string` dominio de la aplicación de 32 bytes en hexadecimal
+* `requiredSigners` - _opcional_ `string[]` claves públicas de 32 bytes en hexadecimal, **estrictamente ordenadas y únicas**
+
+### Resultado [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    signature: string,
+    pub?: string,
+  }
+}
+```
+
+Pro 2 / Neo usan Protocol V2 internamente. No cambies el comportamiento de esta llamada según el modelo del dispositivo.
+
+Consulta también: [solSignTransaction](/es/hardware-sdk/chains/solana/solsigntransaction)

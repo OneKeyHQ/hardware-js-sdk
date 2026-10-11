@@ -323,9 +323,11 @@ export function ChainMethodsSidebar({ lang = 'en' }) {
 
       {/* Chain Dropdown */}
       <ChainDropdown
+        locale={lang}
         chains={CHAINS}
         selectedChainId={displayedChainId}
         onSelect={handleChainSelect}
+        placeholder={ui(lang, 'Select a chain', '选择链')}
         searchPlaceholder={searchPlaceholder}
         noResultsText={noResults}
         className="mb-2"

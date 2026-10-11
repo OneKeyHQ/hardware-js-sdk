@@ -1,0 +1,69 @@
+---
+title: "nostrDecryptMessage"
+---
+
+# nostrDecryptMessage
+
+### 要件 [#requirements]
+
+* SDK が要求する最小ファームウェアバージョン
+  * Touch / Pro (`model_touch`): 4.7.0
+  * Classic / Classic1s / Classic Pure / Mini (`model_mini`): 3.6.0
+
+## Nostr: メッセージを復号 [#nostr-decrypt-message]
+
+指定パスの鍵と相手の公開鍵を使って、メッセージの復号を要求します。
+
+```typescript
+const result = await HardwareSDK.nostrDecryptMessage(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `5`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `pubkey` - _必須_ `string`。相手の公開鍵。
+* `ciphertext` - _必須_ `string` 暗号化されたメッセージ。
+* `showOnOneKey` - _任意_ `boolean` リクエストをデバイスに表示するかどうか。デフォルトは `true`.
+
+### 例 [#examples]
+
+```typescript
+const response = await HardwareSDK.nostrDecryptMessage(
+  connectId,
+  deviceId,
+  {
+     path: "m/44'/1237'/0'/0/0",
+     pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+     ciphertext: encryptedMessage,
+     showOnOneKey: true,
+  }
+);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string;
+    pubkey: string;
+    ciphertext: string;
+    decryptedMessage: string;
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

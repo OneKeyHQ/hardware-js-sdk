@@ -1,0 +1,63 @@
+---
+title: "cosmosSignTransaction"
+---
+
+# cosmosSignTransaction
+
+## Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.0.0
+  * Classic/Mini: 2.10.0
+
+## Cosmos: Transaktion signieren [#cosmos-sign-transaction]
+
+Fordert eine Transaktionssignatur mit dem aus dem angegebenen Pfad abgeleiteten Schlüssel an. Der Nutzer prüft und bestätigt die Anfrage auf dem Gerät.
+
+```typescript
+const result = await HardwareSDK.cosmosSignTransaction(connectId, deviceId, params);
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _erforderlich_ `string` Serialisierte Transaktion als hexadezimale Zeichenfolge kodiert.
+
+### Beispiele [#examples]
+
+```typescript
+const response = await HardwareSDK.cosmosSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/118'/0'/0/0",
+    rawTx: "4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db"
+  }
+);
+```
+
+Ergebnis
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/118'/0'/0/0",
+    signature: string,
+  }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

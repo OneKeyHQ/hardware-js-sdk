@@ -1,0 +1,100 @@
+---
+title: "eth_sendTransaction"
+description: "ネットワークにトランザクションを送信"
+---
+
+# eth_sendTransaction
+
+新しいトランザクションを作成し、ユーザーに確認を求めます。成功するとトランザクションハッシュを返します。
+
+---
+
+## パラメーター [#parameters]
+
+`Array` 単一のトランザクションオブジェクトを含みます:
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `from` | `string` | はい | 送信者アドレス |
+| `to` | `string` | いいえ | 受取人アドレス (コントラクト作成時は省略) |
+| `value` | `string` | いいえ | 送信する wei 単位の値 (16 進数) |
+| `data` | `string` | いいえ | コントラクト呼び出しデータまたはバイトコード |
+| `gas` | `string` | いいえ | ガスリミット (16 進数) |
+| `gasPrice` | `string` | いいえ | wei 単位のガス価格 (16 進数)、レガシートランザクション用 |
+| `maxFeePerGas` | `string` | いいえ | ガス単位あたりの最大手数料 (16 進数)、EIP-1559 用 |
+| `maxPriorityFeePerGas` | `string` | いいえ | 最大優先手数料 (16 進数)、EIP-1559 用 |
+| `nonce` | `string` | いいえ | トランザクションの nonce (16 進数) |
+
+---
+
+## 戻り値 [#returns]
+
+`string` - トランザクションハッシュ (32 バイトの 16 進数文字列)
+
+---
+
+## 例 [#examples]
+
+### ETH を送信 [#send-eth]
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000', // 1 ETH in wei
+  }]
+})
+
+console.log('Transaction hash:', txHash)
+```
+
+### コントラクト関数を呼び出す [#call-contract-function]
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...', // Encoded function call
+  }]
+})
+```
+
+### EIP-1559 トランザクション [#eip-1559-transaction]
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000',
+    maxFeePerGas: '0x2540BE400',      // 10 Gwei
+    maxPriorityFeePerGas: '0x3B9ACA00', // 1 Gwei
+  }]
+})
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーがトランザクションを拒否 |
+| -32000 | 資金不足 | 残高不足 |
+| -32602 | 無効なパラメーター | 無効なトランザクションパラメーター |
+
+---
+
+## 注意事項 [#notes]
+
+- 数値には常に、次の `0x` プレフィックス付きの 16 進数文字列を使用
+- もし `gas` が指定されていない場合、ウォレットが見積もります
+- EIP-1559 チェーンでは、`gasPrice` よりも `maxFeePerGas` を優先します
+- この `from` アドレスは、ユーザーが接続したアカウントである必要があります
+
+コントラクト呼び出しのガスリミットを、ネイティブ通貨の送金の基準値である 21,000 ガスに設定しないでください。ウォレットに見積もらせるか、`eth_estimateGas` を使用してください。例のアドレスと呼び出しデータはプレースホルダーです。ハッシュが返されても実行は確認できません。同じネットワークでレシートを確認してください。

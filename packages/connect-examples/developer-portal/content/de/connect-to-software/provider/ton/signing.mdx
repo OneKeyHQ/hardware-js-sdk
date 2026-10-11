@@ -1,0 +1,114 @@
+---
+title: "Signieren"
+description: "Daten auf TON mit OneKey signieren"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signieren
+
+Verbinden Sie die Wallet, bevor Sie Anfragen senden. Ersetzen Sie Beispieladressen und Manifest-URLs durch gültige Werte. Verwenden Sie zur Authentifizierung eine vom Server erzeugte, einmalig verwendbare Challenge und prüfen Sie den Nachweis auf Ihrem Server.
+
+Erfahren Sie, wie Sie Daten zur Off-Chain-Überprüfung signieren.
+
+---
+
+## Beliebige Daten signieren [#sign-arbitrary-data]
+
+Datenzellen zur Off-Chain-Überprüfung signieren:
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+---
+
+## Nachweis signieren (Authentifizierung) [#sign-proof-authentication]
+
+Während der Verbindung einen Nachweis zur Authentifizierung anfordern:
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem && "proof" in proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 0 | Unbekannter Fehler |
+| 1 | Fehlerhafte Anfrage |
+| 100 | Unbekannte App |
+| 300 | Nutzer hat die Anfrage abgelehnt |
+| 400 | Methode nicht unterstützt |

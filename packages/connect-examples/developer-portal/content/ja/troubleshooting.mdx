@@ -1,0 +1,66 @@
+---
+title: "トラブルシューティング"
+description: "ウォレット接続、ハードウェア検出、署名、QR 統合の問題を診断します。"
+---
+
+<span id="troubleshooting" />
+
+# トラブルシューティング
+
+まず、OneKey ウォレットプロバイダー、ハードウェアトランスポート、QR のエンコード/デコードのどこで失敗しているかを特定します。メソッド、エラーコード、SDK/ウォレットのバージョン、失敗した手順を記録してください。
+
+## dApp が OneKey を見つけられない [#a-dapp-cannot-find-onekey]
+
+- テスト中のブラウザープロファイルで、OneKey がインストール済みかつ有効であることを確認します。インストール後は dApp を再読み込みしてください。
+- ページが利用可能になってから、ブラウザー側のコードでプロバイダーを検出します。サーバーレンダリング中に `window` にアクセスしないでください。
+- 対象チェーンのプロバイダーを使用します。別のウォレットが注入したプロバイダーを OneKey のものと仮定しないでください。
+- [dApp クイックスタート](/ja/connect-to-software)または使用中の[ウォレット UI ライブラリのガイド](/ja/connect-to-software/wallet-ui/web3modal)に従ってください。
+
+## アカウントへのアクセスや署名が拒否される [#account-access-or-signing-is-rejected]
+
+拒否は正当なユーザーの選択です。保留状態を解除し、ユーザーが明示的に再試行できるようにしてください。許可や署名のプロンプトを繰り返し開かないでください。
+
+アカウントやネットワークが変わった場合は、次のリクエストを作る前にアプリの状態を更新してください。Ethereum では次を参照: [アカウントへのアクセス](/ja/connect-to-software/provider/eth/accessing-accounts) および [プロバイダー API](/ja/connect-to-software/provider/eth).
+
+## USB デバイスが一覧に表示されない [#a-usb-device-is-not-listed]
+
+1. ブラウザーが WebUSB に対応し、ページが安全なコンテキストで配信されているか確認してください。
+2. 接続ボタンなどのユーザー操作から USB 選択画面を開き、目的のデバイスを選択します。
+3. ケーブルを確認し、デバイスを使っている可能性のある別のアプリやブラウザータブを閉じます。
+4. 検出を再実行し、デバイスメソッドを呼ぶ前に空の結果を処理します。
+
+[WebUSB ガイド](/ja/hardware-sdk/transport/web-usb)に従ってください。[ネイティブモバイル](/ja/hardware-sdk/transport/native-ble)と [React Native BLE](/ja/hardware-sdk/transport/react-native-ble) では要件が異なり、ブラウザーの USB 手順がすべてのトランスポートに適用されるわけではありません。
+
+## リクエストが無期限に待機する [#a-request-waits-indefinitely]
+
+SDK が PIN/パスフレーズの選択などの UI 応答や、デバイス上の確認を待っていないか確認します。呼び出し前にハンドラーを登録し、次の説明に従って個別のリクエストに応答してください: [Core API ガイド](/ja/hardware-sdk/core-api-guide).
+
+デバイス操作を直列化してください。キャンセルや切断時には保留中の UI 状態を消去し、結果を報告します。結果が不確かな後に、署名やデバイス変更操作を自動再実行しないでください。
+
+## メソッドが未対応 [#a-method-is-unsupported]
+
+[デバイスとチェーンの対応リファレンス](/ja/hardware-sdk/concepts/chain-support)でメソッドを確認し、SDK とファームウェアのバージョンも確認します。あるチェーン、デバイス、トランスポートへの対応が、すべてのメソッドの対応を意味するわけではありません。
+
+## QR レスポンスをデコードできない [#a-qr-response-does-not-decode]
+
+想定するレジストリタイプを使い、複数部分の QR レスポンスの全フラグメントを受信したか確認します。形式がリクエスト識別子を提供する場合は、返された応答を元のリクエストと照合してください。参照: [Ethereum と EVM の QR ガイド](/ja/air-gap/ethereum-and-evm).
+
+## 問題を報告 [#report-an-issue]
+
+失敗した統合を管理するリポジトリを選びます:
+
+| 問題 | 報告先 |
+| --- | --- |
+| Hardware SDK、トランスポート、この開発者ポータル | [Hardware SDK の Issue](https://github.com/OneKeyHQ/hardware-js-sdk/issues) |
+| 注入型ウォレットプロバイダー | [Cross-inpage provider の Issue](https://github.com/OneKeyHQ/cross-inpage-provider/issues) |
+| OneKey アプリまたはブラウザー拡張機能の動作 | [アプリの Issue](https://github.com/OneKeyHQ/app-monorepo/issues) |
+| OneKey 製品の使い方に関するヘルプ | [OneKey ヘルプセンター](https://help.onekey.so/) |
+
+含める情報:
+
+- 期待する動作と実際の動作。
+- テストデータを使った最小限の再現例と、正確な手順。
+- SDK/パッケージのバージョン、実行環境、OS、トランスポート、および関連するデバイスモデル/ファームウェア。
+- メソッド名、エラーコード、機密情報を除いたエラーメッセージ。
+
+リカバリーフレーズ、秘密鍵、PIN、パスフレーズ、認証情報、セッション識別子、未編集のウォレットログを投稿しないでください。脆弱性が疑われる場合は、公開 Issue に悪用方法を記載せず、対象リポジトリのセキュリティポリシーに従ってください。

@@ -1,0 +1,166 @@
+---
+title: "はじめに"
+description: "OneKey の TON Connect 互換プロバイダーで TON に接続"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+リクエスト前にウォレットに接続してください。例のアドレスとマニフェスト URL は有効な値に置き換えます。認証では、サーバーが生成する 1 回限りのチャレンジを使い、サーバー側で証明を検証してください。
+
+OneKey のプロバイダーを検出して接続し、TON を操作する方法を説明します。
+
+<Callout type="info">
+OneKey は、ここで説明する操作について TON Connect 2.0 プロトコルを実装しています。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// Detect OneKey TON provider
+const provider = window.$onekey?.tonconnect
+
+if (!provider) {
+  throw new Error('OneKey TON provider not detected')
+}
+
+// Check device and wallet info
+console.log('Device:', provider.deviceInfo)
+console.log('Wallet:', provider.walletInfo)
+console.log('Protocol Version:', provider.protocolVersion) // 2
+```
+
+---
+
+## ウォレットに接続 [#connect-wallet]
+
+```typescript
+// Basic connection
+const connectEvent = await provider.connect()
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(
+    item => item.name === 'ton_addr'
+  )
+  console.log('Connected:', addressItem?.address)
+} else {
+  console.error('Connection failed:', connectEvent.payload.message)
+}
+```
+
+---
+
+## マニフェストで接続 [#connect-with-manifest]
+
+本番アプリではマニフェスト URL を指定してください:
+
+```typescript
+const connectRequest = {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    { name: 'ton_proof', payload: 'your-challenge-string' }
+  ]
+}
+
+const connectEvent = await provider.connect(2, connectRequest)
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  console.log('Address:', addressItem?.address)
+  console.log('Proof:', proofItem?.proof)
+}
+```
+
+---
+
+## アプリマニフェストの形式 [#app-manifest-format]
+
+アプリのルートに `tonconnect-manifest.json` を作成してください:
+
+```json
+{
+  "url": "https://yourapp.com",
+  "name": "Your App Name",
+  "iconUrl": "https://yourapp.com/icon.png",
+  "termsOfUseUrl": "https://yourapp.com/terms",
+  "privacyPolicyUrl": "https://yourapp.com/privacy"
+}
+```
+
+---
+
+## 接続を復元 [#restore-connection]
+
+以前のセッションを復元します:
+
+```typescript
+const connectEvent = await provider.restoreConnection()
+
+if (connectEvent.event === 'connect') {
+  console.log('Session restored')
+}
+```
+
+---
+
+## 切断 [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## イベント処理 [#event-handling]
+
+```typescript
+provider.listen((event) => {
+  console.log('Wallet event:', event)
+})
+
+// Or use specific event listeners
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('Account changed:', address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+
+provider.on('disconnect', () => {
+  console.log('Wallet disconnected')
+})
+```
+
+---
+
+## TON Connect SDK との併用 [#using-with-ton-connect-sdk]
+
+React アプリケーションでは公式の TON Connect SDK を使用してください:
+
+```bash
+npm install @tonconnect/ui-react
+```
+
+```tsx
+import { TonConnectUIProvider, TonConnectButton } from '@tonconnect/ui-react'
+
+function App() {
+  return (
+    <TonConnectUIProvider manifestUrl="https://yourapp.com/tonconnect-manifest.json">
+      <TonConnectButton />
+      <YourApp />
+    </TonConnectUIProvider>
+  )
+}
+```
+
+OneKey は TON Connect SDK によって自動検出されます。

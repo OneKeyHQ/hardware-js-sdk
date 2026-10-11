@@ -1,0 +1,55 @@
+---
+title: "Wallet-UI-Bibliotheken"
+description: "Vorgefertigte UI-Komponenten zur schnellen Integration von Wallet-Verbindungen"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="wallet-ui-libraries" />
+
+# Wallet-UI-Bibliotheken
+
+Wallet-UI-Bibliotheken bieten eine Wallet-Auswahl und den Verbindungsstatus. Wählen Sie eine Bibliothek für Ihr Framework und Ihre Ziel-Chains und testen Sie anschließend Kontoänderungen, abgelehnte Anfragen und mobile Verbindungen.
+
+<Callout type="info">
+Die folgenden Anleitungen behandeln EVM-Integrationen. Für Aptos verwenden Sie den [Aptos Wallet Adapter](/de/connect-to-software/wallet-ui/aptos-wallet-adapter). Beginnen Sie für andere Chains mit dem [chainspezifischen Provider](/de/connect-to-software/provider).
+</Callout>
+
+---
+
+## Bibliothek auswählen [#choose-your-library]
+
+| Bibliothek | Framework | Funktionen |
+|---------|-----------|----------|
+| [RainbowKit](/de/connect-to-software/wallet-ui/rainbowkit) | Nur React | Wallet-Auswahl, Designs, wagmi-Integration |
+| [AppKit (ehemals Web3Modal)](/de/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | WalletConnect-Ökosystem, mobile QR-Codes, AppKit |
+| [Web3-Onboard](/de/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative, umfangreiche Anpassung |
+
+---
+
+## Framework- und Verbindungsunterstützung [#framework-and-connection-support]
+
+| Funktion | RainbowKit | AppKit | Web3-Onboard |
+|---------|------------|-----------|--------------|
+| React | ✅ | ✅ | ✅ |
+| Vue | ❌ | ✅ | ✅ |
+| Reines JS | ❌ | ✅ | ✅ |
+| Mobiler QR-Code | ✅ | ✅ | ✅ |
+
+---
+
+## Wann verwenden [#when-to-use]
+
+Verwenden Sie Wallet-UI-Bibliotheken, wenn Sie:
+- Eine Wallet-Auswahl mit Verbindungsstatus benötigen
+- Unterstützung mobiler Wallets per QR-Code benötigen
+- Keine eigene Wallet-Verbindungsoberfläche entwickeln möchten
+- Eine WalletConnect-Integration wünschen
+
+---
+
+## Alternative: Eigene Oberfläche [#alternative-custom-ui]
+
+Wenn Sie volle Kontrolle über die Wallet-Oberfläche benötigen, kommen infrage:
+- [Wagmi](/de/connect-to-software/react-hooks/wagmi) - React Hooks ohne Oberfläche
+- [Provider-API](/de/connect-to-software/provider/eth) - Direkter Wallet-Zugriff

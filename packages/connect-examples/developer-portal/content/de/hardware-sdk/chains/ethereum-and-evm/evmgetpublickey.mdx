@@ -1,0 +1,96 @@
+---
+title: "evmGetPublicKey"
+---
+
+# evmGetPublicKey
+
+## Ethereum: Öffentlichen Schlüssel abrufen [#ethereum-get-public-key]
+
+Gibt den aus dem angegebenen Pfad abgeleiteten öffentlichen Schlüssel zurück. Verwenden Sie `showOnOneKey`, um eine Bestätigung auf dem Gerät anzufordern.
+
+```typescript
+const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
+```
+
+## Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Einzelner öffentlicher Schlüssel [#single-public-key]
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Mehr erfahren](/de/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _optional_ `boolean` Ob der öffentliche Schlüssel auf dem Gerät angezeigt werden soll. Standard ist `true`.
+* `chainId` - _optional_ `number` Die ChainId in ETH ist eine eindeutige Kennung für ein bestimmtes Ethereum-Netzwerk und dient zur Unterscheidung verschiedener Versionen der Blockchain. [Referenz](https://github.com/ethereum-lists/chains/tree/master/\_data/chains).
+
+#### Mehrere öffentliche Schlüssel [#multiple-public-keys]
+
+* `bundle` - Array von Objekten mit `path`, `chainId`, `showOnOneKey`-Feldern
+
+### Beispiel [#example]
+
+Öffentlichen Schlüssel des ersten Ethereum-Kontos zurückgeben:
+
+```typescript
+HardwareSDK.evmGetPublicKey(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    showOnOneKey: true,
+    chainId: 1
+});
+```
+
+Ein Bündel öffentlicher Schlüssel mehrerer Ethereum-Konten zurückgeben:
+
+```typescript
+HardwareSDK.evmGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/60'/0'/0/0", chainId: 1 }, // account 1
+        { path: "m/44'/60'/1'/0/0", chainId: 1 }, // account 2
+        { path: "m/44'/60'/2'/0/0", chainId: 1 }  // account 3
+    ]
+});
+```
+
+### Ergebnis [#result]
+
+Antwort für einen einzelnen öffentlichen Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        xpub?: string,        // xpub in legacy format
+        pub: string, // hexadecimal public key
+        publicKey: string, // alias of pub
+    }
+}
+```
+
+[Mehr zum BIP32-Serialisierungsformat erfahren](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+Batch-Antwort für öffentliche Schlüssel
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, xpub, pub }, // account 1
+        { path, xpub, pub }, // account 2
+        { path, xpub, pub }, // account 3
+    ]
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Bei `bundle`-Anfragen mit `useBatch: true` gibt eine unterstützte Batch-Route `{ path, pub, publicKey }` ohne `xpub` oder `node` zurück. Der normale Ablauf gibt den erweiterten öffentlichen Schlüssel und den Knoten zurück; verlangen Sie diese Felder nicht in einer Batch-Antwort.

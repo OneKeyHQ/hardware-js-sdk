@@ -1,0 +1,420 @@
+---
+description: "EVM アカウントを確認し、同じウォレットコンテキストでトランザクション、メッセージ、型付きデータに署名します。"
+title: "EVM 署名者"
+---
+
+<span id="evm-signer" />
+
+# EVM 署名者
+
+> 種類: 統合ガイド · 対象: SDK 統合開発者 · 状態: 現在の実装
+>
+> 範囲: EVM 署名 API と Pro2/Neo ファームウェア · 最終コード検証: 2026-09-15
+>
+> 前提条件: [リクエストの基本](/ja/hardware-sdk/core-api-guide#request-basics)
+
+EVM 署名の一連の手順を説明します。アドレス確認、EIP-1559/Legacy トランザクション、personal\_sign、EIP-712 型付きデータを扱います。SDK は Promise の結果を返し、デバイス操作用の UI イベントを発行します。
+
+## インデックス [#index]
+
+1. [仕組み](#how-it-works)
+2. [クリアサイニング](#clear-signing)
+3. [インストール](#installation)
+4. [初期化](#initialization)
+5. [一般的なシナリオ](#common-scenarios)
+   - [アドレスを取得](#scenario-1-get-address)
+   - [トランザクションに署名 (1559 / Legacy)](#scenario-2-sign-transaction)
+   - [メッセージに署名 (personal\_sign)](#scenario-3-sign-message-personal_sign)
+   - [型付きデータに署名 (EIP-712)](#scenario-4-sign-typed-data-eip-712)
+6. [操作と状態](#interaction--status)
+7. [例](#examples)
+8. [検証とトラブルシューティング](#validation--troubleshooting)
+
+## 仕組み [#how-it-works]
+
+- `HardwareSDK` は OneKey ファームウェアと通信し、API は次を返します: `Promise<{ success, payload }>`.
+- 次を購読して `UI_EVENT` 関連する次の `UI_REQUEST` プロンプトをデバイスとトランスポートに合わせて処理します。参照: [リクエストの基本](/ja/hardware-sdk/core-api-guide#request-basics).
+- デバイスは対応する署名データを解析して確認画面を表示します。表示できる詳細はリクエストとファームウェアによって異なります。参照: [クリアサイニング](#clear-signing).
+- アプリケーションは署名を検証し、RPC を通じてトランザクションをシリアライズ/ブロードキャストします。
+
+## クリアサイニング [#clear-signing]
+
+Clear Signing により、資産の受取人、利用許可を受けるコントラクト、署名する構造化メッセージなど、署名リクエストの意味をハードウェアウォレット上で確認できます。SDK がトランザクションまたは型付きデータを送信し、デバイスのファームウェアが対応形式を解析して、ユーザーに確認を求めます。
+
+既存の次の `evmSignTransaction` および `evmSignTypedData` メソッドを使用します。専用の Clear Signing パッケージや `clearSigning` スイッチはありません。公開トランザクション API は、ホストが指定するトークンメタデータ、コントラクトラベル、または次の `domain` ラベルを受け付けません。
+
+### 対応リクエストと確認内容 [#supported-requests-and-review-details]
+
+以下は現在の SDK 統合と Pro2/Neo ファームウェアの実装を説明しています。画面レイアウト、トークンメタデータ、認識する形式はデバイスとファームウェアによって異なり、すべてのモデルやコントラクトで同じ表示を保証するものではありません。
+
+| リクエスト | 渡す内容 | 対応デバイス上でユーザーが確認する内容 |
+| --- | --- | --- |
+| ネイティブ通貨の送金 | `evmSignTransaction`: 受取人は `transaction.to`, 金額は `value`, 空の `data` | 受取人、金額、ネットワーク、手数料 |
+| ERC-20 送金 | `to` にトークンコントラクト、`value` にネイティブ通貨額ゼロ、`data` に ABI エンコードされた `transfer(address,uint256)` | トークンコントラクト、実際の受取人、トークン数量、手数料 |
+| 承認 / 取り消し | `to` にトークンコントラクト、`value` にネイティブ通貨額ゼロ、`data` に ABI エンコードされた `approve(address,uint256)`。金額が `0` の場合は利用許可を取り消します | spender、トークンコントラクト、利用許可または取り消し、手数料。最大の `uint256` は無制限の利用許可です |
+| トークン / コントラクト | 実際のコントラクトアドレス、チェーン ID、値、完全な calldata | 既知のトークンメタデータと対応するデコード済みフィールド。不明な資産や呼び出しでは、アドレス、生の数量、calldata を表示する場合があります |
+| EIP-712 | `evmSignTypedData` に完全な次を指定: `types`, `primaryType`, `domain`, および `message` | 解析付き署名フローのドメインと構造化フィールド。参照: [ハッシュ署名の制限](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata#hash-signing-fallback) |
+| Safe Tx | `evmSignTypedData` に標準の `SafeTx` スキーマを指定 | Safe アドレス、ネットワーク、送信先、値、操作、nonce、ガス/払い戻しフィールド、トランザクションデータ |
+
+### 送金と利用許可の統合 [#transfer-and-allowance-integration]
+
+ERC-20 送金では、 `transaction.to` は **トークンコントラクト**; 受取人は calldata にエンコードされます。承認では、エンコードされるアドレスは **spender**であり、送金の受取人ではありません。数量はトークンの最小単位の整数です。ネイティブ通貨の `value` は、これらの ERC-20 呼び出しではゼロのままです。
+
+以下のコードは SDK とウォレットの初期化を前提とし、`ethers` v6 を使用します。署名前に例のアドレスを置き換え、選択中のアカウントとネットワークの nonce、ガスリミット、手数料を取得してください。
+
+```ts
+import { Interface } from 'ethers';
+
+const tokenContract = '0x1111111111111111111111111111111111111111';
+const spender = '0x2222222222222222222222222222222222222222';
+const erc20 = new Interface(['function approve(address spender, uint256 amount)']);
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  transaction: {
+    to: tokenContract,
+    value: '0x0',
+    data: erc20.encodeFunctionData('approve', [spender, 0n]), // Revoke
+    chainId: 1,
+    nonce: '0x0',
+    gasLimit: '0x186a0',
+    maxFeePerGas: '0x77359400',
+    maxPriorityFeePerGas: '0x3b9aca00',
+  },
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+金額を正の整数に変えると、その数量の利用許可を付与します。有限の利用許可が要求された場合に、無制限の数量に置き換えないでください。この例は署名を返すため、アプリケーション側で検証、シリアライズ、ブロードキャストを行う必要があります。
+
+### トークンとコントラクトの認識 [#token-and-contract-recognition]
+
+認識にはチェーン ID、コントラクトアドレス、calldata を使用します。見慣れたトークンシンボルやプロバイダー名は補足情報にすぎず、実際のアドレスの確認が必要です。Pro2/Neo では、不明な ERC-20 トークンは小数桁数がわからないため、汎用トークンラベルと生の整数値を表示します。ホストアプリのトークン一覧から、これらの署名 API を通じてデバイス表示用のメタデータを渡すことはできません。
+
+署名の成功は、すべてのコントラクト呼び出しのデコードを意味しません。未対応の呼び出しは、読みやすい操作内容ではなく生の calldata を表示する場合があります。Clear Signing はコントラクトの信頼性を判断したり、実行結果を予測したりするものでもありません。
+
+### EIP-712 と Safe Tx [#eip-712-and-safe-tx]
+
+常に完全な型付きデータと、それに対応する `metamaskV4Compat` の値を渡します (v4 は `true`)。解析付き署名では、デバイスが構造化フィールドを要求して表示できます。ハッシュ署名が必要なデバイスやペイロードでは、同じ構造化された確認はできません。ハッシュを渡しても Clear Signing は強制されません。正確なフォールバック条件は [evmSignTypedData](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata) で確認してください。
+
+Safe では標準の `SafeTx` primary type を使用し、`domain.chainId` と `domain.verifyingContract` に Safe のネットワークとアドレスを設定します。10 個すべての Safe トランザクションフィールドを含めてください。Pro2/Neo の実装は Safe v1.3.0 のドメインとトランザクションスキーマを使用し、`SafeTx` という名前を持つ任意のカスタムスキーマとは置き換えられません。[Safe Tx の例](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata#safe-tx)を参照してください。
+
+返された署名は Safe トランザクションを承認します。所有者の署名の収集と `execTransaction` の送信は、アプリケーション側の別の手順です。オンチェーンの Safe の `approveHash` または `execTransaction` 呼び出しへの署名には `evmSignTransaction` を使用します。対応ファームウェアはそれらの呼び出しを認識できますが、`approveHash` リクエストだけでは、そのハッシュが表すトランザクションを表示できません。
+
+### 統合時の確認事項 [#integration-checks]
+
+- デバイス上でアカウントを確認し、署名にも同じウォレットコンテキストを使い、チェーン ID を対象ネットワークと EIP-712 ドメインに一致させてください。
+- 各対応デバイス/ファームウェアの組み合わせで、ネイティブ通貨の送金、トークン送金、有限の承認、取り消し、EIP-712 メッセージ、Safe Tx を確認してください。不明なトークンやコントラクト、ハッシュ署名が必要なペイロードも含めます。
+- 実際のデバイス画面を確認してください。UI イベントと `success: true` は、すべてのフィールドがデコードされた証明にはなりません。レスポンスに Clear Signing の状態フィールドはありません。
+- 確認項目 `success` を確認してから署名を使用し、正確なリクエストに対して署名者を復元/検証して、シリアライズ時には署名済みフィールドをすべて保持してください。拒否や未対応データはユーザーに示し、自動でリクエストを変更しないでください。
+
+## インストール [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## 初期化 [#initialization]
+
+例では一貫して**標準ウォレット**を使用します。隠しウォレットの場合は、アドレス取得と署名の各呼び出しで `useEmptyPassphrase: true` を検証済みの `passphraseState` に置き換えます。保護された呼び出しの前に [UI ハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録し、ペイロードを使用する前に `success` を確認してください。トランザクション入力を宣言している例は準備用のコードであり、単体で実行できるアプリケーションではありません。
+
+- ファームウェアを最新に保ちます。Web には HTTPS + ユーザー操作、BLE には適切な権限が必要です。
+- 署名前に `evmGetAddress(showOnOneKey: true)` を呼び出し、デバイス上でパス/アカウントを一度確認します。
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error('No device connected');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error('Device connection unavailable');
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device identity unavailable');
+```
+
+## 一般的なシナリオ [#common-scenarios]
+
+### シナリオ 1: アドレスを取得 [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  showOnOneKey: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload: { address, path }
+```
+
+**パラメーター**
+
+- `path` (string \| number\[\]): 必須。BIP44 パス。
+- `showOnOneKey?` (boolean): 任意。デバイスに表示して確認。
+- `chainId?` (number): 任意。デバイスに表示する chainId。
+
+**戻り値**
+
+```ts
+Promise<{ success, payload: { address, path } }>
+```
+
+---
+
+### シナリオ 2: トランザクションに署名 [#scenario-2-sign-transaction]
+
+EIP-1559 と Legacy トランザクションに対応します。
+
+```ts
+const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: tx,
+  useEmptyPassphrase: true,
+});
+if (!success) throw new Error(payload.error);
+// payload: { v, r, s }
+```
+
+**パラメーター**
+
+- `path`: 必須。
+- `transaction`: 必須。
+  - 1559: `to` `value` `data` `nonce` `gasLimit` `maxFeePerGas` `maxPriorityFeePerGas` `chainId`
+  - レガシー: `to` `value` `data` `nonce` `gasLimit` `gasPrice` `chainId`
+- `transaction.chainId`: 必須。transaction 内の数値。
+- `useEmptyPassphrase?`: 任意。標準ウォレットを強制します。隠しウォレットには `openWalletSession` で取得した `passphraseState` を渡します。
+
+SDK は手数料フィールドから EIP-1559 を選択します; `type: 2` はホスト側のシリアライザーにのみ必要です。参照: [クリアサイニング](#clear-signing) でトークン送金と承認を確認してください。
+
+**戻り値**
+
+```ts
+Promise<{ success, payload: { v, r, s } }>
+```
+
+---
+
+### シナリオ 3: メッセージに署名 (personal\_sign) [#scenario-3-sign-message-personal_sign]
+
+```ts
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  messageHex,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature
+```
+
+**パラメーター**
+
+- `path`: 必須。
+- `messageHex`: 必須。メッセージを 16 進数に変換 (次は任意: `0x`).
+- `chainId?`: 任意。デバイスに表示。
+
+**戻り値**
+
+```ts
+Promise<{ success, payload: { address, signature } }>
+```
+
+`signature` は次の `0x` プレフィックスのない 16 進数文字列です。以下のように ethers の検証前にプレフィックスを追加してください。
+
+---
+
+### シナリオ 4: 型付きデータに署名 (EIP-712) [#scenario-4-sign-typed-data-eip-712]
+
+```ts
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  data: typedData,
+  metamaskV4Compat: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature
+```
+
+**パラメーター**
+
+- `path`: 必須。
+- `data`: 必須。`domain/types/primaryType/message` を含む EIP-712 JSON v4。
+- `metamaskV4Compat`: 必須。v4 には `true` を使用します。
+- `chainId`: 任意。次と一致させます: `data.domain.chainId` 存在する場合。
+
+型付きデータのスキーマ、Safe Tx の例、ハッシュ署名の条件は次を参照してください: [evmSignTypedData](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).
+
+**戻り値**
+
+```ts
+Promise<{ success, payload: { address, signature } }>
+```
+
+`signature` は次の `0x` プレフィックスのない 16 進数文字列です。以下のように ethers の検証前にプレフィックスを追加してください。
+
+## 操作と状態 [#interaction--status]
+
+- API は操作の完了時に解決されます。`UI_EVENT` を購読し、`UI_REQUEST` のタイプで識別されるプロンプトを処理してください。
+- 一般的なプロンプトは、デバイスのロック解除、アドレス、トランザクション、メッセージの確認です。イベント処理は次の説明に従ってください: [リクエストの基本](/ja/hardware-sdk/core-api-guide#request-basics).
+- 繰り返し呼び出す場合は、デバイスごとに直列化し、`passphraseState` (または `useEmptyPassphrase: true`) を再利用します。`keepSession` は引き続きトランスポートを保持するもので、ウォレットを関連付けるものではありません。
+
+## 例 [#examples]
+
+### EIP-1559 トランザクション [#eip-1559-transaction]
+
+上記の初期化済み SDK と UI ハンドラーを使います。このシリアライズ例では `@ethersproject/*` v5 を使用します。署名前に最新の nonce、ガス、手数料を取得してください。
+
+```ts
+import { serialize, TransactionTypes } from '@ethersproject/transactions';
+
+const accountPath = "m/44'/60'/0'/0/0";
+const addressResult = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: accountPath,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!addressResult.success) throw new Error(addressResult.payload.error);
+
+const tx = {
+  to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+  value: '0x0',
+  data: '0x',
+  nonce: '0x0',
+  gasLimit: '0x5208',
+  maxFeePerGas: '0x77359400',
+  maxPriorityFeePerGas: '0x3b9aca00',
+  chainId: 1,
+};
+
+const { success, payload: sig } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: accountPath,
+  transaction: tx,
+  useEmptyPassphrase: true,
+});
+
+if (!success) throw new Error(sig.error);
+
+const rawTx = serialize({ ...tx, nonce: Number(tx.nonce), type: TransactionTypes.eip1559 }, {
+  r: sig.r,
+  s: sig.s,
+  v: Number(sig.v),
+});
+
+// Broadcast with your RPC provider, e.g. ethers.js provider.sendTransaction(rawTx)
+```
+
+### レガシートランザクション (gasPrice) [#legacy-transaction-gasprice]
+
+```ts
+const legacyTx = {
+  to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+  value: '0x2386f26fc10000', // 0.01 ETH
+  data: '0x',
+  nonce: '0x1',
+  gasLimit: '0x5208',
+  gasPrice: '0x3b9aca00', // 1 gwei
+  chainId: 1,
+};
+
+const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: accountPath,
+  transaction: legacyTx,
+});
+if (!sig.success) throw new Error(sig.payload.error);
+```
+
+### メッセージ (personal\_sign / EIP-191) [#message-personal_sign--eip-191]
+
+```ts
+import { hexlify, toUtf8Bytes, verifyMessage } from 'ethers';
+
+const message = 'Hello OneKey';
+const messageHex = hexlify(toUtf8Bytes(message));
+
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: accountPath,
+  messageHex,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+const signature = `0x${res.payload.signature}`;
+const signer = verifyMessage(toUtf8Bytes(message), signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
+```
+
+### 型付きデータ (EIP-712) [#typed-data-eip-712]
+
+```ts
+import { verifyTypedData } from 'ethers';
+
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+  },
+  message: {
+    from: { name: 'Cow', wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826' },
+    to: { name: 'Bob', wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB' },
+    contents: 'Hello, Bob!',
+  },
+};
+
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: accountPath,
+  data: typedData,
+  metamaskV4Compat: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+const { EIP712Domain, ...messageTypes } = typedData.types;
+const signature = `0x${res.payload.signature}`;
+const signer = verifyTypedData(typedData.domain, messageTypes, typedData.message, signature);
+if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
+  throw new Error('Signature does not match the returned address');
+}
+```
+
+## 検証とトラブルシューティング [#validation--troubleshooting]
+
+- デバイスで検証: パス/アカウント、受取人、金額、chainId、手数料の概要が UI と一致することを確認します。
+- ガス: 1559 には `maxFeePerGas + maxPriorityFeePerGas` が必要です。Legacy では `gasPrice` のみを使用します。
+- メッセージ/型付きデータ: フィッシングを防ぐため UI に明確な概要/ハッシュを示し、`ethers.verifyMessage` / `ethers.verifyTypedData` で署名者を復元します。
+- よくある問題:
+  - パスの不一致: デフォルトは `m/44'/60'/0'/0/0` です。必要に応じてアカウント/アドレスを増分し、`showOnOneKey` で一度確認します。
+- ChainId の不一致: 対象ネットワークと一致する必要があります。
+- 未対応またはサイズ超過の `data` は拒否される場合があります。エラーを返してください。意図したトランザクションを変更する場合は、ユーザーの再確認が必要です。
+- パスフレーズを繰り返し要求される: `openWalletSession` を一度だけ呼び出し、以降の呼び出しに `passphraseState` を渡してください。デバイスごとに直列化してください。`keepSession` は引き続きトランスポートを保持するもので、ウォレットを関連付けるものではありません。
+- ユーザーの拒否/タイムアウト: 再試行/キャンセルを提示し、自動再実行はしません。チェーンのドキュメントを参照してください: [evmSignTransaction](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) · [evmSignMessage](/ja/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) · [evmSignTypedData](/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).

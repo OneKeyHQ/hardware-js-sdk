@@ -1,0 +1,34 @@
+---
+title: "Configuración y borrado del dispositivo"
+description: "La gestión del dispositivo es independiente del descubrimiento normal de cuentas y la firma. Expón estas operaciones solo en un flujo de gestión claramente identificado que el usuario inicie deliberadamente. La primera conexión nunca debe inicializar ni borrar un dispositivo automáticamente."
+---
+
+<span id="device-setup-and-erase" />
+
+# Configuración y borrado del dispositivo
+
+La gestión del dispositivo es independiente del descubrimiento normal de cuentas y la firma. Expón estas operaciones solo en un flujo de gestión claramente identificado que el usuario inicie deliberadamente. La primera conexión nunca debe inicializar ni borrar un dispositivo automáticamente.
+
+## deviceReset: crear una cartera en un dispositivo [#devicereset-create-a-wallet-on-a-device]
+
+`deviceReset(connectId, params)` solicita configurar el dispositivo y generar nuevo material de recuperación. La implementación actual del SDK usa Protocol V1; no declara soporte V2. No deduzcas compatibilidad con Pro 2 por el nombre del método.
+
+| Parámetro | Tipo | Significado |
+| --- | --- | --- |
+| `displayRandom` | `boolean` | Muestra la entropía generada por el dispositivo antes de solicitar entropía adicional. |
+| `strength` | `number` | Nivel de entropía solicitado. El SDK usa como alternativa `256`; los niveles aceptados también dependen del firmware. |
+| `pinProtection`, `passphraseProtection` | `boolean` | Ajustes de protección solicitados. |
+| `language`, `label` | `string` | Idioma y etiqueta del dispositivo solicitados. |
+| `u2fCounter` | `number` | Contador U2F; el valor alternativo del SDK es el timestamp Unix actual en segundos. |
+| `skipBackup`, `noBackup` | `boolean` | Opciones del flujo de copia de seguridad; ninguna significa que el dispositivo no tenga semilla. No las habilites silenciosamente. |
+| `backupType` | `string \| number` | Formato de copia dependiente del firmware. |
+
+Estas opciones son opcionales en el tipo público. Comprueba el firmware de destino y lee la respuesta. Conserva el material de recuperación en el dispositivo; no lo solicites en un formulario del host ni lo registres.
+
+## deviceWipe: borrar datos privados del dispositivo [#devicewipe-erase-private-device-data]
+
+`deviceWipe(connectId)` elimina datos privados del dispositivo y requiere confirmación deliberada del usuario. En el código actual, Protocol V1 envía `WipeDevice`; Protocol V2 abre el flujo de ajustes de restablecimiento del dispositivo. Un aviso del dispositivo no prueba que haya terminado: espera la respuesta y gestiona la cancelación.
+
+Tras un borrado correcto, el SDK invalida el estado del dispositivo. Descarta la cuenta seleccionada y la vinculación de cartera de la aplicación, y vuelve a descubrir el dispositivo antes de otra operación. No reutilices un `deviceId` anterior ni supongas que la frase de recuperación sigue disponible.
+
+Ambos métodos usan la envoltura de respuesta `success` / `payload` del SDK. Gestiona errores sin reintentar automáticamente operaciones destructivas. Lee [gestión de eventos de interfaz](/es/hardware-sdk/core-api-guide#events-ui) y [identificadores del dispositivo](/es/hardware-sdk/concepts/identifiers) antes de implementar el flujo.

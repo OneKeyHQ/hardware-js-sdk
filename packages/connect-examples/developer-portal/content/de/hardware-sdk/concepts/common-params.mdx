@@ -1,0 +1,101 @@
+---
+description: "Gemeinsame Wallet-Bindungen, Transportoptionen und Ableitungspfadparameter nachschlagen."
+title: "Gemeinsame Parameter"
+---
+
+# Gemeinsame Parameter
+
+Die meisten Chain- und Gerätemethoden akzeptieren ein `params`-Objekt; Initialisierungs-, Ereignis- und Lebenszyklus-APIs haben eigene Signaturen. Die Schlüssel auf dieser Seite bilden den gemeinsamen Satz für Adress-, Signier- und Gerätemethoden. Sie sind **nicht** universell: `openWalletSession` lehnt `useEmptyPassphrase`, `initSession`, `deviceId`, und `passphraseState` auch dann ab, wenn diese Werte `false` sind oder aus einem gemeinsamen Standardwerteobjekt per Spread übernommen werden. Chain- und gerätespezifische Felder (`path`, `coin`, `tx`, `message`, …) bleiben auf der jeweiligen Methodenseite.
+
+Diese Seite ist die Parameter- **Referenz**. Zum Aufruflebenszyklus siehe die [Core-API-Anleitung](/de/hardware-sdk/core-api-guide). Für Antwort-IDs (`connectId`, `deviceId`, `uuid`, `session_id`, …), siehe [Kennungen](/de/hardware-sdk/concepts/identifiers).
+
+<div id="common-params" />
+
+| Parameter | Typ | Zweck | Hinweise |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | Den Aufruf an eine bestimmte versteckte Wallet binden | Einmalig abrufen über `openWalletSession` (oder das veraltete `getPassphraseState`); bei jedem späteren Aufruf übergeben, der diese Wallet verwenden muss. Nicht kombinierbar mit `useEmptyPassphrase`. Dies ist ein Wallet-Fingerabdruck, keine Firmware-`session_id`. |
+| `useEmptyPassphrase` | `boolean` | Standard-Wallet erzwingen | Verhindert, dass eine verbliebene Sitzung einer versteckten Wallet die Adresse unbemerkt ändert. Nicht kombinierbar mit `passphraseState`. |
+| `initSession` | `boolean` | Sitzungsinitialisierung vor dem Aufruf erzwingen | Kombinieren mit `passphraseState` im Kompatibilitätspfad. Neuer Code sollte bevorzugt `openWalletSession({ mode })` verwenden, statt `mode` mit diesem Flag zu mischen. |
+| `deriveCardano` | `boolean` | Cardano-Teilbaum vorab ableiten | Beim ersten Cardano-Aufruf einer Sitzung setzen. |
+| `retryCount` | `number` | Wiederholungslimit für den Verbindungsaufbau | Wird von Core beim Herstellen/Initialisieren der Verbindung verwendet. Ein abgeschlossener oder fehlgeschlagener Signiervorgang wird nicht wiederholt. |
+| `pollIntervalTime` | `number` | Abfrageintervall (ms) zwischen Wiederholungen | Kombiniert mit `retryCount` beim Verbindungsaufbau. |
+| `timeout` | `number` | Zeitlimit eines Verbindungsversuchs (ms) | Legt nicht das Zeitlimit für Signieren/Firmware-Übertragung fest. |
+| `detectBootloaderDevice` | `boolean` | Sofort fehlschlagen, wenn sich das Gerät im Bootloader befindet | In Signierabläufen verwenden, bei denen der Bootloader niemals gültig ist. |
+| `skipWebDevicePrompt` | `boolean` | WebUSB-Auswahl beim erneuten Einstieg überspringen | **Nur WebUSB.** Verwendet die frühere WebUSB-Autorisierung erneut. |
+| `keepSession` | `boolean` | Transport nach dem Aufruf offen halten | Steuert, ob `Device.run()` die Verbindung freigibt. Keine Wallet-Bindung und **nicht** ersetzt durch `passphraseState` oder `openWalletSession`. Behalten Sie es bei aufeinanderfolgenden USB-Signierungen / Prüfen-dann-Aktualisieren und während Electron-BLE-Firmware-Vorgängen bei. |
+
+## Transportspezifische Hinweise [#transport-specific-notes]
+
+| Parameter | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | Verbindungsaufbau | Verbindungsaufbau | Verbindungsaufbau | Verbindungsaufbau | Verbindungsaufbau | Verbindungsaufbau |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## Häufige Kombinationen [#common-combos]
+
+**Standard-Wallet — unbeabsichtigte Aufforderungen für versteckte Wallets vermeiden**
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**Versteckte Wallet — eine Bindung über mehrere Aufrufe wiederverwenden**
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden') {
+  throw new Error('A hidden wallet was not opened');
+}
+const hiddenWallet = {
+  passphraseState: opened.payload.passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+```
+
+Veralteter Kompatibilitätspfad: `getPassphraseState(connectId, { initSession: true })`, dann `{ initSession: true, passphraseState }` bei späteren Aufrufen übergeben. Siehe [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session).
+
+**Vorsichtige BLE-Wiederholungen (nur Erkennung / Adressabfrage / Signieren)**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+```
+
+Übernehmen Sie nicht per Spread `bleDefaults` in `firmwareUpdateV2` / `V3` / `V4`. Siehe [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect).
+
+## HD-Pfad [#hd-path]
+
+
+Die Mindestpfadlänge einer Methode ist eine SDK-Eingabeprüfung, keine Garantie, dass jeder Pfad dieser Länge unterstützt wird. Die Firmware erzwingt außerdem chainspezifische Ableitungs- und Härtungsregeln.
+
+`path: string | number[]` folgt BIP44. ed25519-Chains (Solana, NEAR, …) müssen vollständig gehärtet sein.
+
+| Chain | Beispielpfad | Hinweise |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | Standard-EVM-Konto |
+| BTC (Nested SegWit) | `m/49'/0'/0'/0/0` | Verwenden Sie `84'` für Native SegWit |
+| Solana | `m/44'/501'/0'/0'` | Vollständig gehärtet |
+| NEAR | `m/44'/397'/0'/0'/1'` | Vollständig gehärtet |
+| Cardano | `m/1852'/1815'/0'/0/0` | Stake unter `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | Pfad im EVM-Stil |
+
+Beispiel als Zahlenarray: `[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+
+Fehler wegen unzulässigem Pfad: Prüfen Sie Länge und Härtung auf der Seite der Chain-Methode.
+
+Auf Protocol V1 kann `select-hidden` eine Standard-Wallet zurückgeben, wenn der Passphrase-Schutz deaktiviert ist. Prüfen Sie `walletType` vor dem Speichern oder Verwenden von `passphraseState`.

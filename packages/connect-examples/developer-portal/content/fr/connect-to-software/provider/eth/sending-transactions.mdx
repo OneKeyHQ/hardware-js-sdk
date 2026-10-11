@@ -1,0 +1,59 @@
+---
+title: "Envoi de transactions"
+---
+
+<span id="sending-transactions" />
+
+# Envoi de transactions
+
+Utilisez `eth_sendTransaction` pour demander une transaction depuis un compte connecté. Le portefeuille demande à l’utilisateur de la vérifier et de l’approuver. Une demande réussie renvoie un hash de transaction ; cela ne signifie pas que la transaction a été confirmée ou exécutée avec succès.
+
+## Exemple [#example]
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [from] = await provider.request({ method: 'eth_requestAccounts' });
+const chainId = await provider.request({ method: 'eth_chainId' });
+// Check chainId against your application's intended network before continuing.
+const to = '<RECIPIENT_EVM_ADDRESS>'; // Replace with a valid address.
+
+try {
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to,
+      value: '0x0',
+    }],
+  });
+  console.log('Submitted transaction:', txHash);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Déclenchez ce processus à partir d’une action utilisateur. Remplacez le destinataire et la valeur avant l’envoi. Interrogez `eth_getTransactionReceipt` sur la même chaîne pour déterminer l’inclusion et le statut d’exécution ; une transaction en attente n’a pas encore de reçu.
+
+## Paramètres de transaction [#transaction-parameters]
+
+| Paramètre | Signification |
+| --- | --- |
+| `from` | Compte connecté autorisé à envoyer la transaction |
+| `to` | Adresse du destinataire ; omettre uniquement pour la création d’un contrat |
+| `value` | Montant en devise native sous forme de quantité hexadécimale, dans la plus petite unité (wei sur Ethereum) |
+| `data` | Données d’appel du contrat ou bytecode de création de contrat encodés en hexadécimal |
+| `gas` | Limite de gas facultative ; il s’agit d’une quantité de gas, pas d’un prix du gas |
+| `gasPrice` | Frais facultatifs par unité de gas pour une transaction historique |
+| `maxFeePerGas`, `maxPriorityFeePerGas` | Champs de frais d’une transaction EIP-1559 ; ne pas les combiner avec `gasPrice` |
+| `nonce` | Numéro de séquence des transactions du compte ; laissez normalement le portefeuille le gérer |
+
+Utilisez une arithmétique préservant la précision des entiers pour les montants ; évitez les calculs en virgule flottante lors de la conversion en wei. Laissez le portefeuille estimer les frais sauf si votre application a une raison précise de les fournir. L’utilisateur peut vérifier ou ajuster les détails de la transaction dans le portefeuille.
+
+## Changements de réseau et de compte [#network-and-account-changes]
+
+Lisez `eth_chainId` avant de préparer une transaction et gérez `chainChanged` et `accountsChanged` comme décrit dans [API du fournisseur](/fr/connect-to-software/provider/eth/provider-api). Reconstruisez les données de transaction dépendant du compte ou du réseau après un changement.
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codesandbox.io/embed/ethereum-provider-signtransactions-demo-2glt4y?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

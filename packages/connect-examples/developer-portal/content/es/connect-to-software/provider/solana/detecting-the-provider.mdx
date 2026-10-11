@@ -1,0 +1,37 @@
+---
+title: "Detección del proveedor"
+---
+
+<span id="detecting-the-provider" />
+
+# Detección del proveedor
+
+Para detectar si el usuario ya tiene instalado OneKey, una aplicación web debe comprobar la existencia de un objeto `window.$onekey.solana`.
+
+La extensión de navegador de OneKey, la aplicación móvil de OneKey y el navegador integrado de OneKey Desktop pueden inyectar un objeto `$onekey.solana` en los contextos de navegación compatibles.
+
+Si existe un objeto `window.$onekey.solana`, las aplicaciones de Solana pueden interactuar con OneKey mediante la API disponible en `window.$onekey.solana`. Este objeto `solana` también está disponible en `window.solana` para admitir integraciones heredadas.
+
+Para detectar si OneKey está instalado, una aplicación debe comprobar el indicador adicional `isOneKey`.
+
+```javascript
+const isOneKeyInstalled = window.$onekey?.solana?.isOneKey;
+```
+
+Si OneKey no está instalado, recomendamos dirigir a los usuarios a [https://onekey.so/download/?client=browserExtension](https://onekey.so/download/?client=browserExtension). En conjunto, el resultado puede ser el siguiente.
+
+```javascript
+const getProvider = () => {
+  if ('$onekey' in window) {
+    const provider = window.$onekey?.solana;
+
+    if (provider?.isOneKey) {
+      return provider;
+    }
+  }
+
+  return undefined; // Show an installation link in the application UI.
+};
+```
+
+Si `getProvider()` devuelve `undefined`, muestra una opción de instalación o habilitación de la cartera y detén el flujo de conexión. Abre los enlaces externos solo como respuesta a una acción del usuario.

@@ -1,0 +1,159 @@
+---
+title: "接続の確立"
+---
+
+<span id="establishing-a-connection" />
+
+# 接続の確立
+
+アプリケーションが[プロバイダーを検出](/ja/connect-to-software/provider/solana/detecting-the-provider)すると、OneKey への接続を要求できます。接続リクエストは公開鍵の共有をユーザーに求め、その後のやり取りへの同意を確認します。[メッセージへの署名](/ja/connect-to-software/provider/solana/signing-a-message)や[トランザクションの送信](/ja/connect-to-software/provider/solana/sending-a-transaction)などの追加リクエストを行う前に、ユーザーが接続を承認する必要があります。
+
+最初に権限が付与されると、Web アプリケーションのドメインが今後の接続リクエストの許可リストに追加されます。接続後は、アプリケーション側とユーザー側の両方から接続を終了できます。
+
+## 接続 [#connecting]
+
+**推奨される** **最も簡単な** OneKey への接続方法は `window.$onekey.solana.connect()` の呼び出しです。プロバイダーは `request` JSON RPC インターフェースも公開しています。
+
+### 接続 [#connect]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+try {
+    const resp = await provider.connect();
+    console.log(resp.publicKey.toString());
+    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo
+} catch (err) {
+    // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+### リクエスト [#request]
+```javascript
+const provider = getProvider(); // see "Detecting the Provider"
+try {
+    const resp = await provider.request({ method: "connect" });
+    console.log(resp.publicKey.toString());
+    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo
+} catch (err) {
+    // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+`connect()` の呼び出しは [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) を返します。ユーザーが接続を承認すると解決し、拒否またはポップアップを閉じると拒否されます (await 時にはスローされます)。拒否された Promise を処理し、`code` と `message` を表示してください。ユーザーの拒否には通常 `4001` コードを使用します。
+
+ユーザーが接続要求を承認すると、プロバイダーは次の `connect` イベントも発行します。
+
+```javascript
+provider.on("connect", () => console.log("connected!"));
+```
+
+OneKey に接続した Web アプリケーションは、接続済みアカウントの公開鍵を読み取り、追加のトランザクションをユーザーに求めることができます。利便性のため、次の `isConnected` ブール値も公開されます。
+
+```javascript
+console.log(provider.publicKey.toString());
+console.log(provider.isConnected);
+// true
+```
+
+### 自動接続 [#eagerly-connecting]
+
+Web アプリケーションは OneKey への初回接続後に信頼済みになります。信頼済みになると、以降のアクセスやページ更新で、ユーザーに権限を求めずに自動接続できます。これを「自動接続」と呼びます。
+
+実装するには、アプリケーションから次の `onlyIfTrusted` オプションを次の `connect()` 呼び出しに渡します。
+
+### 接続 [#connect-1]
+```javascript
+provider.connect({ onlyIfTrusted: true });
+```
+
+### リクエスト [#request-1]
+```javascript
+window.$onekey.solana.request({ method: "connect", params: { onlyIfTrusted: true }});
+```
+
+このフラグがある場合、OneKey はアプリケーションが信頼済みの場合のみ自動接続し、`connect` イベントを発行します。信頼されていない場合、OneKey は `4001` エラーをスローし、`onlyIfTrusted` フラグを付けずにユーザーに接続を求めるまで、未接続のままになります。どちらの場合もポップアップは開かないため、ページ読み込み時に毎回使用できます。
+
+以下の Effect は、`provider` が利用可能になった後に React コンポーネント内で実行されます。
+
+```javascript
+import { useEffect } from "react";
+
+useEffect(() => {
+    // Will either automatically connect to OneKey, or do nothing.
+    provider.connect({ onlyIfTrusted: true })
+        .then(({ publicKey }) => {
+            // Handle successful eager connection
+        })
+        .catch(() => {
+            // Handle connection failure as usual
+        })
+}, [provider]);
+```
+
+ライブデモは、サンドボックスの次の `handleConnect` 部分を参照してください。
+
+ウォレットが信頼済みアプリから切断され、その後再接続を試みた場合も、OneKey は自動接続します。アプリが信頼済みになると、ユーザーが「信頼済みアプリ」の設定からそのアプリを取り消すまでは、接続の承認は再度求められません。
+
+## 切断 [#disconnecting]
+
+切断は接続と同様の処理です。ただし、アプリケーションではなくウォレットから切断を開始することもできます。
+
+### disconnect [#disconnect]
+```javascript
+await provider.disconnect();
+```
+
+### request [#request-2]
+```javascript
+await provider.request({ method: "disconnect" });
+```
+
+以下は React アプリケーションで `disconnect` イベントを適切に処理する例です。
+
+```javascript
+import { useState, useEffect } from "react";
+
+// Inside a React component:
+const [pubKey, setPubKey] = useState(null);
+
+useEffect(() => {
+  const onConnect = (publicKey) => setPubKey(publicKey);
+  const onDisconnect = () => setPubKey(null);
+  provider.on("connect", onConnect);
+  provider.on("disconnect", onDisconnect);
+  return () => {
+    provider.off("connect", onConnect);
+    provider.off("disconnect", onDisconnect);
+  };
+}, [provider]);
+```
+
+## アカウントの変更 [#changing-accounts]
+
+OneKey では、1 つの拡張機能またはモバイルアプリ内で複数のアカウント (つまり[鍵ペア](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/Keypair.html)) をスムーズに管理できます。アカウントを切り替えるたびに、OneKey は `accountChanged` イベントを発行します。
+
+アプリケーションへの接続中にアカウントを変更し、新しいアカウントがそのアプリケーションをすでに許可している場合、接続は維持され、OneKey は新しいアカウントの [PublicKey](https://solana-foundation.github.io/solana-web3.js/v1.x/classes/PublicKey.html) を渡します:
+
+```javascript
+provider.on('accountChanged', (publicKey) => {
+    if (publicKey) {
+        // Set new public key and continue as usual
+        console.log(`Switched to account ${publicKey.toBase58()}`);
+    }
+});
+```
+
+OneKey が新しいアカウントの公開鍵を渡さない場合、アプリケーションは何もしないか、再接続を試みることができます:
+
+```javascript
+provider.on('accountChanged', (publicKey) => {
+    if (publicKey) {
+      // Set new public key and continue as usual
+      console.log(`Switched to account ${publicKey.toBase58()}`);
+    } else {
+      // Attempt to reconnect to OneKey
+      provider.connect().catch((error) => {
+        // Handle connection failure
+      });
+    }
+});
+```

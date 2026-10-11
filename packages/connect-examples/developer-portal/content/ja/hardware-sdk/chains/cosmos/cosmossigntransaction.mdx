@@ -1,0 +1,63 @@
+---
+title: "cosmosSignTransaction"
+---
+
+# cosmosSignTransaction
+
+## 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.0.0
+  * Classic/Mini: 2.10.0
+
+## Cosmos: トランザクションに署名 [#cosmos-sign-transaction]
+
+指定パスから導出した鍵でトランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```typescript
+const result = await HardwareSDK.cosmosSignTransaction(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _必須_ `string` 16 進数文字列にエンコードされたシリアライズ済みトランザクション。
+
+### 例 [#examples]
+
+```typescript
+const response = await HardwareSDK.cosmosSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/118'/0'/0/0",
+    rawTx: "4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db"
+  }
+);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/118'/0'/0/0",
+    signature: string,
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

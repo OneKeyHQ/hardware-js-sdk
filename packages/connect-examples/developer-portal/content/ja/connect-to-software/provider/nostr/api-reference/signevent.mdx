@@ -1,0 +1,73 @@
+---
+title: "signEvent"
+---
+
+# signEvent
+
+## メソッド [#method]
+
+```
+declare function signEvent(event: UnsignedEvent): Promise<Event>;
+```
+
+## パラメーター [#params]
+
+* `event` — _必須_ `object`
+  * `kind` — _必須_ `number`
+  * `content`— _必須_ `string`
+  * `tags` — _必須_ `Array<Array<string>>`
+  * `created_at` — _必須_ `number` 秒単位の Unix タイムスタンプ
+
+```typescript
+export type UnsignedEvent = {
+  kind: EventKind;
+  content: string;
+  tags: string[][];
+  created_at: number;
+};
+
+export enum EventKind {
+  Metadata = 0,
+  Text = 1,
+  RelayRec = 2,
+  Contacts = 3,
+  DM = 4,
+  Deleted = 5,
+}
+```
+
+## レスポンス [#response]
+
+イベントオブジェクトを受け取り、`id`、`pubkey`、`sig` を追加して返します。
+
+## 結果 [#result]
+
+```typescript
+export type Event = {
+  id: string;
+  kind: EventKind;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+  sig: string;
+};
+```
+
+## 例 [#example]
+
+```typescript
+const event = {
+  created_at: Math.floor(Date.now() / 1000),
+  kind: 1,
+  content: "OneKey 🚀",
+  tags: [],
+};
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const signedEvent = await provider.signEvent(event);
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/YzBOVgV)

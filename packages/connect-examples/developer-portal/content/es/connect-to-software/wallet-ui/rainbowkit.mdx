@@ -1,0 +1,152 @@
+---
+title: "RainbowKit"
+description: "Integra OneKey con RainbowKit en dApps de React"
+---
+
+import { Callout } from 'nextra/components'
+
+# RainbowKit
+
+RainbowKit ofrece un selector de carteras para React y un conector OneKey integrado.
+
+<Callout type="info">
+RainbowKit incluye el conector `oneKeyWallet`. Inclúyelo explícitamente en la lista de carteras, como se muestra a continuación.
+</Callout>
+
+---
+
+## Instalación [#installation]
+
+```bash
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+---
+
+## Configuración básica [#basic-setup]
+
+Este ejemplo usa RainbowKit 2, wagmi 2, viem 2 y TanStack Query 5. Incluye OneKey explícitamente en el selector de carteras:
+
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
+import { WagmiProvider } from 'wagmi'
+import { mainnet, polygon, arbitrum, optimism } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
+  chains: [mainnet, polygon, arbitrum, optimism],
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+---
+
+## Lista de carteras personalizada [#custom-wallet-list]
+
+Para dar prioridad a OneKey o personalizar el orden de las carteras:
+
+```tsx filename="config.ts"
+import { connectorsForWallets } from '@rainbow-me/rainbowkit'
+import {
+  oneKeyWallet,
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+} from '@rainbow-me/rainbowkit/wallets'
+
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Recommended',
+      wallets: [oneKeyWallet, metaMaskWallet, coinbaseWallet],
+    },
+    {
+      groupName: 'Other',
+      wallets: [walletConnectWallet],
+    },
+  ],
+  {
+    appName: 'My dApp',
+    projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
+  }
+)
+```
+
+---
+
+## Personalización [#customization]
+
+### Tema [#theme]
+
+```tsx
+import { darkTheme, lightTheme } from '@rainbow-me/rainbowkit'
+
+<RainbowKitProvider
+  theme={darkTheme({
+    accentColor: '#00B812', // OneKey green
+    accentColorForeground: 'white',
+    borderRadius: 'medium',
+  })}
+>
+  <ConnectButton />
+</RainbowKitProvider>
+```
+
+### Tamaño del modal [#modal-size]
+
+```tsx
+<RainbowKitProvider modalSize="compact">
+  <ConnectButton />
+</RainbowKitProvider>
+```
+
+---
+
+## Hooks [#hooks]
+
+Usa hooks de wagmi después de conectar:
+
+```tsx
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useAccount, useBalance } from 'wagmi'
+
+function Wallet() {
+  const { address, isConnected } = useAccount()
+  const { data: balance } = useBalance({ address })
+
+  if (!isConnected) return <ConnectButton />
+
+  return (
+    <div>
+      <p>Address: {address}</p>
+      <p>Balance: {balance?.formatted} {balance?.symbol}</p>
+    </div>
+  )
+}
+```
+
+---
+
+## Recursos [#resources]
+
+- [Documentación de RainbowKit](https://www.rainbowkit.com/docs/introduction)
+- [Documentación de Wagmi](https://wagmi.sh)
+- [Obtener un ID de proyecto WalletConnect](https://cloud.reown.com)

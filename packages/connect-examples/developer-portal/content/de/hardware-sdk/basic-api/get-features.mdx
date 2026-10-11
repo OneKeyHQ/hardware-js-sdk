@@ -1,0 +1,77 @@
+---
+description: "Ältere Protocol-V1-Feature-Abfragen pflegen und neue Integrationen zu getDeviceState migrieren."
+title: "Features abrufen"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="get-features" />
+
+# Features abrufen
+
+<Callout type="warning">
+  **Veraltet. Nur Protocol V1.** Verwenden Sie [`getDeviceState`](/de/hardware-sdk/basic-api/get-device-state) für Protocol V1 und V2. Classic / Mini / Touch / Pro können diese Methode weiterhin aufrufen; Pro 2 und Neo lehnen sie ab.
+</Callout>
+
+## Gerätefunktionen abrufen [#get-device-features]
+
+Die ältere Protocol-V1-Features-Darstellung lesen. Neuer Code sollte [`getDeviceState`](/de/hardware-sdk/basic-api/get-device-state) verwenden (`payload.identity.deviceId`).
+
+```typescript
+const response = await HardwareSDK.getFeatures(connectId);
+```
+
+Diese Methode liest eine ältere Features-Darstellung. Verwenden Sie sie nicht als Navigations- oder Entsperr-API und verlassen Sie sich nicht darauf, dass sie das Gerät zum Startbildschirm zurückführt.
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.getFeatures(connectId);
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        major_version: number, // major version number
+        minor_version: number, // middle version number
+        patch_version: number, // patch version number
+        bootloader_mode: null,
+        device_id: string,
+        pin_protection: boolean,
+        passphrase_protection: boolean, // enable passphrase
+        language: string,
+        label: string, // device name
+        initialized: boolean, // device initialization status
+        model: string,
+        safety_checks: string,
+        ble_name: string, // bluetooth name
+        ble_ver: string, // bluetooth firmware version
+        ble_enable: string,
+        se_enable: boolean,
+        se_ver: string,
+        backup_only: boolean,
+        onekey_version: string, // firmware Version
+        onekey_serial: string, // device Serial Number
+        bootloader_version: string, // bootloader version
+  }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

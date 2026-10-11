@@ -334,12 +334,11 @@ const sanitizeOutgoingMessages = messages => {
 
 function ChatWidgetRuntime({ apiUrl, lang }) {
   const pathname = usePathname();
-  const isZh = lang === 'zh';
   const copy = useMemo(() => {
     const result = translateCopy(lang, getWidgetCopy(false));
     result.searchCount = count => ui(lang, 'Results: {count}', '{count} 条结果').replace('{count}', new Intl.NumberFormat(lang).format(count));
     return result;
-  }, [isZh, lang]);
+  }, [lang]);
   const hasChatApi = Boolean(apiUrl);
   const chatApiUrl = apiUrl;
 

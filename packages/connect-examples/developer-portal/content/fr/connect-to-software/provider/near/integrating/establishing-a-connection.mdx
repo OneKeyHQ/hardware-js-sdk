@@ -1,0 +1,53 @@
+---
+title: "Établir une connexion"
+---
+
+<span id="establishing-a-connection" />
+
+# Établir une connexion
+
+Pour commencer à interagir avec OneKey, vous devez d’abord établir une connexion. Cette demande sollicite l’autorisation de l’utilisateur de partager son identifiant de compte et sa clé publique, et indique son accord pour poursuivre les interactions.
+
+Une fois l’autorisation accordée pour la première fois, le domaine de l’application web est ajouté à la liste d’autorisation pour les futures demandes de connexion.
+
+L’application comme l’utilisateur peuvent également mettre fin à la connexion.
+
+## Connexion (SignIn) [#connecting-signin]
+
+La façon **recommandée** et **la plus simple** de se connecter à OneKey consiste à appeler `provider.requestSignIn()`. Toutefois, le fournisseur expose également une interface JSON RPC `request`.
+
+### requestSignIn() [#requestsignin]
+```javascript
+try {
+  const res = await provider.requestSignIn();
+  console.log('requestSignIn', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+### request() [#request]
+```javascript
+try {
+  const res = await provider.request({
+    method: 'near_requestAccounts',
+  });
+  console.log('near_requestAccounts', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+## Déconnexion (SignOut) [#disconnecting-signout]
+
+La déconnexion est similaire à la connexion, mais elle peut être initiée par le portefeuille.
+
+### signOut() [#signout]
+```javascript
+provider.signOut();
+```
+
+### request() [#request-1]
+```javascript
+provider.request({ method: 'near_signOut' });
+```

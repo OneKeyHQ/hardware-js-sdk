@@ -1,0 +1,26 @@
+---
+title: "Firma de mensajes"
+---
+
+<span id="signing-messages" />
+
+# Firma de mensajes
+
+Cuando la aplicación web está conectada a OneKey, también puede solicitar al usuario que firme un mensaje concreto.
+
+Para enviar un mensaje al usuario para su firma, la aplicación web debe:
+
+* Proporcionar una cadena codificada en UTF-8.
+* Solicitar que la cartera OneKey del usuario la firme.
+
+La llamada al método devuelve una [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) que se resuelve con un objeto que contiene `signatures`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_signMessages',
+  params: {
+    messages: ['hello world', 'onekey near wallet'], // must be Array type
+  },
+});
+console.log('near_signMessages', res, res.signatures);
+```

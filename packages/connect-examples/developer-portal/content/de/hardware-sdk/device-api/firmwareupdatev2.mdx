@@ -1,0 +1,64 @@
+---
+description: "Unterstützte Protocol-V1-Haupt- oder BLE-Firmware mit geprüften Release-Versionen oder Binärdateien aktualisieren."
+title: "firmwareUpdateV2"
+---
+
+# firmwareUpdateV2
+
+## Firmware-Update (V2) [#firmware-update-v2]
+
+Firmware-Update-Ablauf für Protocol V1. Unterstützt das Herunterladen und Aktualisieren der Haupt- und BLE-Firmware. Sie müssen `platform` ausdrücklich angeben.
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  updateType: 'firmware', // or 'ble'
+  // Option A: version-based update (recommended)
+  version: targetFirmwareVersion,
+  // Option B: custom binary (use with caution)
+  // binary: ArrayBuffer,
+  // Optional flags
+  forcedUpdateRes: false,
+  isUpdateBootloader: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+Das Beispiel setzt voraus, dass der Nutzer dieses Gerät ausgewählt und das Update genehmigt hat. Ermitteln Sie Zielversionen aus geprüften Release-Metadaten; codieren Sie keine aus der Dokumentation kopierte Version fest.
+
+### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+- `platform` - erforderlich `"native" | "desktop" | "ext" | "web" | "web-embed"` Ausführungsumgebung
+- `updateType` - erforderlich `'firmware' | 'ble'` Update-Ziel (Hauptfirmware oder BLE)
+- `version` - optional `number[]` Zielversion als 3-teiliges Array; lädt die offizielle Firmware dieser Version herunter
+- `binary` - optional `ArrayBuffer` Eigene Firmware-Binärdatei; mit Vorsicht verwenden
+- `forcedUpdateRes` - optional `boolean` Aktualisierung des Ressourcenpakets erzwingen
+- `isUpdateBootloader` - optional `boolean` Bootloader-Update einschließen
+
+### Ergebnis [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    // success indicator from lower layer
+  }
+}
+```
+
+### Fehler [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

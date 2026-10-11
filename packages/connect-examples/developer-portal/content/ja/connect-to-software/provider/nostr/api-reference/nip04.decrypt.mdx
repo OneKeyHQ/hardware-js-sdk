@@ -1,0 +1,37 @@
+---
+title: "nip04.decrypt"
+---
+
+# nip04.decrypt
+
+## メソッド [#method]
+
+```typescript
+// provider.nip04.decrypt
+(pubkey: string, ciphertext: string) => Promise<string>
+```
+
+## パラメーター [#params]
+
+* `pubkey` — _必須_ `string`  送信者の公開鍵
+* `ciphertext` — _必須_ `string` 暗号化されたペイロード
+
+## レスポンス [#response]
+
+復号された平文を返します。
+
+## 例 [#example]
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const message = "Data to be encrypted";
+const encrypted = await provider.nip04.encrypt(pubkey, message);
+const decrypted = await provider.nip04.decrypt(pubkey, encrypted); // Data to be encrypted
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/rNPZwaa)
+
+[NIP-04](https://github.com/nostr-protocol/nips/blob/master/04.md) は Nostr 仕様で非推奨となっています。これらのメソッドは既存の統合のために記載しており、メソッドの存在が新しい NIP への対応を意味するわけではありません。

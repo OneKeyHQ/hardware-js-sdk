@@ -1,0 +1,25 @@
+---
+title: "requestAccounts"
+---
+
+# requestAccounts
+
+Um mit der Interaktion zu beginnen, müssen Sie zuerst die entsprechenden Berechtigungen einholen. Ein Aufruf von `requestAccounts()` fordert den Nutzer auf, ein Bitcoin-Konto mit Ihrer Website zu verbinden. Rufen Sie dies über eine Nutzeraktion auf, etwa eine Verbinden-Schaltfläche. Eine erfolgreiche Verbindung genehmigt keine späteren Signaturen oder Zahlungen im Voraus.
+
+## Methode [#method]
+
+```typescript
+declare function requestAccounts(): Promise<string[]>;
+```
+
+## Beispiel [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const accounts = await provider.requestAccounts()
+```
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codepen.io/OneKeyHQ/pen/mdvGwga)

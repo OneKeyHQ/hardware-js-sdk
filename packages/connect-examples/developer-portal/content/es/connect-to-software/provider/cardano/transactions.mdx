@@ -1,0 +1,121 @@
+---
+title: "Transacciones"
+description: "Envía transacciones en Cardano con OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# Transacciones
+
+Llama a `enable()` antes de usar la API para dApps. Las direcciones que devuelve la API CIP-30 son bytes codificados en hexadecimal; los parámetros de transacción y valor son CBOR codificado en hexadecimal. Los ejemplos para navegador que usan `Buffer` requieren una importación explícita de `buffer` o una función auxiliar de conversión de bytes.
+
+Aprende a firmar y enviar transacciones en Cardano.
+
+---
+
+## Firmar una transacción [#sign-transaction]
+
+```typescript
+// transaction should be CBOR-encoded hex string
+const witnessSetCbor = await api.signTx(transactionCbor, partialSign)
+
+// partialSign: boolean
+// - false: reject if the wallet cannot provide every required signature
+// - true: return the signatures the wallet can provide
+
+console.log('Witness set:', witnessSetCbor)
+```
+
+---
+
+## Enviar una transacción [#submit-transaction]
+
+```typescript
+// Submit signed transaction
+const txHash = await api.submitTx(signedTransactionCbor)
+console.log('Transaction hash:', txHash)
+```
+
+---
+
+### Construir, firmar y enviar [#build-sign-and-submit]
+
+`signTx` devuelve un conjunto de testigos, no una transacción firmada completa. Construye la transacción sin firmar con una biblioteca de transacciones de Cardano, combina los testigos devueltos con el conjunto de testigos existente y envía la transacción completa resultante.
+
+```typescript
+// `unsignedTransactionCbor` is a complete transaction built with current
+// protocol parameters, selected inputs, outputs, fees, and change.
+const witnessSetCbor = await api.signTx(unsignedTransactionCbor, false)
+// Merge witnessSetCbor into the original transaction using your Cardano SDK.
+// Preserve existing witnesses, scripts, datums, redeemers, and auxiliary data.
+// Submit the serialized complete transaction, never witnessSetCbor alone.
+const txHash = await api.submitTx(completeSignedTransactionCbor)
+```
+
+Usa el flujo de Lucid o Mesh que aparece a continuación si tu aplicación aún no implementa la construcción de transacciones y la combinación de testigos. Estos ejemplos de SDK son específicos de una versión; sigue la documentación de la versión que instales.
+
+---
+
+## Uso con Lucid [#using-with-lucid]
+
+[Lucid](https://github.com/spacebudz/lucid) ofrece una API más sencilla:
+
+```bash
+npm install lucid-cardano
+```
+
+```typescript
+import { Lucid, Blockfrost } from 'lucid-cardano'
+
+// Initialize Lucid with OneKey
+const lucid = await Lucid.new(
+  new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
+  'Mainnet'
+)
+
+// Connect OneKey
+const api = await window.cardano.onekey.enable()
+lucid.selectWallet(api)
+
+// Send ADA
+const tx = await lucid
+  .newTx()
+  .payToAddress('addr1...', { lovelace: 5000000n })
+  .complete()
+
+const signedTx = await tx.sign().complete()
+const txHash = await signedTx.submit()
+
+console.log('TX Hash:', txHash)
+```
+
+---
+
+## Uso con Mesh [#using-with-mesh]
+
+[Mesh](https://meshjs.dev/) es otro SDK popular de Cardano:
+
+```bash
+npm install @meshsdk/core
+```
+
+```typescript
+import { BrowserWallet, Transaction } from '@meshsdk/core'
+
+// Connect to OneKey
+const wallet = await BrowserWallet.enable('onekey')
+
+// Get wallet info
+const balance = await wallet.getBalance()
+const addresses = await wallet.getUsedAddresses()
+
+// Build and send transaction
+const tx = new Transaction({ initiator: wallet })
+  .sendLovelace('addr1...', '5000000')
+
+const unsignedTx = await tx.build()
+const signedTx = await wallet.signTx(unsignedTx)
+const txHash = await wallet.submitTx(signedTx)
+```

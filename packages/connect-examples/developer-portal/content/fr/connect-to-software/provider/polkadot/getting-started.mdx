@@ -1,0 +1,138 @@
+---
+title: "Premiers pas"
+description: "Se connecter à Polkadot avec le fournisseur OneKey compatible Polkadot.js"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Premiers pas
+
+Activez l’extension, sélectionnez un compte et connectez un client API à la chaîne prévue. Construisez les données de transaction à partir des métadonnées actuelles de la chaîne ; les valeurs hexadécimales abrégées de ce guide sont fictives.
+
+Découvrez comment détecter Polkadot et les chaînes Substrate, vous y connecter et interagir avec ces réseaux.
+
+<Callout type="info">
+OneKey implémente l’interface de l’extension Polkadot.js pour les opérations documentées ici.
+</Callout>
+
+---
+
+## Détection du fournisseur [#provider-detection]
+
+```typescript
+// OneKey registers as a Polkadot.js extension
+const provider = window.$onekey?.polkadot
+
+// Or use the standard web3Enable API
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+```
+
+---
+
+## Activer l’extension [#enable-extension]
+
+```typescript
+// Using OneKey provider directly
+const enabled = await provider.web3Enable('My dApp')
+
+if (enabled) {
+  const accounts = await provider.web3Accounts()
+  console.log('Accounts:', accounts)
+}
+```
+
+---
+
+## Utilisation de l’API d’extension Polkadot.js (recommandé) [#using-polkadotjs-extension-api-recommended]
+
+```typescript
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+// Enable all extensions (including OneKey)
+const extensions = await web3Enable('My dApp')
+
+if (extensions.length === 0) {
+  throw new Error('No extension found')
+}
+
+// Get all accounts
+const allAccounts = await web3Accounts()
+console.log('Accounts:', allAccounts)
+```
+
+---
+
+## Obtenir les comptes [#get-accounts]
+
+```typescript
+const accounts = await provider.web3Accounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Substrate address
+    name: account.name,           // Account name
+    type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
+    genesisHash: account.genesisHash, // Optional chain genesis
+  })
+})
+```
+
+---
+
+## S’abonner aux changements de compte [#subscribe-to-account-changes]
+
+```typescript
+const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
+  console.log('Accounts changed:', accounts)
+})
+
+// Later: unsubscribe()
+```
+
+---
+
+## Utilisation avec l’API Polkadot.js [#using-with-polkadotjs-api]
+
+### Configuration [#setup]
+
+```bash
+npm install @polkadot/api @polkadot/extension-dapp
+```
+
+### Connecter et signer une transaction [#connect-and-sign-transaction]
+
+```typescript
+import { ApiPromise, WsProvider } from '@polkadot/api'
+import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
+
+// Enable extensions
+await web3Enable('My dApp')
+
+// Get accounts
+const accounts = await web3Accounts()
+const account = accounts[0]
+if (!account) throw new Error("No account was selected")
+
+// Connect to chain
+const wsProvider = new WsProvider('wss://rpc.polkadot.io')
+const api = await ApiPromise.create({ provider: wsProvider })
+
+// Get injector
+const injector = await web3FromAddress(account.address)
+
+// Create and sign transaction
+const tx = api.tx.balances.transferKeepAlive(
+  recipientAddress,
+  '10000000000' // 1 DOT = 10^10 planck on Polkadot
+)
+
+// Sign and send
+const hash = await tx.signAndSend(
+  account.address,
+  { signer: injector.signer }
+)
+
+console.log('Transaction hash:', hash.toHex())
+```

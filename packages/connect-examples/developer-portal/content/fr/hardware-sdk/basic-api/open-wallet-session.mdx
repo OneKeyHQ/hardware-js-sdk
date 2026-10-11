@@ -1,0 +1,64 @@
+---
+description: "Sélectionnez le portefeuille standard ou un portefeuille caché et lisez l’identité publique renvoyée par le SDK."
+title: "Ouvrir une session de portefeuille"
+---
+
+<span id="open-wallet-session" />
+
+# Ouvrir une session de portefeuille
+
+Point d’entrée unifié Protocol V1 / V2 pour ouvrir le portefeuille standard ou laisser l’utilisateur sélectionner un portefeuille caché.
+
+Utilisez cette méthode à la place de l’ancienne [`getPassphraseState`](/fr/hardware-sdk/basic-api/get-passphrase-state). Les appels d’adresse et de signature acceptent toujours `deviceId` + `passphraseState` et ne doivent pas rouvrir une session à chaque fois. Il n’existe aucun mode `resume-hidden`. Le cœur reprend déjà dans la première méthode ultérieure qui porte `passphraseState`.
+
+Voir [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session) pour le contrat.
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
+const res = await HardwareSDK.openWalletSession(connectId, {
+  mode: OpenWalletSessionMode.Standard,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+Ne combinez pas `mode` avec `useEmptyPassphrase` ou `initSession` sur cet appel.
+
+| Paramètre | Type | Obligatoire | Remarques |
+| --- | --- | --- | --- |
+| `mode` | `'standard' \| 'select-hidden'` | Oui | Utilisez `OpenWalletSessionMode` depuis `@onekeyfe/hd-core` |
+
+### Résultat [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    deviceId: string,
+    resumed: boolean,
+    walletType: 'standard' | 'hidden',
+    passphraseState: string | null, // null on standard wallet
+  }
+}
+```
+
+Persistez `deviceId`, `walletType`, et `passphraseState`. Le champ `session_id` du micrologiciel n’est pas renvoyé.
+
+### Erreur [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+`mode: 'resume-hidden'` et `deviceId` / `passphraseState` sur cet appel renvoient `CallMethodInvalidParameter`. Reprenez un portefeuille caché associé en transmettant `passphraseState` sur la méthode d’adresse / de signature suivante. `DeviceCheckUnlockTypeError` signifie que le contexte actuel du PIN / Attach-to-PIN ne permet pas d’accéder au portefeuille demandé.

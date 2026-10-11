@@ -1,0 +1,53 @@
+---
+title: "Elegir una integración"
+description: "Elige la integración de OneKey adecuada para tu dApp, cartera o aplicación."
+---
+
+<span id="choose-an-integration" />
+
+# Elegir una integración
+
+Empieza por determinar a qué necesita conectarse tu aplicación. La API del proveedor de cartera, el SDK de hardware y el SDK QR cubren vías de integración diferentes.
+
+| Quieres… | Usa | Empieza aquí |
+| --- | --- | --- |
+| Permitir que los usuarios conecten su cartera OneKey a un sitio web o dApp | Un proveedor de cartera específico de la cadena o una biblioteca de interfaz de carteras | [Inicio rápido para dApps](/es/connect-to-software) |
+| Conectar tu propia cartera o aplicación directamente a un dispositivo OneKey | SDK de hardware con un transporte para tu entorno de ejecución | [Inicio rápido del SDK de hardware](/es/hardware-sdk/getting-started) |
+| Intercambiar solicitudes de firma con un dispositivo compatible con QR | SDK Air-Gap | [Visión general de la firma mediante QR](/es/air-gap) |
+
+Una integración de dApp pide a la cartera OneKey que administre las cuentas del usuario y el flujo de firma. En una integración directa con hardware, tu aplicación es responsable de la detección del dispositivo, el estado de conexión, los eventos de interfaz y la preparación de transacciones.
+
+## Conectar una dApp [#connect-a-dapp]
+
+1. Instala [OneKey](https://onekey.so/download/) en tu entorno de desarrollo.
+2. Sigue [Inicio rápido para dApps](/es/connect-to-software) para detectar el proveedor y solicitar cuentas desde una acción del usuario.
+3. Elige tu cadena en la [referencia de la API del proveedor](/es/connect-to-software/provider). Los métodos y valores de retorno varían según la cadena.
+4. Gestiona la ausencia de la cartera, una lista de cuentas vacía, las solicitudes rechazadas y los cambios de cuenta o red.
+
+Si tu aplicación ya usa una [biblioteca de interfaz de carteras](/es/connect-to-software/wallet-ui/web3modal), empieza por su integración con OneKey. Para transferir el control a un móvil, consulta [Móviles y enlaces profundos](/es/connect-to-software/mobile-deeplinks).
+
+## Conectar directamente al hardware [#connect-hardware-directly]
+
+Elige tu entorno de ejecución antes de instalar un SDK:
+
+| Entorno de ejecución | Guía |
+| --- | --- |
+| Navegador compatible con WebUSB | [WebUSB](/es/hardware-sdk/transport/web-usb) |
+| React Native con Bluetooth | [React Native BLE](/es/hardware-sdk/transport/react-native-ble) |
+| Android o iOS nativos, o Flutter | [Integración móvil nativa](/es/hardware-sdk/transport/native-ble) |
+
+Después, sigue el [inicio rápido](/es/hardware-sdk/getting-started). Inicializa el SDK, gestiona sus solicitudes de interfaz, selecciona un dispositivo y obtén una dirección antes de pasar a la firma. Comprueba [compatibilidad de dispositivos y cadenas](/es/hardware-sdk/concepts/chain-support) para el método y el dispositivo concretos que quieras usar.
+
+El [entorno de pruebas de hardware](https://hardware-example.onekey.so/) es útil para explorar las API. Un emulador o una compilación correcta no sustituyen las pruebas de tu integración con el dispositivo, firmware y entorno de ejecución previstos.
+
+## Usar la firma mediante QR [#use-qr-signing]
+
+Empieza por la [visión general de Air-Gap](/es/air-gap) y después sigue una guía específica de la cadena, como [Ethereum y EVM](/es/air-gap/ethereum-and-evm). Tu aplicación codifica una solicitud, la muestra como datos QR, lee la respuesta del dispositivo y valida el resultado antes de difundirlo mediante su propia conexión de red.
+
+## Antes de publicar [#before-you-ship]
+
+- Prueba el rechazo, la cancelación, la desconexión y la reconexión, además del flujo correcto.
+- Muestra la cuenta y la red en uso. Mantén la posibilidad de que el usuario revise las solicitudes de firma.
+- Nunca recopiles frases de recuperación ni claves privadas. No incluyas PIN, passphrases, tokens ni datos de sesiones de cartera en registros o informes de errores.
+- Fija y registra las versiones usadas en tu integración. Vuelve a probar después de actualizar el SDK, el firmware o la cartera.
+- Usa la [guía de solución de problemas](/es/troubleshooting) cuando una solicitud falle o se bloquee.

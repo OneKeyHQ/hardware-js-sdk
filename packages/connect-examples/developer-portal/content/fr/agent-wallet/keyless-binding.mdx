@@ -1,0 +1,49 @@
+---
+title: "Liaison sans clé"
+description: "Comprendre les comptes gérés dans l’interface graphique et les limites de la session CLI."
+---
+
+<span id="keyless-binding" />
+
+# Liaison sans clé
+
+La liaison sans clé définit le périmètre fonctionnel permettant aux utilisateurs de gérer un Agent Wallet dans l’interface graphique OneKey sans mémoriser, exporter ni coller de clés privées dans l’environnement d’exécution d’un agent.
+
+La CLI reçoit une session App Transfer. Elle ne doit pas exposer à l’agent les données brutes de clés, les identifiants déchiffrés, les jetons d’accès, les phrases de récupération ni le contenu du trousseau.
+
+## Expérience utilisateur [#user-experience]
+
+Pour l’utilisateur, l’expérience doit être celle d’un portefeuille géré plutôt que d’un exercice de gestion des clés :
+
+| Besoin de l’utilisateur | Comportement de OneKey |
+| --- | --- |
+| Créer un portefeuille d’automatisation | Créer et gérer l’Agent Wallet dans l’interface graphique OneKey. |
+| L’utiliser depuis un client IA | Associer via App Transfer au lieu de coller des clés. |
+| Savoir quel portefeuille est actif | Laisser l’agent lire `onekey auth status` et afficher l’adresse. |
+| Déplacer des fonds | Exiger une confirmation explicite ; recourir éventuellement au contrôle matériel. |
+| Mettre fin à l’accès | Utilisez `onekey auth logout` pour effacer la session CLI active. |
+
+## Répartition des responsabilités [#responsibility-split]
+
+| Interface | Responsabilité |
+| --- | --- |
+| Interface graphique OneKey | Créer et gérer l’Agent Wallet et l’association du compte sans clé |
+| `onekey` CLI | Conserver la session active, exposer les commandes de portefeuille définies par le schéma et utiliser le stockage d’identifiants du système d’exploitation |
+| Environnement d’exécution de l’agent | Lire les schémas, appeler les commandes, résumer les résultats et demander confirmation pour les écritures |
+
+## Règles de l’agent [#agent-rules]
+
+- Considérez l’Agent Wallet géré dans l’interface graphique comme la source de référence pour l’association du compte.
+- Utilisez `onekey auth status` au lieu de deviner quel portefeuille est actif.
+- Utilisez `onekey get-address` pour afficher l’adresse active avant toute action déplaçant des fonds.
+- Ne demandez jamais à l’utilisateur de coller des clés privées, des phrases de récupération ou des identifiants déchiffrés.
+- N’affichez jamais de chemins de trousseau ni de données d’identifiants en réponse.
+
+## Commandes utiles [#useful-commands]
+
+```bash
+onekey auth status
+onekey get-address
+onekey balance --chain eth
+onekey history --chain eth --detail
+```

@@ -1,0 +1,164 @@
+---
+title: "Web3Modal (AppKit)"
+description: "Intégrer OneKey avec Web3Modal / Reown AppKit"
+---
+
+import { Callout } from 'nextra/components'
+
+# Web3Modal (AppKit)
+
+Interface officielle de connexion de portefeuilles WalletConnect, désormais intégrée à Reown AppKit. Prend en charge plusieurs chaînes et les connexions aux portefeuilles mobiles.
+
+<Callout type="info">
+Web3Modal a été renommé Reown AppKit. Ce guide utilise les paquets `@reown/appkit`. Suivez le guide de migration de Reown lors de la mise à niveau d’une intégration Web3Modal existante.
+</Callout>
+
+---
+
+## Installation [#installation]
+
+```bash
+npm install @reown/appkit @reown/appkit-adapter-wagmi wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+---
+
+## Configuration de base [#basic-setup]
+
+```tsx filename="App.tsx"
+import { createAppKit } from '@reown/appkit/react'
+import { WagmiProvider } from 'wagmi'
+import { mainnet, polygon, arbitrum, type AppKitNetwork } from '@reown/appkit/networks'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+
+// 1. Get projectId from https://cloud.reown.com
+const projectId = 'YOUR_PROJECT_ID'
+
+// 2. Configure networks
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [mainnet, polygon, arbitrum]
+
+// 3. Create wagmi adapter
+const wagmiAdapter = new WagmiAdapter({
+  projectId,
+  networks,
+})
+
+// 4. Create modal
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks,
+  projectId,
+  metadata: {
+    name: 'My dApp',
+    description: 'My dApp description',
+    url: 'https://mydapp.com', // Must match your deployed dApp origin
+    icons: ['https://mydapp.com/icon.png'],
+  },
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        {/* Use the web component */}
+        <appkit-button />
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+---
+
+## Mettre OneKey en avant [#feature-onekey]
+
+Ajoutez ces options à l’appel existant `createAppKit` pour donner la priorité à OneKey. Confirmez l’ID du portefeuille dans le guide des portefeuilles WalletConnect lors de la mise à jour de votre intégration :
+
+```tsx
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks,
+  projectId,
+  featuredWalletIds: [
+    // OneKey Wallet ID from WalletConnect Explorer
+    '1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c',
+  ],
+  // Optional: Only show specific wallets
+  includeWalletIds: [
+    '1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c',
+    // Add other wallet IDs as needed
+  ],
+})
+```
+
+---
+
+## Personnalisation [#customization]
+
+### Thème [#theme]
+
+```tsx
+createAppKit({
+  // ...
+  themeMode: 'dark', // or 'light'
+  themeVariables: {
+    '--w3m-accent': '#00B812', // OneKey green
+    '--w3m-border-radius-master': '8px',
+  },
+})
+```
+
+### Bouton personnalisé [#custom-button]
+
+```tsx
+import { useAppKit } from '@reown/appkit/react'
+
+function CustomButton() {
+  const { open } = useAppKit()
+
+  return (
+    <button onClick={() => open()}>
+      Connect Wallet
+    </button>
+  )
+}
+```
+
+---
+
+## Hooks [#hooks]
+
+Utilisez les hooks wagmi après la connexion :
+
+```tsx
+import { useAccount, useDisconnect } from 'wagmi'
+import { useAppKit } from '@reown/appkit/react'
+
+function Wallet() {
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+  const { open } = useAppKit()
+
+  if (!isConnected) {
+    return <button onClick={() => open()}>Connect</button>
+  }
+
+  return (
+    <div>
+      <p>{address}</p>
+      <button onClick={() => disconnect()}>Disconnect</button>
+    </div>
+  )
+}
+```
+
+---
+
+## Ressources [#resources]
+
+- [Documentation Reown AppKit](https://docs.reown.com/appkit/overview)
+- [Guide des portefeuilles WalletConnect - OneKey](https://walletguide.walletconnect.network/?search=onekey)
+- [Obtenir un ID de projet](https://cloud.reown.com)

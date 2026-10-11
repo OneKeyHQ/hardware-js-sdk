@@ -1,0 +1,136 @@
+---
+title: "API リファレンス"
+description: "OneKey の Aptos プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Aptos プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `connect()` | ウォレットに接続してアカウントを取得 |
+| `disconnect()` | ウォレットを切断 |
+| `isConnected()` | 接続状態を確認 |
+| `account()` | 現在のアカウント情報を取得 |
+| `network()` | 現在のネットワーク名を取得 |
+| `getNetwork()` | ネットワークの全情報を取得 |
+| `getNetworkURL()` | ネットワークの RPC URL を取得 |
+| `signMessage(request)` | 任意のメッセージに署名 |
+| `signAndSubmitTransaction(payload)` | トランザクションに署名して送信 |
+| `signTransaction(payload)` | 送信せずにトランザクションに署名 |
+| `signTransactionV2(params)` | BCS シリアライズ済みトランザクションに署名 |
+| `signAndSubmitTransactionV2(params)` | 署名して送信 (Standard V1.1.0) |
+| `signIn(payload)` | AIP サインインフロー |
+| `onAccountChange(callback)` | アカウント変更を監視 |
+| `onNetworkChange(callback)` | ネットワーク変更を監視 |
+| `onDisconnect(callback)` | 切断を監視 |
+
+---
+
+## 型 [#types]
+
+### アカウント情報 [#account-info]
+
+```typescript
+interface AptosAccountInfo {
+  address: string    // Hex address with 0x prefix
+  publicKey: string  // Ed25519 public key
+}
+```
+
+### ネットワーク情報 [#network-info]
+
+```typescript
+interface AptosNetwork {
+  name: string       // Network name
+  chainId: number    // Chain ID
+  url: string        // RPC URL
+}
+```
+
+### メッセージ署名リクエスト [#sign-message-request]
+
+```typescript
+interface SignMessageRequest {
+  message: string    // Message to sign
+  nonce: number      // Required by the direct provider API
+  address?: boolean  // Include address in message
+  application?: boolean // Include app info
+  chainId?: boolean  // Include chain ID
+}
+```
+
+### メッセージ署名レスポンス [#sign-message-response]
+
+```typescript
+interface SignMessageResponse {
+  signature: string     // Hex signature
+  fullMessage: string   // Complete signed message
+  prefix: string        // APTOS prefix
+  address?: string      // Signer address
+  application?: string  // Application info
+  chainId?: number      // Chain ID
+  nonce: number         // Nonce used
+}
+```
+
+### トランザクションペイロード [#transaction-payload]
+
+```typescript
+interface TransactionPayload {
+  type: 'entry_function_payload' | 'script_payload' | 'module_bundle_payload'
+  function: string       // Module::function format
+  type_arguments: string[]
+  arguments: any[]
+}
+```
+
+### Sign Transaction V2 のパラメーター [#sign-transaction-v2-params]
+
+```typescript
+interface SignTransactionV2Params {
+  transaction: string        // BCS serialized transaction
+  transactionType: 'simple' | 'multi_agent'
+  asFeePayer?: boolean       // Sign as fee payer
+}
+```
+
+---
+
+## 対応ネットワーク [#supported-networks]
+
+| ネットワーク | 説明 |
+|---------|-------------|
+| メインネット | 本番ネットワーク |
+| テストネット | テスト環境 |
+| 開発ネット | 開発環境 |
+
+---
+
+## イベント [#events]
+
+| イベント | コールバックのパラメーター | 説明 |
+|-------|---------------------|-------------|
+| `accountChanged` | `address: string \| null` | アカウント変更時 |
+| `accountChangedV2` | `account: AptosAccountInfo \| null` | アカウント変更時 (全情報) |
+| `networkChange` | `network: string \| null` | ネットワーク変更時 |
+| `disconnect` | - | ウォレット切断時 |
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| 4100 | 未認証 |
+| 4200 | 未対応のメソッド |
+| 4201 | 未対応のネットワーク |
+| -32603 | 内部エラー |

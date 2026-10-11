@@ -1,0 +1,37 @@
+---
+title: "getBalance"
+---
+
+# getBalance
+
+現在のアカウントの残高を取得します。
+
+## メソッド [#method]
+
+```typescript
+declare function getBalance(): Promise<BalanceInfo | number>;
+```
+
+## レスポンス [#response]
+
+アカウント残高を返します。互換性のため、プロバイダーの型は数値の結果も許容します。フィールドにアクセスする前に結果の形式を確認してください。
+
+```typescript
+type BalanceInfo = {
+    confirmed: number;
+    unconfirmed: number;
+    total: number
+};
+```
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const balance = await provider.getBalance();
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/qBgMXXJ)

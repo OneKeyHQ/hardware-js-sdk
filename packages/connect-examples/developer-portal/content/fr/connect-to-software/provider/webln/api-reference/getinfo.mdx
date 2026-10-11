@@ -1,0 +1,41 @@
+---
+title: "getInfo"
+---
+
+# getInfo
+
+Obtenir les informations du nœud et les méthodes prises en charge.
+
+## Méthode [#method]
+
+```typescript
+declare function getInfo(): Promise<GetInfoResponse>;
+```
+
+## Réponse [#response]
+
+```typescript
+interface GetInfoResponse {
+  node: {
+    alias: string;
+    pubkey: string;
+    color?: string;
+  };
+  // "request.*" methods are not supported by all connectors
+  // (see webln.request for more info)
+  methods: string[]; // e.g. "makeInvoice", "sendPayment", "request.openchannel", ...
+}
+```
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const info = await provider.getInfo();
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/QWYVvya)

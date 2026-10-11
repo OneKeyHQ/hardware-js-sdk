@@ -1,0 +1,81 @@
+---
+description: "Actualiza los componentes del firmware de OneKey Pro mediante el flujo firmwareUpdateV3 de Protocol V1."
+title: "firmwareUpdateV3"
+---
+
+# firmwareUpdateV3
+
+## Actualización del firmware (V3) [#firmware-update-v3]
+
+Flujo de actualización de Protocol V1 para OneKey Pro. Permite actualizar Bootloader, el firmware principal, el firmware BLE y el paquete de recursos en un único flujo según sea necesario.
+
+- Dispositivo: solo OneKey Pro (Protocol V1)
+- Requisito de arranque: versión de Boot ≥ 4.8.0
+- Pro 2 / Neo: usa [firmwareUpdateV4](/es/hardware-sdk/device-api/firmwareupdatev4)
+
+```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+declare const targetBleVersion: number[];
+declare const targetBootloaderVersion: number[];
+
+const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+
+  // Option A: specify versions (pick any subset)
+  firmwareVersion: targetFirmwareVersion,
+  bleVersion: targetBleVersion,
+  bootloaderVersion: targetBootloaderVersion,
+
+  // Option B: custom binaries (as needed)
+  // firmwareBinary: ArrayBuffer,
+  // bleBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // resourceBinary: ArrayBuffer,
+
+  // Optional: force updating resource package
+  forcedUpdateRes: false,
+});
+if (!res.success) throw new Error(res.payload.error);
+```
+
+El ejemplo presupone que el usuario ha seleccionado este dispositivo y ha aprobado la actualización. Obtén las versiones de destino de metadatos de publicación verificados; no fijes en el código una versión copiada de la documentación.
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+- `platform` - obligatorio `"native" | "desktop" | "ext" | "web" | "web-embed"` entorno de ejecución
+- `firmwareVersion` - opcional `number[]` versión de destino del firmware principal
+- `firmwareBinary` - opcional `ArrayBuffer` firmware principal personalizado
+- `bleVersion` - opcional `number[]` versión de destino del firmware BLE
+- `bleBinary` - opcional `ArrayBuffer` firmware BLE personalizado
+- `bootloaderVersion` - opcional `number[]` versión de destino de Bootloader
+- `bootloaderBinary` - opcional `ArrayBuffer` Bootloader personalizado
+- `resourceBinary` - opcional `ArrayBuffer` binario del paquete de recursos
+- `forcedUpdateRes` - opcional `boolean` forzar la actualización del paquete de recursos
+
+### Resultado [#result]
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### Error [#error]
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code?: string | number   // error code
+  }
+}
+```

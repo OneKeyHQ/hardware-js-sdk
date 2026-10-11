@@ -1,0 +1,147 @@
+---
+description: "OneKey Hardware SDK をインストールし、WebUSB を許可して、デバイス状態を取得し、標準ウォレットのアドレスを確認します。"
+title: "はじめに"
+---
+
+import { Tabs } from 'nextra/components'
+import Link from 'next/link'
+
+<div className="doc-eyebrow">HARDWARE SDK · WEBUSB</div>
+
+<span id="connect-your-first-device" />
+
+# 最初のデバイスを接続
+
+Hardware SDK **1.2.x** をインストールし、デバイスを接続して最初のアドレスを確認します。
+
+このページは初回実行の手順です。動作したら[トランスポートガイド](/ja/hardware-sdk/transport/web-usb)を選び、続いて [Core API ガイド](/ja/hardware-sdk/core-api-guide)で PIN、パスフレーズ、イベント、署名について確認してください。
+
+Hardware SDK 1.2.0 は Protocol V1 (Classic / Mini / Touch / Pro) と Protocol V2 (Pro 2 / Neo) を**同じ JavaScript API** で扱います。`init()` でプロトコルを選択するわけではありません。
+
+<div className="doc-prerequisites">
+<strong>始める前に</strong>
+<ul>
+<li>設定済みの OneKey デバイスとデータ通信対応 USB ケーブル</li>
+<li>デスクトップ版 Chrome や Edge などの WebUSB 対応ブラウザー</li>
+<li>HTTPS オリジン、または開発用の localhost</li>
+</ul>
+</div>
+
+## 1. パッケージを選択 [#1-pick-a-package]
+
+| 実行環境 | パッケージ | 次のガイド |
+| --- | --- | --- |
+| ブラウザー / デスクトップの WebUSB | `@onekeyfe/hd-common-connect-sdk` | [WebUSB](/ja/hardware-sdk/transport/web-usb) |
+| React Native BLE | `@onekeyfe/hd-ble-sdk` | [React Native BLE](/ja/hardware-sdk/transport/react-native-ble) |
+| Android / iOS / Flutter のネイティブブリッジ | `@onekeyfe/hd-common-connect-sdk` (`env: 'lowlevel'`) | [ネイティブ BLE](/ja/hardware-sdk/transport/native-ble) |
+| ブラウザーの iframe ホストのみ | `@onekeyfe/hd-web-sdk` | [プラグインの iframe ホスト](/ja/hardware-sdk#plugin-iframe-host) |
+
+<Tabs items={['npm', 'pnpm', 'yarn']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+pnpm add --save-exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash filename="Terminal"
+yarn add --exact @onekeyfe/hd-common-connect-sdk@1.2 @onekeyfe/hd-core@1.2 @onekeyfe/hd-shared@1.2
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+このコマンドは公開済みの `1.2.x` パッケージを選択し、正確なバージョンを保存します。SDK、core、shared は同じリリースに揃え、ロックファイルをコミットしてください。`@onekeyfe/hd-web-sdk` を埋め込む場合は `connectSrc` を省略し、インストール済みパッケージに合わせてください。
+
+## 2. 一度だけ初期化 [#2-initialize-once]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+アプリの入り口で `init()` を一度呼び出します。同じ実行環境で `@onekeyfe/hd-web-sdk` と `@onekeyfe/hd-common-connect-sdk` を併用しないでください。
+
+## 3. 検索、識別、アドレスの取得 [#3-search-identify-read-an-address]
+
+保護された呼び出しの前に [UI イベントハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録し、ロック中のデバイスで PIN 入力を完了できるようにします。WebUSB では、検出前にユーザーの接続ボタンからデバイスを許可してください:
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Run directly in the Connect button handler.
+if (!navigator.usb) throw new Error('WebUSB is unavailable in this browser');
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+続いてデバイスを検出します。この例では候補が 1 台だけである必要があります。複数のデバイスが見つかった場合は、ユーザーに 1 台を選択してもらってから続行してください。
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success || !devices.payload.length) {
+  throw new Error('No OneKey device found');
+}
+
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (state.success === false) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+  showOnOneKey: true,
+});
+
+if (address.success === false) throw new Error(address.payload.error);
+console.log(address.payload.address);
+```
+
+`payload` を読み取る前に、必ず `success` を確認します。`useEmptyPassphrase: true` は最初の呼び出しを標準ウォレットに固定し、残っている隠しウォレットセッションによってアドレスが知らないうちに変わるのを防ぎます。
+
+`getDeviceState()` は V1/V2 共通の読み取り API です。`getFeatures()` は Protocol V1 のみです。Pro 2 と Neo では `getDeviceState()` を使用する必要があります。
+
+WebUSB には HTTPS とユーザー操作が必要です。BLE には OS の Bluetooth 権限が必要です。
+
+## 1.2.0 が提供する機能 [#what-120-does-for-you]
+
+- SDK は実際のデバイスから Protocol V1 と V2 を検出します。USB PID、BLE 名、製品文字列で分岐させないでください。参照: [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol).
+- Pro 2 と Neo は Classic / Pro と同じメソッドを使用します。デバイスごとの違いは次に記載しています: [デバイス](/ja/hardware-sdk/concepts/devices).
+- `openWalletSession` でウォレットを開くか切り替えます。`getPassphraseState` は非推奨です。[ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)を参照してください。
+
+## 次へ [#next]
+
+<Link className="doc-next" href="/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM と EVM</small><strong>最初のトランザクションに署名</strong><span>パラメーター、手数料の種類、署名レスポンス。</span></span><span aria-hidden="true">↗</span></Link>
+
+1. すでに 1.1.x を使用している場合: [1.1.x から 1.2.x へ](/ja/hardware-sdk/legacy-guides/from-1x)
+2. PIN / パスフレーズの UI イベントを接続: [Core API ガイド](/ja/hardware-sdk/core-api-guide)
+3. 実際のプラットフォームで接続: [トランスポート](/ja/hardware-sdk/transport)
+4. 切断を処理: [再接続と破棄](/ja/hardware-sdk/transport/reconnect)
+5. 各デバイスの対応チェーン: [対応チェーン](/ja/hardware-sdk/concepts/chain-support)
+6. トランザクションに署名: [署名者ガイド](/ja/hardware-sdk/signers)
+7. ファームウェア: [ファームウェア更新](/ja/hardware-sdk/firmware-update)
+8. ハードウェアなしで試す: [プレイグラウンド](/ja/hardware-sdk/playground)

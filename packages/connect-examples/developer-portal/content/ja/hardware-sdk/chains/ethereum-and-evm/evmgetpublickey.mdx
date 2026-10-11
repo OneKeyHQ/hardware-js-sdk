@@ -1,0 +1,96 @@
+---
+title: "evmGetPublicKey"
+---
+
+# evmGetPublicKey
+
+## Ethereum: 公開鍵を取得 [#ethereum-get-public-key]
+
+指定パスから導出した公開鍵を返します。`showOnOneKey` を使用すると、デバイス上での確認を要求できます。
+
+```typescript
+const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 単一の公開鍵 [#single-public-key]
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _任意_ `boolean` 公開鍵をデバイスに表示するかどうか。デフォルトは `true`.
+* `chainId` - _任意_ `number` ETH の ChainId は、特定の Ethereum ネットワークを一意に識別し、ブロックチェーンの異なるバージョンを区別するための識別子です。 [リファレンス](https://github.com/ethereum-lists/chains/tree/master/\_data/chains).
+
+#### 複数の公開鍵 [#multiple-public-keys]
+
+* `bundle` - `path`, `chainId`, `showOnOneKey` フィールドを持つオブジェクトの配列
+
+### 例 [#example]
+
+最初の ethereum アカウントの公開鍵を返します:
+
+```typescript
+HardwareSDK.evmGetPublicKey(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    showOnOneKey: true,
+    chainId: 1
+});
+```
+
+複数の ethereum アカウントの公開鍵をまとめて返します:
+
+```typescript
+HardwareSDK.evmGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/60'/0'/0/0", chainId: 1 }, // account 1
+        { path: "m/44'/60'/1'/0/0", chainId: 1 }, // account 2
+        { path: "m/44'/60'/2'/0/0", chainId: 1 }  // account 3
+    ]
+});
+```
+
+### 結果 [#result]
+
+単一公開鍵のレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        xpub?: string,        // xpub in legacy format
+        pub: string, // hexadecimal public key
+        publicKey: string, // alias of pub
+    }
+}
+```
+
+[BIP32 のシリアライズ形式について詳しく読む](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+公開鍵のバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, xpub, pub }, // account 1
+        { path, xpub, pub }, // account 2
+        { path, xpub, pub }, // account 3
+    ]
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+`useBatch: true` を指定した `bundle` リクエストでは、対応するバッチ処理は `{ path, pub, publicKey }` を返し、`xpub` や `node` は返しません。通常の経路は拡張公開鍵とノードを返します。バッチレスポンスではこれらのフィールドを必須にしないでください。

@@ -1,0 +1,163 @@
+---
+title: "API リファレンス"
+description: "OneKey の Cosmos プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Cosmos プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `enable(chainIds)` | チェーンへのアクセスを要求。値を返さずに解決 |
+| `disable(chainIds)` | チェーンを無効化 |
+| `disconnect()` | すべてのチェーンから切断 |
+| `getKey(chainId)` | チェーンのアカウントキーを取得 |
+| `signAmino(chainId, signer, signDoc)` | Amino エンコードされたトランザクションに署名 |
+| `signDirect(chainId, signer, signDoc)` | Protobuf エンコードされたトランザクションに署名 |
+| `sendTx(chainId, tx, mode)` | 署名済みトランザクションをブロードキャスト |
+| `signArbitrary(chainId, signer, data)` | 任意のメッセージに署名 |
+| `verifyArbitrary(chainId, signer, data, signature)` | 署名を検証 |
+| `signEthereum(chainId, signer, data, type)` | Ethereum データに署名 |
+| `experimentalSuggestChain(chainInfo)` | カスタムチェーンを追加 |
+| `getOfflineSigner(chainId)` | Direct オフライン署名者を取得 |
+| `getOfflineSignerOnlyAmino(chainId)` | Amino 専用オフライン署名者を取得 |
+| `getOfflineSignerAuto(chainId)` | 最適な署名者タイプを自動検出 |
+| `getChainInfosWithoutEndpoints()` | すべてのチェーン情報を取得 |
+| `getChainInfoWithoutEndpoints(chainId)` | 特定のチェーン情報を取得 |
+| `ping()` | 接続を確認 |
+| `babylonConnectWallet()` | Babylon ウォレットに接続 |
+| `babylonGetKey()` | Babylon ウォレットの鍵を取得 |
+
+---
+
+## 鍵のインターフェース [#key-interface]
+
+```typescript
+interface Key {
+  name: string              // Human-readable name
+  algo: string              // Signing algorithm
+  pubKey: Uint8Array        // Public key bytes
+  address: Uint8Array       // Address bytes
+  bech32Address: string     // Bech32 formatted address
+  isNanoLedger: boolean     // Ledger compatibility flag
+  isKeystone: boolean       // True if Keystone hardware
+}
+```
+
+---
+
+## 署名ドキュメントの型 [#sign-doc-types]
+
+### Amino 署名ドキュメント [#amino-sign-doc]
+
+```typescript
+interface StdSignDoc {
+  chain_id: string
+  account_number: string
+  sequence: string
+  fee: {
+    amount: { denom: string; amount: string }[]
+    gas: string
+  }
+  msgs: {
+    type: string
+    value: any
+  }[]
+  memo: string
+}
+```
+
+### Direct 署名ドキュメント [#direct-sign-doc]
+
+```typescript
+interface DirectSignDoc {
+  bodyBytes: Uint8Array | null
+  authInfoBytes: Uint8Array | null
+  chainId: string | null
+  accountNumber: Long | null
+}
+```
+
+---
+
+## 署名レスポンスの型 [#sign-response-types]
+
+```typescript
+interface AminoSignResponse {
+  signed: StdSignDoc
+  signature: StdSignature
+}
+
+interface DirectSignResponse {
+  signed: DirectSignDoc
+  signature: StdSignature
+}
+
+interface StdSignature {
+  pub_key: {
+    type: string
+    value: string  // Base64 encoded
+  }
+  signature: string  // Base64 encoded
+}
+```
+
+---
+
+## ブロードキャストモード [#broadcast-modes]
+
+| モード | 説明 |
+|------|-------------|
+| `block` | ブロックへの取り込みを待機 |
+| `sync` | CheckTx を待機 |
+| `async` | 即座に返却 |
+
+---
+
+## 対応チェーン [#supported-chains]
+
+| チェーン | チェーン ID | ウォレットでの利用可否 |
+|-------|----------|----------------|
+| Cosmos Hub | `cosmoshub-4` | 対象のウォレットで確認 |
+| Osmosis | `osmosis-1` | 対象のウォレットで確認 |
+| Juno | `juno-1` | 対象のウォレットで確認 |
+| Stargaze | `stargaze-1` | 対象のウォレットで確認 |
+| Akash | `akashnet-2` | 対象のウォレットで確認 |
+| Secret Network | `secret-4` | 対象のウォレットで確認 |
+| Evmos | `evmos_9001-2` | 対象のウォレットで確認 |
+| Injective | `injective-1` | 対象のウォレットで確認 |
+| カスタム | チェーン固有 | 次で要求: `experimentalSuggestChain`; 受け入れられる保証はありません |
+
+---
+
+## イベント [#events]
+
+| イベント | 説明 |
+|-------|-------------|
+| `keplr_keystorechange` | アカウントまたは鍵の変更時 |
+| `connect` | チェーン接続時 |
+| `disconnect` | 切断時 |
+
+```typescript
+// Listen for keystore changes
+window.addEventListener('keplr_keystorechange', () => {
+  console.log('Key changed, refresh account info')
+})
+```
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| 4100 | 未認証 |
+| -32603 | 内部エラー |

@@ -9,12 +9,12 @@
       "curated": true,
       "changes": {
         "en": [
-          "Latest stable npm line (`@onekeyfe/hd-core@1.2.1`)",
+          "Protocol V2 maintenance release (@onekeyfe/hd-core@1.2.1)",
           "Harden Protocol V2 BLE firmware-install completion after reboot",
           "Same public API as 1.2.0: V1/V2 auto-detect, openWalletSession, getDeviceState, firmwareUpdateV4"
         ],
         "zh": [
-          "当前 npm 稳定线（`@onekeyfe/hd-core@1.2.1`）",
+          "Protocol V2 维护版本（@onekeyfe/hd-core@1.2.1）",
           "加固 Protocol V2 BLE 固件安装在重启后的完成判定",
           "公开 API 与 1.2.0 相同：V1/V2 自动识别、openWalletSession、getDeviceState、firmwareUpdateV4"
         ]

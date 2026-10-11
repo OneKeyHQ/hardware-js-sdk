@@ -1,0 +1,35 @@
+---
+title: "getBalance"
+---
+
+# getBalance
+
+Consultar el saldo de la cuenta
+
+## Método [#method]
+
+```typescript
+declare function getBalance(): Promise<BalanceResponse>;
+```
+
+## Respuesta [#response]
+
+```typescript
+interface BalanceResponse {
+    balance: number;
+    currency?: "sats" | "EUR" | "USD"
+}
+```
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const balance = await provider.getBalance();
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/GRzXmqN)

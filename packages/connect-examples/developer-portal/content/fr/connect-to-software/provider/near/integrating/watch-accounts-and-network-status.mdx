@@ -1,0 +1,36 @@
+---
+title: "Surveiller l’état des comptes et du réseau"
+---
+
+<span id="watch-accounts--network-status" />
+
+# Surveiller l’état des comptes et du réseau
+
+Le fournisseur émet des événements de compte et de réseau. Écoutez-les pour actualiser l’état du compte et les données propres au réseau dans votre application.
+
+## Ajouter des écouteurs d’événements [#add-event-listeners]
+
+```javascript
+// accountsChanged
+const onAccountsChanged = (payload) => {
+  const accountId = payload?.accounts?.[0]?.accountId || '';
+  console.log('onAccountsChanged', accountId);
+}
+provider.on('accountsChanged', onAccountsChanged);
+
+
+// networkChanged
+const onNetworkChanged = (payload) => {
+  console.log('onNetworkChanged', payload.networkId);
+}
+provider.on('networkChanged', onNetworkChanged);
+```
+
+### Supprimer des écouteurs d’événements [#remove-event-listeners]
+
+Pensez aussi à supprimer les écouteurs lorsque vous n’en avez plus besoin (par exemple au démontage d’un composant React) :
+
+```javascript
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('networkChanged', onNetworkChanged);
+```

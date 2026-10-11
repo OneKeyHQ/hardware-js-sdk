@@ -1,0 +1,85 @@
+---
+description: "Annulez les opérations du SDK sur une connexion sélectionnée et distinguez l’annulation de la fermeture du transport."
+title: "Annuler une demande"
+---
+
+<span id="cancel-request" />
+
+# Annuler une demande
+
+## Vue d’ensemble [#overview]
+
+`cancel(connectId)` annule les requêtes SDK en attente et actives associées à cette connexion, et ferme les interfaces SDK en attente. Omettre `connectId` annule toutes les requêtes en attente. Utilisez cette méthode lorsque l’utilisateur annule une demande de PIN/phrase secrète, quitte le parcours ou atteint un délai limite de l’application.
+
+## Méthode [#method]
+
+```typescript
+HardwareSDK.cancel(connectId);
+// Cancel all pending requests:
+HardwareSDK.cancel();
+```
+
+### Paramètres [#parameters]
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|----------|-------------|
+| `connectId` | `string` | Non | Connexion cible ; omettre pour annuler toutes les requêtes en attente. |
+
+### Valeur de retour [#return-value]
+
+`cancel()` renvoie `void`. Attendez la Promise de la méthode initiale pour observer son résultat. Le SDK public résout normalement une demande annulée avec `success: false` ; l’annulation dans la file utilise `HardwareErrorCode.CallQueueActionCancelled` (`822`). Un refus sur l’appareil ou une erreur survenant avant l’annulation peut renvoyer un code différent. Ne comparez pas le texte des messages d’erreur et ne supposez pas que toutes les annulations ont le même code.
+
+## Exemples [#examples]
+
+### Annulation de base [#basic-cancellation]
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+// Use a fully prepared transaction from your application's transaction builder.
+declare const params: EVMSignTransactionParams;
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+
+// Invoke from the user's Cancel action.
+HardwareSDK.cancel(connectId);
+
+const result = await signPromise;
+if (!result.success) {
+  if (result.payload.code === HardwareErrorCode.CallQueueActionCancelled) {
+    // Close the cancelled operation's UI.
+  } else {
+    throw new Error(result.payload.error);
+  }
+}
+```
+
+### Annulation avec délai limite [#cancel-with-timeout]
+
+Ce minuteur annule toutes les requêtes en attente sur la connexion sélectionnée ; sérialisez donc les opérations par appareil.
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+
+async function signWithTimeout(
+  connectId: string,
+  deviceId: string,
+  params: EVMSignTransactionParams,
+  timeoutMs = 60_000,
+) {
+  const timer = setTimeout(() => HardwareSDK.cancel(connectId), timeoutMs);
+  try {
+    return await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+```
+
+## Annulation et fermeture du transport [#cancel-vs-transport-teardown]
+
+L’annulation interrompt l’opération et peut déclencher le nettoyage de l’appareil/de la liaison. Elle ne garantit pas que la connexion reste utilisable ni qu’un nouvel appel puisse démarrer immédiatement. Attendez le résultat initial ; si la liaison est perdue, redécouvrez l’appareil et actualisez `getDeviceState` avant une nouvelle action utilisateur. Ne relancez pas automatiquement une signature ou une mise à jour du micrologiciel.
+
+Utilisez `HardwareSDK.dispose()` lors de la fermeture du SDK ou d’un changement de transport, puis `init()` avant toute réutilisation. Une déconnexion physique est signalée par `DEVICE.DISCONNECT` ; les appels publics de méthodes en attente renvoient des résultats d’échec.
+
+Voir [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect) et [Codes d’erreur](/fr/hardware-sdk/core-api-guide#error-codes).

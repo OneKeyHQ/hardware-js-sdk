@@ -1,0 +1,36 @@
+---
+title: "Wallet-Provider auswählen"
+description: "Verwenden Sie Ihren EIP-1193-Anfrageablauf weiter und wählen Sie OneKey ausdrücklich aus. Verwenden Sie [EIP-6963-Erkennung](/en/connect-to-software/provider/eth/provider-api) für eine Auswahl mehrerer Wallets oder `window.$onekey.ethereum` für eine OneKey-spezifische Verbindungsschaltfläche."
+---
+
+<span id="select-a-wallet-provider" />
+
+# Wallet-Provider auswählen
+
+Verwenden Sie Ihren EIP-1193-Anfrageablauf weiter und wählen Sie OneKey ausdrücklich aus. Verwenden Sie [EIP-6963-Erkennung](/de/connect-to-software/provider/eth/provider-api) für eine Auswahl mehrerer Wallets oder `window.$onekey.ethereum` für eine OneKey-spezifische Verbindungsschaltfläche.
+
+```javascript
+// Run from a user-initiated Connect action.
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  // Update your application's selected account from accounts.
+} catch (error) {
+  // Show a recoverable error; do not automatically repeat the prompt.
+  console.error(error.code, error.message);
+}
+```
+
+## Eine bestehende Integration migrieren [#migrating-an-existing-integration]
+
+- Behalten Sie den ausgewählten Provider für Konten, Signieren, Transaktionen und Ereignis-Listener bei.
+- Ersetzen Sie veraltete `enable()`-Aufrufe durch `request({ method: 'eth_requestAccounts' })`.
+- Behandeln Sie `isOneKey` als boolesche Eigenschaft. `isMetaMask` allein identifiziert in einer Kompatibilitätsumgebung keine eindeutige Wallet.
+- Behandeln Sie `accountsChanged`, `chainChanged` und abgelehnte Promises; entfernen Sie Listener beim Unmount der Ansicht.
+- Prüfen Sie Wallet-spezifische Methoden in Ihrer Zielversion, statt Unterstützung für jede MetaMask-Methode anzunehmen.
+
+## Früherer Provider-Wechsel [#historical-provider-switching]
+
+Ältere Integrationen verwendeten `window.onekey` und `window.ethereum.switchProvider()`. `switchProvider` ist nicht Teil von EIP-1193. Verwenden Sie in neuem Code die Erkennung oder den Provider mit Namensraum. Prüfen Sie bei der Wartung älterer Integrationen vor dem Aufruf die Verfügbarkeit jeder älteren Methode.

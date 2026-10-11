@@ -1,0 +1,158 @@
+---
+title: "はじめに"
+description: "OneKey の Petra 互換プロバイダーで Aptos に接続"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+署名前にプロバイダーに接続し、選択中のネットワークを確認してください。直接注入されるプロバイダーと Aptos Wallet Standard アダプターでは引数の型が異なるため、例を混用しないでください。省略されたアドレスを置き換え、読み取り専用の呼び出し用に SDK クライアントを用意してください。
+
+OneKey のプロバイダーを検出して接続し、Aptos を操作する方法を説明します。
+
+<Callout type="info">
+OneKey は Petra 互換のメソッドと Aptos Wallet Standard アダプターを公開しています。メソッドのシグネチャは異なるため、統合方法に対応するインターフェースの説明に従ってください。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// Detect OneKey Aptos provider
+const provider = window.$onekey?.aptos
+
+if (!provider) {
+  throw new Error('OneKey Aptos provider not detected')
+}
+
+// Check provider info
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
+```
+
+---
+
+## ウォレットに接続 [#connect-wallet]
+
+```typescript
+// Connect and get account info
+const response = await provider.connect()
+
+console.log({
+  address: response.address,     // Account address
+  publicKey: response.publicKey, // Public key
+})
+```
+
+---
+
+## 接続状態を確認 [#check-connection-status]
+
+```typescript
+const isConnected = await provider.isConnected()
+console.log('Connected:', isConnected)
+```
+
+---
+
+## 現在のアカウントを取得 [#get-current-account]
+
+```typescript
+const account = await provider.account()
+
+console.log({
+  address: account.address,
+  publicKey: account.publicKey,
+})
+```
+
+---
+
+## ネットワーク情報を取得 [#get-network-info]
+
+```typescript
+const network = await provider.network()
+
+console.log('Network:', network) // 'mainnet', 'testnet', 'devnet'
+
+// For full network info
+const networkInfo = await provider.getNetwork()
+console.log({
+  name: networkInfo.name,
+  chainId: networkInfo.chainId,
+  url: networkInfo.url,
+})
+```
+
+---
+
+## 切断 [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## イベントリスナー [#event-listeners]
+
+### アカウント変更を監視 [#listen-for-account-changes]
+
+```typescript
+provider.onAccountChange((newAccount) => {
+  if (newAccount) {
+    console.log('Account changed:', newAccount)
+  } else {
+    console.log('Wallet disconnected')
+  }
+})
+```
+
+### ネットワーク変更を監視 [#listen-for-network-changes]
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('Network changed:', network)
+})
+```
+
+---
+
+## Petra からの移行 [#migration-from-petra]
+
+OneKey の Aptos プロバイダーは Petra と互換性があります。プロバイダーの検出処理を更新してください:
+
+```typescript
+// Before (Petra only)
+const provider = window.petra
+
+// After (OneKey with Petra fallback)
+const provider = window.$onekey?.aptos || window.petra
+```
+
+---
+
+## Aptos Wallet Adapter との併用 [#using-with-aptos-wallet-adapter]
+
+React アプリケーションでは、公式の Aptos Wallet Adapter を使用してください:
+
+```bash
+npm install @aptos-labs/wallet-adapter-react
+```
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+Wallet Standard 互換のアダプターバージョンを使用し、検出されたウォレットの一覧に OneKey が表示されることを確認してください。

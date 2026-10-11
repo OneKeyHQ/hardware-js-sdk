@@ -1,0 +1,58 @@
+---
+description: "関連付けフィールドを使って現在の SDK 入力リクエストに応答し、デバイス通知と区別します。"
+title: "UI イベントに応答"
+---
+
+<span id="respond-to-ui-events" />
+
+# UI イベントに応答
+
+`HardwareSDK.uiResponse()` で保留中の SDK 入力リクエストに応答します。戻り値は `void`; 操作結果は、元のアドレス取得、署名、デバイス操作の Promise を待って取得してください。
+
+保護された呼び出しの前に[UI イベントハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録します。現在のリクエストにのみ応答し、リクエストに `payload.responseCorrelation` が含まれる場合は保持してください。`interactionId` と `deviceId` の関連付けフィールドはレスポンスのトップレベルに置きます。署名呼び出しの位置引数であるウォレットの `deviceId` の代わりにはなりません。
+
+## PIN 入力 [#pin-input]
+
+このコードは次の `UI_REQUEST.REQUEST_PIN` ハンドラー内に配置します。 `message` はそのリクエストであり、 `pinValue` は UI が収集したブラインド PIN の入力位置の完成した並びです。
+
+```ts
+HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: pinValue,
+});
+```
+
+デバイス上での入力も選べるホスト入力リクエストでは、応答値は `@@ONEKEY_INPUT_PIN_IN_DEVICE` です。`deviceOnly`、`ButtonRequest_PinEntry`、`ButtonRequest_AttachPin` が指定されたリクエストはデバイス上の通知です。案内を表示し、返信せずに待機してください。
+
+参照: [PIN](/ja/hardware-sdk/concepts/pin) でブラインドキーパッドの対応関係とモデルの制約を確認してください。
+
+## パスフレーズ入力 [#passphrase-input]
+
+このコードは `UI_REQUEST.REQUEST_PASSPHRASE` の中に配置します。`passphraseValue` にはユーザーの現在の入力を使い、ハードコードした値やログに記録した値を使ってはいけません。
+
+```ts
+HardwareSDK.uiResponse({
+  ...message.payload.responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: {
+    value: passphraseValue,
+    passphraseOnDevice: false,
+    save: false,
+  },
+});
+```
+
+デバイス上での入力を選ぶには、代わりに `{ value: '', passphraseOnDevice: true, save: false }` を使用します。`deviceOnly` に従ってデバイス入力を選択してください。`REQUEST_PASSPHRASE_ON_DEVICE` は後続の通知で、応答は不要です。
+
+ホストで入力した秘密情報を、ログ、分析、永続ストレージ、エラーレポートに含めないでください。ユーザーが対応するセッションキャッシュフローを明示的に選択しない限り、`save: false` を使用します。
+
+## キャンセルと終了 [#cancel-and-close]
+
+ユーザーが入力をキャンセルしたときは、`HardwareSDK.cancel(connectId)` で選択した接続の操作をキャンセルします。操作が完了したとき、または SDK が UI を閉じたときは、保留中のモーダルの送信を無効化し、遅れた応答が別のリクエストに回答しないようにしてください。
+
+`REQUEST_BUTTON`, ファームウェアの進捗、デバイス専用の PIN プロンプトは「OK」の応答を受け付けません。ホストのボタンでデバイス上の確認を代用してはいけません。
+
+## その他の入力リクエスト [#other-input-requests]
+
+WebUSB の bootloader 選択リクエストには、対応する `UI_RESPONSE.SELECT_DEVICE_*` 応答を使用し、選択したデバイス ID を `payload` に含めます。公開の共用型 [`UiResponseEvent`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/events/ui-response.ts) に受け付ける形式が定義されています。`uiResponse` などのライフサイクル API は、一般的な[共通パラメーター](/ja/hardware-sdk/concepts/common-params)オブジェクトを受け取りません。

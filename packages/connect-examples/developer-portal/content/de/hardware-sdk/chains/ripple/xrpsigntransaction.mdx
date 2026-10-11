@@ -1,0 +1,82 @@
+---
+title: "xrpSignTransaction"
+---
+
+# xrpSignTransaction
+
+### Ripple: Transaktion signieren [#ripple-sign-transaction]
+
+Fordert eine Transaktionssignatur an. Der Nutzer prüft und bestätigt die Anfrage auf dem Gerät.
+
+```typescript
+const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `5`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _erforderlich_ `XrpTransaction`-Typ
+
+#### XrpTransaction-Typ [#xrptransaction-type]
+
+```typescript
+type XrpTransaction = {
+    fee: string;
+    flags?: number;
+    sequence: number;
+    maxLedgerVersion?: number; // Proto: "last_ledger_sequence"
+    payment: XrpPayment;
+}
+
+type XrpPayment = {
+    amount: number;
+    destination: string;
+    destinationTag?: number;
+}
+```
+
+Die aktuelle SDK-Laufzeit erwartet `{ path, transaction }` und validiert `transaction.payment.amount` als Zahl. Ihre exportierte TypeScript-Deklaration stimmt mit diesem Laufzeitformat nicht überein. Das folgende Beispiel folgt der Laufzeitvereinbarung; prüfen Sie vor dem Kompilieren der Integration die Deklaration in Ihrer installierten SDK-Version. Beträge werden in Drops angegeben.
+
+### Beispiel [#example]
+
+```typescript
+HardwareSDK.xrpSignTransaction(connectId, deviceId, {
+    path: "m/44'/144'/0'/0/0",
+    transaction: {
+        fee: '12',
+        flags: 0,
+        sequence: 32841006,
+        maxLedgerVersion: 32841630,
+        payment: {
+            amount: 1000000,
+            destination: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
+        }
+    }
+});
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        serializedTx: string;
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

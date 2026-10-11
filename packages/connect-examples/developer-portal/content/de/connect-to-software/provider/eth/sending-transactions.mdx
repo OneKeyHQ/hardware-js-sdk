@@ -1,0 +1,59 @@
+---
+title: "Transaktionen senden"
+---
+
+<span id="sending-transactions" />
+
+# Transaktionen senden
+
+Verwenden Sie `eth_sendTransaction`, um eine Transaktion von einem verbundenen Konto anzufordern. Die Wallet fordert den Nutzer auf, sie zu prüfen und zu genehmigen. Eine erfolgreiche Anfrage gibt einen Transaktionshash zurück; dies bedeutet nicht, dass die Transaktion bestätigt oder erfolgreich ausgeführt wurde.
+
+## Beispiel [#example]
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+const [from] = await provider.request({ method: 'eth_requestAccounts' });
+const chainId = await provider.request({ method: 'eth_chainId' });
+// Check chainId against your application's intended network before continuing.
+const to = '<RECIPIENT_EVM_ADDRESS>'; // Replace with a valid address.
+
+try {
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from,
+      to,
+      value: '0x0',
+    }],
+  });
+  console.log('Submitted transaction:', txHash);
+} catch (error) {
+  console.error(error.code, error.message);
+}
+```
+
+Rufen Sie diesen Ablauf über eine Nutzeraktion auf. Ersetzen Sie Empfänger und Wert vor dem Senden. Fragen Sie `eth_getTransactionReceipt` auf derselben Chain ab, um Aufnahme- und Ausführungsstatus festzustellen; eine ausstehende Transaktion hat noch keinen Beleg.
+
+## Transaktionsparameter [#transaction-parameters]
+
+| Parameter | Bedeutung |
+| --- | --- |
+| `from` | Verbundenes Konto, das zum Senden der Transaktion autorisiert ist |
+| `to` | Empfängeradresse; nur bei Vertragserstellung weglassen |
+| `value` | Betrag der nativen Währung als hexadezimale Mengenangabe in der kleinsten Einheit (Wei auf Ethereum) |
+| `data` | Hexkodierte Vertragsaufrufdaten oder Bytecode zur Vertragserstellung |
+| `gas` | Optionales Gaslimit; dies ist eine Gasmenge, kein Gaspreis |
+| `gasPrice` | Optionale Gebühr pro Gaseinheit für eine Legacy-Transaktion |
+| `maxFeePerGas`, `maxPriorityFeePerGas` | Gebührenfelder einer EIP-1559-Transaktion; nicht kombinieren mit `gasPrice` |
+| `nonce` | Transaktionssequenznummer des Kontos; normalerweise der Wallet die Verwaltung überlassen |
+
+Verwenden Sie ganzzahlsichere Berechnungen für Beträge; vermeiden Sie Gleitkommaberechnungen bei der Umrechnung in Wei. Lassen Sie die Wallet Gebühren schätzen, sofern Ihre Anwendung keinen konkreten Grund hat, sie vorzugeben. Der Nutzer kann Transaktionsdetails in der Wallet prüfen oder anpassen.
+
+## Netzwerk- und Kontoänderungen [#network-and-account-changes]
+
+Lesen Sie `eth_chainId` vor dem Vorbereiten einer Transaktion und behandeln Sie `chainChanged` und `accountsChanged` wie beschrieben in [Provider-API](/de/connect-to-software/provider/eth/provider-api). Erstellen Sie konto- oder netzwerkabhängige Transaktionsdaten nach einer Änderung neu.
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codesandbox.io/embed/ethereum-provider-signtransactions-demo-2glt4y?autoresize=1&fontsize=14&hidenavigation=1&theme=dark)

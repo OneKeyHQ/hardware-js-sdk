@@ -1,0 +1,169 @@
+---
+description: "Configura el SDK BLE nativo de OneKey, permisos de plataforma, descubrimiento de dispositivos y confirmación de direcciones."
+title: "React Native BLE (hd-ble-sdk)"
+---
+
+# React Native BLE (hd-ble-sdk)
+
+> **Nota:**
+Demo: ejemplo React Native / Expo → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
+
+
+Esta guía explica cómo usar la pila BLE pura de React Native con `@onekeyfe/hd-ble-sdk` y `@onekeyfe/hd-transport-react-native`. No se requiere WebView ni adaptador de bajo nivel. El uso de la API de cadenas es el mismo que en Inicio rápido.
+
+## Instalación [#install]
+
+Recomendamos instalar las dependencias nativas de RN en la capa de aplicación para que autolinking incluya los módulos nativos en tu compilación Dev Client:
+
+```bash
+npm i @onekeyfe/hd-ble-sdk @onekeyfe/hd-transport-react-native \
+      @onekeyfe/react-native-ble-utils react-native-ble-plx \
+      buffer process react-native-get-random-values react-native-url-polyfill
+```
+
+En el punto de entrada de la aplicación (por ejemplo, `index.js` o `App.tsx`):
+
+```ts
+// Polyfills (adjust to your project needs)
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+// @ts-ignore
+global.Buffer = global.Buffer || require('buffer').Buffer;
+// @ts-ignore
+global.process = global.process || require('process');
+
+// Register RN transport side-effects before SDK init
+import '@onekeyfe/hd-transport-react-native';
+
+import HardwareSDK from '@onekeyfe/hd-ble-sdk';
+```
+
+## Configuración de Android [#android-setup]
+
+Para un cliente BLE que no deduce ubicación, usa estas declaraciones de permisos. Configura `neverForLocation` solo si esa afirmación es cierta para tu aplicación:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
+
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+```
+
+En Android 12+, solicita `BLUETOOTH_SCAN` y `BLUETOOTH_CONNECT` en tiempo de ejecución. El acceso a ubicación depende del SDK de destino, de si la aplicación deduce la ubicación y de la configuración de la biblioteca BLE; no siempre es obligatorio en Android 12+. En versiones anteriores, usa los permisos heredados/de ubicación correspondientes. Consulta la [guía de permisos de Android](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions).
+
+## Configuración de iOS [#ios-setup]
+
+Añade a `Info.plist`:
+
+- `NSBluetoothAlwaysUsageDescription` (obligatorio)
+- Opcionalmente `NSBluetoothPeripheralUsageDescription` para versiones antiguas de iOS
+- Si tu aplicación usa la cámara (por ejemplo, para escanear QR), añade `NSCameraUsageDescription`
+
+Si usas Expo, puedes declararlos en `app.json` bajo `expo.ios.infoPlist` y `expo.android.permissions`.
+
+## Configuración de Metro (polyfills y exportaciones) [#metro-config-polyfills--exports]
+
+Si Metro informa de API de Node ausentes, asigna solo los módulos que necesite tu grafo de dependencias. Instala todos los paquetes referenciados por `require.resolve` antes de usar una asignación. Integra estas entradas en tu configuración de resolver existente; no sustituyas los valores predeterminados del framework. Lo siguiente es un fragmento de asignación opcional, no una configuración Metro completa:
+
+```js
+// metro.config.js
+config.resolver.extraNodeModules = {
+  buffer: require.resolve('buffer/'),
+  crypto: require.resolve('crypto-browserify'),
+  stream: require.resolve('stream-browserify'),
+  process: require.resolve('process/browser'),
+  events: require.resolve('events/'),
+  http: require.resolve('http-browserify'),
+  https: require.resolve('https-browserify'),
+  zlib: require.resolve('browserify-zlib'),
+  util: require.resolve('util/'),
+  url: require.resolve('url/'),
+  path: require.resolve('path-browserify'),
+};
+config.resolver.unstable_enablePackageExports = true;
+```
+
+## Compilar Dev Client (dispositivos reales) [#build-dev-client-real-devices]
+
+Expo Go no incluye tus módulos BLE nativos. Compila un Dev Client:
+
+```bash
+# iOS
+expo run:ios --device
+
+# Android
+expo run:android --device
+
+# Start bundler for Dev Client
+expo start --dev-client -c
+```
+
+## Inicializar y suscribirse a eventos [#initialize-and-subscribe-to-events]
+
+```ts
+export async function setupBle() {
+  const initialized = await HardwareSDK.init({
+    env: 'react-native',                 // React Native BLE transport
+    debug: false,
+    fetchConfig: true,
+  });
+  if (!initialized) throw new Error('SDK initialization failed');
+
+  // Subscribe to UI events (PIN / Passphrase / confirmations)
+  // import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core'
+  // HardwareSDK.on(UI_EVENT, (msg) => { /* open dialogs and reply via HardwareSDK.uiResponse(...) */ });
+}
+```
+
+## Descubrir dispositivos e identificar device\_id [#discover-devices-and-identify-device_id]
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+
+// BLE returns id + name; read identity via getDeviceState
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const candidate = devices.payload[0];
+const connectId = candidate?.connectId;
+if (!connectId) throw new Error("No device connection");
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+Guarda de forma persistente `connectId` y `deviceId` (la mayoría de API de cadena requieren ambos).
+
+## Ejemplo de primera llamada (dirección BTC) [#first-call-example-btc-address]
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (res.success) {
+  console.log('BTC address:', res.payload.address);
+} else {
+  console.error('Error:', res.payload.error, res.payload.code);
+}
+```
+
+## Consejos [#tips]
+
+- Suscríbete siempre pronto a `UI_EVENT` para evitar que PIN/frase de contraseña/confirmaciones bloqueen las solicitudes. Consulta [Evento de configuración](/es/hardware-sdk/core-api-guide#events-ui).
+- Mantén los permisos BLE alineados con la versión del sistema operativo. Prueba en dispositivos físicos.
+- Para más ejemplos, consulta: [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
+
+## Continuar [#continue]
+
+- [Introducción](/es/hardware-sdk)
+- [Código de error](/es/hardware-sdk/core-api-guide#error-codes), [Parámetros comunes](/es/hardware-sdk/concepts/common-params)
+- Bloques BLE y tramas V1/V2: [Consulta Plugin de transporte de bajo nivel](/es/hardware-sdk/concepts/low-level-plugin#ble-protocol-native-mobile)

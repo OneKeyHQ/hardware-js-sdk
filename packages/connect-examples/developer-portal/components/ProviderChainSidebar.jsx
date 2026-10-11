@@ -266,6 +266,7 @@ export function ProviderChainSidebar({ lang = 'en' }) {
     <div className="provider-chain-sidebar">
       {/* Chain Dropdown */}
       <ChainDropdown
+        locale={lang}
         chains={PROVIDER_CHAINS}
         selectedChainId={displayedChainId}
         onSelect={handleChainSelect}

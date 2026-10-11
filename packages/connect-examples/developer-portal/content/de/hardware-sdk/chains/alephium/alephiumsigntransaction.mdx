@@ -1,0 +1,62 @@
+---
+title: "alephiumSignTransaction"
+---
+
+# alephiumSignTransaction
+
+### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.10.0
+
+### Alephium: Transaktion signieren [#alephium-sign-transaction]
+
+Eine Alephium-Transaktion mit dem privaten Schlüssel signieren, der aus dem angegebenen BIP32-Pfad abgeleitet wird. Der Nutzer muss die Aktion auf dem OneKey-Gerät bestätigen.
+
+```typescript
+const result = await HardwareSDK.alephiumSignTransaction(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    rawTx: "00010080004e20c1174876e80001f3bf9d774d87e65e79a72d5482da5ef35aac8d0b930b394bdd67586930f6ae7b4fd8362b0003f6bd3137b3cadbad59a73527c3b8e26429bba093722a59639f22af9d2adb477302c40de0b6b3a7640000001e98167f559360e002c3f3ceb3cc95c1dad848403f0296c76439093d2b9879ac00000000000000000000c43c7a13049ed60800001e98167f559360e002c3f3ceb3cc95c1dad848403f0296c76439093d2b9879ac00000000000000000000"
+});
+```
+
+#### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`
+* `rawTx` - _erforderlich_ `string` Rohtransaktion im Hexformat
+
+#### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.alephiumSignTransaction(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    rawTx: "0x0123...",
+    scriptOpt: "p2pkh"
+});
+```
+
+Ergebnis
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+    address: string,
+  }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

@@ -1,0 +1,23 @@
+---
+title: "Signature de transaction"
+---
+
+<span id="signing-transaction" />
+
+# Signature de transaction
+
+Signer des transactions sans les envoyer.
+
+La méthode renvoie une Promise. La structure de sa réponse doit être vérifiée pour chaque version : la déclaration publique du fournisseur nomme `transactionHashes`, tandis que l’exemple public lit `signatures`. Ne dépendez d’aucun de ces champs avant d’avoir vérifié le fournisseur installé et la version du portefeuille. Cette demande de signature seule ne diffuse pas la transaction.
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_signTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_signTransactions', res);
+```

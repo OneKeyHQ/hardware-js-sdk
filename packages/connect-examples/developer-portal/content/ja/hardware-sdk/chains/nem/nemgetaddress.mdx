@@ -1,0 +1,94 @@
+---
+title: "nemGetAddress"
+---
+
+# nemGetAddress
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.4.0
+  * Classic/Mini: 3.2.0
+
+## NEM: アドレスを取得 [#nem-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` が `true` の場合は、 ユーザーがデバイス上でアドレスを確認する必要があります。
+
+```typescript
+const response = await HardwareSDK.nemGetAddress(connectId, deviceId, params)
+```
+
+### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+**単一のアドレス**
+
+* `path` - _必須_ `string | Array<number>`  SDK の最小長は `3`. [詳細情報](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `network` - _任意_ `number` ネットワーク ID。デフォルト値は `MAINNET(104)`
+* `showOnOneKey` - _任意_ `boolean` アドレスをデバイスに表示するかどうか。デフォルトは `true`.
+
+**複数のアドレス**
+
+* `bundle` - `path` および `showOnOneKey` フィールドを持つオブジェクトの配列
+
+#### 例 [#example]
+
+最初の nem アカウントのアドレスを表示します:
+
+```typescript
+HardwareSDK.nemGetAddress(connectId, deviceId, {
+    path: "m/44'/43'/0'/0/0"
+});
+```
+
+デバイスに表示せず、NEM アドレスをまとめて返します:
+
+```typescript
+HardwareSDK.nemGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/43'/0'/0/0", showOnOneKey: false }, // account 1
+        { path: "m/44'/43'/1'/0/0", showOnOneKey: false }, // account 2
+        { path: "m/44'/43'/2'/0/0", showOnOneKey: false }  // account 3
+    ]
+});
+```
+
+#### 結果 [#result]
+
+単一アドレスのレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+リクエストと同じ順序のバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string }, // account 1
+        { address: string, path: string }, // account 2
+        { address: string, path: string }  // account 3
+    ]
+}
+```
+
+エラー
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

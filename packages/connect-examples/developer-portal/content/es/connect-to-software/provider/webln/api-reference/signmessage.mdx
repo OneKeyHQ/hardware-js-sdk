@@ -1,0 +1,36 @@
+---
+title: "signMessage"
+---
+
+# signMessage
+
+Solicita al usuario que firme un mensaje de texto.
+
+## Método [#method]
+
+```typescript
+declare function signMessage(message: string): Promise<SignMessageResponse>;
+```
+
+## Respuesta [#response]
+
+```typescript
+interface SignMessageResponse {
+  message: string;
+  signature: string;
+}
+```
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+const message = "Plain Message";
+await provider.enable();
+const signature = await provider.signMessage(message);
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/mdvGmLm)

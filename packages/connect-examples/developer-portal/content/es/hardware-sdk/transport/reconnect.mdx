@@ -1,0 +1,72 @@
+---
+description: "Recupera conexiones, conserva vinculaciones de cartera y cierra el SDK sin repetir efectos secundarios."
+title: "Reconexión y liberación de recursos"
+---
+
+<span id="reconnect-and-dispose" />
+
+# Reconexión y liberación de recursos
+
+Las interrupciones del transporte son normales: desconexión USB, alcance BLE, reinicio de Bluetooth del sistema o del firmware. Hardware SDK 1.2.0 recupera la **conexión**. Tu aplicación todavía debe recuperar la **llamada**.
+
+Esta página define el contrato de integración. No describe los números de secuencia de Protocol V2 ni la generación del transporte.
+
+## Qué hace ya el SDK [#what-the-sdk-already-does]
+
+- Una desconexión/reconexión normal **no** olvida el protocolo confirmado `connectProtocol`. No vuelves a seleccionar V1 o V2 después de una desconexión.
+- Las llamadas en curso fallan. El SDK **no** repite firmas, borrados ni actualizaciones de firmware.
+- Protocol V2 conserva el orden de llamadas por dispositivo. No solapes una segunda llamada funcional mientras se recupera la primera.
+
+## Qué debes hacer [#what-you-must-do]
+
+1. Suscríbete a `DEVICE.CONNECT` / `DEVICE.DISCONNECT` una vez al iniciar la aplicación.
+2. Ante `DISCONNECT`, marca ese `connectId` como ocupado/inválido y termina el flujo actual con error. No repitas el mismo método con efectos secundarios.
+3. Vuelve a buscar (`searchDevices`) cuando el usuario esté preparado. Volver a conectar USB o emparejar BLE puede generar un **nuevo** `connectId`. Guarda en caché los identificadores USB y BLE por separado. Consulta [Identificadores](/es/hardware-sdk/concepts/identifiers).
+4. Después de una nueva conexión, actualiza el estado del dispositivo con [`getDeviceState`](/es/hardware-sdk/basic-api/get-device-state). Reutiliza el valor guardado de `deviceId + passphraseState`; no guardes de forma persistente el `session_id`.
+5. En la siguiente llamada de dirección/firma, envía el valor persistido de `passphraseState` o `useEmptyPassphrase: true`. Core reanuda la sesión del firmware dentro de ese método. No vuelvas a abrir una sesión de cartera solo para reconectar.
+
+```ts
+import { DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => {
+  markDisconnected(payload);
+  // Fail the open UI flow; do not replay signing or firmware updates.
+});
+HardwareSDK.on(DEVICE.CONNECT, () => {
+  refreshDeviceList();
+});
+```
+
+## Específico de BLE [#ble-specific]
+
+- Los permisos (`BLUETOOTH_SCAN` / `CONNECT`, textos de uso de Bluetooth de iOS y, a menudo, ubicación en Android) deben seguir concedidos tras finalizar el proceso. Consulta [React Native BLE](/es/hardware-sdk/transport/react-native-ble).
+- `retryCount` / `timeout` controlan el establecimiento de conexión antes de una llamada al dispositivo. No reintentan la firma ni sustituyen la recuperación a nivel de aplicación.
+- Si la vinculación del sistema está obsoleta, detén los intentos en bucle. Pide al usuario que olvide el dispositivo en los ajustes Bluetooth y vuelva a emparejarlo.
+- Mini no tiene BLE. Neo tiene BLE pero no cámara. Consulta [Dispositivos](/es/hardware-sdk/concepts/devices).
+
+## Específico de USB [#usb-specific]
+
+- WebUSB necesita una acción del usuario para volver a mostrar el selector, salvo que envíes `skipWebDevicePrompt` en un dispositivo todavía autorizado. Consulta [Parámetros comunes](/es/hardware-sdk/concepts/common-params).
+- Otra pestaña o Bridge puede estar usando el dispositivo y provocar un error al adquirirlo/abrirlo. Cierra esa conexión; no uses `dispose()` como primera respuesta.
+
+## `dispose()` [#dispose]
+
+```ts
+await HardwareSDK.dispose();
+```
+
+Llama a `dispose()` solo al cerrar el SDK o cambiar `env` o la pila de transporte (por ejemplo, de WebUSB a bajo nivel). Elimina todas las conexiones y el cursor de transporte de Protocol V2.
+
+Recuerda: **no** llames a `dispose()` ante una interrupción BLE o desconexión USB rutinaria. Busca y conecta de nuevo en la misma instancia del SDK `HardwareSDK`.
+
+Después de `dispose()`, debes llamar a `init()` de nuevo antes de `searchDevices`.
+
+## Reinicio de firmware [#firmware-reboot]
+
+`firmwareUpdateV2` / `V3` / `V4` puede desconectar deliberadamente. Espera, vuelve a conectar y lee las versiones. No interpretes esa interrupción como una actualización fallida que debe repetirse. Consulta [Actualización del firmware](/es/hardware-sdk/firmware-update).
+
+## Siguiente [#next]
+
+- [Selector de transporte](/es/hardware-sdk/transport)
+- [Guía de la API Core](/es/hardware-sdk/core-api-guide)
+- [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session)

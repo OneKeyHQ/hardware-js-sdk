@@ -1,0 +1,101 @@
+---
+title: "btcGetPublicKey"
+---
+
+# btcGetPublicKey
+
+## Bitcoin: obtener una clave pública [#bitcoin-get-public-key]
+
+Devuelve la clave pública derivada de la ruta especificada. Usa `showOnOneKey` para solicitar confirmación en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.btcGetPublicKey(connectId, deviceId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+### Una clave pública [#single-public-key]
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `1`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la clave pública en el dispositivo. El valor predeterminado es `true`.
+* `coin` - _opcional_ `string` determina la definición de red especificada en el archivo coins.json. Puede usarse `shortcut`, `name` o `label` de la moneda. Si `coin` no se establece, la API intenta obtener la definición de red a partir de `path`.
+* `scriptType` - _opcional_ InputScriptType, tipo de script de dirección
+
+#### Varias claves públicas [#multiple-public-keys]
+
+* `bundle` - matriz de objetos que incluyen `path`, `coin` como campos
+
+### Ejemplo [#example]
+
+Devuelve la clave pública de la quinta cuenta de Bitcoin:
+
+```typescript
+HardwareSDK.btcGetPublicKey(connectId, deviceId, {
+    path: "m/49'/0'/4'",
+    coin: "btc"
+});
+```
+
+Devuelve un conjunto de claves públicas para varias cuentas de Bitcoin:
+
+```typescript
+HardwareSDK.btcGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/49'/0'/0'" }, // account 1
+        { path: "m/49'/0'/1'" }, // account 2
+        { path: "m/49'/0'/2'" }  // account 3
+    ]
+});
+```
+
+### Resultado [#result]
+
+Respuesta de una clave pública
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        xpub: string,        // xpub in legacy format
+        xpubSegwit?: string, // optional for segwit accounts: xpub in segwit format
+        root_fingerprint?: number,
+        node: {
+            depth: number,
+            fingerprint: number,
+            child_num: number,
+            chain_code: string,
+            public_key: string,
+        },
+    }
+}
+```
+
+[Más información sobre el formato de serialización BIP32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+Respuesta por lotes de claves públicas
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 1
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 2
+        { path, xpub, xpubSegwit, root_fingerprint, node }  // account 3
+    ]
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

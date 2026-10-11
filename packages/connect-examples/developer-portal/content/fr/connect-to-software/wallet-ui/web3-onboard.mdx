@@ -1,0 +1,201 @@
+---
+title: "Web3-Onboard"
+description: "Intégrer OneKey avec Web3-Onboard de Blocknative"
+---
+
+import { Callout } from 'nextra/components'
+
+# Web3-Onboard
+
+Bibliothèque de connexion à plusieurs portefeuilles de Blocknative. Indépendante du framework, elle prend en charge React, Vue et JavaScript natif.
+
+<Callout type="info">
+OneKey est automatiquement détecté via le module des portefeuilles injectés. Vérifiez la détection avec les versions de OneKey et de la bibliothèque installées.
+</Callout>
+
+---
+
+## Installation [#installation]
+
+```bash
+npm install @web3-onboard/core @web3-onboard/injected-wallets
+```
+
+---
+
+## Configuration de base [#basic-setup]
+
+```javascript
+import Onboard from '@web3-onboard/core'
+import injectedModule from '@web3-onboard/injected-wallets'
+
+const injected = injectedModule()
+
+const onboard = Onboard({
+  wallets: [injected],
+  chains: [
+    {
+      id: '0x1',
+      token: 'ETH',
+      label: 'Ethereum Mainnet',
+      rpcUrl: 'https://mainnet.infura.io/v3/YOUR_INFURA_KEY',
+    },
+    {
+      id: '0x89',
+      token: 'POL',
+      label: 'Polygon',
+      rpcUrl: 'https://polygon-rpc.com',
+    },
+  ],
+  appMetadata: {
+    name: 'My dApp',
+    icon: '<svg>...</svg>',
+    description: 'My dApp description',
+  },
+})
+
+// Connect wallet
+async function connect() {
+  const wallets = await onboard.connectWallet()
+  console.log('Connected wallets:', wallets)
+}
+```
+
+---
+
+## Intégration React [#react-integration]
+
+Installez le module React avec `npm install @web3-onboard/react`.
+
+```tsx filename="App.tsx"
+import { init, useConnectWallet, useWallets } from '@web3-onboard/react'
+import injectedModule from '@web3-onboard/injected-wallets'
+
+const injected = injectedModule()
+
+init({
+  wallets: [injected],
+  chains: [
+    {
+      id: '0x1',
+      token: 'ETH',
+      label: 'Ethereum',
+      rpcUrl: 'https://mainnet.infura.io/v3/YOUR_KEY',
+    },
+  ],
+})
+
+function App() {
+  const [{ wallet, connecting }, connect, disconnect] = useConnectWallet()
+  // useWallets() is available when managing multiple connections.
+
+  if (wallet) {
+    return (
+      <div>
+        <p>Connected: {wallet.accounts[0].address}</p>
+        <button onClick={() => disconnect({ label: wallet.label })}>
+          Disconnect
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button disabled={connecting} onClick={() => connect()}>
+      {connecting ? 'Connecting...' : 'Connect Wallet'}
+    </button>
+  )
+}
+```
+
+---
+
+## Modules de portefeuille supplémentaires [#additional-wallet-modules]
+
+Pour la prise en charge de WalletConnect (portefeuilles mobiles) :
+
+```bash
+npm install @web3-onboard/walletconnect
+```
+
+```javascript
+import walletConnectModule from '@web3-onboard/walletconnect'
+
+const walletConnect = walletConnectModule({
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
+})
+
+const onboard = Onboard({
+  wallets: [injected, walletConnect],
+  // ...
+})
+```
+
+---
+
+## Obtenir le fournisseur [#get-provider]
+
+Cet exemple utilise ethers 6 (`npm install ethers@^6`). Après la connexion, utilisez le fournisseur du portefeuille sélectionné pour les transactions. Remplacez le destinataire fictif avant l’envoi :
+
+```javascript
+import { ethers } from 'ethers'
+
+const wallets = await onboard.connectWallet()
+
+if (wallets[0]) {
+  const provider = new ethers.BrowserProvider(wallets[0].provider)
+  const signer = await provider.getSigner()
+
+  // Send transaction
+  const tx = await signer.sendTransaction({
+    to: '0x...',
+    value: ethers.parseEther('0.1'),
+  })
+}
+```
+
+---
+
+## Personnalisation [#customization]
+
+### Thème [#theme]
+
+```javascript
+const onboard = Onboard({
+  // ...
+  // Use a custom theme object, or replace it with 'dark', 'light', or 'system'.
+  theme: {
+    '--w3o-background-color': '#1a1a1a',
+    '--w3o-foreground-color': '#ffffff',
+    '--w3o-text-color': '#ffffff',
+    '--w3o-border-color': '#333333',
+    '--w3o-action-color': '#00B812',
+  },
+})
+```
+
+### Centre des comptes [#account-center]
+
+```javascript
+const onboard = Onboard({
+  // ...
+  accountCenter: {
+    desktop: {
+      enabled: true,
+      position: 'topRight',
+    },
+    mobile: {
+      enabled: true,
+      position: 'topRight',
+    },
+  },
+})
+```
+
+---
+
+## Ressources [#resources]
+
+- [Documentation Web3-Onboard](https://onboard.blocknative.com/docs/overview/introduction)
+- [Module React](https://onboard.blocknative.com/docs/modules/react)
+- [Dépôt GitHub](https://github.com/blocknative/web3-onboard)

@@ -1,0 +1,72 @@
+---
+description: "デバイス接続を復旧し、ウォレットの関連付けを維持して、副作用を再実行せずに SDK を終了します。"
+title: "再接続と破棄"
+---
+
+<span id="reconnect-and-dispose" />
+
+# 再接続と破棄
+
+USB の取り外し、BLE の圏外、OS の Bluetooth リセット、ファームウェア再起動などによる切断は通常起こり得ます。Hardware SDK 1.2.0 が復旧するのは**接続**です。アプリ側では引き続き**呼び出し**を復旧する必要があります。
+
+このページは統合の仕様です。Protocol V2 のシーケンス番号や Transport の世代については説明しません。
+
+## SDK がすでに行うこと [#what-the-sdk-already-does]
+
+- 通常の切断 / 再接続でも、確認済みの `connectProtocol` は**保持されます**。切断後に V1 と V2 を選び直す必要はありません。
+- 実行中の呼び出しは失敗します。SDK は署名、消去、ファームウェア更新を**再実行しません**。
+- Protocol V2 はデバイスごとに呼び出し順序を保ちます。最初の呼び出しの復旧中に、2 つ目の業務呼び出しを重ねないでください。
+
+## 統合側で行うこと [#what-you-must-do]
+
+1. アプリ起動時に `DEVICE.CONNECT` / `DEVICE.DISCONNECT` を一度だけ購読します。
+2. `DISCONNECT` が発生したら、該当する `connectId` の接続をビジー/無効としてマークし、現在の UI フローを失敗させます。同じ副作用のあるメソッドを再試行しないでください。
+3. 再検索します (`searchDevices`)。ユーザーの準備ができたら実行します。USB の再接続や BLE の再ペアリングで、次が新たに生成される場合があります: **新しい** `connectId`。USB と BLE の ID は別々にキャッシュしてください。参照: [識別子](/ja/hardware-sdk/concepts/identifiers).
+4. 新しい接続後は、[`getDeviceState`](/ja/hardware-sdk/basic-api/get-device-state) でデバイス状態を更新します。永続化した `deviceId + passphraseState` を再利用します。ファームウェアの `session_id` は永続化しないでください。
+5. 次のアドレス取得 / 署名では、永続化した `passphraseState` または `useEmptyPassphrase: true` を渡します。Core はそのメソッド内でファームウェアセッションを再開します。再接続だけのためにウォレットセッションを開き直さないでください。
+
+```ts
+import { DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => {
+  markDisconnected(payload);
+  // Fail the open UI flow; do not replay signing or firmware updates.
+});
+HardwareSDK.on(DEVICE.CONNECT, () => {
+  refreshDeviceList();
+});
+```
+
+## BLE 固有の事項 [#ble-specific]
+
+- 権限 (`BLUETOOTH_SCAN` / `CONNECT`, iOS の Bluetooth 用途文字列、Android では多くの場合位置情報) は、プロセス終了後も許可されている必要があります。参照: [React Native BLE](/ja/hardware-sdk/transport/react-native-ble).
+- `retryCount` / `timeout` はデバイス呼び出し前の接続設定を制御します。署名の再試行やアプリレベルの復旧の代わりにはなりません。
+- OS のボンドが古くなった場合、接続の繰り返しを停止します。システムの Bluetooth 設定からデバイスを削除し、再ペアリングするよう案内してください。
+- Mini には BLE がありません。Neo には BLE がありますが、カメラはありません。参照: [デバイス](/ja/hardware-sdk/concepts/devices).
+
+## USB 固有の事項 [#usb-specific]
+
+- WebUSB で選択画面を再表示するにはユーザー操作が必要です。ただし、まだ許可済みのデバイスに対して `skipWebDevicePrompt` を渡す場合を除きます。[共通パラメーター](/ja/hardware-sdk/concepts/common-params)を参照してください。
+- 別のタブや Bridge がデバイスを保持していると、取得/オープンのエラーになります。他の接続元を閉じてください。最初の対応として `dispose()` を実行しないでください。
+
+## `dispose()` [#dispose]
+
+```ts
+await HardwareSDK.dispose();
+```
+
+`dispose()` は、SDK の終了時や `env` / トランスポート構成の切り替え時 (WebUSB → 低レベルなど) にのみ呼び出します。すべての接続と Protocol V2 のトランスポートカーソルが破棄されます。
+
+通常の BLE 切断や USB 取り外しで `dispose()` を**呼び出さないでください**。同じ `HardwareSDK` インスタンスで検索して再接続します。
+
+`dispose()` の後は、必ず `init()` を再実行してから `searchDevices` を呼び出します。
+
+## ファームウェアの再起動 [#firmware-reboot]
+
+`firmwareUpdateV2` / `V3` / `V4` は意図的に切断する場合があります。待機して再接続し、バージョンを読み取ってください。切断を更新失敗とみなして再実行しないでください。参照: [ファームウェア更新](/ja/hardware-sdk/firmware-update).
+
+## 次へ [#next]
+
+- [トランスポート選択](/ja/hardware-sdk/transport)
+- [Core API ガイド](/ja/hardware-sdk/core-api-guide)
+- [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)

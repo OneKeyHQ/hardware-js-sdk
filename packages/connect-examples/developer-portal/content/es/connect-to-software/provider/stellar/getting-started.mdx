@@ -1,0 +1,49 @@
+---
+title: "Primeros pasos"
+description: "Detectar y usar el proveedor de Stellar de OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Primeros pasos
+
+Detecta el proveedor y solicita una dirección antes de firmar. Usa la passphrase de red que devuelve la red seleccionada en la cartera y datos XDR completos construidos con el SDK de Stellar.
+
+Aprende a detectar el proveedor de Stellar de OneKey y solicitar una dirección de Stellar.
+
+<Callout type="warning">
+La firma de Stellar normalmente depende de la passphrase de red correcta (por ejemplo, red pública o de pruebas). Asegúrate de pasar la adecuada al firmar.
+</Callout>
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```ts
+const stellar = window.$onekey?.stellar
+
+if (!stellar?.isOneKey) {
+  throw new Error('OneKey Stellar provider not detected')
+}
+```
+
+---
+
+## Obtener una dirección (conectar) [#get-address-connect]
+
+```ts
+// Triggers wallet permission / connect flow and returns the address (G...)
+const { address } = await stellar.getAddress()
+console.log('Address:', address)
+```
+
+---
+
+## Obtener la red [#get-network]
+
+```ts
+const { network, networkPassphrase } = await stellar.getNetwork()
+console.log({ network, networkPassphrase })
+```

@@ -1,0 +1,113 @@
+---
+description: "Die richtige Firmware-Update-API für das erkannte Protokoll wählen und Fortschritt, Neustart und Fehler behandeln."
+title: "Firmware-Update"
+---
+
+<span id="firmware-update" />
+
+# Firmware-Update
+
+Wählen Sie die Update-API anhand der **Protokollfamilie**, nicht allein anhand des Marketingnamens. Hardware SDK 1.2.0 bietet eine gemeinsame JavaScript-Oberfläche; das Geräteprotokoll bestimmt, welche Methode gültig ist.
+
+| Aktuelles Gerät | Protokoll | Methode | Was aktualisiert wird |
+| --- | --- | --- | --- |
+| Classic, Mini, Touch | V1 | [`firmwareUpdateV2`](/de/hardware-sdk/device-api/firmwareupdatev2) | Hauptfirmware und/oder BLE |
+| OneKey Pro | V1 | [`firmwareUpdateV3`](/de/hardware-sdk/device-api/firmwareupdatev3) | Bootloader + Hauptfirmware + BLE + Ressourcen in einem Ablauf |
+| OneKey Pro 2, Neo | V2 | [`firmwareUpdateV4`](/de/hardware-sdk/device-api/firmwareupdatev4) | Bootloader, Anwendungspartitionen, Koprozessor, Ressourcen-ZIP |
+
+Bestätigen Sie das aktive Protokoll mit `connectProtocol` im Geräteobjekt oder über [`getDeviceState`](/de/hardware-sdk/basic-api/get-device-state). Verzweigen Sie nicht anhand von USB-PID oder BLE-Namen. Siehe [Geräte](/de/hardware-sdk/concepts/devices) und [Protocol V1 und V2](/de/hardware-sdk/concepts/protocol).
+
+Starten Sie ein Update erst, nachdem der Nutzer das Zielgerät ausgewählt und den Vorgang genehmigt hat. Verwenden Sie offizielle Release-Metadaten und geprüfte Artefakte für dieses Modell; eine Beispielversion darf niemals die zu installierende Firmware bestimmen.
+
+## 1. Prüfen, ob ein Update erforderlich ist [#1-check-whether-an-update-is-needed]
+
+```ts
+const release = await HardwareSDK.checkFirmwareRelease(connectId);
+if (!release.success) throw new Error(release.payload.error);
+
+// payload.status: 'valid' | 'outdated' | 'required' | 'unknown' | 'none'
+const updateAvailable = release.payload !== null &&
+  (release.payload.status === 'outdated' || release.payload.status === 'required');
+// Offer an update only when updateAvailable is true and release metadata exists.
+```
+
+BLE-Koprozessor: [`checkBLEFirmwareRelease`](/de/hardware-sdk/device-api/checkblefirmwarerelease). Abonnieren Sie `FIRMWARE_EVENT` (`RELEASE_INFO` / `BLE_RELEASE_INFO`), wenn Sie später darauf hinweisen möchten, statt die erste Verbindung zu blockieren.
+
+## 2. Fortschritt vor dem Update-Aufruf abonnieren [#2-subscribe-to-progress-before-you-call-update]
+
+```ts
+import { UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (
+    msg.type === UI_REQUEST.FIRMWARE_PROGRESS ||
+    msg.type === UI_REQUEST.FIRMWARE_TIP ||
+    msg.type === UI_REQUEST.FIRMWARE_PROCESSING
+  ) {
+    renderFirmwareProgress(msg.payload);
+  }
+  // firmwareUpdateV4 may emit REQUEST_BUTTON with reason 'firmware-update'.
+  // Show "confirm on device". Do not uiResponse() that hint.
+});
+```
+
+## 3. Passende Methode aufrufen [#3-call-the-matching-method]
+
+Classic / Mini / Touch. Wählen Sie das Ziel aus geprüften Release-Metadaten für das verbundene Modell:
+
+```ts
+declare const targetFirmwareVersion: number[];
+const result = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'web',
+  updateType: 'firmware',
+  version: targetFirmwareVersion,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+Pro:
+
+```ts
+declare const targetFirmwareVersion: number[];
+const result = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop',
+  firmwareVersion: targetFirmwareVersion,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+Pro 2 / Neo — bereits geprüfte Binärdateien übergeben:
+
+```ts
+const result = await HardwareSDK.firmwareUpdateV4(connectId, {
+  platform: 'desktop',
+  bootloaderBinary,
+  applicationP1Binary,
+  applicationP2Binary,
+  coprocessorBinary,
+  resourceArchiveBinary,
+});
+if (!result.success) throw new Error(result.payload.error);
+```
+
+`platform` ist für alle drei Methoden erforderlich: `'native' | 'desktop' | 'ext' | 'web' | 'web-embed'`.
+
+## 4. Nach dem Aufruf [#4-after-the-call]
+
+1. Das Gerät kann neu starten. Warten Sie auf `DEVICE.CONNECT` (oder suchen Sie erneut). Bei normaler Wiederverbindung bleibt das bestätigte Protokoll erhalten. Siehe [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect).
+2. Erneut lesen: [`getDeviceState`](/de/hardware-sdk/basic-api/get-device-state) (`scope: 'firmware'`, wenn Sie Versionen benötigen), bevor Sie dem neuen Build vertrauen.
+3. Wenn der Aufruf mit einer Transportzeitüberschreitung fehlschlägt, **nachdem** die Installationsanfrage gesendet wurde, **wiederholen Sie nicht** dasselbe Update. Stellen Sie die Verbindung wieder her, lesen Sie den Status und entscheiden Sie dann.
+
+## Nicht tun: [#do-not]
+
+- `firmwareUpdateV3` auf Pro 2 / Neo oder `firmwareUpdateV4` auf Classic / Pro aufrufen.
+- Ein Update nach Trennung oder Zeitüberschreitung automatisch wiederholen.
+- BLE-`retryCount`-Hilfsfunktionen per Spread an Update-Aufrufe übergeben.
+- Romloader installieren über `firmwareUpdateV4`.
+
+## Weiter [#next]
+
+- [firmwareUpdateV2](/de/hardware-sdk/device-api/firmwareupdatev2)
+- [firmwareUpdateV3](/de/hardware-sdk/device-api/firmwareupdatev3)
+- [firmwareUpdateV4](/de/hardware-sdk/device-api/firmwareupdatev4)
+- [Core-API-Anleitung → Ereignisse](/de/hardware-sdk/core-api-guide#events-ui)

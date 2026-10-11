@@ -1,0 +1,98 @@
+---
+title: "kaspaGetAddress"
+---
+
+# kaspaGetAddress
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+
+## Kaspa: アドレスを取得 [#kaspa-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` が `true` の場合は、 ユーザーがデバイス上でアドレスを確認する必要があります。
+
+```typescript
+const result = await HardwareSDK.kaspaGetAddress(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 単一のアドレス [#single-address]
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _任意_ `boolean` アドレスをデバイスに表示するかどうか。デフォルトは `true`.
+* `prefix` - _任意_ `string` アドレスのプレフィックス。デフォルトは `kaspa`
+* `scheme` - _任意_ `string` 暗号化アルゴリズムのモード。デフォルトは `schnorr`
+
+#### 複数のアドレス [#multiple-addresses]
+
+* `bundle` - `path`, `showOnOneKey`, `prefix`, および `scheme` フィールドを持つオブジェクトの配列
+
+### 例 [#example]
+
+最初の Kaspa アカウントのアドレスを返します:
+
+```typescript
+HardwareSDK.kaspaGetAddress(connectId, deviceId, {
+    path: "m/44'/111111'/0'/0/0",
+    showOnOneKey: true,
+    prefix: "kaspa",
+    scheme: "schnorr",
+});
+```
+
+複数の Kaspa アカウントのアドレスをまとめて返します:
+
+```typescript
+HardwareSDK.kaspaGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/111111'/0'/0/0" }, // account 1
+        { path: "m/44'/111111'/0'" }, // account 2
+        { path: "m/44'/111111'/0'/0/1" }  // account 3
+    ]
+});
+```
+
+### 結果 [#result]
+
+単一アドレスのレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+    }
+}
+```
+
+アドレスのバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address }, // account 1
+        { path, address }, // account 2
+        { path, address }, // account 3
+    ]
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

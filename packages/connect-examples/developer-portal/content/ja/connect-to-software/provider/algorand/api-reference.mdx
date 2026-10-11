@@ -1,0 +1,109 @@
+---
+title: "API リファレンス"
+description: "OneKey の Algorand プロバイダーの完全な API リファレンス"
+---
+
+<span id="api-reference" />
+
+# API リファレンス
+
+OneKey の Algorand プロバイダーのメソッドと型のリファレンス。
+
+---
+
+## メソッド [#methods]
+
+| メソッド | 説明 |
+|--------|-------------|
+| `connect()` | ウォレットを接続 (従来方式) |
+| `disconnect()` | ウォレットを切断 |
+| `enable(opts?)` | ウォレットを有効化 (ARC-0001) |
+| `signTxns(transactions)` | トランザクションに署名 (ARC-0001) |
+| `postTxns(signedTxns)` | トランザクションをブロードキャスト |
+| `signAndPostTxns(transactions)` | 署名してブロードキャスト |
+| `signTransaction(txns)` | トランザクションに署名 (従来方式) |
+| `signAndSendTransaction(txns)` | 署名して送信 (従来方式) |
+| `signMessage(message, encoding?)` | 任意のメッセージに署名 |
+| `getAlgodv2Client()` | Algod クライアントを取得 |
+| `getIndexerClient()` | Indexer クライアントを取得 |
+
+---
+
+## 型 [#types]
+
+### 有効化のオプション [#enable-options]
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+```
+
+### 有効化の結果 [#enable-result]
+
+```typescript
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+```
+
+### ウォレットのトランザクション [#wallet-transaction]
+
+```typescript
+interface WalletTransaction {
+  txn: string                  // Base64 encoded unsigned transaction
+  signers?: string[]           // Addresses that should sign (empty = skip)
+  stxn?: string                // Pre-signed transaction
+  message?: string             // Message to display
+  msig?: MultisigMetadata
+  authAddr?: string            // Rekeyed auth address
+}
+```
+
+### トランザクション署名の結果 [#sign-txns-result]
+
+```typescript
+type SignTxnsResult = (string | null)[]; // Base64 signed transactions; null means skipped.
+```
+
+### トランザクション送信の結果 [#post-txns-result]
+
+```typescript
+interface PostTxnsResult {
+  txnIDs: string[]
+}
+```
+
+---
+
+## プロパティ [#properties]
+
+| プロパティ | 型 | 説明 |
+|----------|------|-------------|
+| `isConnected` | `boolean` | 接続状態 |
+| `address` | `string \| null` | 接続済みアドレス |
+| `isOneKey` | `boolean` | OneKey 識別子 |
+
+---
+
+## イベント [#events]
+
+| イベント | パラメーター | 説明 |
+|-------|------------|-------------|
+| `connect` | `{ address }` | ウォレット接続時 |
+| `disconnect` | - | ウォレット切断時 |
+| `accountChanged` | `address` | アカウント変更時 |
+
+---
+
+## エラーコード [#error-codes]
+
+| コード | 説明 |
+|------|-------------|
+| 4001 | ユーザーがリクエストを拒否 |
+| 4100 | 未認証 |
+| 4200 | 未対応のメソッド |
+| -32602 | 無効なパラメーター |

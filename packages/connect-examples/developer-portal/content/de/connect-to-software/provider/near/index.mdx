@@ -1,0 +1,82 @@
+---
+title: "NEAR-Provider"
+description: "NEAR Protocol mit der OneKey-Wallet in Ihre dApp integrieren — Provider erkennen, Konten verbinden, Transaktionen senden und Nachrichten signieren"
+---
+
+# NEAR
+
+Integrieren Sie NEAR Protocol mit dem NEAR-Provider von OneKey in Ihre dApp. Verwenden Sie für die unten dokumentierten Methoden das Provider-SDK und die von ihm unterstützte near-api-js-Version.
+
+## Funktionen [#features]
+
+- Kontoverbindung und -verwaltung
+- Transaktionen signieren und senden
+- Signieren von Nachrichten
+- Netzwerkstatus lesen (mainnet/testnet)
+- RPC-Anfragen über den ausgewählten Netzwerkendpunkt
+
+## Installation [#installation]
+
+```bash
+npm install @onekeyfe/onekey-near-provider near-api-js@^0.44.2
+# or
+yarn add @onekeyfe/onekey-near-provider near-api-js@^0.44.2
+```
+
+## Schnellstart [#quick-start]
+
+```typescript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider'
+
+// Create provider instance
+const provider = new OneKeyNearProvider()
+
+// Request account access
+const accounts = await provider.requestSignIn()
+console.log('Connected accounts:', accounts)
+
+// Get current network
+const network = await provider.request({ method: 'near_network' })
+console.log('Current network:', network)
+```
+
+## Dokumentation [#documentation]
+
+### Erste Schritte [#getting-started]
+- [Einführung](introduction) - Übersicht über den NEAR-Provider
+- [Provider-SDK installieren](integrating/install-the-provider-sdk) - Einrichtungsanleitung
+
+### Integrationsanleitungen [#integration-guides]
+- [Provider erkennen](integrating/detecting-the-provider) - Prüfen, ob OneKey installiert ist
+- [Verbindung herstellen](integrating/establishing-a-connection) - Mit Nutzerkonten verbinden
+- [Auf Konten zugreifen](integrating/accessing-accounts) - Kontoinformationen abrufen
+- [Provider-Netzwerk erkennen](integrating/detecting-provider-network) - Aktuelles Netzwerk prüfen
+- [Konto- &amp; Netzwerkstatus überwachen](integrating/watch-accounts-and-network-status) - Änderungen abonnieren
+
+### Transaktionen &amp; Signieren [#transactions--signing]
+- [Transaktionen senden](integrating/sending-transactions) - Transaktionen erstellen und senden
+- [Nachrichten signieren](integrating/signing-messages) - Beliebige Nachrichten signieren
+- [RPC-API-Aufrufe](integrating/rpc-api-calling) - Direkter RPC-Zugriff
+
+### Erweitert [#advanced]
+- [Debug-Protokollierung](integrating/debug-logging) - Debug-Modus aktivieren
+- [Von NEAR Web Wallet migrieren](integrating/migrate-from-near-web-wallet) - Migrationsanleitung
+
+### Referenz [#reference]
+- [API-Referenz](reference/api-reference) - Vollständige API-Dokumentation
+- [Fehlerbehebung](reference/trouble-shooting) - Häufige Probleme und Lösungen
+- [Beispiele &amp; Demo](resources/example-and-demo) - Beispielcode
+- [FAQ](resources/faq) - Häufig gestellte Fragen
+
+## Fehlerbehandlung [#error-handling]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| 4001 | Vom Nutzer abgelehnt | Nutzer hat die Anfrage abgelehnt |
+| -32602 | Ungültige Parameter | Methodenparameter sind ungültig |
+| -32603 | Interner Fehler | Interner JSON-RPC-Fehler |
+
+## Weitere Ressourcen [#related-resources]
+
+- [NEAR-Dokumentation](https://docs.near.org/)
+- [OneKey GitHub](https://github.com/OneKeyHQ)

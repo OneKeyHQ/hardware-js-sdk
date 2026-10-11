@@ -1,0 +1,85 @@
+---
+title: "tonSignProof"
+---
+
+# tonSignProof
+
+### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.10.0
+
+### TON: 証明に署名 [#ton-sign-proof]
+
+指定の BIP32 パスから導出した秘密鍵で、dApp 認証用の証明メッセージに署名します。ユーザーは OneKey デバイス上で操作を確認する必要があります。
+
+```typescript
+const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Math.floor(Date.now() / 1000),
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### パラメーター [#params]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`
+* `appdomain` - _必須_ `string` 証明を要求する dApp のドメイン
+* `comment` - _任意_ `string` 16 進数形式のメッセージコメント
+* `expireAt` - _必須_ `number` 署名のタイムスタンプ (Unix 秒)。フィールド名にかかわらず、ファームウェアは TON 証明のタイムスタンプとして使用します
+* `walletVersion` - _任意_ `TonWalletVersion` TON ウォレットのバージョン (デフォルト: 3)
+* `walletId` - _任意_ `number` ウォレット ID (デフォルト: 698983191)
+* `workchain` - _任意_ `TonWorkChain` TON ワークチェーン (0: BaseChain、1: MasterChain)
+* `isBounceable` - _任意_ `boolean` メッセージが bounceable かどうか (デフォルト: false)
+* `isTestnetOnly` - _任意_ `boolean` テストネットを使用するかどうか (デフォルト: false)
+
+#### 戻り値 [#returns]
+
+レスポンス
+
+* `signature` - 16 進数形式の証明署名
+
+#### 例 [#example]
+
+```typescript
+const response = await HardwareSDK.tonSignProof(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    appdomain: "onekey.so",
+    comment: "48656c6c6f204f6e654b6579",
+    expireAt: Math.floor(Date.now() / 1000),
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+`expireAt` の値がそのまま署名対象の `timestamp` になります。SDK による単位変換はありません。[TON Connect の証明形式](https://github.com/ton-blockchain/ton-connect/blob/main/spec/connect.md#address-proof-signature-ton_proof)を参照してください。

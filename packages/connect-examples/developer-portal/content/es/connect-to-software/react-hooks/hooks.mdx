@@ -1,0 +1,78 @@
+---
+title: "Hooks de React"
+description: "Hooks de React con seguridad de tipos para Ethereum: crea tu propia interfaz de cartera"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="react-hooks" />
+
+# Hooks de React
+
+Hooks de React con seguridad de tipos para Ethereum. Crea tu propia interfaz de conexión de carteras con control total sobre la experiencia de usuario.
+
+<Callout>
+**Ideal para interfaces personalizadas.** Usa hooks de React si quieres diseñar tu propio flujo de conexión de carteras.
+</Callout>
+
+---
+
+## Bibliotecas disponibles [#available-libraries]
+
+| Biblioteca | Descripción |
+|---------|-------------|
+| [Wagmi](/es/connect-to-software/react-hooks/wagmi) | Hooks de React para cuentas EVM, firma y estado de transacciones |
+
+---
+
+## Cuándo usarlos [#when-to-use]
+
+Usa hooks de React si:
+- Necesitas control total sobre la interfaz de conexión de carteras
+- Quieres hooks con seguridad de tipos para interactuar con Ethereum
+- Estás creando una aplicación React
+- No necesitas un modal de selección de carteras listo para usar
+
+---
+
+## Ejemplo rápido [#quick-example]
+
+Configura `WagmiProvider` y `QueryClientProvider` con la [guía de wagmi](/es/connect-to-software/react-hooks/wagmi) primero. Este componente usa los conectores configurados.
+
+```tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+function ConnectButton() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>{address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {connectors.map((connector) => (
+        <button key={connector.uid} disabled={isPending} onClick={() => connect({ connector })}>
+          Connect {connector.name}
+        </button>
+      ))}
+      {error && <p role="alert">{error.message}</p>}
+    </div>
+  )
+}
+```
+
+---
+
+## Alternativa: con interfaz de cartera [#alternative-with-wallet-ui]
+
+Si quieres un modal de selección de carteras listo para usar, considera:
+- [RainbowKit](/es/connect-to-software/wallet-ui/rainbowkit) - Selector de carteras para React
+- [Web3Modal](/es/connect-to-software/wallet-ui/web3modal) - Interfaz de conexión de carteras de Reown

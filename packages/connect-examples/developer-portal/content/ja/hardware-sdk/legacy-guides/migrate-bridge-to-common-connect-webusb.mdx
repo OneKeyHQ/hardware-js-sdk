@@ -1,0 +1,137 @@
+---
+description: "共通 SDK と現在の UI イベント仕様を使い、Bridge 統合を直接 WebUSB 接続に移行します。"
+title: "common-connect-sdk に移行"
+---
+
+<span id="migrate-to-common-connect-sdk" />
+
+# common-connect-sdk に移行
+
+Bridge から WebUSB に移行し、SDK エントリーを次に切り替えます: `@onekeyfe/hd-common-connect-sdk`.
+
+---
+
+## 要件 [#requirements]
+
+- Chromium ブラウザー (デスクトップ版 Chrome/Edge)
+- Node.js 18+ (LTS 推奨)
+
+---
+
+## 変更点の概要 [#what-changed-at-a-glance]
+
+- SDK エントリー: `@onekeyfe/hd-web-sdk` → `@onekeyfe/hd-common-connect-sdk`
+- 初期化オプション: `env: 'webusb'` を使用します。`connectSrc` は不要です (iframe なし)
+- 許可フロー: 公式フィルター `ONEKEY_WEBUSB_FILTER` を指定して `navigator.usb.requestDevice()` を呼び出す (ユーザー操作からの実行が必須)
+- イベントシステム: 次の `@onekeyfe/hd-core` `UI_EVENT / DEVICE` イベントをユーザー操作 (PIN/パスフレーズなど) に使用
+- Bridge 固有のロジックを削除: `checkBridgeStatus()` とすべての Bridge チェック/プロンプトを削除します
+- 業務 API はほぼ変更なし。例: `searchDevices / getDeviceState / btcGetAddress`
+
+---
+
+## インストール [#install]
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+---
+
+## 初期化 (hd-common-connect-sdk + WebUSB) [#initialize-hd-common-connect-sdk--webusb]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+- 次と異なり、 `hd-web-sdk`, 次は不要です: `connectSrc` この構成では不要です (iframe への依存なし)。
+- デバイス機能と案内の設定を取得するため、`fetchConfig: true` の有効化を推奨します。
+
+---
+
+## UI とデバイスのイベントを接続 (PIN / パスフレーズ / 接続・取り外し) [#bind-ui-and-device-events-pin--passphrase--plug-unplug]
+
+保護された呼び出しの前に [Core API の UI ハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録してください。リクエストの関連付けを維持し、入力リクエストだけに返信し、ユーザーがキャンセルしたら選択中の操作をキャンセルします。デバイス専用 PIN とボタンのプロンプトには `uiResponse` は不要です。
+
+`DEVICE.CONNECT` と `DEVICE.DISCONNECT` を購読して接続状態を更新します。デバイスや UI イベントのペイロード全体をログに記録しないでください。
+
+---
+
+## 許可 (WebUSB 選択画面 + 公式フィルター) [#authorization-webusb-picker--official-filter]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Important: must be triggered by a user gesture (e.g., button click) or the browser will block it
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## デバイスの列挙と最初の呼び出し [#enumerate-devices-and-first-call]
+
+```ts
+// 1) Enumerate
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = list.payload[0] ?? {};
+if (!connectId) throw new Error("No device connection");
+
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
+
+// 3) Example: get a BTC address
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (r.success) {
+  console.log('BTC address:', r.payload.address);
+} else {
+  console.error('Error:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## クリーンアップとチェックリスト [#cleanup-and-checklist]
+
+- 依存関係の置き換え: `@onekeyfe/hd-web-sdk` を削除し、代わりに `@onekeyfe/hd-common-connect-sdk` を使用
+- 初期化の変更:
+  - 旧: `env: 'web'` + `connectSrc: 'https://jssdk.onekey.so/.../'`
+  - 新: `env: 'webusb'` (次は不要: `connectSrc`)
+- Bridge 専用ロジックを削除。例: `checkBridgeStatus()`, Bridge のインストール/再起動プロンプト
+- `UI_EVENT / DEVICE` のハンドラーを登録し、PIN/パスフレーズとデバイスの接続/取り外しイベントを確実に処理します
+- 新たな USB 許可には次が必要です: `requestDevice()` ユーザー操作から実行します。許可済みデバイスは、選択画面を再表示せずに列挙できます。
+- 互換性のヒント: 次が `navigator.usb` ない場合は、WebUSB 対応ブラウザーへの切り替えを案内してください
+
+---
+
+## よくある質問 [#faq]
+
+- HTTP で許可プロンプトが出ない? → HTTPS で配信してください
+- UI リクエストが止まる場合は、早い段階で `UI_EVENT` を購読し、`uiResponse` で応答してください
+- `connectSrc` または `HdWebSdk.HardwareWebSdk` をまだ使用している場合は、`hd-common-connect-sdk` に移行してください。iframe は不要です。
+- `requestDevice` をユーザー操作の外で呼び出すと、Chrome がブロックします。クリックなどの操作から実行してください
+
+---
+
+## 関連ドキュメント [#further-reading]
+
+- WebUSB の詳細と完全な例: [WebUSB 接続ガイド](/ja/hardware-sdk/transport/web-usb)
+- イベントと操作: [設定イベント](/ja/hardware-sdk/core-api-guide#events-ui)
+- API リファレンスとパラメーター: [Hardware SDK API リファレンス](/ja/hardware-sdk/core-api-guide), [共通パラメーター](/ja/hardware-sdk/concepts/common-params), [エラーコード](/ja/hardware-sdk/core-api-guide#error-codes)

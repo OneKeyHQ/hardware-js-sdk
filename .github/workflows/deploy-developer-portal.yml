@@ -5,10 +5,25 @@ permissions:
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [onekey]
+    paths:
+      - 'packages/connect-examples/developer-portal/**'
+      - '.github/workflows/deploy-developer-portal.yml'
+  push:
+    branches: [onekey]
+    paths:
+      - 'packages/connect-examples/developer-portal/**'
+      - '.github/workflows/deploy-developer-portal.yml'
+
+concurrency:
+  group: developer-portal-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,11 +42,12 @@ jobs:
 
       - name: Install Dependencies (Developer Portal)
         working-directory: packages/connect-examples/developer-portal
-        run: yarn install
+        run: yarn install --frozen-lockfile
 
       - name: Build Developer Portal
         working-directory: packages/connect-examples/developer-portal
         env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
           NEXT_PUBLIC_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
           NEXT_PUBLIC_COMMIT_ID: ${{ github.sha }}
           NEXT_PUBLIC_COMMIT_SHORT: ${{ github.sha }}

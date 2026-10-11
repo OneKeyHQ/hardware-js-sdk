@@ -1,0 +1,55 @@
+---
+title: "Bibliothèques d’interface de portefeuille"
+description: "Composants d’interface de connexion de portefeuilles prêts à l’emploi pour une intégration rapide"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="wallet-ui-libraries" />
+
+# Bibliothèques d’interface de portefeuille
+
+Les bibliothèques d’interface de portefeuille fournissent un sélecteur de portefeuille et un état de connexion. Choisissez une bibliothèque adaptée à votre framework et aux chaînes cibles, puis testez les changements de compte, les demandes rejetées et les connexions mobiles.
+
+<Callout type="info">
+Les guides ci-dessous couvrent les intégrations EVM. Pour Aptos, utilisez [Aptos Wallet Adapter](/fr/connect-to-software/wallet-ui/aptos-wallet-adapter). Pour les autres chaînes, commencez par le [fournisseur propre à la chaîne](/fr/connect-to-software/provider).
+</Callout>
+
+---
+
+## Choisissez votre bibliothèque [#choose-your-library]
+
+| Bibliothèque | Framework | Fonctionnalités |
+|---------|-----------|----------|
+| [RainbowKit](/fr/connect-to-software/wallet-ui/rainbowkit) | React uniquement | Sélecteur de portefeuille, thèmes, intégration wagmi |
+| [AppKit (anciennement Web3Modal)](/fr/connect-to-software/wallet-ui/web3modal) | React/Vue/JS | Écosystème WalletConnect, QR codes mobiles, AppKit |
+| [Web3-Onboard](/fr/connect-to-software/wallet-ui/web3-onboard) | React/Vue/JS | Blocknative, personnalisation poussée |
+
+---
+
+## Prise en charge des frameworks et connexions [#framework-and-connection-support]
+
+| Fonctionnalité | RainbowKit | AppKit | Web3-Onboard |
+|---------|------------|-----------|--------------|
+| React | ✅ | ✅ | ✅ |
+| Vue | ❌ | ✅ | ✅ |
+| JS natif | ❌ | ✅ | ✅ |
+| QR mobile | ✅ | ✅ | ✅ |
+
+---
+
+## Quand les utiliser [#when-to-use]
+
+Utilisez les bibliothèques d’interface de portefeuille si vous :
+- Avez besoin d’un sélecteur de portefeuille avec état de connexion
+- Avez besoin de prendre en charge les portefeuilles mobiles par QR codes
+- Ne souhaitez pas créer une interface de connexion de portefeuilles personnalisée
+- Souhaitez une intégration WalletConnect
+
+---
+
+## Alternative : interface personnalisée [#alternative-custom-ui]
+
+Si vous avez besoin d’un contrôle total sur l’interface du portefeuille, envisagez :
+- [Wagmi](/fr/connect-to-software/react-hooks/wagmi) - Hooks React sans interface
+- [API du fournisseur](/fr/connect-to-software/provider/eth) - Accès direct au portefeuille

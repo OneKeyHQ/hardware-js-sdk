@@ -10,10 +10,12 @@ export const locales = Object.freeze([
 export const localeCodes = locales.map(locale => locale.code);
 export const translationLocales = localeCodes.filter(code => code !== 'en');
 // Add a locale here only after its complete content and UI catalogs pass acceptance.
-export const publishedLocaleCodes = ['en', 'zh'];
-export const publishedLocales = locales.filter(locale => publishedLocaleCodes.includes(locale.code));
+export const publishedLocaleCodes = ['en', 'zh', 'fr', 'de', 'es', 'ja'];
+export const publishedLocales = locales.filter(locale =>
+  publishedLocaleCodes.includes(locale.code)
+);
 
-const prefixFor = base => base ? `/${base.replace(/^\/+|\/+$/g, '')}` : '';
+const prefixFor = base => (base ? `/${base.replace(/^\/+|\/+$/g, '')}` : '');
 
 export function localeFromPath(path, basePath = '') {
   const prefix = prefixFor(basePath);

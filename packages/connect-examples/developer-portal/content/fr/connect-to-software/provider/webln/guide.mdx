@@ -1,0 +1,73 @@
+---
+title: "Guide"
+---
+
+# Guide
+
+## Vue d’ensemble [#overview]
+
+Ce guide explique comment créer des applications Bitcoin Lightning Network à l’aide de l’API du fournisseur Lightning Network OneKey.
+
+
+### Créer des applications web **Cas d’usage** [#building-web-apps-use-cases]
+
+* Accepter les paiements Lightning Network
+* applications d’identité décentralisée
+
+## Installation [#install]
+
+### 1. Télécharger OneKey Wallet [#1-download-onekey-wallet]
+
+Téléchargez [OneKey Wallet](https://onekey.so/download?client=browserExtension). Installez l’extension de navigateur OneKey.
+
+#### 2. Explication de l’injection de l’API [#2-api-injection-explanation]
+
+* L’extension de navigateur OneKey injecte `Provider API` dans les sites web visités.
+* Deux types d’API sont proposés : `window.webln` et `window.$onekey.webln`.
+* Il est recommandé d’utiliser `window.$onekey.webln`.
+
+> Privilégiez `window.$onekey.webln` pour sélectionner spécifiquement OneKey. Le fournisseur global `window.webln` peut appartenir à un autre portefeuille lorsque plusieurs extensions sont installées.
+
+### Détecter la prise en charge de l’API du fournisseur [#detecting-provider-api-support]
+
+Vérifiez qu’un fournisseur est disponible avant d’effectuer des requêtes :
+
+```javascript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+if (!provider) {
+  throw new Error("No provider is available.");
+}
+```
+
+### Connexion à OneKey [#connecting-to-onekey]
+
+Avant d’utiliser l’API suivante, vous devez d’abord utiliser la méthode `provider.enable` pour demander à l’utilisateur l’accès au compte concerné.
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+```
+
+Les autres API ne peuvent être appelées qu’après autorisation de l’utilisateur.
+
+## API [#api]
+
+Choisissez une API pour l’opération requise par votre application.
+
+* Obtenir les informations du nœud Bitcoin Lightning de l’utilisateur : [`provider.getInfo`](/fr/connect-to-software/provider/webln/api-reference/getinfo)
+* Envoyer un paiement : [`provider.sendPayment`](/fr/connect-to-software/provider/webln/api-reference/sendpayment)
+* Demander une facture pour recevoir un paiement : [`provider.makeInvoice`](/fr/connect-to-software/provider/webln/api-reference/makeinvoice)
+* Demander la signature d’un message quelconque : [`provider.signMessage`](/fr/connect-to-software/provider/webln/api-reference/signmessage)
+
+**Autres interfaces** : [Voir les détails](/fr/connect-to-software/provider/webln/api-reference)
+
+## Événement [#event]
+
+* **Opérations principales** : Comme le changement de compte
+* **Plus d’informations** : [En savoir plus](/fr/connect-to-software/provider/webln/event)
+
+## Gestion des requêtes [#handling-requests]
+
+Exécutez les requêtes de portefeuille depuis une fonction asynchrone ou un module ES. Interceptez les promesses rejetées et affichez l’erreur dans votre application. Demandez les connexions, signatures et paiements à partir d’une action utilisateur, et désactivez le bouton déclencheur tant qu’une demande est en cours.

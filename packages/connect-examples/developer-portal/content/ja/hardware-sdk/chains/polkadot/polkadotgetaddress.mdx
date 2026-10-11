@@ -1,0 +1,105 @@
+---
+title: "polkadotGetAddress"
+---
+
+# polkadotGetAddress
+
+## 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+* Joystream チェーンの最小ファームウェアバージョン
+  * Touch: 4.7.0
+  * Classic/Mini: 3.6.0
+* Manta チェーンの最小ファームウェアバージョン
+  * Touch: 4.9.0
+  * Classic/Mini: 3.7.0
+
+## Polkadot: アドレスを取得 [#polkadot-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` を使用すると、デバイス上での確認を要求できます。
+
+```typescript
+const result = await HardwareSDK.polkadotGetAddress(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 単一のアドレス [#single-address]
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `prefix` - _必須_ `number` SS58 アドレスのプレフィックス。次を使用: `0` は Polkadot 用
+* `network` - _必須_ `string` ネットワーク名。例: `polkadot`
+* `showOnOneKey` - _任意_ `boolean` アドレスをデバイスに表示するかどうか。デフォルトは `true`.
+
+#### 複数のアドレス [#multiple-addresses]
+
+* `bundle` - `path`, `prefix`, `network`, `showOnOneKey` フィールドを持つオブジェクトの配列
+
+### 例 [#example]
+
+最初の Polkadot アカウントのアドレスを返します:
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    path: "m/44'/354'/0'/0'/0'",
+    showOnOneKey: true,
+    network: "polkadot",
+    prefix: 0
+});
+```
+
+複数の Polkadot アカウントのアドレスをまとめて返します:
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/354'/0'/0'/1'", network: "polkadot", prefix: 0 }, // account 1
+        { path: "m/44'/354'/0'/0'/2'", network: "polkadot", prefix: 0 }, // account 2
+        { path: "m/44'/354'/0'/0'/3'", network: "polkadot", prefix: 0 }  // account 3
+    ]
+});
+```
+
+### 結果 [#result]
+
+単一アドレスのレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        address: string,   // address
+        publicKey: string, // publicKey
+    }
+}
+```
+
+アドレスのバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address, publicKey }, // account 1
+        { path, address, publicKey }, // account 2
+        { path, address, publicKey }, // account 3
+    ]
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

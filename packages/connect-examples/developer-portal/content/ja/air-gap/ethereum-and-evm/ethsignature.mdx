@@ -1,0 +1,50 @@
+---
+title: "ETHSignature"
+---
+
+# ETHSignature
+
+`ETHSignature` はデバイスから返された Ethereum 署名をデコードします。クラス名の `ETH` は大文字です。
+
+コンストラクターには `signature: Buffer`、任意の `requestId: Buffer`、任意の `origin: string` を渡します。
+
+## レスポンスをデコード [#decode-the-response]
+
+スキャンセッションごとに新しいデコーダーを作成し、カメラの各フレームに対して `onSignatureFrame` を呼び出します。元のリクエストの `expectedRequestId` を保持し、別のリクエストの署名を受け入れないでください。
+
+```typescript
+import { URDecoder } from '@ngraveio/bc-ur';
+import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
+
+const decoder = new URDecoder();
+
+function onSignatureFrame(frame: string, expectedRequestId: string) {
+  decoder.receivePart(frame);
+  if (decoder.isError()) {
+    throw new Error('Could not decode the signature QR code');
+  }
+  if (!decoder.isSuccess()) return;
+
+  const ur = decoder.resultUR();
+  if (ur.type !== 'eth-signature') {
+    throw new Error('Expected an eth-signature response');
+  }
+  const result = ETHSignature.fromCBOR(ur.cbor);
+  const expectedId = Buffer.from(expectedRequestId.replace(/-/g, ''), 'hex');
+  const receivedId = result.getRequestId();
+  if (!receivedId || !receivedId.equals(expectedId)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = result.getSignature();
+  if (signature.length !== 65) {
+    throw new Error('Expected a 65-byte Ethereum signature');
+  }
+  return {
+    r: signature.subarray(0, 32),
+    s: signature.subarray(32, 64),
+    v: signature[64],
+  };
+}
+```
+
+Ethereum ライブラリを使って、元のトランザクションの種類とチェーンに合わせて `v` を解釈し、署名者を復元して、署名済みトランザクションを組み立てます。デバイスに送信した未署名トランザクションをそのまま再利用してください。新たに構築した、または変更したトランザクションに、この署名を添付してはいけません。

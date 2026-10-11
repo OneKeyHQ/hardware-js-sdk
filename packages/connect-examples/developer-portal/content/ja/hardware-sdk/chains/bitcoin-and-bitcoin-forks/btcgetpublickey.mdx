@@ -1,0 +1,101 @@
+---
+title: "btcGetPublicKey"
+---
+
+# btcGetPublicKey
+
+## Bitcoin: 公開鍵を取得 [#bitcoin-get-public-key]
+
+指定パスから導出した公開鍵を返します。`showOnOneKey` を使用すると、デバイス上での確認を要求できます。
+
+```typescript
+const result = await HardwareSDK.btcGetPublicKey(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 単一の公開鍵 [#single-public-key]
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `1`. [詳細を読む](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _任意_ `boolean` 公開鍵をデバイスに表示するかどうか。デフォルトは `true`.
+* `coin` - _任意_ `string` coins.json ファイルで指定されたネットワーク定義を決定します。コインの `shortcut`, `name` または `label` を使用できます。`coin` が設定されていない場合、API は `path` からネットワーク定義の取得を試みます。
+* `scriptType` - _任意_ InputScriptType、アドレスのスクリプトタイプ
+
+#### 複数の公開鍵 [#multiple-public-keys]
+
+* `bundle` - `path`, `coin` フィールドを持つオブジェクトの配列
+
+### 例 [#example]
+
+5 番目の bitcoin アカウントの公開鍵を返します:
+
+```typescript
+HardwareSDK.btcGetPublicKey(connectId, deviceId, {
+    path: "m/49'/0'/4'",
+    coin: "btc"
+});
+```
+
+複数の bitcoin アカウントの公開鍵をまとめて返します:
+
+```typescript
+HardwareSDK.btcGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/49'/0'/0'" }, // account 1
+        { path: "m/49'/0'/1'" }, // account 2
+        { path: "m/49'/0'/2'" }  // account 3
+    ]
+});
+```
+
+### 結果 [#result]
+
+単一公開鍵のレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        xpub: string,        // xpub in legacy format
+        xpubSegwit?: string, // optional for segwit accounts: xpub in segwit format
+        root_fingerprint?: number,
+        node: {
+            depth: number,
+            fingerprint: number,
+            child_num: number,
+            chain_code: string,
+            public_key: string,
+        },
+    }
+}
+```
+
+[BIP32 のシリアライズ形式について詳しく読む](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+公開鍵のバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 1
+        { path, xpub, xpubSegwit, root_fingerprint, node }, // account 2
+        { path, xpub, xpubSegwit, root_fingerprint, node }  // account 3
+    ]
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

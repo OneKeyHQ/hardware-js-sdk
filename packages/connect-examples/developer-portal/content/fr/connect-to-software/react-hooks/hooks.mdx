@@ -1,0 +1,78 @@
+---
+title: "Hooks React"
+description: "Hooks React avec sécurité de typage pour Ethereum — créez votre propre interface de portefeuille"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="react-hooks" />
+
+# Hooks React
+
+Hooks React avec sécurité de typage pour Ethereum. Créez votre propre interface de connexion au portefeuille en gardant le contrôle total sur l’expérience utilisateur.
+
+<Callout>
+**Idéal pour les interfaces personnalisées.** Utilisez les hooks React lorsque vous souhaitez concevoir votre propre parcours de connexion au portefeuille.
+</Callout>
+
+---
+
+## Bibliothèques disponibles [#available-libraries]
+
+| Bibliothèque | Description |
+|---------|-------------|
+| [Wagmi](/fr/connect-to-software/react-hooks/wagmi) | Hooks React pour l’état des comptes, signatures et transactions EVM |
+
+---
+
+## Quand les utiliser [#when-to-use]
+
+Utilisez les hooks React si vous :
+- Avez besoin d’un contrôle total sur l’interface de connexion au portefeuille
+- Souhaitez des hooks avec sécurité de typage pour les interactions Ethereum
+- Créez une application React
+- N’avez pas besoin d’une fenêtre de sélection de portefeuille prête à l’emploi
+
+---
+
+## Exemple rapide [#quick-example]
+
+Configurez d’abord `WagmiProvider` et `QueryClientProvider` à l’aide du [guide wagmi](/fr/connect-to-software/react-hooks/wagmi). Ce composant utilise les connecteurs configurés.
+
+```tsx
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+
+function ConnectButton() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors, isPending, error } = useConnect()
+  const { disconnect } = useDisconnect()
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>{address}</p>
+        <button onClick={() => disconnect()}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {connectors.map((connector) => (
+        <button key={connector.uid} disabled={isPending} onClick={() => connect({ connector })}>
+          Connect {connector.name}
+        </button>
+      ))}
+      {error && <p role="alert">{error.message}</p>}
+    </div>
+  )
+}
+```
+
+---
+
+## Alternative : avec une interface de portefeuille [#alternative-with-wallet-ui]
+
+Si vous souhaitez une fenêtre de sélection de portefeuille prête à l’emploi, envisagez :
+- [RainbowKit](/fr/connect-to-software/wallet-ui/rainbowkit) - Sélecteur de portefeuille React
+- [Web3Modal](/fr/connect-to-software/wallet-ui/web3modal) - Interface de connexion de portefeuilles Reown

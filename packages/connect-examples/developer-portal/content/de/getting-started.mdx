@@ -1,0 +1,53 @@
+---
+title: "Integration auswählen"
+description: "Die passende OneKey-Integration für Ihre dApp, Wallet oder Anwendung auswählen."
+---
+
+<span id="choose-an-integration" />
+
+# Integration auswählen
+
+Beginnen Sie damit, womit sich Ihre Anwendung verbinden soll. Wallet-Provider-API, Hardware-SDK und QR-SDK dienen unterschiedlichen Integrationswegen.
+
+| Sie möchten … | Verwenden Sie | Hier beginnen |
+| --- | --- | --- |
+| Nutzern ermöglichen, ihre OneKey-Wallet mit einer Website oder dApp zu verbinden | Einen chainspezifischen Wallet-Provider oder eine Wallet-UI-Bibliothek | [Schnellstart für dApps](/de/connect-to-software) |
+| Ihre eigene Wallet oder App direkt mit einem OneKey-Gerät verbinden | Hardware-SDK mit einem Transport für Ihre Laufzeit | [Hardware-SDK-Schnellstart](/de/hardware-sdk/getting-started) |
+| Signieranfragen mit einem QR-fähigen Gerät austauschen | Air-Gap-SDK | [Übersicht zum Signieren per QR-Code](/de/air-gap) |
+
+Eine dApp-Integration bittet die OneKey-Wallet, die Konten und den Signierablauf des Nutzers zu verwalten. Bei einer direkten Hardware-Integration ist Ihre Anwendung für Geräteerkennung, Verbindungsstatus, UI-Ereignisse und Transaktionsvorbereitung verantwortlich.
+
+## Eine dApp verbinden [#connect-a-dapp]
+
+1. Installieren Sie [OneKey](https://onekey.so/download/) in Ihrer Entwicklungsumgebung.
+2. Befolgen Sie [Schnellstart für dApps](/de/connect-to-software), um den Provider zu erkennen und Konten über eine Nutzeraktion anzufordern.
+3. Wählen Sie Ihre Chain in der [Provider-API-Referenz](/de/connect-to-software/provider). Methoden und Rückgabewerte unterscheiden sich je nach Chain.
+4. Behandeln Sie eine fehlende Wallet, eine leere Kontoliste, eine abgelehnte Anfrage sowie Konto- oder Netzwerkänderungen.
+
+Wenn Ihre Anwendung bereits eine [Wallet-UI-Bibliothek](/de/connect-to-software/wallet-ui/web3modal) verwendet, beginnen Sie mit deren OneKey-Integration. Für die Übergabe an Mobilgeräte lesen Sie [Mobilgeräte und Deeplinks](/de/connect-to-software/mobile-deeplinks).
+
+## Hardware direkt verbinden [#connect-hardware-directly]
+
+Wählen Sie Ihre Laufzeit, bevor Sie ein SDK installieren:
+
+| Laufzeit | Anleitung |
+| --- | --- |
+| Browser mit WebUSB-Unterstützung | [WebUSB](/de/hardware-sdk/transport/web-usb) |
+| React Native mit Bluetooth | [React Native BLE](/de/hardware-sdk/transport/react-native-ble) |
+| Natives Android, iOS oder Flutter | [Native mobile Integration](/de/hardware-sdk/transport/native-ble) |
+
+Folgen Sie dann dem [Schnellstart](/de/hardware-sdk/getting-started). Initialisieren Sie das SDK, behandeln Sie seine UI-Anfragen, wählen Sie ein Gerät und rufen Sie eine Adresse ab, bevor Sie zum Signieren übergehen. Prüfen Sie [Geräte- und Chain-Unterstützung](/de/hardware-sdk/concepts/chain-support) für die genaue Methode und das Gerät, die Sie verwenden möchten.
+
+Die [Hardware-Testumgebung](https://hardware-example.onekey.so/) eignet sich zum Erkunden der APIs. Ein Emulator oder ein erfolgreicher Build ersetzt keine Tests Ihrer Integration mit dem vorgesehenen Gerät, der Firmware und der Laufzeit.
+
+## QR-Signieren verwenden [#use-qr-signing]
+
+Beginnen Sie mit der [Air-Gap-Übersicht](/de/air-gap), folgen Sie dann einer chainspezifischen Anleitung wie [Ethereum und EVM](/de/air-gap/ethereum-and-evm). Ihre App kodiert eine Anfrage, zeigt sie als QR-Daten an, liest die Geräteantwort und validiert das Ergebnis, bevor sie es über ihre eigene Netzwerkverbindung überträgt.
+
+## Vor der Veröffentlichung [#before-you-ship]
+
+- Testen Sie Ablehnung, Abbruch, Trennung und Wiederverbindung sowie den Erfolgsfall.
+- Zeigen Sie das verwendete Konto und Netzwerk an. Geben Sie dem Nutzer weiterhin die Möglichkeit, Signieranfragen zu prüfen.
+- Erfassen Sie niemals Wiederherstellungsphrasen oder private Schlüssel. Halten Sie PINs, Passphrasen, Tokens und Wallet-Sitzungsdaten aus Protokollen und Fehlerberichten heraus.
+- Legen Sie die in Ihrer Integration verwendeten Versionen fest und dokumentieren Sie sie. Testen Sie nach SDK-, Firmware- oder Wallet-Upgrades erneut.
+- Verwenden Sie die [Anleitung zur Fehlerbehebung](/de/troubleshooting), wenn eine Anfrage fehlschlägt oder hängen bleibt.

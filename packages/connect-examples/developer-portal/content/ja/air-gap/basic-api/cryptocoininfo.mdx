@@ -1,0 +1,32 @@
+---
+title: "CryptoCoinInfo"
+---
+
+# CryptoCoinInfo
+
+`CryptoCoinInfo` クラスは暗号資産の情報を表します。このページでは、Ethereum の列挙値を含む `@onekeyfe/onekey-air-gap` の従来のエクスポートについて説明します。他のレジストリパッケージでは異なる列挙型が公開されている場合があります。同じインストール済みパッケージのコンストラクターと型を使用してください。
+
+## 型 [#types]
+
+```typescript
+export enum Type {
+  bitcoin = 0,
+  ethereum = 60,
+}
+
+export enum Network {
+  mainnet,
+  testnet,
+}
+```
+
+## パラメーター [#parameters]
+
+| パラメーター | 型 | 説明 |
+|-----------|------|-------------|
+| `type` | `Type` | コンストラクターの第 1 引数。通貨の種類 (例: `bitcoin = 0`, `ethereum = 60`) |
+| `network` | `Network` | コンストラクターの第 2 引数。ネットワークの種類 (`mainnet` または `testnet`) |
+
+## UR タイプ [#ur-type]
+
+UR タイプは `crypto-coin-info`。レジストリエンコーダーでエンコード済みペイロードを生成してください。

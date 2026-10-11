@@ -1,0 +1,97 @@
+---
+title: "dnxGetAddress"
+---
+
+# dnxGetAddress
+
+### Dynex: アドレスを取得 [#dynex-get-address]
+
+指定パスのアドレスを導出して返します。`showOnOneKey` が `true` の場合は、 ユーザーがデバイス上でアドレスを確認する必要があります。
+
+```typescript
+const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
+```
+
+#### 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * classic: 3.8.0
+
+#### パラメーター [#parameters]
+
+connectId: `string`
+
+* 接続の一意の識別子
+
+deviceId: `string`
+
+* ハードウェアデバイスの一意の識別子
+
+params: `object`
+
+* path: `string` - BIP32 パス (例: "m/44'/29538'/0'/0/0") \[必須\]
+* showOnOneKey: `boolean` - アドレスをデバイスに表示するかどうか (デフォルト: true)
+
+アドレスを一括取得する場合:
+
+* bundle: 上記のパラメーターを持つオブジェクトの配列
+
+#### 例 [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    path: "m/44'/29538'/0'/0/0",
+    showOnOneKey: true
+});
+
+// Get multiple addresses
+const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    bundle: [
+        { path: "m/44'/29538'/0'/0/0", showOnOneKey: false },
+        { path: "m/44'/29538'/0'/0/1", showOnOneKey: false }
+    ]
+});
+```
+
+#### 戻り値 [#returns]
+
+単一アドレスの成功レスポンス:
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Dynex address
+        path: string        // BIP32 path used
+    }
+}
+```
+
+複数アドレスの成功レスポンス:
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string },
+        { address: string, path: string }
+    ]
+}
+```
+
+エラーレスポンス:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code?: string | number
+    }
+}
+```
+
+#### ファームウェア要件 [#firmware-requirements]
+
+* 最小ファームウェアバージョン: 3.8.0

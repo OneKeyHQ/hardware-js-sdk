@@ -1,0 +1,38 @@
+---
+description: "Compara las capacidades de transporte de los dispositivos y usa la conexión activa para determinar la compatibilidad del protocolo."
+title: "Dispositivos"
+---
+
+<span id="devices" />
+
+# Dispositivos
+
+El SDK de hardware 1.2.0 admite dos familias de protocolos mediante una sola API pública. Identifica aquí las restricciones del dispositivo y sigue llamando a los mismos métodos.
+
+| Dispositivo | Código | Protocolo | USB | BLE | Air-Gap (QR) |
+| --- | --- | --- | --- | --- | --- |
+| OneKey Classic | `classic` | V1 | Sí | Sí | No |
+| OneKey Classic 1s | `classic1s` | V1 | Sí | Sí | No |
+| OneKey Classic 1s Pure | `classicpure` | V1 | Sí | Sí | No |
+| OneKey Mini | `mini` | V1 | Sí | **No** | No |
+| OneKey Touch | `touch` | V1 | Sí | Sí | No |
+| OneKey Pro | `pro` | V1 | Sí | Sí | Sí |
+| OneKey Pro 2 | `pro2` | **V2** | Sí | Sí | Sí |
+| OneKey Neo | `neo` | **V2** | Sí | Sí | **No** (sin cámara) |
+
+El SDK indica el protocolo conectado en el objeto del dispositivo mediante `connectProtocol` (`'V1'` o `'V2'`). Ese valor es el resultado de una consulta en vivo, no de una búsqueda basada en el nombre del modelo.
+
+## Cómo debes usar el modelo [#what-you-should-do-with-the-model]
+
+- Usa el modelo para determinar **las capacidades y la experiencia de usuario**: Mini no tiene BLE, Neo no tiene QR Air-Gap y Pro / Pro 2 admiten Air-Gap.
+- Recuerda: **no** uses el nombre del modelo para elegir entre Protocol V1 y V2. Lee el protocolo confirmado por la conexión activa.
+- La API de actualización de firmware sigue la familia del protocolo: Pro usa [`firmwareUpdateV3`](/es/hardware-sdk/device-api/firmwareupdatev3); Pro 2 / Neo usan [`firmwareUpdateV4`](/es/hardware-sdk/device-api/firmwareupdatev4).
+
+## Lista de comprobación del integrador [#integrator-checklist]
+
+1. Almacena en caché `connectId` **por transporte**. Los identificadores USB y BLE de una misma unidad son distintos.
+2. Actualiza `deviceId` después de un borrado / recuperación. Consulta [Identificadores](/es/hardware-sdk/concepts/identifiers).
+3. Ejecuta las llamadas en serie por dispositivo. Mantén los flujos de entrada y firma en serie para que las solicitudes y los resultados sigan asociados a su operación.
+4. Nunca repitas una actualización de firmware, un borrado ni otra llamada con efectos secundarios después de un error de transporte.
+
+Consulta también: [Compatibilidad de cadenas](/es/hardware-sdk/concepts/chain-support) · [Protocol V1 y V2](/es/hardware-sdk/concepts/protocol) · [Sesiones de cartera](/es/hardware-sdk/concepts/wallet-session)

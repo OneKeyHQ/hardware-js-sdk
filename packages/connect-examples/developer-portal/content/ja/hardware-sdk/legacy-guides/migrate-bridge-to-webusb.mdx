@@ -1,0 +1,102 @@
+---
+description: "iframe ベースの Hardware Web SDK 統合を維持しながら、OneKey Bridge を WebUSB に置き換えます。"
+title: "web-sdk + WebUSB に移行"
+---
+
+<span id="migrate-to-web-sdk--webusb" />
+
+# web-sdk + WebUSB に移行
+
+Bridge を WebUSB に置き換え、SDK エントリーとして `@onekeyfe/hd-web-sdk` を維持します。
+
+---
+
+## 要件 [#requirements]
+
+- Chromium ブラウザー (デスクトップ版 Chrome/Edge)
+- Node.js 18+ (LTS 推奨)
+
+---
+
+## 変更点の概要 [#what-changed-at-a-glance]
+
+- 次で SDK を初期化します: `env: 'webusb'`
+  - (Bridge (環境: `web`) → WebUSB (環境: `webusb`).)
+- `connectSrc` の省略を推奨します。省略すると、`@onekeyfe/hd-web-sdk` が `https://jssdk.onekey.so/<installed-version>/` を設定します。iframe を自分でホストする場合のみ上書きしてください。
+- 公式 OneKey フィルターを指定した `navigator.usb.requestDevice()` でユーザーの許可を求めます。Chrome のセキュリティ制限により、新しい許可要求はボタンのクリックなどのユーザー操作から実行する必要があります。許可済みデバイスは、選択画面を再表示せずに列挙できます
+- Bridge 固有のチェックは非推奨です (例: `checkBridgeStatus()`)
+- その他の SDK の使い方は同じです
+
+---
+
+## 初期化 (hd-web-sdk + WebUSB) [#initialize-hd-web-sdk--webusb]
+
+```ts
+import HdWebSdk from '@onekeyfe/hd-web-sdk';
+
+// Same pattern as expo-example: default export → .HardwareWebSdk
+const HardwareSDK = HdWebSdk.HardwareWebSdk;
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  // omit connectSrc — SDK fills https://jssdk.onekey.so/<installed-hd-web-sdk-version>/
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+---
+
+## 許可 (WebUSB 選択画面 + 公式フィルター) [#authorization-webusb-picker--official-filter]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Important: must be triggered by a user gesture (e.g., button click)
+// Previously authorized devices can be enumerated without opening the chooser again.
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## デバイスの列挙と最初の呼び出し [#enumerate-devices-and-first-call]
+
+```ts
+// 1) Enumerate
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = list.payload[0] ?? {};
+if (!connectId) throw new Error("No device connection");
+
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
+
+// 3) Example: BTC address
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (r.success) {
+  console.log('BTC address:', r.payload.address);
+} else {
+  console.error('Error:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## クリーンアップとチェックリスト [#cleanup-and-checklist]
+
+- Bridge 固有のチェック/CTA を削除 (例: `checkBridgeStatus()`)
+- iframe を自分でホストする場合を除き、`connectSrc` を省略します。自分でホストする場合は、インストール済みの `@onekeyfe/hd-web-sdk` のバージョンに合わせる必要があります
+- 次の機能を検出し、 `navigator.usb` 未対応ならわかりやすい案内を表示します
+- その他の SDK メソッドと UI フローは変わりません

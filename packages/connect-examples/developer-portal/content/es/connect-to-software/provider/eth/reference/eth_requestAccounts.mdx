@@ -1,0 +1,51 @@
+---
+title: "eth_requestAccounts"
+description: "Solicitar las cuentas de Ethereum del usuario"
+---
+
+# eth_requestAccounts
+
+Solicita al usuario una dirección de Ethereum con la que identificarse. Este método abre una ventana de conexión si el usuario aún no está conectado.
+
+---
+
+## Parámetros [#parameters]
+
+Ninguno
+
+---
+
+## Devuelve [#returns]
+
+`string[]` - Una matriz de direcciones de Ethereum. Gestiona una matriz vacía y no supongas un número fijo de cuentas.
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_requestAccounts'
+})
+
+console.log('Connected account:', accounts[0])
+// "0x742d35Cc6634C0532925a3b844Bc9e7595f..."
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| 4001 | El usuario rechazó la solicitud | El usuario denegó la solicitud de conexión |
+| -32002 | Ya hay una solicitud pendiente | Una solicitud anterior sigue esperando la respuesta del usuario |
+
+---
+
+## Notas [#notes]
+
+- Este método solo debe llamarse como respuesta a una acción del usuario (por ejemplo, pulsar un botón)
+- Si el usuario ya está conectado, este método devuelve las cuentas conectadas sin mostrar una ventana
+- Equivalente al método obsoleto `ethereum.enable()`
+- Definido por [EIP-1102](https://eips.ethereum.org/EIPS/eip-1102)

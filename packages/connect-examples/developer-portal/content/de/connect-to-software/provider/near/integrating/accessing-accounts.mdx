@@ -1,0 +1,22 @@
+---
+title: "Auf Konten zugreifen"
+---
+
+<span id="accessing-accounts" />
+
+# Auf Konten zugreifen
+
+Nachdem die Wallet-Verbindung hergestellt wurde, können Sie auf die mit der OneKey-Wallet verbundenen Konten zugreifen.
+
+Nutzerkonten werden in OneKey in verschiedenen Zusammenhängen verwendet, unter anderem als Kennungen und zum Signieren von Transaktionen.
+
+```javascript
+const res = await provider.request({
+  method: 'near_accounts',
+});
+const accountId = res?.accounts?.[0]?.accountId || '';
+const publicKey = res?.accounts?.[0]?.publicKey || '';
+
+// An empty accounts array means no account is exposed to this site
+console.log('near_accounts', res?.accounts, accountId, publicKey);
+```

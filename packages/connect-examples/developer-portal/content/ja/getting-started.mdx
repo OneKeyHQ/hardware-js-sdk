@@ -1,0 +1,53 @@
+---
+title: "統合方法を選択"
+description: "dApp、ウォレット、アプリケーションに適した OneKey の統合方法を選択します。"
+---
+
+<span id="choose-an-integration" />
+
+# 統合方法を選択
+
+まず、アプリケーションの接続先を決めます。ウォレットの Provider API、Hardware SDK、QR SDK は、それぞれ異なる統合方法に対応します。
+
+| やりたいこと | 使用するもの | ここから始める |
+| --- | --- | --- |
+| Web サイトや dApp にユーザーの OneKey ウォレットを接続 | チェーン別のウォレットプロバイダーまたはウォレット UI ライブラリ | [dApp クイックスタート](/ja/connect-to-software) |
+| 独自のウォレットやアプリを OneKey デバイスに直接接続 | 実行環境に対応したトランスポート付きの Hardware SDK | [Hardware SDK クイックスタート](/ja/hardware-sdk/getting-started) |
+| QR 対応デバイスと署名リクエストをやり取り | Air-Gap SDK | [QR 署名の概要](/ja/air-gap) |
+
+dApp の統合では、OneKey ウォレットにユーザーアカウントと署名フローの管理を任せます。ハードウェアと直接統合する場合、アプリケーションがデバイス検出、接続状態、UI イベント、トランザクションの準備を担当します。
+
+## dApp を接続 [#connect-a-dapp]
+
+1. 開発環境に [OneKey](https://onekey.so/download/) をインストールします。
+2. [dApp クイックスタート](/ja/connect-to-software)に従って、プロバイダーを検出し、ユーザー操作からアカウントを要求します。
+3. [Provider API リファレンス](/ja/connect-to-software/provider)でチェーンを選択します。メソッドと戻り値はチェーンによって異なります。
+4. ウォレットがない場合、アカウント一覧が空の場合、リクエストの拒否、アカウントやネットワークの変更を処理してください。
+
+アプリケーションですでに[ウォレット UI ライブラリ](/ja/connect-to-software/wallet-ui/web3modal)を使用している場合は、その OneKey 統合から始めてください。モバイルへの引き継ぎについては[モバイルとディープリンク](/ja/connect-to-software/mobile-deeplinks)を参照してください。
+
+## ハードウェアに直接接続 [#connect-hardware-directly]
+
+SDK のインストール前に実行環境を選択します:
+
+| 実行環境 | ガイド |
+| --- | --- |
+| WebUSB 対応ブラウザー | [WebUSB](/ja/hardware-sdk/transport/web-usb) |
+| Bluetooth を使用する React Native | [React Native BLE](/ja/hardware-sdk/transport/react-native-ble) |
+| ネイティブ Android、iOS、Flutter | [ネイティブモバイル統合](/ja/hardware-sdk/transport/native-ble) |
+
+続いて[クイックスタート](/ja/hardware-sdk/getting-started)に従います。SDK を初期化し、UI リクエストを処理し、デバイスを選択してアドレスを取得してから署名へ進みます。[デバイスとチェーンの対応状況](/ja/hardware-sdk/concepts/chain-support)で、使用予定のメソッドとデバイスを正確に確認してください。
+
+この [ハードウェアプレイグラウンド](https://hardware-example.onekey.so/) は API を試すのに便利です。エミュレーターやビルドの成功は、想定するデバイス、ファームウェア、実行環境での統合テストの代わりにはなりません。
+
+## QR 署名を使用 [#use-qr-signing]
+
+まず [Air-Gap の概要](/ja/air-gap)を読み、続いて [Ethereum と EVM](/ja/air-gap/ethereum-and-evm) などのチェーン別ガイドを参照します。アプリがリクエストをエンコードして QR データで表示し、デバイスのレスポンスを読み取って結果を検証した後、独自のネットワーク接続でブロードキャストします。
+
+## リリース前に [#before-you-ship]
+
+- 成功時だけでなく、拒否、キャンセル、切断、再接続もテストしてください。
+- 使用中のアカウントとネットワークを表示し、ユーザーが署名リクエストを確認する機会を確保してください。
+- リカバリーフレーズや秘密鍵を収集してはいけません。PIN、パスフレーズ、トークン、ウォレットセッションのデータをログや不具合報告に含めないでください。
+- 統合で使用するバージョンを固定して記録してください。SDK、ファームウェア、ウォレットの更新後には再テストしてください。
+- リクエストが失敗または停止したときは、[トラブルシューティングガイド](/ja/troubleshooting)を参照してください。

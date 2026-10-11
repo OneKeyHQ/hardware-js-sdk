@@ -1,0 +1,116 @@
+---
+title: "Signature"
+description: "Signer des messages sur Aptos avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signature
+
+Connectez le fournisseur avant de signer et confirmez le réseau sélectionné. Le fournisseur injecté directement et l’adaptateur Aptos Wallet Standard utilisent des types d’arguments différents ; n’intervertissez pas leurs exemples. Remplacez les adresses abrégées et fournissez un client SDK pour les appels en lecture seule.
+
+Découvrez comment signer des messages pour l’authentification ou la vérification.
+
+---
+
+## Signer un message [#sign-message]
+
+Signer des messages arbitraires pour l’authentification ou la vérification :
+
+```typescript
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
+})
+
+console.log({
+  signature: response.signature,   // Hex-encoded signature
+  fullMessage: response.fullMessage, // Full signed message
+  prefix: response.prefix,         // Message prefix used
+})
+```
+
+---
+
+## Options de signature de message [#sign-message-options]
+
+```typescript
+const response = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+  address: true,      // Include address in message
+  application: true,  // Include app info
+  chainId: true,      // Include chain ID
+})
+```
+
+---
+
+## Vérifier un message (hors chaîne) [#verify-message-off-chain]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## Se connecter (norme AIP) [#sign-in-aip-standard]
+
+Pour un processus de connexion normalisé :
+
+```typescript
+const signInInput = {
+  // Sign-in parameters
+}
+
+const result = await provider.signIn(signInInput)
+
+console.log({
+  address: result.account.address,
+  publicKey: result.account.publicKey,
+  signature: result.signature,
+})
+```
+
+---
+
+## Gestion des erreurs [#error-handling]
+
+```typescript
+try {
+  await provider.signMessage({ message: 'Hello', nonce: 12345 })
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('User rejected the request')
+      break
+    case 4100:
+      console.log('The account or method is not authorized')
+      break
+    case 4200:
+      console.log('Unsupported method')
+      break
+    default:
+      console.error('Error:', error.message)
+  }
+}
+```
+
+La méthode directe `signMessage` utilise un nonce numérique. `signMessageCompatible` et les intégrations Wallet Standard utilisent un nonce sous forme de chaîne. Vérifiez la valeur renvoyée de `fullMessage`, le signataire et le défi, puis invalidez le défi après utilisation. L’entrée de connexion ci-dessus est un exemple schématique ; construisez l’objet complet `AptosSignInInput` requis par la version de votre adaptateur.

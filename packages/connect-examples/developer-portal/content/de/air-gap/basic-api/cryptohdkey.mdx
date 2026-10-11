@@ -1,0 +1,61 @@
+---
+title: "CryptoHDKey"
+---
+
+# CryptoHDKey
+
+Die Klasse `CryptoHDKey` stellt Informationen zu hierarchisch-deterministischen Schlüsseln dar.
+
+OneKey kann dieses Registry-Objekt als QR-Code exportieren, damit die Wallet Adressen aus öffentlichen Schlüsseldaten ableiten kann.
+
+## Parameter [#parameters]
+
+| Parameter | Typ | Beschreibung |
+|-----------|------|-------------|
+| `isMaster` | `boolean` | Ob es sich um einen Master-Schlüssel handelt |
+| `isPrivateKey` | `boolean` | Ob es sich um einen privaten Schlüssel handelt |
+| `key` | `Buffer` | Die Schlüsseldaten |
+| `chainCode` | `Buffer` | Der Chain Code |
+| `useInfo` | [`CryptoCoinInfo`](/de/air-gap/basic-api/cryptocoininfo) | Nutzungsinformationen |
+| `origin` | [`CryptoKeypath`](/de/air-gap/basic-api/cryptokeypath) | Der Ursprungspfad |
+| `children` | [`CryptoKeypath`](/de/air-gap/basic-api/cryptokeypath) | Der Pfad der untergeordneten Schlüssel |
+| `parentFingerprint` | `Buffer` | Der übergeordnete Fingerabdruck |
+| `name` | `string` | Der Name (optional) |
+| `note` | `string` | Die Notiz (optional) |
+
+### Werte für die Notiz [#note-values]
+
+- `'account.standard'` – BIP44-Standardkonto
+- `'account.ledger_live'` – Ledger-Live-Konto
+- `'account.ledger_legacy'` – Ledger-Legacy-Konto
+
+## UR-Beispiel [#ur-example]
+
+```
+UR:CRYPTO-HDKEY/PDAXHDCLAOZTRDKBTKFPRFKBCWVEWYBGDPNTCPVLEOENJSWMBKFTLTRESNWTNLTLMKJYVYMWBSAAHDCXCSBNNLLNBZIAJZTPKPPKJOSTCEZSJEKGYKJOCSKNHFTPSWTIGHVABDIEGTBWWLTEAHTAADEHOYADCSFNAMTAADDYOYADLNCSDWYKCSFNYKAEYKATTAADDYOYADLRAEWKLAWKAYAEASINFPIAIAJLKPJTJYCXEHBKKOGHISINJKCXINJKCXHSC
+```
+
+## Dekodierungsbeispiel [#decoding-example]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoHDKey } from '@keystonehq/bc-ur-registry';
+
+const dec = new URDecoder();
+// push each scanned frame string into the decoder
+// dec.receivePart(frame)
+
+if (dec.isError()) throw new Error('Could not decode account QR code');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'crypto-hdkey') throw new Error('Expected crypto-hdkey');
+  const hdkey = CryptoHDKey.fromCBOR(ur.cbor);
+  if (hdkey.isPrivateKey()) throw new Error('Expected a public account export');
+
+  const name = hdkey.getName();
+  const note = hdkey.getNote();
+  const chainCode = hdkey.getChainCode();
+  const origin = hdkey.getOrigin();
+  const xfp = origin?.getSourceFingerprint();
+}
+```
