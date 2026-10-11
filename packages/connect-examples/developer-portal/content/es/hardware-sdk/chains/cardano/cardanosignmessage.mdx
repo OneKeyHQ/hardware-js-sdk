@@ -6,9 +6,10 @@ title: "cardanoSignMessage"
 
 ## Requisitos [#requirements]
 
-* Versiones mínimas de firmware
-  * Touch: 4.1.0
-  * Classic/Mini: 3.0.0
+* Versiones mínimas de firmware exigidas por el SDK
+  * Touch / Pro (`model_touch`): 4.10.0
+
+Este método no declara una versión mínima de firmware para Classic/Mini. La ausencia de una comprobación de versión en el SDK no demuestra que el firmware admita este método.
 
 ## Cardano: firmar un mensaje <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#cardano-sign-message-]
 
@@ -22,7 +23,7 @@ const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params)
 
 [**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
 
-* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _obligatorio_ `string` Ruta BIP32 con al menos `3` componentes. Este método no acepta un array de números. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
 * `message` - _obligatorio_ `string` Mensaje que se va a firmar, codificado como cadena hexadecimal.
 * `networkId` - _obligatorio_ `Integer` 1 para la red principal, 0 para la red de pruebas
 * `derivationType` - _obligatorio_ `CardanoDerivationType`: enumeración que selecciona el algoritmo de derivación. El valor predeterminado en ejecución es `ICARUS` (`1`).

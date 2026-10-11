@@ -6,9 +6,10 @@ title: "cardanoSignMessage"
 
 ## 要件 [#requirements]
 
-* 最小ファームウェアバージョン
-  * Touch: 4.1.0
-  * Classic/Mini: 3.0.0
+* SDK が要求する最小ファームウェアバージョン
+  * Touch / Pro (`model_touch`): 4.10.0
+
+このメソッドでは、Classic/Mini の最小ファームウェアバージョンは定義されていません。SDK にバージョンチェックがないことは、ファームウェアがこのメソッドに対応していることを意味しません。
 
 ## Cardano: メッセージに署名 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#cardano-sign-message-]
 
@@ -22,7 +23,7 @@ const result = await HardwareSDK.cardanoSignMessage(connectId, deviceId, params)
 
 [**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
 
-* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必須_ `string` 少なくとも `3` 個の構成要素を持つ BIP32 パスです。このメソッドは数値配列を受け付けません。[パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
 * `message` - _必須_ `string` 署名するメッセージ。16 進数文字列にエンコードします。
 * `networkId` - _必須_ `Integer` メインネットは 1、テストネットは 0
 * `derivationType` - _必須_ `CardanoDerivationType` 列挙型。導出アルゴリズムを選択します。実行時のデフォルトは `ICARUS` (`1`).

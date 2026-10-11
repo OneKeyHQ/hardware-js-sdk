@@ -2900,8 +2900,8 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosignmessage.mdx": {
-        "sourceHash": "5333f9ca53ac410e6ad611a9743effda352f2b6b3ba6c464b52baa289aafeaf9",
-        "outputHash": "d0dd42d6ce2d4faa2d461575a27c5ebb4fff71c23f2d2d98782eaacf2c92717d",
+        "sourceHash": "c117d1ca612cc00b34a26b6873796b76f56cecd2312afc2fd44eef25388d18d3",
+        "outputHash": "77a427b8d2e22d6bacc963fbcfa62c48a0cf24ade1de49aa08a155dfe746d9ed",
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosigntransaction.mdx": {
@@ -3045,18 +3045,18 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrdecryptmessage.mdx": {
-        "sourceHash": "49ab718c68160b91b63803fbe2cc03b7518c44dbcb408e226be5473a0eefd367",
-        "outputHash": "6560ccf4f3c035f3bac60cacb9b67ee9479239c1c6d55d179739e2d4e46e8a98",
+        "sourceHash": "6a34e042d924cf7c2509c2e6be3071023326fa3ade2f33148e2b0c9b7ccda496",
+        "outputHash": "792df1fab9d90e791ffd55b57d6ac23cf28b4d63db57920a7eef34dd6c943b89",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrencryptmessage.mdx": {
-        "sourceHash": "4a98e977f7ff3f42d51cbf66ae86c6ef9289060e58a54e64446ff63309dbe51e",
-        "outputHash": "9742360644fc04f15dc369fa5e64fb6f4a50bba24245ac1335189a5100157270",
+        "sourceHash": "aeff309fc3484ce614aaf0e2cdf13f94066f5faf23dbb9acca0f68a80477747d",
+        "outputHash": "59104524eb10a9868d73bb75185d9abfd82823aa7088df53eb633680d547073d",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrgetpublickey.mdx": {
-        "sourceHash": "22d325ffb78a2c5ea2021ae655abe7074febad1eba7f1bee978077689db4dedf",
-        "outputHash": "4d96f02fd5ce4f5192c7012e63b6fbfe7fa058846e293e8b8a035311441d9953",
+        "sourceHash": "a82487f67df99ddf042c580c3ab140642bb333f17e904281e9304b2560060429",
+        "outputHash": "875bddfaaffd7056b5c49451c0e1aac5963c5042e1234013a4e1e741145be8fb",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrsignevent.mdx": {
@@ -4662,8 +4662,8 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosignmessage.mdx": {
-        "sourceHash": "5333f9ca53ac410e6ad611a9743effda352f2b6b3ba6c464b52baa289aafeaf9",
-        "outputHash": "1973917f03cdfebf31f5bfa8d9cfa4d1f4579c0e496c7dabbaf561bff28c7dcf",
+        "sourceHash": "c117d1ca612cc00b34a26b6873796b76f56cecd2312afc2fd44eef25388d18d3",
+        "outputHash": "e371896709aa61aa7ce9c41bb2129c77c7a78b466490466ac48f00e624bf48de",
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosigntransaction.mdx": {
@@ -4807,18 +4807,18 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrdecryptmessage.mdx": {
-        "sourceHash": "49ab718c68160b91b63803fbe2cc03b7518c44dbcb408e226be5473a0eefd367",
-        "outputHash": "b939a676a70d160ee98e89e87682a4039413ebde77b29417564adeeacde88d87",
+        "sourceHash": "6a34e042d924cf7c2509c2e6be3071023326fa3ade2f33148e2b0c9b7ccda496",
+        "outputHash": "9c0e13c106c00d6fa9227defea7e764ff245601b1e526a12df774c5d25743699",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrencryptmessage.mdx": {
-        "sourceHash": "4a98e977f7ff3f42d51cbf66ae86c6ef9289060e58a54e64446ff63309dbe51e",
-        "outputHash": "181f5607c104924e46fb49f4de2e4db793dd1e50f34273633ce5a5cdb8d4d8f4",
+        "sourceHash": "aeff309fc3484ce614aaf0e2cdf13f94066f5faf23dbb9acca0f68a80477747d",
+        "outputHash": "1c8b8bfdc785a446cedc71defdce998383dc896d0898b22ff443cbec829dece4",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrgetpublickey.mdx": {
-        "sourceHash": "22d325ffb78a2c5ea2021ae655abe7074febad1eba7f1bee978077689db4dedf",
-        "outputHash": "b73a1005de76c26ffc16d8e949e9c80745aa8dcf48fe5467520b61ecdbb635ff",
+        "sourceHash": "a82487f67df99ddf042c580c3ab140642bb333f17e904281e9304b2560060429",
+        "outputHash": "e095fd1cf2c6c4a84762efb84e09c5d1f4664f2a3d19df775b6c8efcaa9a22a2",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrsignevent.mdx": {
@@ -6424,8 +6424,8 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosignmessage.mdx": {
-        "sourceHash": "5333f9ca53ac410e6ad611a9743effda352f2b6b3ba6c464b52baa289aafeaf9",
-        "outputHash": "65561b18972754d2022865619cdb88c7005ac524c07869be4efc440d04687ca2",
+        "sourceHash": "c117d1ca612cc00b34a26b6873796b76f56cecd2312afc2fd44eef25388d18d3",
+        "outputHash": "51689c192a7377cddf58551d3a571b2c11fc3c4fd661939d1ceca349a8db2583",
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosigntransaction.mdx": {
@@ -6569,18 +6569,18 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrdecryptmessage.mdx": {
-        "sourceHash": "49ab718c68160b91b63803fbe2cc03b7518c44dbcb408e226be5473a0eefd367",
-        "outputHash": "2254c6d3540780aac2e3b7b1722a69365fbb7dca1a24b5fcd7e629e65a7e1f22",
+        "sourceHash": "6a34e042d924cf7c2509c2e6be3071023326fa3ade2f33148e2b0c9b7ccda496",
+        "outputHash": "ee263f4ef02b1cd61ff9d223d5763a08bd50da3022f8e6596db275186b90861e",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrencryptmessage.mdx": {
-        "sourceHash": "4a98e977f7ff3f42d51cbf66ae86c6ef9289060e58a54e64446ff63309dbe51e",
-        "outputHash": "b8c8565e3c635a957b28f0f549d5c0bbb739f47acaae084c31556ff7dafdd89c",
+        "sourceHash": "aeff309fc3484ce614aaf0e2cdf13f94066f5faf23dbb9acca0f68a80477747d",
+        "outputHash": "dc4f67bc164534356253d3ffe6bf0227ac8da7a69e312d4346468f08dc812589",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrgetpublickey.mdx": {
-        "sourceHash": "22d325ffb78a2c5ea2021ae655abe7074febad1eba7f1bee978077689db4dedf",
-        "outputHash": "c3da1e7c6630cb1f8c828837dc73e8caf3f0a8d7b80409109ee9f02edbc2e2d0",
+        "sourceHash": "a82487f67df99ddf042c580c3ab140642bb333f17e904281e9304b2560060429",
+        "outputHash": "6af751f89cba893d5c123566997dd4d62a7762f76e556cb1712563630d98a394",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrsignevent.mdx": {
@@ -8186,8 +8186,8 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosignmessage.mdx": {
-        "sourceHash": "5333f9ca53ac410e6ad611a9743effda352f2b6b3ba6c464b52baa289aafeaf9",
-        "outputHash": "ceef8879560a1433c42caae6ebf8ec42a4e22a85b6a6f3cf6af981cb7f03850b",
+        "sourceHash": "c117d1ca612cc00b34a26b6873796b76f56cecd2312afc2fd44eef25388d18d3",
+        "outputHash": "accf7a576942b2fe29b945451a1ff3fee56e167fb0badc73aec9c813a0b3fb85",
         "mode": "translated"
       },
       "hardware-sdk/chains/cardano/cardanosigntransaction.mdx": {
@@ -8331,18 +8331,18 @@
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrdecryptmessage.mdx": {
-        "sourceHash": "49ab718c68160b91b63803fbe2cc03b7518c44dbcb408e226be5473a0eefd367",
-        "outputHash": "261fb22d3d9c35e16f8777d61a11e1b16bdff251b4c5b2c428f10e43b4a20675",
+        "sourceHash": "6a34e042d924cf7c2509c2e6be3071023326fa3ade2f33148e2b0c9b7ccda496",
+        "outputHash": "02312676885dbaac87763973213a28a5bcecf78dc805fc003d71b015b0d9f053",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrencryptmessage.mdx": {
-        "sourceHash": "4a98e977f7ff3f42d51cbf66ae86c6ef9289060e58a54e64446ff63309dbe51e",
-        "outputHash": "7533b8e0b3b091f9671ed88fdb06b6cd300e8e2e43dd6671e743b5481197f976",
+        "sourceHash": "aeff309fc3484ce614aaf0e2cdf13f94066f5faf23dbb9acca0f68a80477747d",
+        "outputHash": "2cff6209749e39ae6cd4baa2542caf5bda9734ae2d39adb48767eac27eb962f2",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrgetpublickey.mdx": {
-        "sourceHash": "22d325ffb78a2c5ea2021ae655abe7074febad1eba7f1bee978077689db4dedf",
-        "outputHash": "4b5dfc8b08363facff6fc575993d12bd3ae1b871290cc44eadb0575201f17296",
+        "sourceHash": "a82487f67df99ddf042c580c3ab140642bb333f17e904281e9304b2560060429",
+        "outputHash": "a0bf22b28bd2fb033861919dbb38071e35f819c085ff9d1cb3e3d73dc9dcf5c2",
         "mode": "translated"
       },
       "hardware-sdk/chains/nostr/nostrsignevent.mdx": {
