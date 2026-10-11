@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Enable the target chain before reading its key or requesting a signature. Use the account number, sequence, fees, and RPC endpoint for that chain; placeholder values in signing examples must be replaced before use.
+
 Learn how to detect, connect, and interact with Cosmos chains using OneKey's provider.
 
 ---
@@ -32,8 +34,8 @@ console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
 ```typescript
 const chainId = 'cosmoshub-4'
 
-// Enable the chain - returns key info
-const key = await provider.enable(chainId)
+// Request access to the chain. Read key information separately with getKey().
+await provider.enable(chainId)
 
 // Or enable multiple chains at once
 await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
@@ -51,9 +53,9 @@ console.log({
   name: key.name,           // Account name
   algo: key.algo,           // Signing algorithm (secp256k1)
   pubKey: key.pubKey,       // Public key (Uint8Array)
-  address: key.address,     // Bech32 address (Uint8Array)
+  address: key.address,     // Raw address bytes
   bech32Address: key.bech32Address,  // Bech32 formatted address
-  isNanoLedger: key.isNanoLedger,    // Hardware wallet flag
+  isNanoLedger: key.isNanoLedger,    // Ledger compatibility flag
 })
 ```
 
@@ -151,4 +153,3 @@ const provider = window.keplr
 // After (OneKey with Keplr fallback)
 const provider = window.$onekey?.cosmos || window.keplr
 ```
-

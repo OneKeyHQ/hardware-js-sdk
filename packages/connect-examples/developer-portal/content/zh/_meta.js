@@ -15,6 +15,30 @@ export default {
       copyPage: false,
     },
   },
+  'getting-started': { title: '开始接入', type: 'page' },
+  'connect-to-software': {
+    title: 'dApp 接入',
+    type: 'menu',
+    items: {
+      quickstart: { title: 'dApp 快速开始', href: '/zh/connect-to-software' },
+      provider: { title: 'Provider API', href: '/zh/connect-to-software/provider' },
+      web3modal: { title: 'Web3Modal UI 组件', href: '/zh/connect-to-software/wallet-ui/web3modal' },
+    },
+  },
+  'hardware-sdk': {
+    title: '硬件接入',
+    type: 'menu',
+    items: {
+      'getting-started': { title: '快速开始', href: '/zh/hardware-sdk/getting-started' },
+      'web-usb': { title: 'WebUSB 连接', href: '/zh/hardware-sdk/transport/web-usb' },
+      'react-native-ble': { title: 'React Native BLE', href: '/zh/hardware-sdk/transport/react-native-ble' },
+      'native-ble': { title: '原生移动端 BLE', href: '/zh/hardware-sdk/transport/native-ble' },
+    },
+  },
+  'air-gap': {
+    title: '离线签名',
+    type: 'page',
+  },
   'agent-wallet': {
     title: AgentWalletBetaTitle({ betaLabel: '内测' }),
     type: 'menu',
@@ -46,29 +70,20 @@ export default {
       safety: { title: '安全规则', href: '/zh/agent-wallet/safety' },
     },
   },
+  'integration-guides': {
+    title: '资源',
+    type: 'menu',
+    items: {
+      guides: { title: '集成指南', href: '/zh/integration-guides' },
+      glossary: { title: '术语表', href: '/zh/integration-guides/glossary' },
+      troubleshooting: { title: '排障指南', href: '/zh/troubleshooting' },
+      contributing: { title: '参与贡献', href: '/zh/integration-guides/contributing' },
+      legacy: { title: '历史集成', href: '/zh/legacy' },
+    },
+  },
+  legacy: { title: '历史集成', display: 'hidden' },
   // 导航菜单及下拉项
-  'hardware-sdk': {
-    title: '硬件接入',
-    type: 'menu',
-    items: {
-      'getting-started': { title: '快速开始', href: '/zh/hardware-sdk/getting-started' },
-      'web-usb': { title: 'WebUSB 连接', href: '/zh/hardware-sdk/transport/web-usb' },
-      'react-native-ble': { title: 'React Native BLE', href: '/zh/hardware-sdk/transport/react-native-ble' },
-      'native-ble': { title: '原生移动端 BLE', href: '/zh/hardware-sdk/transport/native-ble' },
-    },
-  },
-  'connect-to-software': {
-    title: 'dApp 接入',
-    type: 'menu',
-    items: {
-      provider: { title: 'Provider API', href: '/zh/connect-to-software/provider' },
-      web3modal: { title: 'Web3Modal UI 组件', href: '/zh/connect-to-software/wallet-ui/web3modal' },
-    },
-  },
-  'air-gap': {
-    title: '离线签名',
-    type: 'page',
-  },
+  troubleshooting: { title: '排障指南', display: 'hidden' },
   changelog: {
     title: '更新日志',
     display: 'hidden',

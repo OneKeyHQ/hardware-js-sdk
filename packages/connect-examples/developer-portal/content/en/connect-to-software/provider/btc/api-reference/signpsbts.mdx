@@ -2,23 +2,23 @@
 title: signPsbts
 ---
 
+
 # signPsbts
 
-## signPsbts
 
 Sign multiple PSBTs at once. This method will traverse all inputs that match the current address to sign.
 
-#### Wallet & Address Type Compatibility
+## Wallet & Address Type Compatibility
 
 | Wallet Type     | Model          | Address Types Supported                |
 | --------------- | -------------- | -------------------------------------- |
 | Software Wallet | All            | p2wpkh (Native Segwit), p2tr (Taproot) |
 | Hardware Wallet | Pro, Classic1S | p2tr (Taproot)                         |
 
-#### Method
+## Method
 
 ```typescript
-async function signPsbts(
+declare function signPsbts(
     psbtHexs: string[],
     options?: {
         autoFinalized?: boolean;
@@ -34,7 +34,7 @@ async function signPsbts(
 ): Promise<string[]>
 ```
 
-#### Parameters
+## Parameters
 
 * `psbtHexs` — _required_ `string[]` Array of hex strings of PSBTs to sign
 * `options` — _optional_ `object`
@@ -47,11 +47,11 @@ async function signPsbts(
     * `disableTweakSigner` — _optional_ `boolean` Default is `false`. Set `true` to use original private key when signing Taproot inputs
     * `useTweakedSigner` — _optional_ `boolean` Force whether to use tweaked signer; higher priority than `disableTweakSigner`
 
-#### Returns
+## Returns
 
 * `Promise<string[]>` Array of hex strings of signed PSBTs
 
-#### Example
+## Example
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
@@ -84,8 +84,10 @@ try {
 }
 ```
 
-#### Demo
+## Demo
 
 
 <iframe src="https://codepen.io/OneKeyHQ/pen/XWOPaPY" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
 
+
+The abbreviated values are placeholders. Replace them with complete PSBTs, addresses, and public keys. The published provider interface exposes `autoFinalized`; advanced input options depend on the wallet implementation and should be verified against the target version. Signing does not broadcast a transaction.

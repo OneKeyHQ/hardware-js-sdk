@@ -10,7 +10,7 @@ import { Callout } from 'nextra/components'
 WalletConnect's official wallet connection UI, now part of Reown AppKit. Provides multi-chain support and mobile wallet connections.
 
 <Callout type="info">
-Web3Modal has been rebranded to Reown AppKit. Both package names work, but `@reown/appkit` is recommended for new projects.
+Web3Modal has been rebranded to Reown AppKit. This guide uses the `@reown/appkit` packages. Follow Reown’s migration guide when upgrading an existing Web3Modal integration.
 </Callout>
 
 ---
@@ -18,7 +18,7 @@ Web3Modal has been rebranded to Reown AppKit. Both package names work, but `@reo
 ## Installation
 
 ```bash
-npm install @reown/appkit @reown/appkit-adapter-wagmi wagmi viem @tanstack/react-query
+npm install @reown/appkit @reown/appkit-adapter-wagmi wagmi@^2 viem@^2 @tanstack/react-query@^5
 ```
 
 ---
@@ -28,7 +28,7 @@ npm install @reown/appkit @reown/appkit-adapter-wagmi wagmi viem @tanstack/react
 ```tsx filename="App.tsx"
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiProvider } from 'wagmi'
-import { mainnet, polygon, arbitrum } from '@reown/appkit/networks'
+import { mainnet, polygon, arbitrum, type AppKitNetwork } from '@reown/appkit/networks'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 
@@ -36,7 +36,7 @@ import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 const projectId = 'YOUR_PROJECT_ID'
 
 // 2. Configure networks
-const networks = [mainnet, polygon, arbitrum]
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [mainnet, polygon, arbitrum]
 
 // 3. Create wagmi adapter
 const wagmiAdapter = new WagmiAdapter({
@@ -52,7 +52,7 @@ createAppKit({
   metadata: {
     name: 'My dApp',
     description: 'My dApp description',
-    url: 'https://mydapp.com',
+    url: 'https://mydapp.com', // Must match your deployed dApp origin
     icons: ['https://mydapp.com/icon.png'],
   },
 })
@@ -75,7 +75,7 @@ export default function App() {
 
 ## Feature OneKey
 
-To prioritize OneKey in the wallet list:
+Add these options to the existing `createAppKit` call to prioritize OneKey. Confirm the wallet ID in the WalletConnect wallet guide when updating your integration:
 
 ```tsx
 createAppKit({

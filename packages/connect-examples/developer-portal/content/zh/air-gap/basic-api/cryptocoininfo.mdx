@@ -4,7 +4,7 @@ title: CryptoCoinInfo
 
 # CryptoCoinInfo
 
-`CryptoCoinInfo` 类表示加密货币信息。
+`CryptoCoinInfo` 类表示加密货币信息。本页介绍 `@onekeyfe/onekey-air-gap` 的旧版导出，其中包含以太坊的枚举值。其他注册表包的枚举可能不同；请使用同一个已安装包提供的构造函数和类型。
 
 ## 类型
 
@@ -24,12 +24,11 @@ export enum Network {
 
 | 参数 | 类型 | 描述 |
 |-----------|------|-------------|
-| `Type` | `enum` | 货币类型（如 `bitcoin = 0`，`ethereum = 60`） |
-| `Network` | `enum` | 网络类型（`mainnet` 或 `testnet`） |
+| `type` | `Type` | 第一个构造参数；币种类型，例如 `bitcoin = 0`、`ethereum = 60` |
+| `network` | `Network` | 第二个构造参数；网络类型（`mainnet` 或 `testnet`） |
 
-## UR 示例
+<span id="ur-示例" />
 
-```
-ur:crypto-coin-info/xxxxx
-```
+## UR 类型
 
+UR 类型为 `crypto-coin-info`。使用注册表编码器生成编码数据。

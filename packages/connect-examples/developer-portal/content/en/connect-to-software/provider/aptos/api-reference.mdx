@@ -5,7 +5,7 @@ description: Complete API reference for OneKey's Aptos provider
 
 # API Reference
 
-Complete reference for OneKey's Aptos provider methods and types.
+Reference for OneKey's Aptos provider methods and types.
 
 ---
 
@@ -21,8 +21,8 @@ Complete reference for OneKey's Aptos provider methods and types.
 | `getNetwork()` | Get full network info |
 | `getNetworkURL()` | Get network RPC URL |
 | `signMessage(request)` | Sign arbitrary message |
-| `signAndSubmitTransaction(payload, options?)` | Sign and submit transaction |
-| `signTransaction(payload, options?)` | Sign transaction without submitting |
+| `signAndSubmitTransaction(payload)` | Sign and submit transaction |
+| `signTransaction(payload)` | Sign transaction without submitting |
 | `signTransactionV2(params)` | Sign BCS-serialized transaction |
 | `signAndSubmitTransactionV2(params)` | Sign and submit (Standard V1.1.0) |
 | `signIn(payload)` | AIP sign-in flow |
@@ -48,7 +48,7 @@ interface AptosAccountInfo {
 ```typescript
 interface AptosNetwork {
   name: string       // Network name
-  chainId: string    // Chain ID
+  chainId: number    // Chain ID
   url: string        // RPC URL
 }
 ```
@@ -58,7 +58,7 @@ interface AptosNetwork {
 ```typescript
 interface SignMessageRequest {
   message: string    // Message to sign
-  nonce?: string     // Optional nonce
+  nonce: number      // Required by the direct provider API
   address?: boolean  // Include address in message
   application?: boolean // Include app info
   chainId?: boolean  // Include chain ID
@@ -75,7 +75,7 @@ interface SignMessageResponse {
   address?: string      // Signer address
   application?: string  // Application info
   chainId?: number      // Chain ID
-  nonce: string         // Nonce used
+  nonce: number         // Nonce used
 }
 ```
 
@@ -132,4 +132,3 @@ interface SignTransactionV2Params {
 | 4200 | Unsupported method |
 | 4201 | Unsupported network |
 | -32603 | Internal error |
-

@@ -1,3 +1,5 @@
+import { translateCopy, ui } from '../../../../i18n/ui.mjs';
+
 const PRO_I18N_ZH = {
   homeSwipeUpToShowApps: '向上滑动查看应用程序',
   processing: '处理中...',
@@ -35,6 +37,6 @@ const PRO_I18N_EN = {
 };
 
 export function getProI18n(locale) {
-  if ((locale ?? 'zh') === 'en') return PRO_I18N_EN;
-  return PRO_I18N_ZH;
+  const language = locale ?? 'zh';
+  return { ...translateCopy(language, PRO_I18N_EN), addressTitle: network => ui(language, '{network} Address', '{network} 地址').replace('{network}', () => network) };
 }

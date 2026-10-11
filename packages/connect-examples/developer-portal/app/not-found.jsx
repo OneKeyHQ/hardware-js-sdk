@@ -1,10 +1,12 @@
 'use client'
 
+import { publishedLocaleCodes } from '../i18n/locales.mjs'
+
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
-const supportedLocales = ['en', 'zh']
+const supportedLocales = publishedLocaleCodes
 const defaultLocale = 'en'
 
 export default function NotFound() {

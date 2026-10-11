@@ -14,11 +14,11 @@ description: 将代币添加到钱包的跟踪列表
 `object` 包含：
 
 | 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `type` | `string` | 是 | 代币类型（目前仅支持 `ERC20`） |
+|-------|------|----------|-------------|
+| `type` | `string` | 是 | 代币类型；本页演示 `ERC20` |
 | `options` | `object` | 是 | 代币详情 |
 | `options.address` | `string` | 是 | 代币合约地址 |
-| `options.symbol` | `string` | 是 | 代币符号（1-11 个字符） |
+| `options.symbol` | `string` | 是 | 代币代码，1–11 个字符 |
 | `options.decimals` | `number` | 是 | 代币精度 |
 | `options.image` | `string` | 否 | 代币图标 URL |
 
@@ -47,9 +47,9 @@ const wasAdded = await window.$onekey.ethereum.request({
 })
 
 if (wasAdded) {
-  console.log('代币已添加到钱包')
+  console.log('Token added to wallet')
 } else {
-  console.log('用户拒绝添加代币')
+  console.log('User declined to add token')
 }
 ```
 
@@ -68,7 +68,7 @@ const tokens = [
     decimals: 6
   },
   {
-    address: '0x6B175474E89094C44Da98b954EescdecAD3F9c6',
+    address: '<TOKEN_CONTRACT_ADDRESS>',
     symbol: 'DAI',
     decimals: 18
   }
@@ -85,7 +85,7 @@ async function addTokens(tokenList) {
         }
       })
     } catch (error) {
-      console.error(`添加 ${token.symbol} 失败:`, error)
+      console.error(`Failed to add ${token.symbol}:`, error)
     }
   }
 }
@@ -99,16 +99,16 @@ async function suggestToken() {
     method: 'eth_chainId'
   })
 
-  // 不同网络的代币地址
+  // Different addresses per network
   const tokenAddresses = {
-    '0x1': '0x...主网地址',
-    '0x89': '0x...Polygon地址',
-    '0xa4b1': '0x...Arbitrum地址'
+    '0x1': '0x...MainnetAddress',
+    '0x89': '0x...PolygonAddress',
+    '0xa4b1': '0x...ArbitrumAddress'
   }
 
   const address = tokenAddresses[chainId]
   if (!address) {
-    throw new Error('此网络上没有该代币')
+    throw new Error('Token not available on this network')
   }
 
   return window.$onekey.ethereum.request({
@@ -139,8 +139,8 @@ async function suggestToken() {
 
 ## 说明
 
-- 目前仅支持 `ERC20` 类型
-- 钱包可能已经在跟踪该代币（仍返回 `true`）
-- 图片 URL 应为 HTTPS 且可访问
-- 符号应与链上符号匹配以获得最佳用户体验
-- 遵循 [EIP-747](https://eips.ethereum.org/EIPS/eip-747) 规范
+- 本页介绍 `ERC20`；其他类型需在目标钱包版本中验证。
+- 钱包可能已显示该代币，此时仍可返回 `true`。
+- 图标应使用可访问的 HTTPS URL。
+- 代币代码应与链上信息一致，方便用户辨认。
+- 规范见 [EIP-747](https://eips.ethereum.org/EIPS/eip-747)。

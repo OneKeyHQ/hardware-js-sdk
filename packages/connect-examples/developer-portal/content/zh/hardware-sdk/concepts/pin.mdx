@@ -1,5 +1,6 @@
 ---
 title: PIN（核心指南）
+description: 处理设备端或宿主端 PIN 输入，正确关联并取消请求。
 ---
 
 # PIN（核心指南）
@@ -10,53 +11,48 @@ title: PIN（核心指南）
 
 - 设备锁定机制：当设备锁定时，受保护的调用会触发 `UI_REQUEST.REQUEST_PIN` 事件。
 - Pro/Touch/Pro 2/Neo：PIN 码只能在硬件设备上输入（不支持软件输入）。
-- 其他型号：支持软件端 PIN 输入（位置加密方式），但出于安全考虑建议在设备上输入。
+- 其他型号的软件盲输 PIN 能力取决于固件，读取 `inputPinOnSoftware.support` 后再提供入口；支持时优先让用户在设备上输入。
 
 ## 支持矩阵（软件 PIN 输入）
 
-使用此表格快速确定某个型号是否支持软件端 PIN 输入。为了最佳安全性，建议所有型号都在设备上输入 PIN；仅在确实必要且仅在支持的型号上启用软件端 PIN 输入。
+下表用于了解输入方式；实际入口应结合当前设备、固件能力及 UI 请求决定。设备端输入可用时优先使用，仅在当前设备支持且确有需要时提供宿主盲输。
 
 | 设备 | 软件端 PIN 输入 | 仅设备端输入 |
 | --- | --- | --- |
-| OneKey Classic | 支持 | 否 |
-| OneKey Classic 1s | 支持 | 否 |
-| OneKey Classic 1s Pure | 支持 | 否 |
-| OneKey Mini | 支持 | 否 |
+| OneKey Classic / 1s / 1s Pure / Mini | 取决于固件；检查 `inputPinOnSoftware.support` | 宿主输入流程可能提供设备输入选项 |
 | OneKey Touch | 不支持 | 是 |
 | OneKey Pro | 不支持 | 是 |
 | OneKey Pro 2 / Neo | 不支持 | 是 |
 
 ## UI 预期
 
-- 显示单个 PIN 输入提示，包含两个选项：
-  - 在设备上输入（推荐；Pro/Touch/Pro 2/Neo 设备必须使用此方式）
-  - 在此屏幕上输入（软件端 PIN 输入）— 使用固定的 3x3 键盘（1-9），掩码显示，不会显示真实数字
-- 收到 `UI_REQUEST.CLOSE_UI_WINDOW` 时关闭对话框。
+- 仅显示当前设备、固件与 UI 请求支持的输入方式。两种方式均可用时，可在同一提示中提供：
+  - 在设备上输入（默认）
+  - 在此屏幕上盲输 — 使用固定的 3x3 键盘（1-9），掩码显示，不回显真实数字
+- 收到 `UI_REQUEST.CLOSE_UI_PIN_WINDOW` / `CLOSE_UI_WINDOW` 或原操作结束时关闭提示，并使待提交回调失效。
 
 ### PIN 位置映射（软件键盘）
 
-固定键盘布局（软件 UI）：
-
-```
-7 8 9
-4 5 6
-1 2 3
-```
-
-映射数组（索引 0..8 将软件标签 1..9 映射到转换后的数字）：
+收集完整的位置序列，校验后一次性回复；不要每点击一个键就提交一次 PIN。盲输键盘采用固定的 3×3 布局，不回显真实数字。
 
 ```ts
-let transformedPin = "";
+import { UI_RESPONSE } from "@onekeyfe/hd-core";
+
+// Completed sequence of host keypad positions, numbered 1..9.
+declare const selectedPositions: number[];
+// Copy this from the current REQUEST_PIN event.
+declare const responseCorrelation: { interactionId: string; deviceId: string } | undefined;
 const BLIND_KEYBOARD_MAP = ['7','8','9','4','5','6','1','2','3'];
+if (!selectedPositions.length || selectedPositions.some(position =>
+  !Number.isInteger(position) || position < 1 || position > 9
+)) throw new Error('Invalid PIN keypad sequence');
 
-function onSoftwareKey(label: number) {
-  // label 是来自固定键盘的 1..9
-  transformedPin += BLIND_KEYBOARD_MAP[label - 1];
-}
+HardwareSDK.uiResponse({
+  ...responseCorrelation,
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: selectedPositions.map(position => BLIND_KEYBOARD_MAP[position - 1]).join(''),
+});
 ```
-
-示例：如果用户点击软件键 "1, 9"，转换后变为 `7`（来自索引 0）然后 `3`（来自索引 8）= `73`。通过 `uiResponse` 发送此转换后的字符串。
-
 
 ## 事件到响应
 
@@ -69,16 +65,11 @@ HardwareSDK.on(UI_EVENT, (msg) => {
       // Show the device prompt and wait; this notification does not need a reply.
       return;
     }
-    // 选项 A：在设备上输入
     HardwareSDK.uiResponse({
+      ...msg.payload.responseCorrelation,
       type: UI_RESPONSE.RECEIVE_PIN,
       payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
     });
-
-    // 选项 B：软件端 PIN 输入（Pro/Touch/Pro 2/Neo 设备不支持）
-    // const transformed = '73'; // 从键盘位置派生
-    // HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: transformed });
-
   }
 });
 ```

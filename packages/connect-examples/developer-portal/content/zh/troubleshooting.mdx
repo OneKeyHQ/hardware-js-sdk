@@ -1,0 +1,57 @@
+---
+title: 排障指南
+description: 排查钱包连接、硬件发现、签名与二维码集成问题。
+---
+
+# 排障指南
+
+先确认问题发生在钱包 Provider、硬件传输还是二维码编解码层。记录失败的方法、错误码、版本与具体步骤。
+
+## dApp 找不到 OneKey
+
+- 确认 OneKey 已安装并在当前浏览器配置中启用；安装后刷新 dApp。
+- 页面可用后在浏览器端检测 Provider，不要在服务端渲染期间访问 `window`。
+- 使用目标链对应的 Provider，不要把其他钱包注入的 Provider 当成 OneKey。
+- 参考 [dApp 快速开始](/zh/connect-to-software)或[钱包 UI 组件指南](/zh/connect-to-software/wallet-ui/web3modal)。
+
+## 账户访问或签名被拒绝
+
+拒绝是正常的用户选择。清除等待状态，让用户主动重试，不要循环弹出授权或签名提示。
+
+账户或网络变化后，先更新应用状态，再构造下一次请求。以太坊集成可参考[账户访问](/zh/connect-to-software/provider/eth/accessing-accounts)和 [Provider API](/zh/connect-to-software/provider/eth)。
+
+## USB 设备未显示
+
+1. 确认浏览器支持 WebUSB，页面位于安全上下文中。
+2. 由用户操作（例如点击“连接”）打开 USB 选择器，并选择目标设备。
+3. 检查数据线，关闭可能占用设备的其他应用或标签页。
+4. 重新发现设备，处理空结果后再调用设备方法。
+
+参考 [WebUSB 指南](/zh/hardware-sdk/transport/web-usb)。[原生移动端](/zh/hardware-sdk/transport/native-ble)和 [React Native BLE](/zh/hardware-sdk/transport/react-native-ble) 的要求不同，不能直接套用浏览器 USB 流程。
+
+## 请求一直等待
+
+检查 SDK 是否等待 PIN、Passphrase 选择等 UI 响应，或等待设备确认。在调用前注册处理器，按 [Core API 指南](/zh/hardware-sdk/core-api-guide)响应当前请求。
+
+串行执行设备操作。用户取消或传输断开后，清除等待中的 UI 状态并报告结果。结果不确定时，不要自动重放签名请求或改变设备状态的操作。
+
+## 方法不受支持
+
+按[设备与链支持参考](/zh/hardware-sdk/concepts/chain-support)核对具体方法，再检查 SDK 和固件版本。支持某条链、某个设备或传输方式，不代表其所有方法都可用。
+
+## 二维码响应无法解码
+
+检查 registry 类型是否正确、多段二维码是否接收完整。如果格式提供请求 ID，将响应与原请求匹配。参考[以太坊与 EVM 二维码指南](/zh/air-gap/ethereum-and-evm)。
+
+<span id="report-an-issue" />
+
+## 报告问题
+
+- 硬件 SDK 或开发者门户：[hardware-js-sdk issues](https://github.com/OneKeyHQ/hardware-js-sdk/issues)。
+- 钱包 Provider：[cross-inpage-provider issues](https://github.com/OneKeyHQ/cross-inpage-provider/issues)。
+- App 或浏览器扩展：[app-monorepo issues](https://github.com/OneKeyHQ/app-monorepo/issues)。
+- 产品使用问题：[帮助中心](https://help.onekey.so/)。
+
+提供预期和实际行为、使用测试数据的最小复现及完整步骤、软件包版本、运行环境、操作系统、传输方式，以及相关设备型号和固件版本。附上方法名、错误码和脱敏后的错误消息。
+
+不要公开恢复短语、私钥、PIN、Passphrase、凭据、令牌、会话标识或未脱敏的钱包日志。安全漏洞请按对应仓库的安全政策报告，不要在公开 Issue 披露利用细节。

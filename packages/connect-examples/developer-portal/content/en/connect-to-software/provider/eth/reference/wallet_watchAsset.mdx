@@ -15,7 +15,7 @@ Requests that the wallet tracks a new token. This will prompt the user to add th
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `type` | `string` | Yes | Token type (currently only `ERC20`) |
+| `type` | `string` | Yes | Token type; this page demonstrates `ERC20` |
 | `options` | `object` | Yes | Token details |
 | `options.address` | `string` | Yes | Token contract address |
 | `options.symbol` | `string` | Yes | Token symbol (1-11 characters) |
@@ -68,7 +68,7 @@ const tokens = [
     decimals: 6
   },
   {
-    address: '0x6B175474E89094C44Da98b954EescdecAD3F9c6',
+    address: '<TOKEN_CONTRACT_ADDRESS>',
     symbol: 'DAI',
     decimals: 18
   }
@@ -139,7 +139,7 @@ async function suggestToken() {
 
 ## Notes
 
-- Currently only `ERC20` type is supported
+- This page covers `ERC20`; verify any other token type against the target wallet version
 - The wallet may already track the token (still returns `true`)
 - Image URL should be HTTPS and accessible
 - Symbol should match the on-chain symbol for best UX

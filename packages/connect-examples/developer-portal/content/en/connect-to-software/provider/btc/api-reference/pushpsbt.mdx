@@ -4,34 +4,31 @@ title: pushPsbt
 
 # pushPsbt
 
-Push Transaction
+Broadcast a finalized PSBT.
 
-### Method
+## Method
 
 ```typescript
-async function pushPsbt(psbtHex: string): string
+declare function pushPsbt(psbtHex: string): Promise<string>;
 ```
 
-### Params
+## Params
 
-* `rawtx` — _required_ `string`  the hex string of psbt to push
+* `psbtHex` — _required_ `string`  the hex string of psbt to push
 
-### Response
+## Response
 
 `txid` — `string`
 
-### Example
+## Example
 
 ```typescript
-const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const psbtHex = "010203"
-const txid = async provider.pushPsbt(psbtHex);
-
+const psbtHex = "<FINALIZED_PSBT_HEX>"; // Supply a complete finalized PSBT
+const txid = await provider.pushPsbt(psbtHex);
 ```
 
-### Demo
+## Demo
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/dyaqzgE" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codepen.io/OneKeyHQ/pen/dyaqzgE)

@@ -25,7 +25,7 @@ To obtain an ETH account, use the [CryptoHDKey](../basic-api/cryptohdkey) to acq
 2. Encode as UR and display animated QR
 3. Device scans, verifies, and signs offline
 4. Decode response using [EthSignature](./ethsignature)
-5. Attach signature to transaction and broadcast
+5. Match the response request ID, verify the signer, then attach the signature to the original transaction and broadcast
 
 ## Quick Example
 
@@ -36,7 +36,7 @@ const eth = new KeystoneEthereumSDK();
 
 // Generate sign request
 const ur = eth.generateSignRequest({
-  requestId: 'uuid-string',
+  requestId: globalThis.crypto.randomUUID(),
   signData: unsignedTxHex,    // hex without 0x
   dataType: 4,                // EIP-1559
   path: "m/44'/60'/0'/0/0",
@@ -47,4 +47,3 @@ const ur = eth.generateSignRequest({
 
 // Encode and display QR
 ```
-

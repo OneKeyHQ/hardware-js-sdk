@@ -6,7 +6,7 @@ title: CryptoHDKey
 
 The `CryptoHDKey` class represents hierarchical deterministic key information.
 
-This is an instruction provided by the OneKey hardware, which includes the extended public key information.
+OneKey can export this registry object as a QR code so the wallet can derive addresses from public key data.
 
 ## Parameters
 
@@ -45,9 +45,12 @@ const dec = new URDecoder();
 // push each scanned frame string into the decoder
 // dec.receivePart(frame)
 
-if (dec.isComplete()) {
-  const ur = dec.resultUR(); // ur.type should be 'crypto-hdkey'
+if (dec.isError()) throw new Error('Could not decode account QR code');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'crypto-hdkey') throw new Error('Expected crypto-hdkey');
   const hdkey = CryptoHDKey.fromCBOR(ur.cbor);
+  if (hdkey.isPrivateKey()) throw new Error('Expected a public account export');
   
   const name = hdkey.getName();
   const note = hdkey.getNote();
@@ -56,4 +59,3 @@ if (dec.isComplete()) {
   const xfp = origin?.getSourceFingerprint();
 }
 ```
-

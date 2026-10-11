@@ -4,19 +4,19 @@ title: signEvent
 
 # signEvent
 
-### Method
+## Method
 
 ```
-async function signEvent(event: UnsignedEvent): Event 
+declare function signEvent(event: UnsignedEvent): Promise<Event>;
 ```
 
-### Params
+## Params
 
 * `event` — _required_ `object`
   * `kind` — _required_ `number`
   * `content`— _required_ `string`
   * `tags` — _required_ `Array<Array<string>>`
-  * `created_at` — _required_ `number`
+  * `created_at` — _required_ `number` Unix timestamp in seconds
 
 ```typescript
 export type UnsignedEvent = {
@@ -36,11 +36,11 @@ export enum EventKind {
 }
 ```
 
-### Response
+## Response
 
 takes an event object, adds `id`, `pubkey` and `sig` and returns it
 
-### Result
+## Result
 
 ```typescript
 export type Event = {
@@ -54,11 +54,11 @@ export type Event = {
 };
 ```
 
-### Example
+## Example
 
 ```typescript
 const event = {
-  created_at: 1700000000,
+  created_at: Math.floor(Date.now() / 1000),
   kind: 1,
   content: "OneKey 🚀",
   tags: [],
@@ -68,8 +68,6 @@ const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
 const signedEvent = await provider.signEvent(event);
 ```
 
-### Demo
+## Demo
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/YzBOVgV" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codepen.io/OneKeyHQ/pen/YzBOVgV)

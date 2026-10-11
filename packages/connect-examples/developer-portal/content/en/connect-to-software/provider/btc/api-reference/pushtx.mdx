@@ -4,34 +4,31 @@ title: pushTx
 
 # pushTx
 
-Push Transaction
+Broadcast a signed raw transaction.
 
-### Method
+## Method
 
 ```typescript
-async function pushTx(rawtx: string): string
+declare function pushTx(rawtx: string): Promise<string>;
 ```
 
-### Params
+## Params
 
 * `rawtx` — _required_ `string`  rawtx to push
 
-### Response
+## Response
 
 `txid` — `string`
 
-### Example
+## Example
 
 ```typescript
-const provider = (window.$onekey &#x26;&#x26; window.$onekey.btc) || window.unisat;
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
-const rawtx = "010203"
-const txid = async provider.pushTx(rawtx);
-
+const rawtx = "<SIGNED_RAW_TRANSACTION_HEX>";
+const txid = await provider.pushTx(rawtx);
 ```
 
-### Demo
+## Demo
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/VwgGzxO" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[Open example](https://codepen.io/OneKeyHQ/pen/VwgGzxO)

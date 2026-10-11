@@ -5,33 +5,6 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @font-face {
-  font-family: "Stabil Grotesk";
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url("/fonts/StabilGrotesk/StabilGrotesk-Light.woff2") format("woff2"),
-       url("/fonts/StabilGrotesk/StabilGrotesk-Light.woff") format("woff");
-}
-
-@font-face {
-  font-family: "Stabil Grotesk";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/StabilGrotesk/StabilGrotesk-Regular.woff2") format("woff2"),
-       url("/fonts/StabilGrotesk/StabilGrotesk-Regular.woff") format("woff");
-}
-
-@font-face {
-  font-family: "Stabil Grotesk";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("/fonts/StabilGrotesk/StabilGrotesk-Medium.woff2") format("woff2"),
-       url("/fonts/StabilGrotesk/StabilGrotesk-Medium.woff") format("woff");
-}
-
-@font-face {
   font-family: "Geist Mono";
   font-style: normal;
   font-weight: 400;
@@ -99,7 +72,9 @@
   --error-100: #ffe7f2;
 
   /* Typography */
-  --font-ui: "Stabil Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-ui: var(--font-roobert), -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: var(--font-ui);
+  --x-font-sans: var(--font-ui);
   --font-mono: "Geist Mono", "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace;
 
   /* Font Sizes (Stripe Scale) */
@@ -1018,16 +993,16 @@ button[aria-label="Collapse sidebar"] {
 /* Target the specific active link class pattern from Nextra */
 aside a.x\:bg-primary-100,
 aside a[class*="x:bg-primary-100"] {
-  background-color: #dbeafe !important; /* blue-100 */
-  color: #1e40af !important; /* blue-800 */
+  background-color: var(--portal-surface) !important;
+  color: var(--portal-green-ink) !important;
   font-weight: 600 !important;
   border-radius: 6px;
 }
 
 .dark aside a.x\:bg-primary-100,
 .dark aside a[class*="x:bg-primary-100"] {
-  background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500/20 - more visible */
-  color: #93c5fd !important; /* blue-300 - lighter for dark mode */
+  background-color: var(--portal-surface) !important;
+  color: var(--portal-green-ink) !important;
 }
 
 /* ============================================
@@ -1641,140 +1616,6 @@ hr {
 /* Landing page overrides - needs higher specificity than Nextra defaults */
 html:has(.landing-page) {
   overflow-x: hidden;
-}
-
-html:has(.landing-page) body {
-  min-height: 100vh;
-  background-color: #101111;
-  background-image:
-    radial-gradient(800px 520px at 20% 10%, rgba(61, 61, 61, 0.6), transparent 60%),
-    radial-gradient(760px 520px at 80% 20%, rgba(39, 39, 39, 0.5), transparent 62%);
-  background-repeat: no-repeat;
-}
-
-.dark:has(.landing-page) body {
-  background-color: #101111;
-  background-image:
-    radial-gradient(800px 520px at 20% 10%, rgba(61, 61, 61, 0.6), transparent 60%),
-    radial-gradient(760px 520px at 80% 20%, rgba(39, 39, 39, 0.5), transparent 62%);
-  background-repeat: no-repeat;
-}
-
-@keyframes landingBackgroundFlow {
-  0% {
-    background-position: 0% 0%, 100% 0%, 20% 100%, center;
-  }
-  50% {
-    background-position: 10% 15%, 85% 20%, 30% 85%, center;
-  }
-  100% {
-    background-position: 0% 0%, 100% 0%, 20% 100%, center;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:has(.landing-page) body,
-  .dark:has(.landing-page) body {
-    animation: none;
-  }
-}
-
-.landing-title-dynamic {
-  background-size: 200% 200%;
-  animation: landingTitleShift 8s ease-in-out infinite;
-}
-
-@keyframes landingTitleShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-body:has(.landing-page) .nextra-navbar-blur {
-  background-color: rgba(16, 17, 17, 0.72) !important;
-  backdrop-filter: blur(18px) saturate(150%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-html.dark body:has(.landing-page) .nextra-navbar-blur {
-  background-color: rgba(16, 17, 17, 0.72) !important;
-  backdrop-filter: blur(18px) saturate(150%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-body:has(.landing-page) header.nextra-navbar a,
-body:has(.landing-page) header.nextra-navbar button {
-  color: rgba(255, 255, 255, 0.64) !important;
-}
-
-body:has(.landing-page) header.nextra-navbar a:hover,
-body:has(.landing-page) header.nextra-navbar button:hover {
-  color: rgba(255, 255, 255, 0.92) !important;
-}
-
-body:has(.landing-page) header.nextra-navbar a[aria-current="true"],
-body:has(.landing-page) header.nextra-navbar button[data-onekey-nav-active="true"] {
-  color: #ffffff !important;
-}
-
-@media (min-width: 769px) and (max-width: 1279px) {
-  header.nextra-navbar .onekey-logo-subtitle {
-    display: none;
-  }
-}
-
-/* Landing page footer styles */
-.landing-page footer {
-  background-color: #18181b !important;
-}
-
-/* IMPORTANT: Override green link colors in footer */
-.landing-page footer a,
-.landing-page footer a:hover,
-.dark .landing-page footer a,
-.dark .landing-page footer a:hover,
-article .landing-page footer a,
-.dark article .landing-page footer a {
-  color: #d4d4d8 !important; /* zinc-300 */
-  text-decoration: none !important;
-}
-
-.landing-page footer a:hover,
-.dark .landing-page footer a:hover {
-  color: #ffffff !important;
-}
-
-.landing-page footer h3 {
-  color: #a1a1aa !important; /* zinc-400 */
-}
-
-.landing-page footer p {
-  color: #71717a !important; /* zinc-500 */
-}
-
-.landing-page footer ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.landing-page footer li {
-  margin: 0;
-}
-
-/* Footer social icons */
-.landing-page footer svg {
-  color: #a1a1aa !important; /* zinc-400 */
-}
-
-.landing-page footer a:hover svg {
-  color: #ffffff !important;
 }
 
 /* ============================================

@@ -14,16 +14,16 @@ description: 向钱包添加新的以太坊链
 `Array` 包含一个链配置对象：
 
 | 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `chainId` | `string` | 是 | 链 ID（带 0x 前缀的十六进制） |
-| `chainName` | `string` | 是 | 可读的链名称 |
-| `nativeCurrency` | `object` | 是 | 原生代币信息 |
-| `nativeCurrency.name` | `string` | 是 | 代币名称 |
-| `nativeCurrency.symbol` | `string` | 是 | 代币符号（2-6 个字符） |
-| `nativeCurrency.decimals` | `number` | 是 | 代币精度（通常为 18） |
-| `rpcUrls` | `string[]` | 是 | RPC URL 数组（至少一个） |
+|-------|------|----------|-------------|
+| `chainId` | `string` | 是 | 带 0x 前缀的十六进制 Chain ID |
+| `chainName` | `string` | 是 | 便于阅读的链名称 |
+| `nativeCurrency` | `object` | 是 | 原生币信息 |
+| `nativeCurrency.name` | `string` | 是 | 币种名称 |
+| `nativeCurrency.symbol` | `string` | 是 | 原生币代码 |
+| `nativeCurrency.decimals` | `number` | 是 | 币种精度，通常为 18 |
+| `rpcUrls` | `string[]` | 是 | RPC URL 数组，至少包含一个地址 |
 | `blockExplorerUrls` | `string[]` | 否 | 区块浏览器 URL 数组 |
-| `iconUrls` | `string[]` | 否 | 图标 URL 数组（目前不使用） |
+| `iconUrls` | `string[]` | 否 | 可选图标 URL；是否显示取决于钱包 |
 
 ---
 
@@ -42,8 +42,8 @@ await window.$onekey.ethereum.request({
     chainId: '0x89',
     chainName: 'Polygon Mainnet',
     nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
+      name: 'POL',
+      symbol: 'POL',
       decimals: 18
     },
     rpcUrls: ['https://polygon-rpc.com'],
@@ -103,10 +103,10 @@ await window.$onekey.ethereum.request({
 
 ## 说明
 
-- 仅使用 `rpcUrls` 和 `blockExplorerUrls` 数组的第一个元素
-- 钱包会验证 RPC 端点是否正确响应
-- 某些钱包不支持添加非 18 位精度的原生代币
-- 遵循 [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085) 规范
+- 提供有效的 RPC 端点，并使用目标网络的正确元数据。
+- 钱包会验证 RPC 端点的响应。
+- 添加链不保证钱包自动切换到该链；完成后应读取 `eth_chainId`。
+- 规范见 [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085)。
 
 ### 组合添加和切换
 
@@ -122,6 +122,10 @@ async function switchToChain(chainConfig) {
       await window.$onekey.ethereum.request({
         method: 'wallet_addEthereumChain',
         params: [chainConfig]
+      })
+      await window.$onekey.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainConfig.chainId }]
       })
     } else {
       throw error

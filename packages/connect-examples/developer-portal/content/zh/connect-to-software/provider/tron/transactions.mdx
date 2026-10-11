@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+先连接 provider，并使用同一钱包对应的 TronWeb 实例。将省略的地址和合约方法替换为有效值。准备交易前，检查所选网络。
+
 了解如何在 TRON 上签署和发送交易。
 
 ---
@@ -16,19 +18,19 @@ import { Callout } from 'nextra/components'
 签署交易但不广播：
 
 ```typescript
-// 构建交易
+// Build transaction
 const tx = await tronWeb.transactionBuilder.sendTrx(
   'TRecipientAddress...',
   tronWeb.toSun(10),
   tronWeb.defaultAddress.base58
 )
 
-// 通过 provider 签名
+// Sign via provider
 const signedTx = await provider.sign(tx)
 
-console.log('已签名的交易:', signedTx)
+console.log('Signed transaction:', signedTx)
 
-// 手动广播
+// Broadcast manually
 const result = await tronWeb.trx.sendRawTransaction(signedTx)
 ```
 
@@ -39,10 +41,10 @@ const result = await tronWeb.trx.sendRawTransaction(signedTx)
 ```typescript
 const contract = await tronWeb.contract().at(contractAddress)
 
-// 读取（视图函数）
+// Read (view function)
 const result = await contract.someViewFunction().call()
 
-// 写入（需要签名）
+// Write (requires signing)
 const tx = await contract.someWriteFunction(param1, param2).send({
   feeLimit: 100_000_000, // 100 TRX
   callValue: 0,
@@ -78,18 +80,17 @@ const result = await tronWeb.trx.sendRawTransaction(signedTx)
 ```typescript
 const sunWeb = window.sunWeb
 
-// 主链到侧链
+// Main chain to side chain
 await sunWeb.depositTrx(
   amount,
   depositFee,
   feeLimit
 )
 
-// 侧链到主链
+// Side chain to main chain
 await sunWeb.withdrawTrx(
   amount,
   withdrawFee,
   feeLimit
 )
 ```
-

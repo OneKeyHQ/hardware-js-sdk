@@ -4,14 +4,14 @@ title: tonSignProof
 
 # tonSignProof
 
-### Use requirement
+### Requirements
 
-* Firmware version required
+* Minimum firmware versions
   * Touch: 4.10.0
 
 ### TON: sign proof
 
-Sign a proof message for dApp authentication using the private key derived by given BIP32 path. User needs to confirm the action on OneKey device.
+Sign a proof message for dApp authentication using the private key derived from the specified BIP32 path. User needs to confirm the action on OneKey device.
 
 ```typescript
 const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
@@ -29,7 +29,7 @@ const result = await HardwareSDK.tonSignProof(connectId, deviceId, {
 
 [Optional common params](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is 3
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`
 * `appdomain` - _required_ `string` domain of the dApp requesting the proof
 * `comment` - _optional_ `string` message comment in hex format
 * `expireAt` - _required_ `number` signing timestamp in Unix seconds; despite the field name, firmware uses it as the TON proof timestamp

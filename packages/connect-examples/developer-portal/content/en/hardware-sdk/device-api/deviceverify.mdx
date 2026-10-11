@@ -1,4 +1,5 @@
 ---
+description: "Request a device certificate and challenge signature for verification by your verification service."
 title: deviceVerify
 ---
 
@@ -25,9 +26,11 @@ const result = await HardwareSDK.deviceVerify(connectId, params);
 // Obtain a fresh challenge from your verification flow.
 declare const challengeHex: string;
 
-HardwareSDK.deviceVerify(connectId, {
+const result = await HardwareSDK.deviceVerify(connectId, {
     dataHex: challengeHex
 });
+if (!result.success) throw new Error(result.payload.error);
+// Submit the result to the verification service and check its verdict.
 ```
 
 ## Result

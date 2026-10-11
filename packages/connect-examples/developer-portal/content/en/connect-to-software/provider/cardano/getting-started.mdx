@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Call `enable()` before using the dApp API. Addresses returned by the CIP-30 API are hex-encoded bytes; transaction and value parameters are hex-encoded CBOR. Browser examples using `Buffer` require an explicit `buffer` import or a byte conversion helper.
+
 Learn how to detect, connect, and interact with Cardano using OneKey's provider.
 
 <Callout type="info">
-OneKey implements CIP-30 (Cardano dApp Connector), ensuring compatibility with all Cardano dApps. It also provides Nami wallet compatibility.
+OneKey implements CIP-30 (Cardano dApp Connector), for the operations documented here. It also provides Nami wallet compatibility.
 </Callout>
 
 ---
@@ -81,10 +83,10 @@ const balance = await api.getBalance()
 console.log('Balance (CBOR):', balance)
 
 // Decode using cardano-serialization-lib
-import { Value } from '@emurgo/cardano-serialization-lib-browser'
+import { Value, BigNum } from '@emurgo/cardano-serialization-lib-browser'
 const value = Value.from_bytes(Buffer.from(balance, 'hex'))
 const lovelace = value.coin().to_str()
-console.log('Balance:', parseInt(lovelace) / 1000000, 'ADA')
+console.log('Balance in lovelace:', lovelace) // Keep the exact integer string.
 ```
 
 ---
@@ -120,7 +122,8 @@ console.log('UTxOs:', utxos)
 
 // Get UTxOs with minimum amount
 const utxosWithAmount = await api.getUtxos(
-  '1000000' // Minimum 1 ADA in lovelace (CBOR encoded)
+  Buffer.from(Value.new(BigNum.from_str('1000000')).to_bytes()).toString('hex')
+  // CBOR-encoded Value for 1 ADA; import Value and BigNum from the serialization SDK.
 )
 
 // With pagination
@@ -147,7 +150,7 @@ api.experimental.on('accountChange', (addresses) => {
 
 ## Nami Compatibility
 
-OneKey provides Nami wallet compatibility:
+The compatibility alias can belong to another extension. Use `window.cardano.onekey` to select OneKey explicitly.
 
 ```typescript
 // Access via Nami interface
@@ -157,4 +160,3 @@ const api = await nami.enable()
 // Same API as OneKey
 const balance = await api.getBalance()
 ```
-

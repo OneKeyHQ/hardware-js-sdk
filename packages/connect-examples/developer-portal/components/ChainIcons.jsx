@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { OneKeyLogo } from './OneKeyLogo'
 
 const getBasePath = () => process.env.NEXT_PUBLIC_BASE_PATH
   ? process.env.NEXT_PUBLIC_BASE_PATH.replace(/\/$/, '')
@@ -168,15 +169,7 @@ export function DeviceIcon({ device, size = 40, className = '' }) {
 
 // OneKey logo
 export function OneKeyIcon({ size = 24, className = '' }) {
-  const basePath = getBasePath()
   return (
-    <Image
-      src={`${basePath}/icons/onekey.png`}
-      alt="OneKey"
-      width={size}
-      height={size}
-      className={className}
-      unoptimized
-    />
+    <OneKeyLogo size={size} variant="white" className={className} />
   )
 }

@@ -1,53 +1,162 @@
 ---
+title: RainbowKit
 description: 将 OneKey 集成到 RainbowKit (EVM)
 ---
 
+import { Callout } from 'nextra/components'
+
 # RainbowKit
 
-## 文档
+RainbowKit 提供 React 钱包选择界面，并内置 OneKey 连接器。
 
-- 官方文档：https://www.rainbowkit.com/docs/introduction
+<Callout type="info">
+RainbowKit 内置 `oneKeyWallet` 连接器。请按下方示例，将其明确加入钱包列表。
+</Callout>
+
+---
 
 ## 安装
 
 ```bash
-yarn add @rainbow-me/rainbowkit wagmi viem
-# 或
-npm install @rainbow-me/rainbowkit wagmi viem
+npm install @rainbow-me/rainbowkit@^2 wagmi@^2 viem@^2 @tanstack/react-query@^5
 ```
 
-## 配置 OneKey
+---
 
-将 OneKey 钱包添加到 RainbowKit 配置中。
+<span id="快速开始--demo" />
 
-```javascript
-// 导入 OneKey 钱包
-import { oneKeyWallet } from "@rainbow-me/rainbowkit/wallets";
+## 基础设置
 
-const appName = "OneKey Demo";
-const projectId = "12345";
+示例使用 RainbowKit 2、wagmi 2、viem 2 和 TanStack Query 5，并明确将 OneKey 加入钱包选择列表：
 
-const { wallets } = getDefaultWallets({ appName, projectId, chains });
-const connectors = connectorsForWallets([
-  ...wallets,
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { oneKeyWallet, injectedWallet, walletConnectWallet } from '@rainbow-me/rainbowkit/wallets'
+import { WagmiProvider } from 'wagmi'
+import { mainnet, polygon, arbitrum, optimism } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  wallets: [{ groupName: 'Wallets', wallets: [oneKeyWallet, injectedWallet, walletConnectWallet] }],
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.reown.com
+  chains: [mainnet, polygon, arbitrum, optimism],
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+---
+
+<span id="配置-onekey" />
+
+## 自定义钱包列表
+
+如需优先显示 OneKey 或调整钱包顺序：
+
+```tsx filename="config.ts"
+import { connectorsForWallets } from '@rainbow-me/rainbowkit'
+import {
+  oneKeyWallet,
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+} from '@rainbow-me/rainbowkit/wallets'
+
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Recommended',
+      wallets: [oneKeyWallet, metaMaskWallet, coinbaseWallet],
+    },
+    {
+      groupName: 'Other',
+      wallets: [walletConnectWallet],
+    },
+  ],
   {
-    groupName: "推荐",
-    // 配置 OneKey 钱包
-    wallets: [oneKeyWallet({ chains })]
+    appName: 'My dApp',
+    projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
   }
-]);
-
-const wagmiConfig = createConfig({
-  connectors,
-  publicClient
-});
+)
 ```
 
-## 快速开始 / Demo
+---
 
+## 自定义界面
 
-<iframe src="https://codesandbox.io/embed/rainbowkit-demo-hg62ng?autoresize=1&fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+### 主题
 
-## 相关链接
+```tsx
+import { darkTheme, lightTheme } from '@rainbow-me/rainbowkit'
 
-- React + wagmi（基于 Hooks 的集成）：[指南](/zh/connect-to-software/react-hooks/wagmi)
+<RainbowKitProvider
+  theme={darkTheme({
+    accentColor: '#00B812', // OneKey green
+    accentColorForeground: 'white',
+    borderRadius: 'medium',
+  })}
+>
+  <ConnectButton />
+</RainbowKitProvider>
+```
+
+### 弹窗尺寸
+
+```tsx
+<RainbowKitProvider modalSize="compact">
+  <ConnectButton />
+</RainbowKitProvider>
+```
+
+---
+
+## Hooks
+
+连接后使用 wagmi hooks：
+
+```tsx
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useAccount, useBalance } from 'wagmi'
+
+function Wallet() {
+  const { address, isConnected } = useAccount()
+  const { data: balance } = useBalance({ address })
+
+  if (!isConnected) return <ConnectButton />
+
+  return (
+    <div>
+      <p>Address: {address}</p>
+      <p>Balance: {balance?.formatted} {balance?.symbol}</p>
+    </div>
+  )
+}
+```
+
+---
+
+<span id="文档" />
+
+<span id="相关链接" />
+
+## 资源
+
+- [RainbowKit 文档](https://www.rainbowkit.com/docs/introduction)
+- [Wagmi 文档](https://wagmi.sh)
+- [获取 WalletConnect Project ID](https://cloud.reown.com)
+
+- [React + wagmi 集成指南](/zh/connect-to-software/react-hooks/wagmi)

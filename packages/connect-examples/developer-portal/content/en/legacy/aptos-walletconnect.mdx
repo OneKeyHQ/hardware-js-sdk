@@ -1,0 +1,22 @@
+---
+title: "Aptos WalletConnect v1"
+description: "Historical custom-method integration. WalletConnect v1 `@1` URIs, Bridge URLs, and `sendCustomRequest` are not compatible with a current WalletConnect SDK. For a browser integration, use the [Aptos Wallet Adapter](/en/connect-to-software/wallet-ui/aptos-wallet-adapter)."
+---
+
+# Aptos WalletConnect v1
+
+> Historical custom-method integration. WalletConnect v1 `@1` URIs, Bridge URLs, and `sendCustomRequest` are not compatible with a current WalletConnect SDK. For a browser integration, use the [Aptos Wallet Adapter](/en/connect-to-software/wallet-ui/aptos-wallet-adapter).
+
+The old integration appended a `network` parameter to the connection URI and used the following custom methods after user consent:
+
+| Method | Historical role |
+| --- | --- |
+| `account` | Return the account public key and address. |
+| `network` | Return the selected network name. |
+| `getChainId` | Return the chain ID. |
+| `signAndSubmitTransaction` | Sign and submit an Aptos transaction payload. |
+| `signMessage` | Sign a message with nonce and optional address, application, and chain context. |
+
+The response of `signMessage` included `fullMessage`, `signature`, and optional context. Verify the exact returned signed message and intended nonce/account; do not verify the unprefixed input alone. Do not assume Ethereum event names: the historical integration did not document an event contract.
+
+This archive does not claim a supported WalletConnect v2 replacement for those custom methods. Keep old-version compatibility tests when maintaining an existing application. The complete historical request/response examples remain in the [original reference](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-software/using-walletconnect/aptos/wallet-connect-api.md).

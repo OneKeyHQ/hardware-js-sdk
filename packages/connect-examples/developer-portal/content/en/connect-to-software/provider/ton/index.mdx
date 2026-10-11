@@ -10,7 +10,7 @@ import { Callout, Tabs } from 'nextra/components'
 Integrate TON blockchain using OneKey's TON Connect compatible provider. Access via `window.$onekey.tonconnect`.
 
 <Callout type="info">
-OneKey implements the TON Connect 2.0 protocol, ensuring compatibility with all TON dApps.
+OneKey implements the TON Connect 2.0 protocol, for the operations documented here.
 </Callout>
 
 ---
@@ -18,7 +18,7 @@ OneKey implements the TON Connect 2.0 protocol, ensuring compatibility with all 
 ## Quick Links
 
 - [API Reference](#api-reference)
-- [Connecting](#connecting)
+- [Getting started](getting-started)
 - [Transactions](#transactions)
 - [Data Signing](#data-signing)
 
@@ -54,7 +54,7 @@ if (connectEvent.event === 'connect') {
   const addressItem = connectEvent.payload.items.find(
     item => item.name === 'ton_addr'
   )
-  console.log('Connected:', addressItem.address)
+  console.log('Connected:', addressItem?.address)
 } else {
   console.error('Connection failed:', connectEvent.payload.message)
 }
@@ -79,7 +79,7 @@ if (connectEvent.event === 'connect') {
   const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
   const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
 
-  console.log('Address:', addressItem.address)
+  console.log('Address:', addressItem?.address)
   console.log('Proof:', proofItem?.proof)
 }
 ```
@@ -150,7 +150,7 @@ if ('result' in result) {
 
 ### Send Multiple Messages
 
-TON supports up to 4 messages per transaction:
+The provider currently advertises a maximum of four messages. Read `deviceInfo.features` for the wallet's advertised limit rather than treating it as a network-wide limit:
 
 ```typescript
 const result = await provider.send({
@@ -273,7 +273,7 @@ const connectEvent = await provider.connect(2, {
 if (connectEvent.event === 'connect') {
   const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
 
-  if (proofItem) {
+  if (proofItem && "proof" in proofItem) {
     // Send proof to your backend for verification
     const proof = proofItem.proof
     console.log({
@@ -347,7 +347,7 @@ interface TransactionRequest {
   valid_until?: number  // UNIX timestamp for validity
   network?: string      // Network ID
   from?: string         // Sender address
-  messages: Message[]   // Up to 4 messages
+  messages: Message[]   // Respect the wallet-advertised maximum
 }
 
 interface Message {
@@ -373,7 +373,7 @@ interface DeviceInfo {
   appName: string      // 'onekey'
   appVersion: string   // Wallet version
   maxProtocolVersion: number // 2
-  features: string[]   // Supported features
+  features: Array<string | { name: string; maxMessages?: number; [key: string]: unknown }> // Advertised capabilities
 }
 ```
 
@@ -491,4 +491,3 @@ if ('error' in result) {
   console.log('Success:', result.result)
 }
 ```
-

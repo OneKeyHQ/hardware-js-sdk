@@ -1,5 +1,6 @@
 ---
 title: Flutter：通过蓝牙连接（原生）
+description: 通过平台桥接接入 Flutter，并处理设备 UI 和连接生命周期。
 ---
 
 # Flutter：通过蓝牙连接（原生）
@@ -27,7 +28,7 @@ title: Flutter：通过蓝牙连接（原生）
 
 ## 步骤 5. 处理 UI 事件
 
-为 PIN/Passphrase/确认显示原生对话框，并通过 `HardwareSDK.uiResponse` 响应。
+为输入请求显示原生弹窗，为设备端操作显示说明。只有输入请求才调用 `HardwareSDK.uiResponse`，并保留响应关联字段。按键确认和设备端 PIN 提示属于通知。参见 [UI 事件处理](/zh/hardware-sdk/core-api-guide#events-ui)。
 
 ## BLE UUID
 

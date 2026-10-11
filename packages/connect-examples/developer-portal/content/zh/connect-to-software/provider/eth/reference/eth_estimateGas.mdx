@@ -43,14 +43,14 @@ description: 估算交易所需的 Gas
 const gasEstimate = await window.$onekey.ethereum.request({
   method: 'eth_estimateGas',
   params: [{
-    from: '0x你的地址...',
-    to: '0x接收方地址...',
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
     value: '0xDE0B6B3A7640000' // 1 ETH
   }]
 })
 
-console.log('估算 Gas:', parseInt(gasEstimate, 16))
-// 简单 ETH 转账: ~21000
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+// Simple ETH transfer: ~21000
 ```
 
 ### 估算合约调用
@@ -59,13 +59,13 @@ console.log('估算 Gas:', parseInt(gasEstimate, 16))
 const gasEstimate = await window.$onekey.ethereum.request({
   method: 'eth_estimateGas',
   params: [{
-    from: '0x你的地址...',
-    to: '0x合约地址...',
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
     data: '0xa9059cbb...' // transfer(address,uint256)
   }]
 })
 
-console.log('估算 Gas:', parseInt(gasEstimate, 16))
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
 ```
 
 ### 添加安全缓冲

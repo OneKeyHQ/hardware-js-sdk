@@ -4,22 +4,21 @@ title: 调试日志
 
 # 调试日志
 
-你可以打印出 provider 和 OneKey 钱包之间的内部通信消息。此功能可能对你的应用调试和开发有用。
+开发期间，可输出 provider 与 OneKey 钱包之间的内部通信消息。分享日志前请先检查内容，日志可能包含账户或请求数据。
 
-日志消息按 **jsBridge**、**providerBase** 和 **extInjected** 分组。你可以像这样打开或关闭它们，页面重新加载后生效：
+日志按 **jsBridge**、**providerBase** 和 **extInjected** 分组。可按下方方式分别启用或关闭；设置在刷新页面后生效。
 
 ```javascript
-// 打开所有分组日志
+// turn on all groups logging
 localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '*');
 
-// 关闭所有分组日志
+// turn off all groups logging
 localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', '');
 
-// 仅打开 `jsBridge` 分组
+// turn on `jsBridge` group only
 localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge');
 
-// 同时打开 `jsBridge` 和 `providerBase` 分组
+// turn on both `jsBridge` and `providerBase` group
 localStorage.setItem('$$ONEKEY_DEBUG_LOGGER', 'jsBridge,providerBase');
 
 ```
-

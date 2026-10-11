@@ -10,7 +10,7 @@ import { Callout, Tabs } from 'nextra/components'
 Integrate Cardano blockchain using OneKey's CIP-30 compatible provider. Access via `window.cardano.onekey` or `window.cardano.nami`.
 
 <Callout type="info">
-OneKey implements CIP-30 (Cardano dApp Connector), ensuring compatibility with all Cardano dApps. It also provides Nami wallet compatibility.
+OneKey implements CIP-30 (Cardano dApp Connector), for the operations documented here. It also provides Nami wallet compatibility.
 </Callout>
 
 ---
@@ -18,7 +18,7 @@ OneKey implements CIP-30 (Cardano dApp Connector), ensuring compatibility with a
 ## Quick Links
 
 - [API Reference](#api-reference)
-- [Connecting](#connecting)
+- [Getting started](getting-started)
 - [Transactions](#transactions)
 - [Data Signing](#data-signing)
 
@@ -90,10 +90,10 @@ const balance = await api.getBalance()
 console.log('Balance (CBOR):', balance)
 
 // Decode using cardano-serialization-lib
-import { Value } from '@emurgo/cardano-serialization-lib-browser'
+import { Value, BigNum } from '@emurgo/cardano-serialization-lib-browser'
 const value = Value.from_bytes(Buffer.from(balance, 'hex'))
 const lovelace = value.coin().to_str()
-console.log('Balance:', parseInt(lovelace) / 1000000, 'ADA')
+console.log('Balance in lovelace:', lovelace) // Keep the exact integer string.
 ```
 
 ### Get Addresses
@@ -125,7 +125,8 @@ console.log('UTxOs:', utxos)
 
 // Get UTxOs with minimum amount
 const utxosWithAmount = await api.getUtxos(
-  '1000000' // Minimum 1 ADA in lovelace (CBOR encoded)
+  Buffer.from(Value.new(BigNum.from_str('1000000')).to_bytes()).toString('hex')
+  // CBOR-encoded Value for 1 ADA; import Value and BigNum from the serialization SDK.
 )
 
 // With pagination
@@ -143,13 +144,13 @@ const paginatedUtxos = await api.getUtxos(undefined, {
 
 ```typescript
 // transaction should be CBOR-encoded hex string
-const signedTx = await api.signTx(transactionCbor, partialSign)
+const witnessSetCbor = await api.signTx(transactionCbor, partialSign)
 
 // partialSign: boolean
-// - false: sign all inputs owned by wallet
-// - true: sign only inputs explicitly owned (for multi-sig)
+// - false: reject if the wallet cannot provide every required signature
+// - true: return the signatures the wallet can provide
 
-console.log('Signed TX:', signedTx)
+console.log('Witness set:', witnessSetCbor)
 ```
 
 ### Submit Transaction
@@ -160,71 +161,21 @@ const txHash = await api.submitTx(signedTransactionCbor)
 console.log('Transaction hash:', txHash)
 ```
 
-### Complete Transaction Flow
+### Build, sign, and submit
+
+`signTx` returns a witness set, not a complete signed transaction. Build the unsigned transaction with a Cardano transaction library, merge the returned witnesses with its existing witness set, and submit the resulting complete transaction.
 
 ```typescript
-import {
-  TransactionBuilder,
-  TransactionBuilderConfigBuilder,
-  LinearFee,
-  BigNum,
-  Address,
-  TransactionOutput,
-  Value,
-} from '@emurgo/cardano-serialization-lib-browser'
-
-async function sendAda(recipientAddress, amountLovelace) {
-  const api = await window.cardano.onekey.enable()
-
-  // Get UTxOs
-  const utxos = await api.getUtxos()
-  const changeAddress = await api.getChangeAddress()
-
-  // Build transaction
-  const txBuilder = TransactionBuilder.new(
-    TransactionBuilderConfigBuilder.new()
-      .fee_algo(LinearFee.new(
-        BigNum.from_str('44'),
-        BigNum.from_str('155381')
-      ))
-      .pool_deposit(BigNum.from_str('500000000'))
-      .key_deposit(BigNum.from_str('2000000'))
-      .max_value_size(5000)
-      .max_tx_size(16384)
-      .coins_per_utxo_byte(BigNum.from_str('4310'))
-      .build()
-  )
-
-  // Add inputs from UTxOs
-  utxos.forEach(utxo => {
-    // Add UTxO as input...
-  })
-
-  // Add output
-  txBuilder.add_output(
-    TransactionOutput.new(
-      Address.from_bech32(recipientAddress),
-      Value.new(BigNum.from_str(amountLovelace))
-    )
-  )
-
-  // Set change address
-  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
-
-  // Build transaction
-  const tx = txBuilder.build_tx()
-  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
-
-  // Sign
-  const signedTxCbor = await api.signTx(txCbor, false)
-
-  // Submit
-  const txHash = await api.submitTx(signedTxCbor)
-  console.log('TX Hash:', txHash)
-
-  return txHash
-}
+// `unsignedTransactionCbor` is a complete transaction built with current
+// protocol parameters, selected inputs, outputs, fees, and change.
+const witnessSetCbor = await api.signTx(unsignedTransactionCbor, false)
+// Merge witnessSetCbor into the original transaction using your Cardano SDK.
+// Preserve existing witnesses, scripts, datums, redeemers, and auxiliary data.
+// Submit the serialized complete transaction, never witnessSetCbor alone.
+const txHash = await api.submitTx(completeSignedTransactionCbor)
 ```
+
+Use the Lucid or Mesh flow below if your application does not already implement transaction construction and witness merging. These SDK examples are version-specific; follow their documentation for the version you install.
 
 ---
 
@@ -267,8 +218,8 @@ const coseKey = COSEKey.from_bytes(
 const signedPayload = coseSign1.payload()
 
 // Verify signature
-const publicKey = coseKey.header(0) // Get Ed25519 key
-// Verification logic...
+// Parsing COSE is not verification. Use a CIP-8 verifier to check the
+// protected headers, signing structure, payload, signature, and address binding.
 ```
 
 ---
@@ -311,7 +262,7 @@ api.experimental.on('accountChange', (addresses) => {
 | `getUnusedAddresses()` | Get unused addresses |
 | `getChangeAddress()` | Get change address |
 | `getRewardAddresses()` | Get staking addresses |
-| `signTx(tx, partialSign?)` | Sign transaction |
+| `signTx(tx, partialSign?)` | Return the signed portions of a witness set |
 | `signData(addr, payload)` | Sign data (CIP-8) |
 | `submitTx(tx)` | Submit transaction |
 
@@ -355,10 +306,10 @@ type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
 try {
   const api = await window.cardano.onekey.enable()
 } catch (error) {
-  if (error.code === -1) {
-    console.log('User rejected connection')
-  } else if (error.code === -2) {
-    console.log('Account not found')
+  if (error.code === -3) {
+    console.log('The wallet refused the request')
+  } else if (error.code === -4) {
+    console.log('The account changed; reconnect and retry')
   } else {
     console.error('Error:', error.message)
   }
@@ -369,9 +320,10 @@ try {
 
 | Code | Description |
 |------|-------------|
-| -1 | User rejected |
-| -2 | Account not found |
-| -3 | Invalid network |
+| -1 | Invalid request |
+| -2 | Internal error |
+| -3 | Refused request |
+| -4 | Account changed |
 
 ---
 
@@ -384,7 +336,7 @@ npm install lucid-cardano
 ```
 
 ```typescript
-import { Lucid } from 'lucid-cardano'
+import { Lucid, Blockfrost } from 'lucid-cardano'
 
 // Initialize Lucid with OneKey
 const lucid = await Lucid.new(
@@ -441,7 +393,7 @@ const txHash = await wallet.submitTx(signedTx)
 
 ## Nami Compatibility
 
-OneKey provides Nami wallet compatibility:
+The compatibility alias can belong to another extension. Use `window.cardano.onekey` to select OneKey explicitly.
 
 ```typescript
 // Access via Nami interface
@@ -451,4 +403,3 @@ const api = await nami.enable()
 // Same API as OneKey
 const balance = await api.getBalance()
 ```
-

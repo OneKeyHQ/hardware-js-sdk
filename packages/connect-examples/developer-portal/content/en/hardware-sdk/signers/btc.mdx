@@ -1,4 +1,5 @@
 ---
+description: "Confirm Bitcoin addresses and prepare UTXO signing with matching paths, scripts, and previous transactions."
 title: BTC Signer
 ---
 
@@ -34,6 +35,8 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ## Initialization
 
+The examples use the **standard wallet** consistently. For a hidden wallet, replace `useEmptyPassphrase: true` with the verified `passphraseState` on every address and signing call. Register [UI handlers](/en/hardware-sdk/core-api-guide#events-ui) before protected calls, and check `success` before using any payload. Examples containing declared transaction inputs are preparation fragments, not standalone runnable applications.
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
@@ -41,6 +44,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -55,6 +60,7 @@ if (!deviceId) throw new Error("Device has no wallet identity");
 
 ```ts
 const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/84'/0'/0'/0/0",
   coin: 'btc',
   showOnOneKey: true,
@@ -83,6 +89,7 @@ type AddressResult =
 
 ```ts
 const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   coin: 'btc',
   inputs,
   outputs,
@@ -137,6 +144,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -145,7 +154,12 @@ const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
-await HardwareSDK.btcGetAddress(connectId, deviceId, { path: path49, coin: 'btc', showOnOneKey: true });
+const confirmedAddress = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: path49, coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
 
 const inputs: BTCSignTransactionParams['inputs'] = [
   {
@@ -174,6 +188,7 @@ const outputs: BTCSignTransactionParams['outputs'] = [
 declare const refTxs: BTCSignTransactionParams['refTxs'];
 
 const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   coin: 'btc',
   inputs,
   outputs,
@@ -181,9 +196,8 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
   locktime: 0,
 });
 
-if (success) {
-  // Verify the signed transaction, then submit it through your Bitcoin client.
-}
+if (!success) throw new Error(payload.error);
+// Verify the signed transaction before submitting it through your Bitcoin client.
 ```
 
 ## Validation & Troubleshooting
@@ -194,8 +208,8 @@ if (success) {
 - Verify on device: inputs, outputs, change, fee must match your UI.
 - Host verify: rebuild with `bitcoinjs-lib` / `@scure/btc-signer`, check `serializedTx`/txid and signatures.
 - Common issues:
-  - Too many inputs: split transactions or simplify.
-  - Fee anomalies: recalc outputs/change; respect dust rules.
+  - Too many inputs: report the limit. Splitting or simplifying a transaction requires rebuilding it and obtaining a new user review.
+  - Fee anomaly: stop signing. Recalculate outputs, change, and dust limits with the user; do not silently alter a reviewed transaction.
   - User reject/timeout: offer retry/cancel; no auto-resubmission.
 
 See method docs: [btcSignTransaction](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) · [btcGetAddress](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress).

@@ -39,8 +39,14 @@ try {
     // Chain not added, try adding it
     await window.$onekey.ethereum.request({
       method: 'wallet_addEthereumChain',
-      params: [{ /* chain config */ }]
+      params: [chainConfig] // Define the full configuration for this chain first.
     })
+    await window.$onekey.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x89" }]
+    })
+  } else {
+    throw error
   }
 }
 ```

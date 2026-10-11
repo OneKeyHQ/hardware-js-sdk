@@ -2,5 +2,13 @@
 title: API 参考
 ---
 
-# API 参考
+# Nostr API 参考
 
+所有方法均为异步方法。调用前请检查 provider 是否存在，并处理 Promise 拒绝，包括用户拒绝钱包请求的情况。使用顶层 await 的示例必须在 ES 模块或 async 函数中运行。
+
+- [getPublicKey](/zh/connect-to-software/provider/nostr/api-reference/getpublickey)
+- [getRelays](/zh/connect-to-software/provider/nostr/api-reference/getrelays)
+- [nip04.decrypt](/zh/connect-to-software/provider/nostr/api-reference/nip04.decrypt)
+- [nip04.encrypt](/zh/connect-to-software/provider/nostr/api-reference/nip04.encrypt)
+- [signEvent](/zh/connect-to-software/provider/nostr/api-reference/signevent)
+- [signSchnorr](/zh/connect-to-software/provider/nostr/api-reference/signschnorr)

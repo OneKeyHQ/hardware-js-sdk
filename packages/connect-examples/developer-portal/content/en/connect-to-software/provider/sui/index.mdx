@@ -7,10 +7,12 @@ import { Callout, Tabs } from 'nextra/components'
 
 # Sui
 
+The signing examples below use `connectSuiAccount()` from [Getting Started](/en/connect-to-software/provider/sui/getting-started#account-context-for-signing). It returns a Wallet Standard account and its active chain. The examples use `@mysten/sui@1.28.2`. Even the legacy `*TransactionBlock` methods now declare `Transaction` inputs in `@mysten/wallet-standard@0.14.7`.
+
 Integrate Sui blockchain using OneKey's provider. Access via `window.$onekey.sui`.
 
 <Callout type="info">
-OneKey implements the Sui Wallet Standard, ensuring compatibility with all Sui dApps.
+OneKey implements the Sui Wallet Standard, for compatible wallet-standard integrations.
 </Callout>
 
 ---
@@ -18,7 +20,7 @@ OneKey implements the Sui Wallet Standard, ensuring compatibility with all Sui d
 ## Quick Links
 
 - [API Reference](#api-reference)
-- [Connecting](#connecting)
+- [Getting started](getting-started)
 - [Transactions](#transactions)
 - [Message Signing](#message-signing)
 
@@ -100,52 +102,45 @@ console.log('Active chain:', chain) // e.g., 'sui:testnet'
 
 ### Sign and Execute Transaction Block
 
+The current injected provider does not forward `options` in `signAndExecuteTransactionBlock`. Query the returned digest with a Sui client on the same chain to request effects, events, or object changes.
+
 ```typescript
-import { TransactionBlock } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 // Create transaction block
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 // Add a transfer
 txb.transferObjects(
   [txb.object('0xobject_id')],
-  txb.pure('0xrecipient_address')
+  txb.pure.address('RECIPIENT_SUI_ADDRESS')
 )
 
 // Or send SUI
-const [coin] = txb.splitCoins(txb.gas, [txb.pure(1000000000)]) // 1 SUI
-txb.transferObjects([coin], txb.pure('0xrecipient_address'))
+const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(1000000000)]) // 1 SUI
+txb.transferObjects([coin], txb.pure.address('RECIPIENT_SUI_ADDRESS'))
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 // Sign and execute
 const result = await provider.signAndExecuteTransactionBlock({
   account,
   chain,
   transactionBlock: txb,
-  options: {
-    showEffects: true,
-    showEvents: true,
-    showObjectChanges: true,
-  },
 })
 
 console.log({
   digest: result.digest,
-  effects: result.effects,
-  events: result.events,
 })
 ```
 
 ### Sign Transaction Block (Without Executing)
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 // ... build transaction
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const signedTxb = await provider.signTransactionBlock({
   account,
@@ -169,39 +164,34 @@ console.log({
 
 ```typescript
 // Using the newer signAndExecuteTransaction API (Transaction type)
-import { Transaction } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
 // ... build transaction
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransaction({
-  transaction: tx,
   account,
   chain,
-  options: {
-    showEffects: true,
-  },
+  transaction: tx,
 })
 ```
 
 ### Sign Transaction (New API)
 
 ```typescript
-import { Transaction } from '@mysten/sui.js/transactions'
+import { Transaction } from '@mysten/sui/transactions'
 
 const tx = new Transaction()
 // ... build transaction
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const signedTxn = await provider.signTransaction({
-  transaction: tx,
   account,
   chain,
+  transaction: tx,
 })
 ```
 
@@ -215,13 +205,12 @@ Sign arbitrary messages for authentication:
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signPersonalMessage({
-  message,
   account,
   chain,
+  message,
 })
 
 console.log({
@@ -234,13 +223,11 @@ console.log({
 
 ```typescript
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signMessage({
-  message,
   account,
-  chain,
+  message,
 })
 
 console.log({
@@ -252,18 +239,15 @@ console.log({
 ### Verify Signature
 
 ```typescript
-import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 
 const message = new TextEncoder().encode('Hello, Sui!')
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
-const accounts = await provider.getAccounts()
-const publicKey = accounts[0].publicKey
-
-const isValid = await verifyPersonalMessage(message, signature)
-console.log('Signature valid:', isValid)
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('Expected signer:', isExpectedSigner)
 ```
 
 ---
@@ -273,20 +257,19 @@ console.log('Signature valid:', isValid)
 ### Move Call
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 // Call a Move function
 txb.moveCall({
   target: '0xpackage::module::function',
   arguments: [
-    txb.pure('arg1'),
+    txb.pure.string('arg1'),
     txb.object('0xobject_id'),
   ],
   typeArguments: ['0x2::sui::SUI'],
 })
 
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
@@ -298,7 +281,7 @@ const result = await provider.signAndExecuteTransactionBlock({
 ### Publish Package
 
 ```typescript
-const txb = new TransactionBlock()
+const txb = new Transaction()
 
 const [upgradeCap] = txb.publish({
   modules: compiledModules,
@@ -308,10 +291,8 @@ const [upgradeCap] = txb.publish({
   ],
 })
 
-txb.transferObjects([upgradeCap], txb.pure(senderAddress))
-
-const [account] = await provider.getAccounts()
-const chain = await provider.getActiveChain()
+const { account, chain } = await connectSuiAccount()
+txb.transferObjects([upgradeCap], txb.pure.address(account.address))
 
 const result = await provider.signAndExecuteTransactionBlock({
   account,
@@ -337,21 +318,27 @@ const result = await provider.signAndExecuteTransactionBlock({
 | `signTransactionBlock(input)` | Sign only, requires `account`/`chain` |
 | `signAndExecuteTransaction(input)` | Sign and execute (new API, `Transaction`, requires `account`/`chain`) |
 | `signTransaction(input)` | Sign transaction (new API, `Transaction`, requires `account`/`chain`) |
-| `signMessage(input)` | Sign message (legacy, requires `account`/`chain`) |
+| `signMessage(input)` | Sign message (legacy, requires `account`) |
 | `signPersonalMessage(input)` | Sign personal message (requires `account`/`chain`) |
 
 ### Types
 
+`getAccounts()` returns `AccountInfo[]`. Signing inputs require the Wallet Standard `WalletAccount`, whose `publicKey` is a byte array and which also carries `chains` and `features`. Obtain it through `standard:connect`; do not cast `AccountInfo` to `WalletAccount`.
+
 ```typescript
-interface WalletAccount {
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
   address: string
-  publicKey: string
+  publicKey: string // Hex-encoded public key
 }
 
 interface SignAndExecuteTransactionBlockInput {
   account: WalletAccount
-  chain?: string
-  transactionBlock: TransactionBlock
+  chain: IdentifierString
+  transactionBlock: Transaction
   options?: {
     showEffects?: boolean
     showEvents?: boolean
@@ -369,7 +356,7 @@ interface SignTransactionBlockOutput {
 
 interface SignPersonalMessageInput {
   account: WalletAccount
-  chain?: string
+  chain?: IdentifierString
   message: Uint8Array
 }
 
@@ -383,6 +370,7 @@ interface SignPersonalMessageOutput {
 
 | Chain | Identifier |
 |-------|------------|
+| Mainnet | `sui:mainnet` |
 | Testnet | `sui:testnet` |
 | Devnet | `sui:devnet` |
 
@@ -414,15 +402,15 @@ try {
 
 ## Using with Sui Wallet Kit
 
-For React applications, use the official Sui Wallet Kit:
+This React example uses the compatible package versions pinned below:
 
 ```bash
-npm install @mysten/dapp-kit @mysten/sui.js @tanstack/react-query
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
 ```
 
 ```tsx
 import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
-import { getFullnodeUrl } from '@mysten/sui.js/client'
+import { getFullnodeUrl } from '@mysten/sui/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
@@ -451,7 +439,7 @@ OneKey is automatically detected through the Sui Wallet Standard.
 ## Using with Sui SDK
 
 ```typescript
-import { SuiClient } from '@mysten/sui.js/client'
+import { SuiClient } from '@mysten/sui/client'
 
 const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
 

@@ -6,14 +6,14 @@ title: evmSignTypedData
 
 ### Ethereum: Sign Typed Data
 
-Asks device to sign an [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed data message using the private key derived by given BIP32 path.
+Asks device to sign an [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed data message using the private key derived from the specified BIP32 path.
 
 The device asks the user to confirm the request. The displayed detail depends on whether parsed signing or hash signing is used.
 
 * **Supports EIP-712 (v3 and v4)**
 * **Use `evmSignTypedData` for signing typed structured data**
 * **Not for EIP-191 typed data signing**
-* **Use** [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) **to signing EIP-191(**&#x70;ersonal\_sign)
+* **Use** [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) **to sign EIP-191(**&#x70;ersonal\_sign)
 
 ```typescript
 const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
@@ -23,10 +23,10 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `path` - _required_ `string | Array<number>` minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _required_ `string | Array<number>` SDK minimum length is `3`. [read more](/en/hardware-sdk/concepts/common-params#hd-path)
 * `data` - _required_ `Object` type of `EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>`. A JSON Schema definition can be found in the EIP-712 spec.
-* `metamaskV4Compat` - _required_ `boolean` set to `true` for compatibility with [MetaMask's signTypedData\_v4](https://docs.metamask.io/guide/signing-data.html#sign-typed-data-v4).
-* `chainId` - _optional_ `number` The ChainId in ETH is a unique identifier for a specific Ethereum network, used to distinguish different versions of the blockchain. [Reference](https://github.com/ethereum-lists/chains/tree/master/_data/chains).&#x20;
+* `metamaskV4Compat` - _required_ `boolean` set to `true` for compatibility with [MetaMask's signTypedData\_v4](https://docs.metamask.io/metamask-connect/evm/guides/sign-data/#sign-typed-data-v4).
+* `chainId` - _optional_ `number` The ChainId in ETH is a unique identifier for a specific Ethereum network, used to distinguish different versions of the blockchain. [Reference](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
 
 ### Parsed signing
 
@@ -104,7 +104,7 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
     messageHash,
     chainId: eip712Data.domain.chainId,
 });
-if (!result.success) throw new Error(result.payload.error);
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
 ### Safe Tx
@@ -156,7 +156,7 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
   metamaskV4Compat: true,
   chainId: safeTypedData.domain.chainId,
 });
-if (!result.success) throw new Error(result.payload.error);
+if (result.success === false) throw new Error(result.payload.error);
 ```
 
 This returns an owner signature, not a broadcast transaction. Keep the typed data unchanged when verifying and collecting signatures. See [Safe Tx integration](/en/hardware-sdk/signers/evm#eip-712-and-safe-tx) for the distinction from on-chain Safe calls.

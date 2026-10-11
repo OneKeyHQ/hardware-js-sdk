@@ -1,4 +1,5 @@
 ---
+description: "Update supported Protocol V1 main or BLE firmware using verified release versions or binaries."
 title: firmwareUpdateV2
 ---
 
@@ -6,21 +7,27 @@ title: firmwareUpdateV2
 
 ## Firmware update (V2)
 
-Next‑gen firmware update flow. Supports downloading and updating Main firmware and BLE firmware. You must explicitly pass a `platform`.
+Protocol V1 firmware update flow. Supports downloading and updating Main firmware and BLE firmware. You must explicitly pass a `platform`.
 
 ```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+
 const res = await HardwareSDK.firmwareUpdateV2(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
   updateType: 'firmware', // or 'ble'
   // Option A: version-based update (recommended)
-  version: [2, 10, 0],
+  version: targetFirmwareVersion,
   // Option B: custom binary (use with caution)
   // binary: ArrayBuffer,
   // Optional flags
   forcedUpdateRes: false,
   isUpdateBootloader: false,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
+
+The example assumes the user has selected this device and approved the update. Resolve target versions from verified release metadata; do not hard-code a version copied from documentation.
 
 ### Params
 

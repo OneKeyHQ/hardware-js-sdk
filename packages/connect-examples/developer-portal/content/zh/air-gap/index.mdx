@@ -6,7 +6,9 @@ title: Air-Gap（离线二维码签名）
 
 使用 UR 编码二维码构建"设备保持离线"的签名流程。
 
-## 工作原理
+<span id="工作原理" />
+
+## 工作流程
 
 1. **构建请求**：创建签名请求 UR 数据包，渲染为动画二维码帧
 2. **设备扫描**：设备扫描二维码，在屏幕上验证详情，离线签名
@@ -15,12 +17,21 @@ title: Air-Gap（离线二维码签名）
 
 ## 按链快速开始
 
-| 链 | 请求类型 | 响应类型 |
+| 链 | 请求类型（应用 → 设备） | 响应类型（设备 → 应用） |
 |-------|-------------|---------------|
 | [Ethereum & EVM](./ethereum-and-evm) | `eth-sign-request` | `eth-signature` |
 | [Bitcoin (PSBT)](./bitcoin) | `crypto-psbt` | `crypto-psbt` |
 | [Solana](./solana) | `sol-sign-request` | `sol-signature` |
 | [Tron](./tron) | `tron-sign-request` | `tron-signature` |
+
+### 账户导出类型（设备 → 应用）
+
+首次连接时，设备通过以下 UR 类型向应用导出账户信息：
+
+| UR 类型 | 说明 |
+|---------|-------------|
+| `crypto-hdkey` | 导出单个 HD 密钥（[BCR-2020-007](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-007-hdkey.md)） |
+| `crypto-multi-accounts` | 导出多链账户集合 |
 
 ## API 参考
 
@@ -29,14 +40,46 @@ title: Air-Gap（离线二维码签名）
 ## 依赖包
 
 ```bash
-# Keystone SDK 和 UR 注册表
+# Keystone SDK & UR registries
 npm install @keystonehq/keystone-sdk @keystonehq/bc-ur-registry-eth
 
-# UR 基础库
+# UR primitives
 npm install @ngraveio/bc-ur
 ```
 
-## 示例和演示
+## 接入第三方钱包
+
+将 OneKey Air-Gap 接入现有钱包时，应确保二维码扫描器把这些 UR 类型交给采用喷泉码的 **BC-UR v2 解码器**，而不是旧版 v1 解码器。
+
+### 扫描器需要接受的 UR 类型
+
+| 方向 | UR 类型 | 用途 |
+|-----------|---------|------|
+| 设备 → 应用 | `crypto-psbt` | BTC 已签名 PSBT |
+| 设备 → 应用 | `crypto-hdkey` | 连接时导出 HD 密钥 |
+| 设备 → 应用 | `crypto-multi-accounts` | 连接时导出多个账户 |
+| 设备 → 应用 | `eth-signature` | ETH 签名响应 |
+| 设备 → 应用 | `sol-signature` | SOL 交易签名 |
+| 设备 → 应用 | `btc-signature` | BTC 签名（非 PSBT） |
+| 应用 → 设备 | `eth-sign-request` | ETH 签名请求 |
+| 应用 → 设备 | `sol-sign-request` | SOL 签名请求 |
+| 应用 → 设备 | `crypto-psbt` | BTC 未签名 PSBT |
+| 设备 → 应用 | `tron-signature` | TRON 签名响应 |
+| 应用 → 设备 | `tron-sign-request` | TRON 签名请求 |
+
+### 常见问题：UR 类型路由
+
+部分钱包使用**允许列表**决定哪些 UR 类型交给现代 BC-UR v2 解码器处理（例如 `@ngraveio/bc-ur` 使用的喷泉码）。列表之外的类型可能落入编码方式完全不同的旧版 v1 解码器，导致扫描始终无法完成。
+
+**如果扫描器一直提示“请继续扫描”，却始终不能完成**，请检查当前 UR 类型是否已加入 v2 解码器的允许列表。
+
+### `onekey-app-call-device`（私有协议）
+
+`onekey-app-call-device` 是 **OneKey 内部协议**，用于 `getMultiAccounts`、`verifyAddress` 等设备管理操作。它可能随时改变，第三方钱包**不应实现此类型**，应使用标准 Keystone SDK 方法。
+
+<span id="示例和演示" />
+
+## 演示与示例
 
 - **React Native 演示**：[GitHub Air-Gap Demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap)
   - 扫描器：[AirGapScanner.tsx](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/connect-examples/react-native-demo/air-gap/src/components/AirGapScanner.tsx)

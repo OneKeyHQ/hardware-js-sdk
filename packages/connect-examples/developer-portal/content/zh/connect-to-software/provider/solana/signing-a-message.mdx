@@ -8,51 +8,53 @@ title: 签署消息
 
 要发送消息让用户签署，Web 应用必须：
 
-1. 提供一个 **hex** 或 **UTF-8** 编码的字符串作为 Uint8Array。
-2. 请求通过用户的 OneKey 钱包签署编码后的消息。
+1. 将消息字节作为 `Uint8Array` 提供；UTF-8 文本使用 `TextEncoder` 编码。
+2. 请求用户通过 OneKey 钱包签署编码后的消息。
 
-### 使用 signMessage 方法
+## 使用 signMessage 方法
+
 ```javascript
 const provider = getProvider();
-const message = `为防止数字资产被盗，请在下方签名以通过 CryptoCorgis 进行身份验证`;
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const message = `To avoid digital dognappers, sign below to authenticate with CryptoCorgis`;
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await provider.signMessage(encodedMessage, "utf8");
 ```
 
-### 使用 request 方法
+## 使用 request 方法
+
 ```javascript
 const provider = getProvider();
-const message = `为防止数字资产被盗，请在下方签名以通过 CryptoCorgis 进行身份验证`;
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const message = `To avoid digital dognappers, sign below to authenticate with CryptoCorgis`;
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await provider.request({
     method: "signMessage",
     params: {
-         message: encodedMessage,
-         display: "hex",
+         message: bs58.encode(encodedMessage),
+         display: "utf8",
     },
 });
 ```
 
----
+`request` 示例需要 `import bs58 from "bs58"`。两种调用方式均返回包含 `Uint8Array` 类型 `signature` 和 `PublicKey` 类型 `publicKey` 的对象。display 选项仅影响显示，不改变被签署的字节。用于身份验证时，应对原始消息验证签名，并使用一次性挑战。
 
-## 签署链下消息
+<span id="签署链下消息" />
+<span id="使用-solsignoffchainmessage-方法" />
 
-用于签署支持版本的链下消息（适用于身份验证和验证）：
+## 链下消息签名
 
-### 使用 solSignOffchainMessage 方法
+当前 provider 源码支持版本 1，并要求提供预期签名者列表。使用便捷方法编码请求，并获取实际签署的完整字节。旧版钱包可能不支持此方法，请处理请求被拒绝的情况。
+
 ```javascript
 const provider = getProvider();
-const message = "签署此消息以验证您的身份";
-const signedMessage = await provider.request({
-    method: "solSignOffchainMessage",
-    params: {
-         message: message,
-         version: 0, // 可选的版本号
-    },
-});
-
-console.log({
-    signature: signedMessage.signature,
-    publicKey: signedMessage.publicKey,
-});
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const { publicKey } = await provider.connect();
+const result = await provider.solSignOffchainMessage(
+  'Sign in to example.com. Nonce: <SERVER_GENERATED_NONCE>',
+  [publicKey],
+);
+// Verify result.signature against result.signedOffchainMessage and result.publicKey.
 ```
+
+不要沿用旧版 version 0 请求格式。请核对应用支持的钱包版本中的方法可用性和响应结构。

@@ -6,17 +6,16 @@ title: 签名交易
 
 签名交易但不发送。
 
-方法调用将返回一个包含 `signatures` 的 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) 对象。
+此方法返回 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)。公开 SDK 的类型声明与示例对仅签名时的返回结构不一致：类型声明为 `transactionHashes`，示例读取 `signatures`。请先在目标钱包版本上验证实际响应，再读取相应字段；不要把签名结果当作广播成功。
 
 ```javascript
-const transaction = ... // 首先创建交易
+// `transaction` is created in the Create Transaction guide.
 
 const res = await provider.request({
   method: 'near_signTransactions',
   params: {
-    transactions: [transaction], // 必须是数组类型
+    transactions: [transaction], // must be Array type
   },
 });
-console.log('near_signTransactions', res, res.signatures);
+console.log('near_signTransactions', res);
 ```
-

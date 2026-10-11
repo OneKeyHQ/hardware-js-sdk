@@ -1,4 +1,5 @@
 ---
+description: "Start a user-requested device PIN change and understand the Protocol V2 PIN-removal restriction."
 title: deviceChangePin
 ---
 
@@ -6,7 +7,7 @@ title: deviceChangePin
 
 ## Change device pin
 
-Change the device pin code.
+Open the device PIN-change flow after the user requests it. The user completes protected steps on the device. Never collect or log an actual device PIN as a substitute for this flow.
 
 ```typescript
 const result = await HardwareSDK.deviceChangePin(connectId, params);
@@ -16,14 +17,15 @@ const result = await HardwareSDK.deviceChangePin(connectId, params);
 
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
-* `remove` - _optional_ `boolean` request remove pin.
+* `remove` - optional `boolean`. `false` changes the PIN. `true` requests PIN removal on supported Protocol V1 devices; Protocol V2 rejects `remove: true`.
 
 ## Example
 
 ```typescript
-HardwareSDK.deviceChangePin(connectId, {
+const result = await HardwareSDK.deviceChangePin(connectId, {
     remove: false
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 ## Result

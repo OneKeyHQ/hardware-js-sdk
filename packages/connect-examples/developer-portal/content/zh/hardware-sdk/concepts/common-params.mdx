@@ -1,5 +1,6 @@
 ---
 title: 通用参数
+description: 区分连接、钱包、会话和轮询参数的适用范围。
 ---
 
 # 通用参数
@@ -28,7 +29,7 @@ title: 通用参数
 | 参数 | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
 | --- | --- | --- | --- | --- | --- | --- |
 | `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
-| `retryCount` | `number` | 建立连接的重试上限 | Core 在连接/初始化阶段使用，不会重放已完成或失败的签名操作。 |
+| `retryCount` / `pollIntervalTime` / `timeout` | 建立连接 | 建立连接 | 建立连接 | 建立连接 | 建立连接 | 建立连接 |
 | `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
@@ -79,7 +80,6 @@ const bleDefaults = {
 
 ## HD Path
 
-<div id="hd-path" />
 
 方法文档中的最小路径长度是 SDK 输入校验，不代表该长度的任意路径都受支持。固件还会校验各链的派生与硬化规则。
 

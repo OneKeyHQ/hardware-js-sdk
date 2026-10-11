@@ -3,49 +3,68 @@ title: JSON-RPC 参考
 description: OneKey Ethereum Provider JSON-RPC 方法参考
 ---
 
-# JSON-RPC 方法参考
+import { Callout } from 'nextra/components'
 
-本参考文档详细介绍了 OneKey Ethereum Provider 支持的所有 JSON-RPC 方法。
+# JSON-RPC 参考
+
+OneKey 常用 Ethereum JSON-RPC 和钱包方法参考。
+
+<Callout type="info">
+所有方法均通过 `window.$onekey.ethereum.request({ method, params })` 调用。
+</Callout>
 
 ---
 
 ## 账户方法
 
-| 方法 | 描述 |
-|------|------|
-| [eth_requestAccounts](./eth_requestAccounts) | 请求用户连接账户 |
-| [eth_accounts](./eth_accounts) | 获取已连接的账户 |
-| [wallet_requestPermissions](./wallet_requestPermissions) | 请求 dApp 权限 |
+| 方法 | 说明 |
+|--------|-------------|
+| [eth_requestAccounts](./eth_requestAccounts) | 请求访问用户账户，可触发连接弹窗 |
+| [eth_accounts](./eth_accounts) | 获取已连接账户，不弹窗 |
+| [wallet_requestPermissions](./wallet_requestPermissions) | 请求指定权限 |
 | [wallet_getPermissions](./wallet_getPermissions) | 获取当前权限 |
 
 ---
 
 ## 交易方法
 
-| 方法 | 描述 |
-|------|------|
+| 方法 | 说明 |
+|--------|-------------|
 | [eth_sendTransaction](./eth_sendTransaction) | 发送交易 |
-| [eth_call](./eth_call) | 执行只读合约调用 |
-| [eth_estimateGas](./eth_estimateGas) | 估算 Gas 消耗 |
-| [eth_getTransactionByHash](./eth_getTransactionByHash) | 通过哈希获取交易详情 |
+| [eth_call](./eth_call) | 执行调用，不创建交易 |
+| [eth_estimateGas](./eth_estimateGas) | 估算交易 gas |
+| [eth_getTransactionByHash](./eth_getTransactionByHash) | 按哈希获取交易 |
 | [eth_getTransactionReceipt](./eth_getTransactionReceipt) | 获取交易回执 |
 
 ---
 
 ## 签名方法
 
-| 方法 | 描述 |
-|------|------|
-| [personal_sign](./personal_sign) | 签名消息 |
-| [eth_signTypedData_v4](./eth_signTypedData_v4) | 签名结构化数据 (EIP-712) |
+| 方法 | 说明 |
+|--------|-------------|
+| [personal_sign](./personal_sign) | 签署消息（EIP-191） |
+| [eth_signTypedData_v4](./eth_signTypedData_v4) | 签署结构化数据（EIP-712） |
 
 ---
 
 ## 网络方法
 
-| 方法 | 描述 |
-|------|------|
-| [eth_chainId](./eth_chainId) | 获取当前链 ID |
-| [wallet_switchEthereumChain](./wallet_switchEthereumChain) | 切换网络 |
-| [wallet_addEthereumChain](./wallet_addEthereumChain) | 添加新网络 |
-| [wallet_watchAsset](./wallet_watchAsset) | 添加代币到钱包 |
+| 方法 | 说明 |
+|--------|-------------|
+| [eth_chainId](./eth_chainId) | 获取当前 Chain ID |
+| [wallet_switchEthereumChain](./wallet_switchEthereumChain) | 切换链 |
+| [wallet_addEthereumChain](./wallet_addEthereumChain) | 添加链 |
+| [wallet_watchAsset](./wallet_watchAsset) | 将代币添加到钱包 |
+
+---
+
+## 标准 Ethereum 方法
+
+其他 Ethereum JSON-RPC 方法是否可用，取决于连接的网络和钱包实现。完整列表见 [Ethereum JSON-RPC 规范](https://ethereum.github.io/execution-apis/)。
+
+常用方法包括：
+
+- `eth_blockNumber` — 获取当前区块号。
+- `eth_getBalance` — 获取账户余额。
+- `eth_getCode` — 获取合约代码。
+- `eth_getLogs` — 获取事件日志。

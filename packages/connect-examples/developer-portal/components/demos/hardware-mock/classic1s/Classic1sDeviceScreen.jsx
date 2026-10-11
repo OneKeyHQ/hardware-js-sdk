@@ -1,24 +1,26 @@
 'use client'
 
+import { ui } from '../../../../i18n/ui.mjs'
+
 import { useEffect, useMemo, useState } from 'react'
 import { CLASSIC1S_DEVICE } from './classic1sConstants'
 import { Classic1sDeviceViewport } from './Classic1sDeviceViewport'
 
 function getI18n(locale) {
-  const isEn = locale === 'en'
+
   return {
-    lockTitle: isEn ? 'Locked' : '已锁定',
-    lockHint: isEn ? 'Press Power to unlock' : '按电源键解锁',
-    pinTitle: isEn ? 'Enter PIN' : '输入 PIN',
-    pinModeApp: isEn ? 'In app' : '在页面输入',
-    pinModeDevice: isEn ? 'On device' : '在设备输入',
-    pinPlaceholder: isEn ? 'PIN (any 4 digits)' : 'PIN（任意 4 位）',
-    pinSubmit: isEn ? 'Submit' : '提交',
-    pinSubmitOnDevice: isEn ? "I've entered on device" : '我已在设备输入',
-    confirmTitle: isEn ? 'Confirm' : '确认',
-    confirmHint: isEn ? 'Confirm on device' : '请在设备上确认',
-    approve: isEn ? 'Approve' : '同意',
-    reject: isEn ? 'Reject' : '拒绝'
+    lockTitle: ui(locale, "Locked", "已锁定"),
+    lockHint: ui(locale, "Press Power to unlock", "按电源键解锁"),
+    pinTitle: ui(locale, "Enter PIN", "输入 PIN"),
+    pinModeApp: ui(locale, "In app", "在页面输入"),
+    pinModeDevice: ui(locale, "On device", "在设备输入"),
+    pinPlaceholder: ui(locale, "PIN (any 4 digits)", "PIN（任意 4 位）"),
+    pinSubmit: ui(locale, "Submit", "提交"),
+    pinSubmitOnDevice: ui(locale, "I've entered on device", "我已在设备输入"),
+    confirmTitle: ui(locale, "Confirm", "确认"),
+    confirmHint: ui(locale, "Confirm on device", "请在设备上确认"),
+    approve: ui(locale, "Approve", "同意"),
+    reject: ui(locale, "Reject", "拒绝")
   }
 }
 
@@ -198,7 +200,7 @@ function PinMatrixLayoutScreen({ locale, matrix }) {
     <ScreenContainer>
       <div className="relative h-full w-full px-1 py-1 text-[#9fe3ff]">
         <div className="text-center text-[9px] font-semibold leading-none">
-          {locale === 'en' ? 'Enter PIN' : '输入 PIN 码'}
+          {ui(locale, "Enter PIN", "输入 PIN 码")}
         </div>
 
         <div className="mt-1">
@@ -235,7 +237,7 @@ function SubmittingPinScreen({ locale }) {
     <ScreenContainer>
       <div className="relative flex h-full w-full flex-col items-center justify-center px-3 py-2 text-[#9fe3ff]">
         <div className="text-center text-[11px] font-semibold text-white/90">
-          {locale === 'en' ? 'Verifying PIN…' : '校验 PIN 中…'}
+          {ui(locale, "Verifying PIN…", "校验 PIN 中…")}
         </div>
       </div>
     </ScreenContainer>
@@ -251,7 +253,7 @@ function PinOnDeviceScreen({ locale, inputDigit, inputMask }) {
     <ScreenContainer>
       <div className="relative h-full w-full overflow-hidden px-2 py-1 text-[#9fe3ff]">
         <div className="rounded-[4px] bg-[#8ecfff] py-[2px] text-center text-[10px] font-semibold leading-none text-black">
-          {locale === 'en' ? 'Enter PIN' : '输入 PIN 码'}
+          {ui(locale, "Enter PIN", "输入 PIN 码")}
         </div>
 
         <div className="mt-2 flex items-center justify-between">
@@ -320,7 +322,7 @@ function AddressConfirmScreen({ locale, details }) {
         </div>
 
         <div className="mt-1 text-[10px] font-semibold leading-none text-white/90">
-          {locale === 'en' ? 'Address:' : '地址:'}
+          {ui(locale, "Address:", "地址:")}
         </div>
 
         <div className="mt-[2px] pr-7 font-mono text-[10px] leading-tight text-white/90">
@@ -349,13 +351,9 @@ function ConfirmScreen({ locale, disabled, ui, onApprove, onReject }) {
   const i18n = useMemo(() => getI18n(locale), [locale])
   const title =
     ui?.action === 'btcGetAddress'
-      ? locale === 'en'
-        ? 'Confirm address'
-        : '确认地址'
+      ? ui(locale, "Confirm address", "确认地址")
       : ui?.action === 'btcSignMessage'
-        ? locale === 'en'
-          ? 'Confirm signing'
-          : '确认签名'
+        ? ui(locale, "Confirm signing", "确认签名")
         : i18n.confirmTitle
 
   return (
@@ -365,12 +363,12 @@ function ConfirmScreen({ locale, disabled, ui, onApprove, onReject }) {
         <div className="mt-1 text-[10px] text-white/65">{i18n.confirmHint}</div>
 
         <div className="mt-2 flex-1 overflow-hidden rounded bg-black/35 p-2 text-[10px] text-white/80 ring-1 ring-white/10">
-          <div className="text-white/85">{locale === 'en' ? 'Use device buttons:' : '使用设备按键：'}</div>
+          <div className="text-white/85">{ui(locale, "Use device buttons:", "使用设备按键：")}</div>
           <div className="mt-1 text-white/70">
-            {locale === 'en' ? 'Enter = Approve · Power = Reject' : 'Enter = 同意 · Power = 拒绝'}
+            {ui(locale, "Enter = Approve · Power = Reject", "Enter = 同意 · Power = 拒绝")}
           </div>
           <div className="mt-2 text-white/60">
-            {locale === 'en' ? 'Waiting for confirmation…' : '等待设备确认…'}
+            {ui(locale, "Waiting for confirmation…", "等待设备确认…")}
           </div>
         </div>
       </div>
@@ -476,8 +474,8 @@ export function Classic1sDeviceScreen({
         ) : deviceUnlocked ? (
           <ScreenContainer>
             <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-white/80">
-              <div className="text-[12px] font-semibold">{locale === 'en' ? 'Ready' : '就绪'}</div>
-              <div className="text-[10px] text-white/65">{locale === 'en' ? 'Send a command.' : '发送命令。'}</div>
+              <div className="text-[12px] font-semibold">{ui(locale, "Ready", "就绪")}</div>
+              <div className="text-[10px] text-white/65">{ui(locale, "Send a command.", "发送命令。")}</div>
             </div>
           </ScreenContainer>
         ) : (

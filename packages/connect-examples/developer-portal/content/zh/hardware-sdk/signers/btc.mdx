@@ -1,5 +1,6 @@
 ---
 title: BTC Signer
+description: 保持钱包上下文一致，构造和验证 Bitcoin UTXO 签名请求。
 ---
 
 # BTC Signer
@@ -24,7 +25,7 @@ OneKey BTC signer 通过 `HardwareSDK` 与设备交互，通过 OneKey 协议请
 
 - 路径必须与脚本 purpose 对应（44/49/84/86）。
 - 在 `refTxs` 中提供签名流程请求的完整前序交易；具体要求取决于输入类型与固件。
-- 设备逐条展示输入/输出/找零/手续费，确认后返回签名或序列化交易。
+- 设备展示支持的交易确认信息，用户确认后返回签名或序列化交易。具体可展示字段取决于请求、设备与固件，应用应核对实际屏幕。
 
 ## 安装
 
@@ -34,6 +35,8 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ## 初始化
 
+示例统一使用**标准钱包**。隐藏钱包应在每次地址和签名调用中，以经过确认的 `passphraseState` 替代 `useEmptyPassphrase: true`。受保护调用前先注册 [UI 处理器](/zh/hardware-sdk/core-api-guide#events-ui)，使用返回数据前检查 `success`。含待提供交易参数的代码是接入片段，应用仍需实现 UI、设备选择与网络数据获取。
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
@@ -41,6 +44,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -54,9 +59,9 @@ if (!deviceId) throw new Error("Device has no wallet identity");
 ### 场景 1：获取地址
 
 ```ts
-const path84 = "m/84'/0'/0'/0/0";
 const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
-  path: path84,
+  useEmptyPassphrase: true,
+  path: "m/84'/0'/0'/0/0",
   coin: 'btc',
   showOnOneKey: true,
 });
@@ -84,6 +89,7 @@ type AddressResult =
 
 ```ts
 const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   coin: 'btc',
   inputs,
   outputs,
@@ -138,6 +144,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -146,7 +154,12 @@ const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path49 = [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0, 0];
-await HardwareSDK.btcGetAddress(connectId, deviceId, { path: path49, coin: 'btc', showOnOneKey: true });
+const confirmedAddress = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: path49, coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
 
 const inputs: BTCSignTransactionParams['inputs'] = [
   {
@@ -162,12 +175,12 @@ const outputs: BTCSignTransactionParams['outputs'] = [
   {
     address_n: [(49 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 1, 1],
     amount: '3181747',
-    script_type: 'PAYTOP2SHWITNESS', // 找零
+    script_type: 'PAYTOP2SHWITNESS', // change
   },
   {
     address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
     amount: '200000',
-    script_type: 'PAYTOADDRESS', // 收款人
+    script_type: 'PAYTOADDRESS', // recipient
   },
 ];
 
@@ -175,6 +188,7 @@ const outputs: BTCSignTransactionParams['outputs'] = [
 declare const refTxs: BTCSignTransactionParams['refTxs'];
 
 const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   coin: 'btc',
   inputs,
   outputs,
@@ -182,9 +196,8 @@ const { success, payload } = await HardwareSDK.btcSignTransaction(connectId, dev
   locktime: 0,
 });
 
-if (success) {
-  // Verify the signed transaction, then submit it through your Bitcoin client.
-}
+if (!success) throw new Error(payload.error);
+// Verify the signed transaction before submitting it through your Bitcoin client.
 ```
 
 ## 验签与排障
@@ -199,8 +212,8 @@ if (success) {
 - 设备确认：输入、输出、找零、手续费需与前端显示一致。
 - 验签：用 `bitcoinjs-lib` / `@scure/btc-signer` 重建交易，校验 txid 与 `serializedTx`。
 - 常见问题：
-  - 输入过多：分批签名或精简交易。
-  - 手续费异常：调整输出/找零并遵守 dust 规则。
+  - 输入过多：向用户报告限制；拆分或调整交易后，必须重新构造请求并让用户核对。
+  - 手续费异常：停止当前签名；经用户确认后重新计算输出、找零与 dust 限制，不自动改写已确认的交易。
   - 拒签/超时：提供重试/取消，不要自动重播。
 
 参见方法文档：[btcSignTransaction](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) · [btcGetAddress](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress)。

@@ -52,7 +52,7 @@ const balance = await window.$onekey.ethereum.request({
   }, 'latest']
 })
 
-console.log('Balance:', parseInt(balance, 16))
+console.log('Balance:', BigInt(balance).toString())
 ```
 
 ### Read Contract Name
@@ -68,7 +68,8 @@ const name = await window.$onekey.ethereum.request({
 })
 
 // Decode the result (ABI encoded string)
-console.log('Contract name:', decodeString(name))
+// Decode `name` with your ABI library's string decoder.
+console.log('ABI-encoded contract name:', name)
 ```
 
 ### Using ethers.js
@@ -103,5 +104,7 @@ console.log('USDC Balance:', balance.toString())
 
 - This method does not consume gas or modify state
 - The `from` address is optional but may affect the result for some contracts
-- Always use `latest` for most up-to-date state
+- Choose a block tag appropriate for your use case; `latest` reflects the latest block visible to the endpoint
 - For complex contract interactions, consider using ethers.js or web3.js
+
+The token-address examples are for Ethereum mainnet. Confirm the chain and substitute a complete 20-byte account address before encoding `balanceOf`.

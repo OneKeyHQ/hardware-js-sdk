@@ -1,0 +1,34 @@
+---
+title: "选择钱包 Provider"
+description: "可以沿用现有 EIP-1193 请求流程，但要明确选择 OneKey。多钱包选择器使用 [EIP-6963 发现机制](/zh/connect-to-software/provider/eth/provider-api)；OneKey 专用连接按钮可使用 `window.$onekey.ethereum`。"
+---
+
+# 选择钱包 Provider
+
+可以沿用现有 EIP-1193 请求流程，但要明确选择 OneKey。多钱包选择器使用 [EIP-6963 发现机制](/zh/connect-to-software/provider/eth/provider-api)；OneKey 专用连接按钮可使用 `window.$onekey.ethereum`。
+
+```javascript
+// 由用户点击“连接”后执行。
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  // 使用 accounts 更新应用当前选择的账户。
+} catch (error) {
+  // 提示可恢复的错误，不要自动重复弹出授权请求。
+  console.error(error.code, error.message);
+}
+```
+
+## 迁移已有集成
+
+- 账户、签名、交易和事件监听都使用用户选中的同一个 Provider。
+- 将已弃用的 `enable()` 改为 `request({ method: 'eth_requestAccounts' })`。
+- `isOneKey` 是布尔属性。兼容环境中的 `isMetaMask` 不能唯一标识某个钱包。
+- 处理 `accountsChanged`、`chainChanged` 和 Promise 拒绝；视图卸载时移除监听器。
+- 按目标钱包版本核对专有方法，不要假定所有 MetaMask 方法均受支持。
+
+## 历史 Provider 切换方式
+
+旧集成曾使用 `window.onekey` 和 `window.ethereum.switchProvider()`。`switchProvider` 不属于 EIP-1193。新代码应使用发现机制或命名空间 Provider；维护旧代码时，调用前检测旧方法是否存在。

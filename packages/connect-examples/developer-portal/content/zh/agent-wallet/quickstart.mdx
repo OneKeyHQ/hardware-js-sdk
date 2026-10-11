@@ -1,8 +1,11 @@
 ---
 title: 快速开始
+description: 安装 OneKey wallet skills，连接会话并先尝试只读请求。
 ---
 
 # 快速开始
+
+> 当前为私有测试版。访问资格、支持的命令与钱包流程取决于 OneKey 和 CLI 版本。使用示例前，先检查已安装 CLI 的 schema。
 
 先在 AI client 里安装 OneKey wallet skills。之后用户直接用自然语言提钱包请求；skills 会在背后处理 CLI preflight、schema discovery 和安全路由。
 
@@ -42,7 +45,7 @@ git clone https://github.com/OneKeyHQ/onekey-wallet-skills
 在 AI client 里输入：
 
 ```text
-Connect my OneKey Agent Wallet.
+连接我的 OneKey Agent Wallet。
 ```
 
 Skill 会通过 OneKey GUI App Transfer 配对本机会话，并总结当前活动钱包。如果缺少 `onekey` CLI，skill preflight 会先安装再继续；用户不需要手动配置 CLI 命令。
@@ -53,11 +56,11 @@ Skill 会通过 OneKey GUI App Transfer 配对本机会话，并总结当前活�
 
 | 对 AI client 说 | Skill 路由 |
 | --- | --- |
-| `Show my wallet balance.` | Wallet |
-| `Show my receiving address for ETH.` | Wallet |
-| `What tokens are trending right now?` | Market |
+| `显示我的钱包余额。` | Wallet |
+| `显示我的 ETH 收款地址。` | Wallet |
+| `现在有哪些热门代币？` | Market |
 | `What is the price of SOL?` | Market |
-| `Is this token safe before I buy it?` | Security |
+| `买入前，先检查这个代币的风险。` | Security |
 
 回答应该结果优先：钱包状态、route、risk 和一个有用的下一步，而不是把原始终端输出甩给用户。
 
@@ -66,17 +69,17 @@ Skill 会通过 OneKey GUI App Transfer 配对本机会话，并总结当前活�
 输入：
 
 ```text
-Quote a swap from 1 ETH to USDC. Do not execute yet.
+查询 1 ETH 兑换 USDC 的报价，先不要执行。
 ```
 
-Swap skill 应先报价、运行相关安全检查、展示 route 和预计输出，然后在执行前停止。后续类似 `Yes, execute the swap` 的确认，只能执行已经审阅过的订单。
+Swap skill 应先报价、运行相关安全检查、展示 route 和预计输出，然后在执行前停止。后续类似 `确认，执行这笔兑换` 的确认，只能执行已经审阅过的订单。
 
 ## 5. 使用硬件确认
 
 高风险操作可以输入：
 
 ```text
-Use my OneKey hardware wallet for this transfer.
+使用我的 OneKey 硬件钱包处理这笔转账。
 ```
 
-Wallet skill 会切换到硬件会话，涉及资金移动的动作可以升级到设备端 clear signing。硬件登录后，普通 wallet、transfer、swap、signing prompt 会自动使用当前硬件会话。
+Wallet skill 切换到硬件会话后，支持的签名请求需要用户在设备上审阅并确认。可展示的明文签名详情取决于链、设备固件和 CLI 版本。硬件登录后，wallet、transfer、swap、signing 请求使用当前硬件会话；先核对活动地址，再准备资金操作。

@@ -1,5 +1,6 @@
 ---
 title: Solana Signer
+description: 准备 Solana 序列化消息，在一致的钱包上下文中确认并签名。
 ---
 
 # Solana Signer
@@ -20,13 +21,13 @@ Solana 硬件签名全链路指南，覆盖地址确认与交易/消息签名，
 
 ## 工作原理
 
-通过 `HardwareSDK` 与设备 通信，设备会展示序列化 `rawTx`（仅接受十六进制字符串，`0x` 可选）中的来源/目标/金额/费用摘要，确认后返回签名；应用端将签名附加到交易（`@solana/web3.js`）并验证公钥。
+通过 `HardwareSDK` 将序列化消息发送给设备。设备解析支持的内容并请求用户确认，具体可展示字段取决于请求、设备与固件。应用将返回签名附加到交易（`@solana/web3.js`），并验证签名及账户公钥。
 
 关键点：
 
 - 使用固件支持的全硬化路径，例如：`m/44'/501'/account'/0'`（如 `m/44'/501'/0'/0'`）。
 - `rawTx` 只接受十六进制字符串，若使用 `Transaction`，编码 `serializeMessage()` 的结果；若使用 `VersionedTransaction`，编码 `message.serialize()` 的结果。不要传包含签名区的整笔交易序列化结果。
-- 需要应用端自行构造并序列化消息/交易（含 recent blockhash）；若为 Versioned Tx，固件需 Classic1s ≥ `3.1.0`、Touch ≥ `4.3.0`。
+- 应用需自行构造并序列化消息（含 recent blockhash）；Versioned Transaction 的支持情况应按目标机型、固件与对应链方法的要求验证。
 
 ## 安装
 
@@ -36,6 +37,8 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ## 初始化
 
+示例统一使用**标准钱包**。隐藏钱包应在每次地址和签名调用中，以经过确认的 `passphraseState` 替代 `useEmptyPassphrase: true`。受保护调用前先注册 [UI 处理器](/zh/hardware-sdk/core-api-guide#events-ui)，使用返回数据前检查 `success`。含待提供交易参数的代码是接入片段，应用仍需实现 UI、设备选择与网络数据获取。
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
@@ -43,6 +46,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -56,9 +61,9 @@ if (!deviceId) throw new Error("Device has no wallet identity");
 ### 场景 1：获取地址
 
 ```ts
-const path = "m/44'/501'/0'/0'";
 const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
-  path,
+  useEmptyPassphrase: true,
+  path: "m/44'/501'/0'/0'",
   showOnOneKey: true,
 });
 if (!res.success) throw new Error(res.payload.error);
@@ -126,6 +131,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -134,7 +141,12 @@ const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path = "m/44'/501'/0'/0'";
-await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
+const confirmedAddress = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
 
 // Obtain these bytes from Transaction.serializeMessage() or
 // VersionedTransaction.message.serialize(), with a fresh recent blockhash.
@@ -147,9 +159,8 @@ const { success, payload } = await HardwareSDK.solSignTransaction(connectId, dev
   useEmptyPassphrase: true,
 });
 
-if (success) {
-  // Attach the signature and verify it against the address before broadcasting.
-}
+if (!success) throw new Error(payload.error);
+// Attach the signature and verify it against the confirmed address before broadcasting.
 ```
 
 ## 验签与排障
@@ -159,7 +170,7 @@ if (success) {
 - 设备核对：路径/账户、公链币金额、目标账户、费用摘要需与前端一致。
 - 验签：用 `@solana/web3.js` 将签名附加到 `Transaction`，验证签名公钥对应 `solGetAddress` 返回的 base58 `address`。
 - 常见问题：
-  - 超大消息或不支持的指令：精简指令或拆分交易。
+  - 超大消息或不支持的指令：报告限制并终止当前请求；如需精简或拆分交易，重新构造请求并取得用户确认，不自动改写后重签。
   - 会话交互：同一设备串行调用；`openWalletSession` 一次后带上 `passphraseState`。`keepSession` 仍是传输持有，不是钱包绑定。
   - 拒签/超时：提供重试/取消，不要自动重播。
 

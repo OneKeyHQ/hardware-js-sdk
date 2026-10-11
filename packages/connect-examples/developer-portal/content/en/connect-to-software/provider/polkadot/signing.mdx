@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Enable the extension, select an account, and connect an API client to the intended chain. Construct transaction payloads from current chain metadata; the abbreviated hex values in this guide are placeholders.
+
 Learn how to sign transactions and messages on Polkadot.
 
 ---
@@ -33,7 +35,7 @@ const payload = {
   specVersion: '0x...',
   tip: '0x...',
   transactionVersion: '0x...',
-  signedExtensions: [...],
+  signedExtensions: [], // Populate from current chain metadata; do not sign this placeholder
   version: 4,
 }
 
@@ -164,4 +166,3 @@ function usePolkadotWallet() {
   return { accounts, isConnected, connect }
 }
 ```
-

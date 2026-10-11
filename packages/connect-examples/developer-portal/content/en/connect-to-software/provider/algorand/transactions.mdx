@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Transactions
 
+Connect the provider before signing. The transaction examples use the algosdk 2-style `from`/`to` fields; match the SDK major version you install. `algodClient`, addresses, and grouped transactions must be prepared before running the snippets. Browser examples using `Buffer` need an explicit `buffer` import or an equivalent base64 encoder.
+
 Learn how to sign and send transactions on Algorand.
 
 ---
@@ -80,8 +82,12 @@ const signedTxns = await provider.signTxns(walletTxns)
 Broadcast signed transactions:
 
 ```typescript
-const result = await provider.postTxns(signedTxns)
-console.log('Transaction IDs:', result.txIDs)
+const completeTxns = signedTxns.filter((txn) => txn !== null)
+if (completeTxns.length !== signedTxns.length) {
+  throw new Error('Complete all required signatures before broadcasting the group')
+}
+const result = await provider.postTxns(completeTxns)
+console.log('Transaction IDs:', result.txnIDs)
 ```
 
 ---
@@ -92,7 +98,7 @@ Sign and broadcast in one step:
 
 ```typescript
 const result = await provider.signAndPostTxns(walletTxns)
-console.log('Transaction IDs:', result.txIDs)
+console.log('Transaction IDs:', result.txnIDs)
 ```
 
 ---
@@ -129,6 +135,7 @@ import algosdk from 'algosdk'
 async function sendAlgo() {
   // Connect
   const provider = window.$onekey?.algo
+  if (!provider) throw new Error("OneKey Algorand provider is unavailable")
   const { address } = await provider.connect()
 
   // Setup client
@@ -156,6 +163,8 @@ async function sendAlgo() {
 
   const signedTxns = await provider.signTxns(walletTxns)
 
+  if (!signedTxns[0]) throw new Error("The transaction was not signed")
+
   // Send
   const { txId } = await algodClient.sendRawTransaction(
     Buffer.from(signedTxns[0], 'base64')
@@ -168,4 +177,3 @@ async function sendAlgo() {
   console.log('Confirmed!')
 }
 ```
-

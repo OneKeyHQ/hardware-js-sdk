@@ -1,0 +1,34 @@
+---
+title: "Select a wallet provider"
+description: "Reuse your EIP-1193 request flow and select OneKey explicitly. Use [EIP-6963 discovery](/en/connect-to-software/provider/eth/provider-api) for a multi-wallet chooser, or `window.$onekey.ethereum` for a OneKey-specific connection button."
+---
+
+# Select a wallet provider
+
+Reuse your EIP-1193 request flow and select OneKey explicitly. Use [EIP-6963 discovery](/en/connect-to-software/provider/eth/provider-api) for a multi-wallet chooser, or `window.$onekey.ethereum` for a OneKey-specific connection button.
+
+```javascript
+// Run from a user-initiated Connect action.
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  // Update your application's selected account from accounts.
+} catch (error) {
+  // Show a recoverable error; do not automatically repeat the prompt.
+  console.error(error.code, error.message);
+}
+```
+
+## Migrating an existing integration
+
+- Keep the selected provider for accounts, signing, transactions, and event listeners.
+- Replace deprecated `enable()` calls with `request({ method: 'eth_requestAccounts' })`.
+- Treat `isOneKey` as a boolean property. `isMetaMask` alone does not identify a unique wallet in a compatibility environment.
+- Handle `accountsChanged`, `chainChanged`, and rejected promises; remove listeners when the view unmounts.
+- Check wallet-specific methods in your target version instead of assuming support for every MetaMask method.
+
+## Historical provider switching
+
+Older integrations used `window.onekey` and `window.ethereum.switchProvider()`. `switchProvider` is not part of EIP-1193. Use discovery or the namespaced provider in new code. Feature-detect any legacy method before calling it when maintaining an old integration.

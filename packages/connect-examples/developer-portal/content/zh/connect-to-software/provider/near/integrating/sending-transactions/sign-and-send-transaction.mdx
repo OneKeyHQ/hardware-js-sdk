@@ -10,47 +10,46 @@ title: 签名并发送交易
 
 在这两种情况下，调用都将返回一个包含 `transactionHashes` 对象的 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)。
 
+## 使用 requestSignTransactions() 方法
 
-### 使用 requestSignTransactions() 方法
 ```javascript
-const transaction = ... // 首先创建交易
+// `transaction` is created in the Create Transaction guide.
 
 const res = await provider.requestSignTransactions({
-  transactions: [transaction], // 必须是数组类型
+  transactions: [transaction], // must be Array type
 });
 console.log('requestSignTransactions', res, res.transactionHashes);
 
 ```
 
+## 使用 request() 方法
 
-### 使用 request() 方法
 ```javascript
-const transaction = ... // 首先创建交易
+// `transaction` is created in the Create Transaction guide.
 
 const res = await provider.request({
   method: 'near_sendTransactions',
   params: {
-    transactions: [transaction], // 必须是数组类型
+    transactions: [transaction], // must be Array type
   },
 });
 console.log('near_sendTransactions', res, res.transactionHashes);
 ```
-
-
 
 交易也可以在调用方法之前先序列化为 **`base64`** 字符串。
 
 ```javascript
-const transaction = ... // 首先创建交易
+// `transaction` is created in the Create Transaction guide.
 
-const transactionSerialized = transaction.encode().toString('base64');
+const transactionSerialized = btoa(String.fromCharCode(...transaction.encode()));
 
 const res = await provider.request({
   method: 'near_sendTransactions',
   params: {
-    transactions: [transactionSerialized], // 必须是数组类型
+    transactions: [transactionSerialized], // must be Array type
   },
 });
 console.log('near_sendTransactions', res, res.transactionHashes);
 ```
 
+通过 `try`/`catch` 处理请求被拒绝的情况。返回交易哈希只是提供交易标识，不保证执行成功；请通过网络 RPC 检查交易结果。

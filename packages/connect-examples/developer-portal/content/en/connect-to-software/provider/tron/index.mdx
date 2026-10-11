@@ -10,7 +10,7 @@ import { Callout, Tabs } from 'nextra/components'
 Integrate TRON blockchain using OneKey's TronLink-compatible provider. Access via `window.$onekey.tron` or `window.tronWeb`.
 
 <Callout type="info">
-OneKey's TRON provider is fully compatible with TronLink, including TronWeb and SunWeb instances.
+OneKey exposes a TronLink-compatible provider and TronWeb integration. Feature availability depends on the wallet version and selected network.
 </Callout>
 
 ---
@@ -18,7 +18,7 @@ OneKey's TRON provider is fully compatible with TronLink, including TronWeb and 
 ## Quick Links
 
 - [API Reference](#api-reference)
-- [Connecting](#connecting)
+- [Getting started](getting-started)
 - [Transactions](#transactions)
 - [Message Signing](#message-signing)
 
@@ -31,7 +31,7 @@ OneKey's TRON provider is fully compatible with TronLink, including TronWeb and 
 const provider = window.$onekey?.tron
 
 // TronWeb is available globally after connection
-const tronWeb = window.tronWeb
+let tronWeb = provider?.tronWeb
 
 if (!provider) {
   throw new Error('OneKey TRON provider not detected')
@@ -54,6 +54,8 @@ const result = await provider.request({
 })
 
 if (result.code === 200) {
+  tronWeb = provider.tronWeb
+  if (!tronWeb) throw new Error('OneKey TronWeb is not ready')
   console.log('Connected!')
   const address = tronWeb.defaultAddress.base58
   console.log('Address:', address)
@@ -66,7 +68,7 @@ if (result.code === 200) {
 
 ```typescript
 // Check if TronWeb is ready
-if (tronWeb && tronWeb.ready) {
+if (provider.ready && tronWeb && tronWeb.defaultAddress.base58) {
   console.log('Connected:', tronWeb.defaultAddress.base58)
 } else {
   console.log('Not connected')
@@ -77,7 +79,7 @@ if (tronWeb && tronWeb.ready) {
 
 ## Using TronWeb
 
-After connection, TronWeb instance is available globally:
+After connection, use `provider.tronWeb` to keep requests associated with OneKey:
 
 ### Get Balance
 
@@ -107,7 +109,7 @@ const contract = await tronWeb.contract().at(contractAddress)
 const decimals = await contract.decimals().call()
 
 // Transfer tokens
-const amount = 100 * (10 ** decimals) // 100 tokens
+const amount = (100n * 10n ** BigInt(decimals.toString())).toString() // 100 tokens, exact integer
 const tx = await contract.transfer(
   'TRecipientAddress...',
   amount
@@ -247,7 +249,7 @@ window.addEventListener('tronLink#initialized', () => {
 
 // Listen for messages
 window.addEventListener('message', (event) => {
-  if (event.data.isTronLink) {
+  if (event.source === window && event.data?.isTronLink && event.data?.message) {
     const { action, data } = event.data.message
     console.log('TronLink event:', action, data)
   }
@@ -278,6 +280,8 @@ window.addEventListener('message', (event) => {
 | `signMessageV2` | Sign message V2 |
 
 ### Response Codes
+
+For `tron_requestAccounts`, inspect the resolved response’s `code`. The current provider implementation returns `4001` for an already pending request and `4000` when no accounts are returned or the request fails. These are not Ethereum JSON-RPC error meanings.
 
 | Code | Description |
 |------|-------------|
@@ -328,15 +332,13 @@ try {
     method: 'tron_requestAccounts'
   })
 
-  if (result.code !== 200) {
-    throw new Error(result.message)
+  if (result.code === 4001) {
+    console.log('A connection request is already pending')
+  } else if (result.code !== 200) {
+    console.log('Connection was not approved:', result.message)
   }
 } catch (error) {
-  if (error.code === 4001) {
-    console.log('User rejected the request')
-  } else {
-    console.error('Error:', error.message)
-  }
+  console.error('Request failed:', error)
 }
 ```
 
@@ -352,6 +354,5 @@ const tronWeb = window.tronWeb
 
 // After (OneKey with TronLink fallback)
 const provider = window.$onekey?.tron || window.tronLink
-const tronWeb = window.tronWeb // Both inject this
+const tronWeb = window.tronWeb // Compatibility global; verify which wallet owns it
 ```
-

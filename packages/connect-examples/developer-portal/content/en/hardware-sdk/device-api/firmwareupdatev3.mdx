@@ -1,4 +1,5 @@
 ---
+description: "Update OneKey Pro firmware components with the Protocol V1 firmwareUpdateV3 flow."
 title: firmwareUpdateV3
 ---
 
@@ -6,20 +7,25 @@ title: firmwareUpdateV3
 
 ## Firmware update (V3)
 
-All‑new update flow (Pro only). Supports updating Bootloader, Main firmware, BLE firmware and the resource package in a single flow as needed.
+Protocol V1 update flow for OneKey Pro. Supports updating Bootloader, Main firmware, BLE firmware and the resource package in a single flow as needed.
 
 - Device: OneKey Pro (Protocol V1) only
 - Boot requirement: Boot version ≥ 4.8.0
 - Pro 2 / Neo: use [firmwareUpdateV4](/en/hardware-sdk/device-api/firmwareupdatev4)
 
 ```typescript
+// Select versions from verified release metadata for this device.
+declare const targetFirmwareVersion: number[];
+declare const targetBleVersion: number[];
+declare const targetBootloaderVersion: number[];
+
 const res = await HardwareSDK.firmwareUpdateV3(connectId, {
   platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
 
   // Option A: specify versions (pick any subset)
-  firmwareVersion: [4, 10, 0],
-  bleVersion: [4, 10, 0],
-  bootloaderVersion: [4, 8, 0],
+  firmwareVersion: targetFirmwareVersion,
+  bleVersion: targetBleVersion,
+  bootloaderVersion: targetBootloaderVersion,
 
   // Option B: custom binaries (as needed)
   // firmwareBinary: ArrayBuffer,
@@ -30,7 +36,10 @@ const res = await HardwareSDK.firmwareUpdateV3(connectId, {
   // Optional: force updating resource package
   forcedUpdateRes: false,
 });
+if (!res.success) throw new Error(res.payload.error);
 ```
+
+The example assumes the user has selected this device and approved the update. Resolve target versions from verified release metadata; do not hard-code a version copied from documentation.
 
 ### Params
 
