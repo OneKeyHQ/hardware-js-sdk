@@ -33,6 +33,8 @@ export interface BtcPublicKey {
   chainCode: string;
   path: string;
   depth: number;
+  /** Set by air-gapped wallets (Keystone): the exported key, for pinning by the host. */
+  accountKey?: ExportedAccountKey;
 }
 
 export interface BtcSignTxParams extends PassphraseStateAware {

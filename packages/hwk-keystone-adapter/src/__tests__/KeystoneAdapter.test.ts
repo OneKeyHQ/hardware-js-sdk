@@ -830,32 +830,37 @@ describe('KeystoneAdapter', () => {
       ['evm', "m/44'/60'/0'/0/3", "m/44'/60'/0'"],
       ['btc', "m/84'/0'/0'/0/3", "m/84'/0'/0'"],
       ['tron', "m/44'/195'/0'/0/3", "m/44'/195'/0'"],
+      ['btcPublicKey', "m/84'/0'/0'", "m/84'/0'/0'"],
     ] as const)(
-      'returns the exported %s account xpub with the address',
-      async (chain, path, accountPath) => {
-        const getAddress = async (root: HDKey) => {
+      'returns the exported %s account key with the result',
+      async (method, path, accountPath) => {
+        const getAccountKey = async (root: HDKey) => {
           const adapter = newTestAdapter();
           attachFakeDevice(adapter, { root });
           const getters = {
             evm: () => adapter.evmGetAddress(null, null, { path }),
             btc: () => adapter.btcGetAddress(null, null, { path }),
             tron: () => adapter.tronGetAddress(null, null, { path }),
+            btcPublicKey: () => adapter.btcGetPublicKey(null, null, { path }),
           };
-          const result = await getters[chain]();
+          const result = await getters[method]();
           await adapter.dispose();
-          if (!result.success) throw new Error(`${chain} getAddress failed`);
+          if (!result.success) throw new Error(`${method} failed`);
           return result.payload.accountKey;
         };
 
-        const own = await getAddress(FIXTURE_ROOT);
+        const node = FIXTURE_ROOT.derive(accountPath);
+        const own = await getAccountKey(FIXTURE_ROOT);
         expect(own).toEqual({
           path: accountPath,
-          xpub: FIXTURE_ROOT.derive(accountPath).publicExtendedKey,
+          publicKey: Buffer.from(node.publicKey ?? []).toString('hex'),
+          chainCode: Buffer.from(node.chainCode ?? []).toString('hex'),
+          xpub: node.publicExtendedKey,
         });
         // Same self-reported fingerprint, different seed: only the key tells them apart.
-        const other = await getAddress(OTHER_ROOT);
+        const other = await getAccountKey(OTHER_ROOT);
         expect(other?.path).toBe(accountPath);
-        expect(other?.xpub).not.toBe(own?.xpub);
+        expect(other?.publicKey).not.toBe(own?.publicKey);
       }
     );
 
@@ -871,7 +876,9 @@ describe('KeystoneAdapter', () => {
       expect(result.payload[0].payload).toMatchObject({
         accountKey: {
           path: "m/44'/60'/0'",
-          xpub: FIXTURE_ROOT.derive("m/44'/60'/0'").publicExtendedKey,
+          publicKey: Buffer.from(FIXTURE_ROOT.derive("m/44'/60'/0'").publicKey ?? []).toString(
+            'hex'
+          ),
         },
       });
     });

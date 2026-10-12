@@ -97,6 +97,7 @@ import type {
   EvmSignTypedDataParams,
   EvmSignature,
   EvmSignedTx,
+  ExportedAccountKey,
   HardwareEvent,
   HardwareEventMap,
   IConnector,
@@ -916,7 +917,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       return success<EvmAddress>({
         address,
         path: normalizePath(params.path),
-        accountKey: { path: normalizePath(accountPath), xpub },
+        accountKey: this._exportedAccountKey(accountPath, xpub),
       });
     });
   }
@@ -1126,7 +1127,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       return success<BtcAddress>({
         address,
         path: normalizedPath,
-        accountKey: { path: accountPath, xpub },
+        accountKey: this._exportedAccountKey(accountPath, xpub),
       });
     });
   }
@@ -1179,6 +1180,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         depth: meta.depth,
         fingerprint: meta.parentFingerprint,
         path: normalizePath(accountPath),
+        accountKey: this._exportedAccountKey(accountPath, xpub),
       });
     });
   }
@@ -1472,7 +1474,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       return success<TronAddress>({
         address,
         path: normalizePath(params.path),
-        accountKey: { path: normalizePath(accountPath), xpub },
+        accountKey: this._exportedAccountKey(accountPath, xpub),
       });
     });
   }
@@ -1606,6 +1608,12 @@ export class KeystoneAdapter implements IHardwareWallet {
       });
     }
     return account.extendedPublicKey;
+  }
+
+  /** The exported key behind an address, reduced to the fields that identify it. */
+  private _exportedAccountKey(accountPath: string, xpub: string): ExportedAccountKey {
+    const { publicKey, chainCode } = this.urEngine.parseXpubMeta(xpub);
+    return { path: normalizePath(accountPath), publicKey, chainCode, xpub };
   }
 
   /**
