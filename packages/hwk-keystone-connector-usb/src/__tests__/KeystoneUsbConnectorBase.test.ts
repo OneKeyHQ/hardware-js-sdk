@@ -403,6 +403,32 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(disposeTransport).toHaveBeenLastCalledWith(secondTransport);
     });
 
+    it('refuses two connected devices that report the same wallet fingerprint', async () => {
+      const first = { serialNumber: 'FIRST' };
+      const second = { serialNumber: 'SECOND' };
+      const firstTransport = versionTransport();
+      const secondTransport = versionTransport();
+      const connectDevice = jest.fn((device: KeystoneUsbDeviceDescriptor) =>
+        Promise.resolve(device === first ? firstTransport : secondTransport)
+      );
+      const disposeTransport = jest.fn();
+      const connector = newConnector(
+        exactTransportClass([first, second], { connectDevice, disposeTransport })
+      );
+
+      await expect(
+        connector.connectTarget({
+          type: 'expected-device-identity',
+          deviceIdentity: FAKE_MFP,
+        })
+      ).rejects.toMatchObject({ code: HardwareErrorCode.DeviceOneDeviceOnly });
+      // Neither claimant is kept open.
+      expect(disposeTransport.mock.calls.map(([transport]) => transport)).toEqual(
+        expect.arrayContaining([firstTransport, secondTransport])
+      );
+      expect(disposeTransport).toHaveBeenCalledTimes(2);
+    });
+
     it('fails closed after every connected Keystone has the wrong wallet fingerprint', async () => {
       const connectDevice = jest.fn().mockResolvedValue(versionTransport('deadbeef'));
       const connector = newConnector(
@@ -472,6 +498,28 @@ describe('KeystoneUsbConnectorBase', () => {
   });
 
   describe('call("resolveUr", ...)', () => {
+    it('reports a reply that does not decode as unreadable and keeps the session', async () => {
+      const connector = versionConnector({
+        [Actions.CMD_RESOLVE_UR]: () => 'UR:ETH-SIGNATURE/NOT-A-VALID-PART',
+      });
+      const session = await connector.connect();
+
+      const result = await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData: 'de',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toMatchObject({
+        code: HardwareErrorCode.PayloadTooLarge,
+        params: expect.objectContaining({ origin: 'device', replyUnreadable: true }),
+      });
+      // The device answered, so the same session still serves the next request.
+      const again = await connector.call(session.sessionId, 'getAppConfig', {});
+      expect(again.success).toBe(true);
+    });
+
     it('encodes the outgoing UR as a bech32 string and decodes the response back to {urType, urData}', async () => {
       const request = EthSignRequest.constructETHRequest(
         Buffer.from('deadbeef', 'hex'),

@@ -111,9 +111,14 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
   const text = typeof encoded === 'string' ? encoded.trim() : '';
   const parts = text.split(/\s+/).filter(Boolean);
   const decoder = new URDecoder();
-  for (const part of parts) {
-    decoder.receivePart(part);
-    if (decoder.isComplete()) break;
+  try {
+    for (const part of parts) {
+      decoder.receivePart(part);
+      if (decoder.isComplete()) break;
+    }
+  } catch {
+    // A part that does not decode is the device's reply, not a broken link: report it below as
+    // an unreadable answer so the session is kept rather than re-claimed.
   }
   if (!parts.length || !decoder.isComplete() || !decoder.isSuccess()) {
     const shape =
@@ -124,6 +129,8 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
       code: HardwareErrorCode.PayloadTooLarge,
       message: `Keystone USB returned an incomplete BC-UR response (${shape})`,
       origin: 'device',
+      // The device processed the request; only its reply is unusable.
+      params: { replyUnreadable: true },
     });
   }
   const ur = decoder.resultUR();
@@ -305,6 +312,7 @@ export class KeystoneUsbConnectorBase implements IConnector {
             });
           }
           let readableDeviceFound = false;
+          let ambiguous = false;
           let lastError: unknown;
           let matched:
             | {
@@ -322,14 +330,28 @@ export class KeystoneUsbConnectorBase implements IConnector {
               const candidateConfig = await this._readAppConfig(candidate.transport);
               readableDeviceFound = true;
               if (candidateConfig.mfp?.toLowerCase() === expectedMasterFingerprint.toLowerCase()) {
+                if (matched) {
+                  candidate.dispose();
+                  ambiguous = true;
+                  break;
+                }
                 matched = { device, opened: candidate, config: candidateConfig };
-                break;
+                // eslint-disable-next-line no-continue
+                continue;
               }
               candidate.dispose();
             } catch (error) {
               candidate?.dispose();
               lastError = error;
             }
+          }
+          // The fingerprint is self-reported, so two claimants are refused, not ranked.
+          if (ambiguous) {
+            matched?.opened.dispose();
+            throw createHwkError({
+              code: HardwareErrorCode.DeviceOneDeviceOnly,
+              message: `More than one connected Keystone reports wallet fingerprint ${expectedMasterFingerprint}; keep one connected`,
+            });
           }
           if (!matched) {
             if (!readableDeviceFound && lastError) throw mapKeystoneUsbError(lastError);
