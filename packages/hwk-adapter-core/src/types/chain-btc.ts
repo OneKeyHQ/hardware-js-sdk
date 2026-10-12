@@ -1,6 +1,7 @@
 import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
 import type { IHardwareCallParams, IHardwareCommonCallParams, NullableCallArg } from './wallet';
+import type { ExportedAccountKey } from './qr';
 
 export interface BtcGetAddressParams extends PassphraseStateAware {
   path: string;
@@ -14,6 +15,8 @@ export interface BtcGetAddressParams extends PassphraseStateAware {
 export interface BtcAddress {
   address: string;
   path: string;
+  /** Set by air-gapped wallets (Keystone): the exported key this address derives from. */
+  accountKey?: ExportedAccountKey;
 }
 
 export interface BtcGetPublicKeyParams extends PassphraseStateAware {

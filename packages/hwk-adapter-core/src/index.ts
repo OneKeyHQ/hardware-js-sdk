@@ -111,7 +111,7 @@ export type {
 
 export type { PassphraseStateAware } from './types/passphrase';
 
-export type { QrDisplayData, QrResponseData } from './types/qr';
+export type { ExportedAccountKey, QrDisplayData, QrResponseData } from './types/qr';
 
 export type { ChainForFingerprint } from './types/fingerprint';
 export {

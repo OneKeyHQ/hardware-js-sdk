@@ -909,9 +909,14 @@ export class KeystoneAdapter implements IHardwareWallet {
         signal,
         bundle
       );
-      // showOnDevice is not wired; the address is derived offline from a device-verified xpub.
+      // showOnDevice is not wired: Keystone cannot show an address on request, and the address is
+      // derived offline from an export that carries no signature.
       const address = this.urEngine.deriveEvmAddressFromXpub(xpub, relativeDerivePath);
-      return success<EvmAddress>({ address, path: normalizePath(params.path) });
+      return success<EvmAddress>({
+        address,
+        path: normalizePath(params.path),
+        accountKey: { path: normalizePath(accountPath), xpub },
+      });
     });
   }
 
@@ -1117,7 +1122,11 @@ export class KeystoneAdapter implements IHardwareWallet {
         bundle
       );
       const address = this.urEngine.deriveBtcAddressFromXpub(xpub, relativeDerivePath, scriptType);
-      return success<BtcAddress>({ address, path: normalizedPath });
+      return success<BtcAddress>({
+        address,
+        path: normalizedPath,
+        accountKey: { path: accountPath, xpub },
+      });
     });
   }
 
@@ -1327,7 +1336,11 @@ export class KeystoneAdapter implements IHardwareWallet {
       KeystoneAdapter._throwIfAborted(signal);
       // The Ed25519 public key is the Solana address (base58).
       const address = bs58.encode(Buffer.from(account.publicKey, 'hex'));
-      return success<SolAddress>({ address, path });
+      return success<SolAddress>({
+        address,
+        path,
+        accountKey: { path, publicKey: account.publicKey },
+      });
     });
   }
 
@@ -1455,7 +1468,11 @@ export class KeystoneAdapter implements IHardwareWallet {
         bundle
       );
       const address = this.urEngine.deriveTronAddressFromXpub(xpub, relativeDerivePath);
-      return success<TronAddress>({ address, path: normalizePath(params.path) });
+      return success<TronAddress>({
+        address,
+        path: normalizePath(params.path),
+        accountKey: { path: normalizePath(accountPath), xpub },
+      });
     });
   }
 

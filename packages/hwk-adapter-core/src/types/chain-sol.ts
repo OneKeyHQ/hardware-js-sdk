@@ -1,6 +1,7 @@
 import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
 import type { IHardwareCallParams, NullableCallArg } from './wallet';
+import type { ExportedAccountKey } from './qr';
 
 export interface SolGetAddressParams extends PassphraseStateAware {
   path: string;
@@ -11,6 +12,8 @@ export interface SolAddress {
   /** Base58-encoded Solana address — this is also the Ed25519 public key. */
   address: string;
   path: string;
+  /** Set by air-gapped wallets (Keystone): the exported key this address derives from. */
+  accountKey?: ExportedAccountKey;
 }
 
 export interface SolSignTxParams extends PassphraseStateAware {

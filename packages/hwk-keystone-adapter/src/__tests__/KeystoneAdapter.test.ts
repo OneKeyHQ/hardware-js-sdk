@@ -1,3 +1,4 @@
+import bs58 from 'bs58';
 import {
   CryptoCoinInfo,
   CryptoHDKey,
@@ -820,6 +821,72 @@ describe('KeystoneAdapter', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.payload.code).toBe(HardwareErrorCode.InvalidParams);
+    });
+  });
+
+  describe('accountKey', () => {
+    // Hosts pin this key per account path, so it must be exactly what the device exported.
+    it.each([
+      ['evm', "m/44'/60'/0'/0/3", "m/44'/60'/0'"],
+      ['btc', "m/84'/0'/0'/0/3", "m/84'/0'/0'"],
+      ['tron', "m/44'/195'/0'/0/3", "m/44'/195'/0'"],
+    ] as const)(
+      'returns the exported %s account xpub with the address',
+      async (chain, path, accountPath) => {
+        const getAddress = async (root: HDKey) => {
+          const adapter = newTestAdapter();
+          attachFakeDevice(adapter, { root });
+          const getters = {
+            evm: () => adapter.evmGetAddress(null, null, { path }),
+            btc: () => adapter.btcGetAddress(null, null, { path }),
+            tron: () => adapter.tronGetAddress(null, null, { path }),
+          };
+          const result = await getters[chain]();
+          await adapter.dispose();
+          if (!result.success) throw new Error(`${chain} getAddress failed`);
+          return result.payload.accountKey;
+        };
+
+        const own = await getAddress(FIXTURE_ROOT);
+        expect(own).toEqual({
+          path: accountPath,
+          xpub: FIXTURE_ROOT.derive(accountPath).publicExtendedKey,
+        });
+        // Same self-reported fingerprint, different seed: only the key tells them apart.
+        const other = await getAddress(OTHER_ROOT);
+        expect(other?.path).toBe(accountPath);
+        expect(other?.xpub).not.toBe(own?.xpub);
+      }
+    );
+
+    it('keeps the account key on each all-network item', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter);
+      const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+        bundle: [{ methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/1" }],
+      });
+      await adapter.dispose();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.payload[0].payload).toMatchObject({
+        accountKey: {
+          path: "m/44'/60'/0'",
+          xpub: FIXTURE_ROOT.derive("m/44'/60'/0'").publicExtendedKey,
+        },
+      });
+    });
+
+    it('returns the exported Solana public key with the address', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter);
+      const path = "m/44'/501'/0'/0'";
+      const result = await adapter.solGetAddress(null, null, { path });
+      await adapter.dispose();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const { address, accountKey } = result.payload;
+      expect(accountKey?.path).toBe(path);
+      expect(bs58.encode(Buffer.from(accountKey?.publicKey ?? '', 'hex'))).toBe(address);
     });
   });
 
