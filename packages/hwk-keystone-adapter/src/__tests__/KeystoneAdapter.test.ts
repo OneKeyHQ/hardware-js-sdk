@@ -2557,6 +2557,52 @@ describe('KeystoneAdapter', () => {
       }
     );
 
+    it('keeps the USB session and warns of a possible signature when the signed reply is unreadable', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      await adapter.releaseOperation(connected.payload);
+      const target = `keystone-wallet:${FIXTURE_MFP}`;
+      const callUsb = usb.connector.call.bind(usb.connector);
+      const callSpy = jest
+        .spyOn(usb.connector, 'call')
+        .mockImplementation((sessionId, method, params) => {
+          if ((params as { urType?: string })?.urType === 'eth-sign-request') {
+            return Promise.resolve({
+              success: false,
+              error: {
+                code: HardwareErrorCode.PayloadTooLarge,
+                message: 'Keystone USB returned an incomplete BC-UR response',
+                params: { origin: 'device', replyUnreadable: true },
+              },
+            });
+          }
+          return callUsb(sessionId, method, params);
+        });
+      try {
+        const params = { path: "m/44'/60'/0'/0/0", serializedTx: `02${'ab'.repeat(30)}` };
+        const signed = await adapter.evmSignTransaction(target, FIXTURE_MFP, params);
+        expect(signed.success).toBe(false);
+        if (signed.success) return;
+        expect(signed.payload.params?.operationMayHaveCompleted).toBe(true);
+        expect(signed.payload.recovery).toEqual({ scope: 'unknown' });
+        // Not a lost link: no QR detour and no re-claim of another USB device.
+        expect(qrFake.requests).toHaveLength(0);
+
+        const connectsAfterFailure = usb.connectArgs.length;
+        callSpy.mockRestore();
+        const retry = await adapter.evmSignTransaction(target, FIXTURE_MFP, params);
+        expect(retry.success).toBe(true);
+        expect(usb.connectArgs).toHaveLength(connectsAfterFailure);
+      } finally {
+        callSpy.mockRestore();
+        await adapter.dispose();
+      }
+    });
+
     it('probes USB before each fetch and attaches when USB returns', async () => {
       const usb = fakeUsbConnector();
       usb.setAvailable(false);

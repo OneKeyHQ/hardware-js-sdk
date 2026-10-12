@@ -909,8 +909,9 @@ export class KeystoneAdapter implements IHardwareWallet {
         signal,
         bundle
       );
-      // showOnDevice is not wired: Keystone cannot show an address on request, and the address is
-      // derived offline from an export that carries no signature.
+      // showOnDevice is accepted but not wired: Keystone firmware cannot show an address on
+      // request yet, so the address is derived offline from an unsigned export. Wire it here once
+      // the device supports it.
       const address = this.urEngine.deriveEvmAddressFromXpub(xpub, relativeDerivePath);
       return success<EvmAddress>({
         address,
@@ -2214,6 +2215,17 @@ export class KeystoneAdapter implements IHardwareWallet {
             params: operationMayHaveCompletedParams(operationName),
           });
         }
+      }
+      // The device answered with a reply that cannot be read. The session stays, but a signing
+      // request may already have been approved on the device, so it must not be resent blindly.
+      if (operationName && (usbError as { replyUnreadable?: unknown }).replyUnreadable === true) {
+        throw createHwkError({
+          code: (usbErrorCode as HardwareErrorCode) ?? HardwareErrorCode.UnknownError,
+          message: `Keystone ${operationName} may have completed but its reply could not be read`,
+          origin: 'device',
+          recovery: { scope: 'unknown' },
+          params: operationMayHaveCompletedParams(operationName),
+        });
       }
       throw usbError;
     }
