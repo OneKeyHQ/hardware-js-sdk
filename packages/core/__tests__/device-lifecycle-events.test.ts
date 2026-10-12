@@ -364,11 +364,11 @@ describe('public device lifecycle events', () => {
 
   test('clears the cleanup barrier when its deadline expires', async () => {
     const realSetTimeout = setTimeout;
-    jest
-      .spyOn(global, 'setTimeout')
-      .mockImplementation((callback, delay, ...args) =>
-        realSetTimeout(callback, delay === 5_000 ? 0 : delay, ...args)
-      );
+    const cleanupDeadline = createDeferred<() => void>();
+    jest.spyOn(global, 'setTimeout').mockImplementation((callback, delay, ...args) => {
+      if (delay === 5_000) cleanupDeadline.resolve(() => callback(...args));
+      return realSetTimeout(callback, delay, ...args);
+    });
     {
       jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
       const acquire = jest.spyOn(Device.prototype, 'acquire').mockResolvedValue(undefined);
@@ -382,13 +382,15 @@ describe('public device lifecycle events', () => {
         type: IFRAME.CALL,
         payload: { method: 'getDeviceState', connectId: 'draining-device', connectProtocol: 'V2' },
       } as CoreMessage);
-      setImmediate(() => cancel(context, 'draining-device'));
+      const expireCleanupDeadline = await cleanupDeadline.promise;
+      cancel(context, 'draining-device');
+      expireCleanupDeadline();
       await expect(result).resolves.toBeDefined();
-      gate.resolve();
       await new Promise(resolve => {
         setImmediate(resolve);
       });
       expect(context.getPrePendingCallPromise('draining-device')).toBeUndefined();
+      gate.resolve();
     }
   });
 
