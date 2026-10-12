@@ -147,7 +147,13 @@ function formatDeviceMismatchError(expected: string, actual: string): string {
 // Viewing keys reveal a Zcash account's whole shielded history; logs get exported to support.
 const LOG_REDACTED_RESULT_KEYS = ['ufvk', 'orchardFvk'];
 
-function redactResultForLog(result: unknown): unknown {
+// Signing payloads and their signatures stay out of logs, as in the Trezor adapter.
+function isSigningMethod(method: string): boolean {
+  return /sign/i.test(method);
+}
+
+function redactResultForLog(result: unknown, method: string): unknown {
+  if (isSigningMethod(method)) return '[redacted]';
   if (!result || typeof result !== 'object') return result;
   const keys = LOG_REDACTED_RESULT_KEYS.filter(key => key in result);
   if (!keys.length) return result;
@@ -2533,7 +2539,7 @@ export class LedgerAdapter implements IHardwareWallet {
     debugLog('[LedgerAdapter][REQ]', {
       method,
       connectId: effectiveConnectId || '(empty)',
-      params,
+      params: isSigningMethod(method) ? '[redacted]' : params,
     });
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
@@ -2594,7 +2600,7 @@ export class LedgerAdapter implements IHardwareWallet {
       debugLog('[LedgerAdapter][RES]', {
         method,
         success: true,
-        payload: redactResultForLog(result),
+        payload: redactResultForLog(result, method),
       });
       return result;
     } catch (err) {

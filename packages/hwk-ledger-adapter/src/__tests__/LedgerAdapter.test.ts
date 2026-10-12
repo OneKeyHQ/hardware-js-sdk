@@ -2195,6 +2195,24 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  it('keeps signing payloads and signatures out of the request and response logs', async () => {
+    const logs: string[] = [];
+    const stop = onSdkEvent(event => logs.push(event.message));
+    try {
+      await adapter.connectDevice('dev-1');
+      connector.callImpl.mockResolvedValue({ signature: 'cafe-signature-bytes' });
+      await adapter.evmSignMessage('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        messageHex: 'beef-message-payload',
+      });
+      expect(logs.some(message => message.includes('evmSignMessage'))).toBe(true);
+      expect(logs.some(message => message.includes('beef-message-payload'))).toBe(false);
+      expect(logs.some(message => message.includes('cafe-signature-bytes'))).toBe(false);
+    } finally {
+      stop();
+    }
+  });
+
   it('keeps Zcash viewing keys out of the response log', async () => {
     const logs: string[] = [];
     const stop = onSdkEvent(event => logs.push(event.message));
