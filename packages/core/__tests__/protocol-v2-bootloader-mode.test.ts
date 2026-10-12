@@ -1,5 +1,6 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
+import DeviceReboot from '../src/api/protocol-v2/DeviceReboot';
 import { Device } from '../src/device/Device';
 import { UI_REQUEST } from '../src/events/ui-request';
 
@@ -25,6 +26,17 @@ const createBootloaderDevice = (protocolType: 'V1' | 'V2') => {
 };
 
 describe('Pro2 bootloader mode', () => {
+  test('allows deviceReboot to return a Protocol V2 bootloader to normal mode', () => {
+    const device = createBootloaderDevice('V2');
+    const method = new DeviceReboot({
+      id: 1,
+      payload: { method: 'deviceReboot', rebootType: 'normal' },
+    });
+    method.init();
+
+    expect(device.hasUnexpectedMode(method.allowDeviceMode, method.requireDeviceMode)).toBeNull();
+  });
+
   test('blocks Protocol V2 methods that are not allowed in bootloader mode', () => {
     const device = createBootloaderDevice('V2');
 

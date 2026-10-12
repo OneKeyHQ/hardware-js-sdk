@@ -1,5 +1,6 @@
 import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
+import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { normalizeRebootType } from './helpers';
 
@@ -11,6 +12,7 @@ export default class DeviceReboot extends BaseMethod<DeviceRebootParams> {
   }
 
   init() {
+    this.allowDeviceMode.push(UI_REQUEST.BOOTLOADER);
     this.skipForceUpdateCheck = true;
     this.useDevicePassphraseState = false;
     this.unlockPolicy = 'unlock-before-run';
