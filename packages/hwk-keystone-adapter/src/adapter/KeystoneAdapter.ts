@@ -2392,6 +2392,11 @@ export class KeystoneAdapter implements IHardwareWallet {
     else signal.addEventListener('abort', onAbort, { once: true });
     try {
       return await pending;
+    } catch (error) {
+      // An ended operation aborts its calls with OperationEnded; report that, not the prompt's cancel.
+      const reason = signal.reason as { code?: unknown } | undefined;
+      if (signal.aborted && reason?.code === HardwareErrorCode.OperationEnded) throw signal.reason;
+      throw error;
     } finally {
       settled = true;
       signal.removeEventListener('abort', onAbort);
@@ -2404,20 +2409,26 @@ export class KeystoneAdapter implements IHardwareWallet {
     signal?: AbortSignal
   ): Promise<KeystoneUr> {
     const operationId = this._activeOperationId();
-    const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
-      UI_REQUEST.REQUEST_QR_DISPLAY,
-      { timeoutMs: this._qrTimeoutMs, operationId }
-    );
-    this.emitter.emit(UI_REQUEST.REQUEST_QR_DISPLAY, {
-      type: UI_REQUEST.REQUEST_QR_DISPLAY,
-      payload: { device, data, operationId },
-    });
-    const response = await this._awaitQrResponse(
-      UI_REQUEST.REQUEST_QR_DISPLAY,
-      waitPromise,
-      signal
-    );
-    return { urType: response.urType, urData: response.urData };
+    // An open prompt keeps its operation alive, so the operation's TTL cannot end a pending scan.
+    const release = operationId ? this._operations.retain(operationId) : undefined;
+    try {
+      const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
+        UI_REQUEST.REQUEST_QR_DISPLAY,
+        { timeoutMs: this._qrTimeoutMs, operationId }
+      );
+      this.emitter.emit(UI_REQUEST.REQUEST_QR_DISPLAY, {
+        type: UI_REQUEST.REQUEST_QR_DISPLAY,
+        payload: { device, data, operationId },
+      });
+      const response = await this._awaitQrResponse(
+        UI_REQUEST.REQUEST_QR_DISPLAY,
+        waitPromise,
+        signal
+      );
+      return { urType: response.urType, urData: response.urData };
+    } finally {
+      release?.();
+    }
   }
 
   private async _requestQrScanAndAwaitResponse(
@@ -2425,16 +2436,22 @@ export class KeystoneAdapter implements IHardwareWallet {
     signal?: AbortSignal
   ): Promise<KeystoneUr> {
     const operationId = this._activeOperationId();
-    const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
-      UI_REQUEST.REQUEST_QR_SCAN,
-      { timeoutMs: this._qrTimeoutMs, operationId }
-    );
-    this.emitter.emit(UI_REQUEST.REQUEST_QR_SCAN, {
-      type: UI_REQUEST.REQUEST_QR_SCAN,
-      payload: { device, operationId },
-    });
-    const response = await this._awaitQrResponse(UI_REQUEST.REQUEST_QR_SCAN, waitPromise, signal);
-    return { urType: response.urType, urData: response.urData };
+    // An open prompt keeps its operation alive, so the operation's TTL cannot end a pending scan.
+    const release = operationId ? this._operations.retain(operationId) : undefined;
+    try {
+      const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
+        UI_REQUEST.REQUEST_QR_SCAN,
+        { timeoutMs: this._qrTimeoutMs, operationId }
+      );
+      this.emitter.emit(UI_REQUEST.REQUEST_QR_SCAN, {
+        type: UI_REQUEST.REQUEST_QR_SCAN,
+        payload: { device, operationId },
+      });
+      const response = await this._awaitQrResponse(UI_REQUEST.REQUEST_QR_SCAN, waitPromise, signal);
+      return { urType: response.urType, urData: response.urData };
+    } finally {
+      release?.();
+    }
   }
 
   private async _callUsbConnector(

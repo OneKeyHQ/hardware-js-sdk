@@ -1455,7 +1455,38 @@ describe('KeystoneAdapter', () => {
       // Without this the call would hold the queue until the QR timeout.
       const settled = await Promise.race([pending.then(() => true), sleep(200).then(() => false)]);
       expect(settled).toBe(true);
-      await expect(pending).resolves.toMatchObject({ success: false });
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.OperationEnded },
+      });
+      await adapter.dispose();
+    });
+
+    it('keeps the live operation from expiring while an unpinned QR prompt is open', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+      const connected = await connectQrDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      fake.detach();
+      const operations = (
+        adapter as unknown as {
+          _operations: { _active: Map<string, { timer?: unknown }> };
+        }
+      )._operations._active;
+
+      // No operationId on the call, so it neither resolves nor retains the operation itself.
+      const pending = adapter.evmSignTransaction(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
+      await sleep(10);
+      // A retained operation runs no TTL timer, so it cannot end under the open prompt.
+      expect(operations.get(connected.payload)?.timer).toBeUndefined();
+
+      adapter.cancel(`keystone-wallet:${FIXTURE_MFP}`);
+      await pending;
+      expect(operations.get(connected.payload)?.timer).toBeDefined();
       await adapter.dispose();
     });
 
