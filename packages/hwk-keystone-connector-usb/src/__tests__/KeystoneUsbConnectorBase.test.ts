@@ -700,7 +700,7 @@ describe('KeystoneUsbConnectorBase', () => {
       [Status.PRS_INVALID_INDEX, HardwareErrorCode.InvalidParams],
       [Status.PRS_PARSING_REJECTED, HardwareErrorCode.UserRejected],
       [Status.PRS_PARSING_ERROR, HardwareErrorCode.InvalidParams],
-      [Status.PRS_PARSING_DISALLOWED, HardwareErrorCode.DeviceLocked],
+      [Status.PRS_PARSING_DISALLOWED, HardwareErrorCode.DeviceBusy],
       [Status.PRS_PARSING_UNMATCHED, HardwareErrorCode.InvalidParams],
       [Status.PRS_PARSING_MISMATCHED_WALLET, HardwareErrorCode.DeviceMismatch],
       [Status.PRS_PARSING_VERIFY_PASSWORD_ERROR, HardwareErrorCode.PinInvalid],
@@ -719,6 +719,18 @@ describe('KeystoneUsbConnectorBase', () => {
         code,
         origin: 'device',
       });
+    });
+
+    // The firmware sends PRS_PARSING_DISALLOWED for several states; only its lock text is locked.
+    it.each<[string, HardwareErrorCode]>([
+      ['Device is locked', HardwareErrorCode.DeviceLocked],
+      ['Previous request is not finished', HardwareErrorCode.DeviceBusy],
+      ['Waiting for user approval', HardwareErrorCode.DeviceBusy],
+      ['Export address is just allowed on specific pages', HardwareErrorCode.DeviceBusy],
+    ])('maps a declined request "%s" to code %s', async (text, code) => {
+      const error = await resolveUrError(new TransportError(text, Status.PRS_PARSING_DISALLOWED));
+      expect(error.code).toBe(code);
+      expect(error.message).toContain(text);
     });
 
     it('names a firmware status the device sent no text for', async () => {

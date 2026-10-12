@@ -95,9 +95,14 @@ export function mapKeystoneUsbError(err: unknown): HwkError {
     const fromDevice = isDeviceStatus(statusCode);
     // An unlisted firmware status keeps origin 'device'; 'transport' would make the
     // adapter tear down a live session over an on-device decline.
-    const code = fromDevice
+    let code = fromDevice
       ? DEVICE_STATUS_MAP[statusCode] ?? HardwareErrorCode.UnknownError
       : CLIENT_STATUS_MAP[statusCode] ?? HardwareErrorCode.TransportError;
+    // Firmware also returns PRS_PARSING_DISALLOWED for an unfinished request, a pending approval
+    // and a screen that takes no requests; only its "Device is locked" text means locked.
+    if (statusCode === Status.PRS_PARSING_DISALLOWED && !/\blocked\b/i.test(message)) {
+      code = HardwareErrorCode.DeviceBusy;
+    }
     let origin: HwkErrorOrigin | undefined;
     if (fromDevice) {
       origin = 'device';
