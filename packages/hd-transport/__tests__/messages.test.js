@@ -1,3 +1,5 @@
+const { execFileSync } = require('child_process');
+
 const {
   createMessageFromName,
   createMessageFromType,
@@ -64,6 +66,71 @@ const json = {
 };
 
 describe('messages', () => {
+  test('built-in schemas encode and decode with string code generation disabled', () => {
+    const script = `
+      const assert = require('assert');
+      const babel = require('@babel/core');
+      require.extensions['.ts'] = (mod, filename) => {
+        const { code } = babel.transformFileSync(filename, { rootMode: 'upward' });
+        mod._compile(code, filename);
+      };
+      const { parseConfigure } = require('./src/serialization/protobuf/messages.ts');
+      const { encode } = require('./src/serialization/protobuf/encode.ts');
+      const { decode } = require('./src/serialization/protobuf/decode.ts');
+      const { ProtocolV2 } = require('./src/protocols/index.ts');
+      const { encodeProtobufFrame } = require('./src/protocols/v2/encode.ts');
+      const v1 = require('../core/src/data/messages/messages.json');
+      const legacyV1 = require('../core/src/data/messages/messages_legacy_v1.json');
+      const v2 = require('./messages-protocol-v2.json');
+      for (const schema of [v1, legacyV1, v2]) {
+        for (const input of [schema, JSON.stringify(schema)]) {
+          const root = parseConfigure(input);
+          const ping = root.lookupType('Ping');
+          const encoded = encode(ping, { message: 'csp' });
+          assert.strictEqual(encoded.toString('hex'), '0a03637370');
+          assert.strictEqual(decode(ping, encoded).message, 'csp');
+          assert.strictEqual(ping.verify(ping.fromObject({ message: 'csp' })), null);
+          assert.strictEqual(ping.toObject(ping.create({ message: 'csp' })).message, 'csp');
+          encode(root.lookupType('Initialize'), {});
+          const amount = root.lookupType('StellarBumpSequenceOp');
+          const amountBytes = encode(amount, { bump_to: '18446744073709551615' });
+          assert.strictEqual(amountBytes.toString('hex'), '10ffffffffffffffffff01');
+          assert.deepStrictEqual(decode(amount, amountBytes), {
+            source_account: null, bump_to: '18446744073709551615'
+          });
+          const request = root.lookupType('TxRequest');
+          assert.deepStrictEqual(decode(request, encode(request, {
+            request_type: 'TXINPUT', details: { request_index: 7, tx_hash: 'abcd' }
+          })), {
+            request_type: 'TXINPUT', serialized: null,
+            details: { request_index: 7, tx_hash: 'abcd', extra_data_len: null, extra_data_offset: null }
+          });
+          const reordered = { ...schema, nested: Object.fromEntries(Object.entries(schema.nested).reverse()) };
+          const otherPing = parseConfigure(reordered).lookupType('Ping');
+          assert.notStrictEqual(ping.ctor, otherPing.ctor);
+          assert.strictEqual(ping.decode(encoded.toBuffer()).$type, ping);
+          assert.strictEqual(decode(otherPing, encoded).message, 'csp');
+        }
+      }
+      const schemas = { protocolV1: parseConfigure(v1), protocolV2: parseConfigure(v2) };
+      const frame = ProtocolV2.encodeFrame(schemas, 'ProtocolInfoRequest', { eventless_wallet_session: true });
+      assert.strictEqual(ProtocolV2.decodeFrame(schemas, frame).message.eventless_wallet_session, true);
+      const legacyFrame = encodeProtobufFrame(
+        v2.nested.MessageType.values.MessageType_ProtocolInfo,
+        Uint8Array.from([0x08, 0x02, 0x10, 0x01])
+      );
+      assert.deepStrictEqual(ProtocolV2.decodeFrame(schemas, legacyFrame).message, {
+        version: 2, build_fingerprint: '', supported_messages: [1], protobuf_definition: null
+      });
+    `;
+
+    execFileSync(process.execPath, ['--disallow-code-generation-from-strings', '-e', script], {
+      cwd: `${__dirname}/..`,
+      env: { ...process.env, BABEL_DISABLE_CACHE: '1' },
+      stdio: 'pipe',
+    });
+  });
+
   test('V1 GetPassphraseState matches the current firmware schema', () => {
     const { fields } = v1Messages.nested.GetPassphraseState;
 
