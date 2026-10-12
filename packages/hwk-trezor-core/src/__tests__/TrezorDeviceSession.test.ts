@@ -584,7 +584,7 @@ describe('TrezorDeviceSession', () => {
     [true, false],
     [false, false],
   ])(
-    'v1 empty-passphrase session on a locked device unlocks without a wallet, then with protection=%s refuses always-on-device=%s',
+    'v1 empty-passphrase session on a locked device unlocks with a silent address call, then with protection=%s refuses always-on-device=%s',
     async (passphraseProtection, alwaysOnDevice) => {
       const calls: CallRecord[] = [];
       const session = new TrezorDeviceSession({

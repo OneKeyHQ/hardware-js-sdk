@@ -878,6 +878,8 @@ export class TrezorDeviceSession {
       // Locked firmware (core >= 2.4.3) hides these private settings. Unlock with a silent testnet
       // GetAddress, as hd-core does for older OneKey firmware; every build including bitcoin-only
       // supports it. Its result is discarded, and the next session starts fresh via Initialize.
+      // With the passphrase always entered on the device, the user types it here before the
+      // refusal below; that costs only an extra prompt and is accepted to match hd-core.
       expectMessage(
         await this.call('GetAddress', {
           address_n: [0x8000002c, 0x80000001, 0x80000000, 0, 0],
