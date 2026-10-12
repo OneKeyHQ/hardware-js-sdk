@@ -1,0 +1,21 @@
+{
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "lang": "en",
+  "name": "HardwareExample",
+  "short_name": "HardwareExample",
+  "start_url": "/?utm_source=web_app_manifest",
+  "orientation": "portrait",
+  "related_applications": [
+    {
+      "platform": "itunes",
+      "id": "com.onekey.dev.hardware.example"
+    },
+    {
+      "platform": "play",
+      "url": "http://play.google.com/store/apps/details?id=com.onekey.dev.hardware.example",
+      "id": "com.onekey.dev.hardware.example"
+    }
+  ],
+  "prefer_related_applications": true
+}

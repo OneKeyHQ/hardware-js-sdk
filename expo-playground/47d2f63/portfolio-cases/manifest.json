@@ -1,0 +1,2848 @@
+{
+  "version": 2,
+  "firmwareCommit": "9d58ee244f77324f45683e8d78f821c00ae095dc",
+  "appCommit": "0c4008b7491862d6a4d9c4809cbeea8c0db377d7",
+  "sdkCommit": "4501ad9a9c46eb74237e0f69e4c8bc1d1b02b365",
+  "intervalMs": 60000,
+  "cases": [
+    {
+      "id": "P00",
+      "title": "完整传输基线",
+      "description": "验证完整 5 Token v1 数据、签名包、分块写入与 PortfolioUpdate 全链路。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P00 Transport baseline",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$70,581.74",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.41308",
+            "fiatValue": "$27,112.10",
+            "portfolioPercentage": 38.41,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4.20492",
+            "fiatValue": "$14,720.64",
+            "portfolioPercentage": 20.86,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "93.5061",
+            "fiatValue": "$14,808.43",
+            "portfolioPercentage": 20.98,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "5721.33",
+            "fiatValue": "$5,721.33",
+            "portfolioPercentage": 8.11,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "4260.73",
+            "fiatValue": "$4,260.73",
+            "portfolioPercentage": 6.03,
+            "networkId": "evm--1"
+          }
+        ],
+        "otherTokens": {
+          "count": 19,
+          "fiat": "$3,958.51",
+          "portfolioPercentage": 5.61,
+          "color": 9211020
+        }
+      },
+      "package": "P00.okpkg"
+    },
+    {
+      "id": "P01",
+      "title": "零资产同步",
+      "description": "验证 tokenCount=0、空 tokens 和全零 Other 仍是合法同步数据。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P01 Zero assets",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$0.00",
+        "tokenCount": 0,
+        "tokens": [],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P01.okpkg"
+    },
+    {
+      "id": "P02",
+      "title": "小额与下标",
+      "description": "覆盖零值、< $0.01、普通小数及 Unicode 下标小数 0.0₄7276。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P02 Small and subscript",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$2.01K",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0",
+            "fiatValue": "$0.00",
+            "portfolioPercentage": 0,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.1235",
+            "fiatValue": "< $0.01",
+            "portfolioPercentage": 10,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.01235",
+            "fiatValue": "$12.35",
+            "portfolioPercentage": 20,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "0.001235",
+            "fiatValue": "$999.99",
+            "portfolioPercentage": 30,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "0.0₄7276",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 40,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P02.okpkg"
+    },
+    {
+      "id": "P03",
+      "title": "单位进位与上限",
+      "description": "覆盖 K/M/B/T/Q 进位、四位 Token 精度、两位 Fiat 精度和 Q 封顶。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P03 Units and caps",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "> $999.99Q",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9",
+            "fiatValue": "$999.99",
+            "portfolioPercentage": 5,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 10,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "123.5M",
+            "fiatValue": "$123.46M",
+            "portfolioPercentage": 20,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "1.235B",
+            "fiatValue": "$1.23T",
+            "portfolioPercentage": 25,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": ">999.9Q",
+            "fiatValue": "> $999.99Q",
+            "portfolioPercentage": 30,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 99,
+          "fiat": "$10.00K",
+          "portfolioPercentage": 10,
+          "color": 9211020
+        }
+      },
+      "package": "P03.okpkg"
+    },
+    {
+      "id": "P04",
+      "title": "币种字形 A",
+      "description": "覆盖 €、₩、₹、₽、₺、₫、฿ 的金额字符串传输。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P04 Glyph A",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "€999.99Q",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₩999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₹999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₽999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "₺999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "₫999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 7,
+          "fiat": "฿999.99Q",
+          "portfolioPercentage": 25,
+          "color": 9211020
+        }
+      },
+      "package": "P04.okpkg"
+    },
+    {
+      "id": "P05",
+      "title": "币种字形 B",
+      "description": "覆盖 ₱、₦、₴、₪、₿、₸、₡ 的金额字符串传输。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P05 Glyph B",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "₱999.99Q",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₦999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₴999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₪999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "₿999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "₸999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 7,
+          "fiat": "₡999.99Q",
+          "portfolioPercentage": 25,
+          "color": 9211020
+        }
+      },
+      "package": "P05.okpkg"
+    },
+    {
+      "id": "P06",
+      "title": "币种字形 C",
+      "description": "覆盖 ₲、₵、₭、₮、₼、₾、₨ 的金额字符串传输。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P06 Glyph C",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "₲999.99Q",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₵999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₭999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "₮999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "₼999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "₾999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 7,
+          "fiat": "₨999.99Q",
+          "portfolioPercentage": 25,
+          "color": 9211020
+        }
+      },
+      "package": "P06.okpkg"
+    },
+    {
+      "id": "P07",
+      "title": "币种字形与 ISO 降级",
+      "description": "覆盖 ৳、៛、؋、常用符号，以及不支持字符降级后的 XYZ 前缀。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P07 Glyph D and ISO",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "৳999.99Q",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "៛999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "؋999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "999.9Q",
+            "fiatValue": "XYZ 999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "$999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "999.9Q",
+            "fiatValue": "£999.99Q",
+            "portfolioPercentage": 15,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 7,
+          "fiat": "¥999.99Q",
+          "portfolioPercentage": 25,
+          "color": 9211020
+        }
+      },
+      "package": "P07.okpkg"
+    },
+    {
+      "id": "P08",
+      "title": "顺序、颜色与 Other",
+      "description": "验证 Token 数组顺序、RGB888 颜色、百分比和 Other 最大 count=65535。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P08 Order color other",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$100.00K",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$1.00",
+            "portfolioPercentage": 1,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$90.00K",
+            "portfolioPercentage": 50,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$5.00K",
+            "portfolioPercentage": 10,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "4",
+            "fiatValue": "$3.00K",
+            "portfolioPercentage": 20,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "5",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 18,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 65535,
+          "fiat": "$1.00K",
+          "portfolioPercentage": 1,
+          "color": 9211020
+        }
+      },
+      "package": "P08.okpkg"
+    },
+    {
+      "id": "P09",
+      "title": "47 字节边界",
+      "description": "验证金额字段恰好 47 个 UTF-8 字节时仍被固件接受。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P09 Parser max 47 bytes",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "tokenCount": 0,
+        "tokens": [],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P09.okpkg"
+    },
+    {
+      "id": "P10",
+      "title": "完整总额显示",
+      "description": "验证 totalFiat 按当前 App 规则以字节宽度校验，不套用 Token 的 7 位有效数字限制。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P10 Full total amount",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$12,345,678.90",
+        "tokenCount": 0,
+        "tokens": [],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P10.okpkg"
+    },
+    {
+      "id": "M01",
+      "title": "原生资产映射 1/13",
+      "description": "验证 btc--0, doge--0, bch--0, ltc--0, neurai--0 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M01 Native 1",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "DOGE",
+            "name": "Dogecoin",
+            "contractAddress": "",
+            "iconName": "DOGE",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "doge--0"
+          },
+          {
+            "symbol": "BCH",
+            "name": "Bitcoin Cash",
+            "contractAddress": "",
+            "iconName": "BCH",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "bch--0"
+          },
+          {
+            "symbol": "LTC",
+            "name": "Litecoin",
+            "contractAddress": "",
+            "iconName": "LTC",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "ltc--0"
+          },
+          {
+            "symbol": "XNA",
+            "name": "Neurai",
+            "contractAddress": "",
+            "iconName": "XNA",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "neurai--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M01.okpkg"
+    },
+    {
+      "id": "M02",
+      "title": "原生资产映射 2/13",
+      "description": "验证 tbtc--0, tbtc--1, evm--1, evm--56, evm--137 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M02 Native 2",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "TBTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "tbtc--0"
+          },
+          {
+            "symbol": "SBTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "tbtc--1"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "BNB",
+            "name": "BNB",
+            "contractAddress": "",
+            "iconName": "BNB",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--56"
+          },
+          {
+            "symbol": "POL",
+            "name": "POL",
+            "contractAddress": "",
+            "iconName": "POL",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--137"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M02.okpkg"
+    },
+    {
+      "id": "M03",
+      "title": "原生资产映射 3/13",
+      "description": "验证 evm--42161, evm--43114, evm--10, evm--324, evm--5000 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M03 Native 3",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--42161"
+          },
+          {
+            "symbol": "AVAX",
+            "name": "Avalanche",
+            "contractAddress": "",
+            "iconName": "AVAX",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--43114"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--10"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--324"
+          },
+          {
+            "symbol": "MNT",
+            "name": "Mantle",
+            "contractAddress": "",
+            "iconName": "MNT",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--5000"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M03.okpkg"
+    },
+    {
+      "id": "M04",
+      "title": "原生资产映射 4/13",
+      "description": "验证 evm--59144, evm--2222, evm--314, evm--10001, evm--11155111 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M04 Native 4",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--59144"
+          },
+          {
+            "symbol": "KAVA",
+            "name": "Kava",
+            "contractAddress": "",
+            "iconName": "KAVA",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--2222"
+          },
+          {
+            "symbol": "FIL",
+            "name": "Filecoin",
+            "contractAddress": "",
+            "iconName": "FIL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--314"
+          },
+          {
+            "symbol": "ETHW",
+            "name": "EthereumPoW",
+            "contractAddress": "",
+            "iconName": "ETHW",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--10001"
+          },
+          {
+            "symbol": "TETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--11155111"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M04.okpkg"
+    },
+    {
+      "id": "M05",
+      "title": "原生资产映射 5/13",
+      "description": "验证 evm--61, evm--25, evm--1030, evm--288, evm--8453 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M05 Native 5",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ETC",
+            "name": "Ethereum Classic",
+            "contractAddress": "",
+            "iconName": "ETC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--61"
+          },
+          {
+            "symbol": "CRO",
+            "name": "Cronos",
+            "contractAddress": "",
+            "iconName": "CRO",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--25"
+          },
+          {
+            "symbol": "CFX",
+            "name": "Conflux",
+            "contractAddress": "",
+            "iconName": "CFX",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--1030"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--288"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--8453"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M05.okpkg"
+    },
+    {
+      "id": "M06",
+      "title": "原生资产映射 6/13",
+      "description": "验证 evm--1313161554, evm--146, evm--177, evm--560048, cosmos--celestia 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M06 Native 6",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--1313161554"
+          },
+          {
+            "symbol": "S",
+            "name": "Sonic",
+            "contractAddress": "",
+            "iconName": "S",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--146"
+          },
+          {
+            "symbol": "HSK",
+            "name": "HashKey Chain",
+            "contractAddress": "",
+            "iconName": "HSK",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--177"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--560048"
+          },
+          {
+            "symbol": "TIA",
+            "name": "Celestia",
+            "contractAddress": "",
+            "iconName": "TIA",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--celestia"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M06.okpkg"
+    },
+    {
+      "id": "M07",
+      "title": "原生资产映射 7/13",
+      "description": "验证 cosmos--secret-4, cosmos--juno-1, cosmos--fetchhub-4, cosmos--crypto-org-chain-mainnet-1, cosmos--akashnet-2 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M07 Native 7",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "SCRT",
+            "name": "Secret Network",
+            "contractAddress": "",
+            "iconName": "SCRT",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--secret-4"
+          },
+          {
+            "symbol": "JUNO",
+            "name": "Juno",
+            "contractAddress": "",
+            "iconName": "JUNO",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--juno-1"
+          },
+          {
+            "symbol": "FET",
+            "name": "Fetch.ai",
+            "contractAddress": "",
+            "iconName": "FET",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--fetchhub-4"
+          },
+          {
+            "symbol": "CRO",
+            "name": "Cronos",
+            "contractAddress": "",
+            "iconName": "CRO",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--crypto-org-chain-mainnet-1"
+          },
+          {
+            "symbol": "AKT",
+            "name": "Akash",
+            "contractAddress": "",
+            "iconName": "AKT",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--akashnet-2"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M07.okpkg"
+    },
+    {
+      "id": "M08",
+      "title": "原生资产映射 8/13",
+      "description": "验证 cosmos--osmosis-1, cosmos--cosmoshub-4, cosmos--bbn-1, cosmos--bbn-test-5, cosmos--noble-1 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M08 Native 8",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "OSMO",
+            "name": "Osmosis",
+            "contractAddress": "",
+            "iconName": "OSMO",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--osmosis-1"
+          },
+          {
+            "symbol": "ATOM",
+            "name": "Cosmos",
+            "contractAddress": "",
+            "iconName": "ATOM",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--cosmoshub-4"
+          },
+          {
+            "symbol": "BABY",
+            "name": "Babylon",
+            "contractAddress": "",
+            "iconName": "BABY",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--bbn-1"
+          },
+          {
+            "symbol": "TBABY",
+            "name": "Babylon",
+            "contractAddress": "",
+            "iconName": "BABY",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--bbn-test-5"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cosmos--noble-1"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M08.okpkg"
+    },
+    {
+      "id": "M09",
+      "title": "原生资产映射 9/13",
+      "description": "验证 dot--astar, dot--manta, dot--asset-hub, dot--kusama-assethub, aptos--1 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M09 Native 9",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ASTR",
+            "name": "Astar",
+            "contractAddress": "",
+            "iconName": "ASTR",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "dot--astar"
+          },
+          {
+            "symbol": "MANTA",
+            "name": "Manta",
+            "contractAddress": "",
+            "iconName": "MANTA",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "dot--manta"
+          },
+          {
+            "symbol": "DOT",
+            "name": "Polkadot",
+            "contractAddress": "",
+            "iconName": "DOT",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "dot--asset-hub"
+          },
+          {
+            "symbol": "KSM",
+            "name": "Kusama",
+            "contractAddress": "",
+            "iconName": "KSM",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "dot--kusama-assethub"
+          },
+          {
+            "symbol": "APT",
+            "name": "Aptos",
+            "contractAddress": "0x1::aptos_coin::AptosCoin",
+            "iconName": "APT",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "aptos--1"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M09.okpkg"
+    },
+    {
+      "id": "M10",
+      "title": "原生资产映射 10/13",
+      "description": "验证 ada--0, xrp--0, nostr--0, near--0, tron--0x2b6653dc 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M10 Native 10",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ADA",
+            "name": "Cardano",
+            "contractAddress": "",
+            "iconName": "ADA",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "ada--0"
+          },
+          {
+            "symbol": "XRP",
+            "name": "XRP",
+            "contractAddress": "",
+            "iconName": "XRP",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "xrp--0"
+          },
+          {
+            "symbol": "nostr",
+            "name": "Nostr",
+            "contractAddress": "",
+            "iconName": "NOSTR",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "nostr--0"
+          },
+          {
+            "symbol": "NEAR",
+            "name": "NEAR",
+            "contractAddress": "",
+            "iconName": "NEAR",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "near--0"
+          },
+          {
+            "symbol": "TRX",
+            "name": "TRON",
+            "contractAddress": "",
+            "iconName": "TRON",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "tron--0x2b6653dc"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M10.okpkg"
+    },
+    {
+      "id": "M11",
+      "title": "原生资产映射 11/13",
+      "description": "验证 cfx--1029, sol--101, nexa--0, kaspa--kaspa, fil--314 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M11 Native 11",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "CFX",
+            "name": "Conflux",
+            "contractAddress": "",
+            "iconName": "CFX",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "cfx--1029"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "NEX",
+            "name": "Nexa",
+            "contractAddress": "",
+            "iconName": "NEX",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "nexa--0"
+          },
+          {
+            "symbol": "KAS",
+            "name": "Kaspa",
+            "contractAddress": "",
+            "iconName": "KAS",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "kaspa--kaspa"
+          },
+          {
+            "symbol": "FIL",
+            "name": "Filecoin",
+            "contractAddress": "",
+            "iconName": "FIL",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "fil--314"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M11.okpkg"
+    },
+    {
+      "id": "M12",
+      "title": "原生资产映射 12/13",
+      "description": "验证 algo--4160, sui--mainnet, nervos--mainnet, alph--mainnet, ton--mainnet 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M12 Native 12",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "ALGO",
+            "name": "Algorand",
+            "contractAddress": "",
+            "iconName": "ALGO",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "algo--4160"
+          },
+          {
+            "symbol": "SUI",
+            "name": "Sui",
+            "contractAddress": "0x2::sui::SUI",
+            "iconName": "SUI",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "sui--mainnet"
+          },
+          {
+            "symbol": "CKB",
+            "name": "Nervos",
+            "contractAddress": "",
+            "iconName": "CKB",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "nervos--mainnet"
+          },
+          {
+            "symbol": "ALPH",
+            "name": "Alephium",
+            "contractAddress": "",
+            "iconName": "ALPH",
+            "color": 2586058,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "alph--mainnet"
+          },
+          {
+            "symbol": "GRAM",
+            "name": "TON",
+            "contractAddress": "",
+            "iconName": "TON",
+            "color": 2531707,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "ton--mainnet"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M12.okpkg"
+    },
+    {
+      "id": "M13",
+      "title": "原生资产映射 13/13",
+      "description": "验证 bfc--mainnet, stellar--mainnet, stellar--testnet 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M13 Native 13",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$60.00",
+        "tokenCount": 3,
+        "tokens": [
+          {
+            "symbol": "BFC",
+            "name": "BenFen",
+            "contractAddress": "",
+            "iconName": "BFC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 33.33,
+            "networkId": "bfc--mainnet"
+          },
+          {
+            "symbol": "XLM",
+            "name": "Stellar",
+            "contractAddress": "",
+            "iconName": "XLM",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 33.33,
+            "networkId": "stellar--mainnet"
+          },
+          {
+            "symbol": "XLM",
+            "name": "Stellar",
+            "contractAddress": "",
+            "iconName": "XLM",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 33.34,
+            "networkId": "stellar--testnet"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M13.okpkg"
+    },
+    {
+      "id": "M14",
+      "title": "合约资产映射 1/2",
+      "description": "验证 evm--1, evm--1, evm--56, evm--56, evm--137 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M14 Contract 1",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "iconName": "USDT",
+            "color": 16225050,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "iconName": "USDC",
+            "color": 9211135,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "0x55d398326f99059ff775485246999027b3197955",
+            "iconName": "USDT",
+            "color": 1372565,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--56"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--56"
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": "evm--137"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M14.okpkg"
+    },
+    {
+      "id": "M15",
+      "title": "合约资产映射 2/2",
+      "description": "验证 evm--137, sol--101, sol--101, tron--0x2b6653dc 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M15 Contract 2",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$100.00",
+        "tokenCount": 4,
+        "tokens": [
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+            "iconName": "USDC",
+            "color": 16225050,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 25.0,
+            "networkId": "evm--137"
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            "iconName": "USDT",
+            "color": 9211135,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 25.0,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "iconName": "USDC",
+            "color": 1372565,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 25.0,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            "iconName": "USDT",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": false,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 25.0,
+            "networkId": "tron--0x2b6653dc"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M15.okpkg"
+    },
+    {
+      "id": "M16",
+      "title": "全网络聚合映射 1/2",
+      "description": "验证 BTC, ETH, BNB, SOL, TRON 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M16 All Networks 1",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$150.00",
+        "tokenCount": 5,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 20.0,
+            "networkId": ""
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 20.0,
+            "networkId": ""
+          },
+          {
+            "symbol": "BNB",
+            "name": "BNB",
+            "contractAddress": "",
+            "iconName": "BNB",
+            "color": 1372565,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 20.0,
+            "networkId": ""
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "4",
+            "fiatValue": "$40.00",
+            "portfolioPercentage": 20.0,
+            "networkId": ""
+          },
+          {
+            "symbol": "TRX",
+            "name": "TRON",
+            "contractAddress": "",
+            "iconName": "TRON",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "5",
+            "fiatValue": "$50.00",
+            "portfolioPercentage": 20.0,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M16.okpkg"
+    },
+    {
+      "id": "M17",
+      "title": "全网络聚合映射 2/2",
+      "description": "验证 USDC, USDT, XRP 的 networkId、contractAddress、name 与 iconName 正常传输和显示。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "M17 All Networks 2",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$60.00",
+        "tokenCount": 3,
+        "tokens": [
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 16225050,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "1",
+            "fiatValue": "$10.00",
+            "portfolioPercentage": 33.33,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 9211135,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "2",
+            "fiatValue": "$20.00",
+            "portfolioPercentage": 33.33,
+            "networkId": ""
+          },
+          {
+            "symbol": "XRP",
+            "name": "XRP",
+            "contractAddress": "",
+            "iconName": "XRP",
+            "color": 1372565,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "3",
+            "fiatValue": "$30.00",
+            "portfolioPercentage": 33.34,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "M17.okpkg"
+    },
+    {
+      "id": "P11",
+      "title": "反向测试保护基线",
+      "description": "在非法用例前写入一份有效数据，用于确认后续拒绝不会破坏已安装 Portfolio。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P11 Negative guard",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P11.okpkg"
+    },
+    {
+      "id": "N01",
+      "title": "48 字节金额",
+      "description": "金额字段超过固件 47 字节上限，预期返回 Invalid portfolio package。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N01 48-byte amount",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "N01.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N02",
+      "title": "Token 数量不一致",
+      "description": "tokenCount 与 tokens.length 不一致，预期固件拒绝。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N02 tokenCount mismatch",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$2.01K",
+        "tokenCount": 4,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0",
+            "fiatValue": "$0.00",
+            "portfolioPercentage": 0,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.1235",
+            "fiatValue": "< $0.01",
+            "portfolioPercentage": 10,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.01235",
+            "fiatValue": "$12.35",
+            "portfolioPercentage": 20,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "0.001235",
+            "fiatValue": "$999.99",
+            "portfolioPercentage": 30,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "0.0₄7276",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 40,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "N02.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N03",
+      "title": "超过 5 个 Token",
+      "description": "发送 6 个详情 Token，验证固件的 5 项上限。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N03 six tokens",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$2.01K",
+        "tokenCount": 6,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0",
+            "fiatValue": "$0.00",
+            "portfolioPercentage": 0,
+            "networkId": "btc--0"
+          },
+          {
+            "symbol": "ETH",
+            "name": "Ethereum",
+            "contractAddress": "",
+            "iconName": "ETH",
+            "color": 9211135,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.1235",
+            "fiatValue": "< $0.01",
+            "portfolioPercentage": 10,
+            "networkId": "evm--1"
+          },
+          {
+            "symbol": "SOL",
+            "name": "Solana",
+            "contractAddress": "",
+            "iconName": "SOL",
+            "color": 1372565,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "0.01235",
+            "fiatValue": "$12.35",
+            "portfolioPercentage": 20,
+            "networkId": "sol--101"
+          },
+          {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "contractAddress": "",
+            "iconName": "USDC",
+            "color": 2586058,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "0.001235",
+            "fiatValue": "$999.99",
+            "portfolioPercentage": 30,
+            "networkId": ""
+          },
+          {
+            "symbol": "USDT",
+            "name": "Tether USD",
+            "contractAddress": "",
+            "iconName": "USDT",
+            "color": 2531707,
+            "isNative": false,
+            "isAllNetworks": true,
+            "balance": "0.0₄7276",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 40,
+            "networkId": ""
+          },
+          {
+            "symbol": "XRP",
+            "name": "XRP",
+            "contractAddress": "",
+            "iconName": "XRP",
+            "color": 2304303,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1",
+            "fiatValue": "$1.00",
+            "portfolioPercentage": 0,
+            "networkId": "xrp--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "N03.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N04",
+      "title": "根对象额外字段",
+      "description": "增加已移除的 currency 字段，验证 v1 精确对象结构。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N04 extra root field",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        },
+        "currency": "usd"
+      },
+      "package": "N04.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N05",
+      "title": "百分比越界",
+      "description": "portfolioPercentage=100.01，验证 0..100 范围。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N05 percentage overflow",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100.01,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "N05.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N06",
+      "title": "非聚合 Token 缺少网络",
+      "description": "isAllNetworks=false 且 networkId 为空，预期固件拒绝。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N06 empty network",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": ""
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "N06.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N07",
+      "title": "颜色越界",
+      "description": "color=0x1000000 超出 RGB888 范围，预期固件拒绝。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N07 color overflow",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16777216,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "N07.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N08",
+      "title": "Other 缺少颜色",
+      "description": "缺少当前 schema 必填的 otherTokens.color，预期固件按精确对象结构拒绝。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N08 missing other color",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0
+        }
+      },
+      "package": "N08.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "N09",
+      "title": "Other 颜色越界",
+      "description": "otherTokens.color 超出 RGB888 范围，预期固件拒绝。",
+      "expected": "reject",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "N09 other color overflow",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 16777216
+        }
+      },
+      "package": "N09.okpkg",
+      "expectedError": "Invalid portfolio package"
+    },
+    {
+      "id": "L01",
+      "title": "8 位 Token 金额客户端拦截",
+      "description": "Token balance 包含 8 位 ASCII 有效数字；必须在上传前拦截，绝不传给硬件。",
+      "expected": "client-block",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "L01 significant digit guard",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "12345678",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "expectedError": "Token 或 Other 金额超过 7 位有效数字"
+    },
+    {
+      "id": "P12",
+      "title": "最终有效数据恢复",
+      "description": "所有反向用例结束后恢复有效 Portfolio，避免设备停留在测试保护数据之外。",
+      "expected": "accept",
+      "payload": {
+        "v": 1,
+        "ts": 1785200000000,
+        "account": {
+          "label": "P11 Negative guard",
+          "addressMasked": "0x12...ab"
+        },
+        "totalFiat": "$1.00K",
+        "tokenCount": 1,
+        "tokens": [
+          {
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "contractAddress": "",
+            "iconName": "BTC",
+            "color": 16225050,
+            "isNative": true,
+            "isAllNetworks": false,
+            "balance": "1K",
+            "fiatValue": "$1.00K",
+            "portfolioPercentage": 100,
+            "networkId": "btc--0"
+          }
+        ],
+        "otherTokens": {
+          "count": 0,
+          "fiat": "$0.00",
+          "portfolioPercentage": 0,
+          "color": 9211020
+        }
+      },
+      "package": "P12.okpkg"
+    }
+  ]
+}
