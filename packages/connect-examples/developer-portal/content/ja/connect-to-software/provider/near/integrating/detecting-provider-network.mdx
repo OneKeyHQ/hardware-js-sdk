@@ -1,0 +1,17 @@
+---
+title: "プロバイダーのネットワークを検出"
+---
+
+<span id="detecting-provider-network" />
+
+# プロバイダーのネットワークを検出
+
+OneKey ウォレットで選択されているプロバイダーのネットワークを検出できます。現在は次の両方に対応しています:  `mainnet` および `testnet`.
+
+```javascript
+const res = await provider.request({
+  method: 'near_networkInfo',
+});
+console.log('near_networkInfo', res, res?.networkId);
+
+```

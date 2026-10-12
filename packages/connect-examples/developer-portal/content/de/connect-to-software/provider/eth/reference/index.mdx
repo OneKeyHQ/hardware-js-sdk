@@ -1,0 +1,71 @@
+---
+title: "JSON-RPC-Referenz"
+description: "Vollständige Referenz der von OneKey unterstützten Ethereum-JSON-RPC-Methoden"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="json-rpc-reference" />
+
+# JSON-RPC-Referenz
+
+Referenz gängiger Ethereum-JSON-RPC- und Wallet-Methoden für die Verwendung mit OneKey.
+
+<Callout type="info">
+Alle Methoden werden aufgerufen über `window.$onekey.ethereum.request({ method, params })`.
+</Callout>
+
+---
+
+## Kontomethoden [#account-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| [eth_requestAccounts](./eth_requestAccounts) | Nutzerkonten anfordern (öffnet Verbindungs-Popup) |
+| [eth_accounts](./eth_accounts) | Verbundene Konten abrufen (kein Popup) |
+| [wallet_requestPermissions](./wallet_requestPermissions) | Bestimmte Berechtigungen anfordern |
+| [wallet_getPermissions](./wallet_getPermissions) | Aktuelle Berechtigungen abrufen |
+
+---
+
+## Transaktionsmethoden [#transaction-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| [eth_sendTransaction](./eth_sendTransaction) | Eine Transaktion senden |
+| [eth_call](./eth_call) | Einen Aufruf ausführen, ohne eine Transaktion zu erstellen |
+| [eth_estimateGas](./eth_estimateGas) | Gas für eine Transaktion schätzen |
+| [eth_getTransactionByHash](./eth_getTransactionByHash) | Transaktion anhand des Hashs abrufen |
+| [eth_getTransactionReceipt](./eth_getTransactionReceipt) | Transaktionsbeleg abrufen |
+
+---
+
+## Signiermethoden [#signing-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| [personal_sign](./personal_sign) | Eine Nachricht signieren (EIP-191) |
+| [eth_signTypedData_v4](./eth_signTypedData_v4) | Typisierte Daten signieren (EIP-712) |
+
+---
+
+## Netzwerkmethoden [#network-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| [eth_chainId](./eth_chainId) | Aktuelle Chain-ID abrufen |
+| [wallet_switchEthereumChain](./wallet_switchEthereumChain) | Zu einer anderen Chain wechseln |
+| [wallet_addEthereumChain](./wallet_addEthereumChain) | Eine neue Chain hinzufügen |
+| [wallet_watchAsset](./wallet_watchAsset) | Einen Token zur Wallet hinzufügen |
+
+---
+
+## Standardmäßige Ethereum-Methoden [#standard-ethereum-methods]
+
+Weitere Ethereum-JSON-RPC-Methoden hängen vom verbundenen Netzwerk und der Wallet-Implementierung ab. Die vollständige Liste finden Sie in der [Ethereum-JSON-RPC-Spezifikation](https://ethereum.github.io/execution-apis/).
+
+Häufige Methoden sind:
+- `eth_blockNumber` - Aktuelle Blocknummer abrufen
+- `eth_getBalance` - Kontoguthaben abrufen
+- `eth_getCode` - Vertragscode abrufen
+- `eth_getLogs` - Ereignisprotokolle abrufen

@@ -1,0 +1,22 @@
+---
+title: "Detección del proveedor"
+---
+
+<span id="detecting-the-provider" />
+
+# Detección del proveedor
+
+Solo puedes llamar a algunos métodos del proveedor si la extensión OneKey está instalada en el navegador del usuario.
+
+Para detectar si la extensión está instalada, puedes llamar al método asíncrono `detectWalletInstalled`.
+
+Si OneKey no está instalado, recomendamos dirigir a los usuarios a [nuestro sitio web](https://www.onekey.so). En conjunto, el resultado puede ser el siguiente.
+
+```javascript
+const installed = await provider.detectWalletInstalled();
+if (installed) {
+  await provider.request({ method: 'near_accounts' });
+} else {
+  window.open('https://www.onekey.so');
+}
+```

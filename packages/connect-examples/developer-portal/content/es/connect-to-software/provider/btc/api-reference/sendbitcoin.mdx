@@ -1,0 +1,41 @@
+---
+title: "sendBitcoin"
+---
+
+# sendBitcoin
+
+Enviar BTC
+
+## Método [#method]
+
+```typescript
+declare function sendBitcoin(
+    toAddress: string,
+    satoshis: number,
+    options?: { feeRate?: number; memo?: string; memos?: string[] }
+): Promise<string>;
+```
+
+## Parámetros [#params]
+
+* `toAddress` — _obligatorio_ `string`  la dirección de destino
+* `satoshis` — _obligatorio_ `number` los satoshis que se van a enviar
+* `options` — _opcional_
+  * `feeRate`  — _opcional_ `number` la tasa de comisión de red
+
+## Respuesta [#response]
+
+`txid` — `string`
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const address = "<RECIPIENT_BITCOIN_ADDRESS>"; // Replace with a valid address
+const txid = await provider.sendBitcoin(address, 1000);
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/RwvYZjX)

@@ -1,0 +1,94 @@
+---
+title: "dnxSignTransaction"
+---
+
+# dnxSignTransaction
+
+### Dynex: Transaktion signieren [#dynex-sign-transaction]
+
+Signiert die angegebene Dynex-Transaktion mit dem privaten Schlüssel aus dem angegebenen BIP32-Pfad. Der Nutzer wird aufgefordert, die Transaktionsdetails auf OneKey zu bestätigen.
+
+```typescript
+const result = await HardwareSDK.dnxSignTransaction(connectId, deviceId, params);
+```
+
+#### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * classic: 3.8.0
+
+#### Parameter [#parameters]
+
+connectId: `string`
+
+* Eindeutige Kennung der Verbindung
+
+deviceId: `string`
+
+* Eindeutige Kennung des Hardwaregeräts
+
+params: `object`
+
+* path: `string` - BIP32-Pfad (z. B. "m/44'/0'/0'/0/0") \[erforderlich\]
+* inputs: `array` - Array von Transaktionseingaben \[erforderlich\]
+  * prevIndex: `number` - Index der vorherigen Ausgabe
+  * globalIndex: `number` - Globaler Index
+  * txPubkey: `string` - Öffentlicher Transaktionsschlüssel
+  * prevOutPubkey: `string` - Öffentlicher Schlüssel der vorherigen Ausgabe
+  * amount: `string` - Eingabebetrag
+* toAddress: `string` - Zieladresse \[erforderlich\]
+* amount: `string` - Transaktionsbetrag \[erforderlich\]
+* fee: `string` - Transaktionsgebühr \[erforderlich\]
+* paymentIdHex: `string` - Optionale Zahlungs-ID (muss 32 Bytes lang sein)
+
+#### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.dnxSignTransaction('connect1', 'device1', {
+    path: "m/44'/0'/0'/0/0",
+    inputs: [{
+        prevIndex: 0,
+        globalIndex: 323,
+        txPubkey: "0d708b68003ae5fee4c9f9aad56a8cfdb0a5dcbcdd2e3fc18eb813349457a78c",
+        prevOutPubkey: "ff4df9a9fc83e48f2c0242c4d94f3906546a889950bccd8ba4392f3e7886c3a1",
+        amount: "1000000000"
+    }],
+    toAddress: "XwmxTF8FxAy2s5cvtS62oSGxY3fzvDcgo2CiJ6rrpz9te68sApSDs3LQihubFtpsfT5z6NYHZzMKUjavNpTkW46i2dYgHBULG",
+    amount: "1000000000",
+    fee: "100000",
+});
+```
+
+#### Rückgabe [#returns]
+
+Erfolgsantwort:
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string,              // BIP32 path used for signing
+        txKey: {
+            ephemeralTxSecKey: string,  // Transaction secret key
+            ephemeralTxPubKey: string   // Transaction public key
+        },
+        computedKeyImages: string[],    // Array of computed key images
+        signatures: string[],           // Array of signatures
+        outputKeys: string[]            // Array of output keys
+    }
+}
+```
+
+Fehlerantwort:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code?: string | number
+    }
+}
+```
+
+#### [#]

@@ -5,7 +5,7 @@ description: 使用以太坊账户签名消息
 
 # personal_sign
 
-使用指定账户签名消息。消息会自动添加 `"\x19Ethereum Signed Message:\n"` 前缀以防止签名恶意交易。
+使用指定账户签署消息。签名前会添加 `"\x19Ethereum Signed Message:\n"` 前缀，以区分消息签名与原始交易签名。
 
 ---
 
@@ -28,14 +28,14 @@ description: 使用以太坊账户签名消息
 
 ```typescript
 const message = 'Hello, OneKey!'
-const hexMessage = '0x' + Buffer.from(message, 'utf8').toString('hex')
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
 
 const signature = await window.$onekey.ethereum.request({
   method: 'personal_sign',
   params: [hexMessage, accounts[0]]
 })
 
-console.log('签名:', signature)
+console.log('Signature:', signature)
 ```
 
 ### 使用 ethers.js
@@ -44,16 +44,16 @@ console.log('签名:', signature)
 import { hashMessage, recoverAddress } from 'ethers'
 
 const message = 'Hello, OneKey!'
-const hexMessage = '0x' + Buffer.from(message, 'utf8').toString('hex')
+const hexMessage = '0x' + Array.from(new TextEncoder().encode(message), byte => byte.toString(16).padStart(2, '0')).join('')
 
 const signature = await window.$onekey.ethereum.request({
   method: 'personal_sign',
   params: [hexMessage, accounts[0]]
 })
 
-// 验证签名
+// Verify signature
 const recoveredAddress = recoverAddress(hashMessage(message), signature)
-console.log('验证通过:', recoveredAddress === accounts[0])
+console.log('Verified:', recoveredAddress.toLowerCase() === accounts[0].toLowerCase())
 ```
 
 ---
@@ -73,3 +73,5 @@ console.log('验证通过:', recoveredAddress === accounts[0])
 - 实际签名的消息格式为：`"\x19Ethereum Signed Message:\n" + len(message) + message`
 - 签名结构化数据请使用 [eth_signTypedData_v4](/zh/connect-to-software/provider/eth/reference/eth_signTypedData_v4)
 - 遵循 [EIP-191](https://eips.ethereum.org/EIPS/eip-191) 规范
+
+用于身份验证时，请检查目标域名、账户、过期时间和服务器签发的一次性挑战。对固定示例消息生成有效签名，不等于完成了安全的登录流程。

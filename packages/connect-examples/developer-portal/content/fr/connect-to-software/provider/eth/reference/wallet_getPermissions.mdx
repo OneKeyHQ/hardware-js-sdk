@@ -1,0 +1,86 @@
+---
+title: "wallet_getPermissions"
+description: "Obtenir les autorisations actuelles de la dApp"
+---
+
+# wallet_getPermissions
+
+Renvoie les autorisations actuellement accordées à la dApp. Cette méthode ne sollicite pas l’utilisateur.
+
+---
+
+## Paramètres [#parameters]
+
+Aucun
+
+---
+
+## Valeur de retour [#returns]
+
+`Array` d’objets d’autorisation :
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `parentCapability` | `string` | Le nom de l’autorisation |
+| `date` | `number` | Horodatage de l’octroi |
+| `caveats` | `array` | Restrictions de l’autorisation |
+
+---
+
+## Exemple [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_getPermissions'
+})
+
+console.log('Current permissions:', permissions)
+
+// Check if connected
+const isConnected = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Is connected:', isConnected)
+```
+
+### Utilitaire de vérification des autorisations [#permission-check-utility]
+
+```typescript
+async function checkPermissions() {
+  const permissions = await window.$onekey.ethereum.request({
+    method: 'wallet_getPermissions'
+  })
+
+  return {
+    hasAccounts: permissions.some(p => p.parentCapability === 'eth_accounts'),
+    permissions
+  }
+}
+
+const { hasAccounts } = await checkPermissions()
+if (!hasAccounts) {
+  // Request connection
+  await window.$onekey.ethereum.request({
+    method: 'eth_requestAccounts'
+  })
+}
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32603 | Erreur interne | Erreur du fournisseur |
+
+---
+
+## Remarques [#notes]
+
+- Renvoie un tableau vide si aucune autorisation n’a été accordée
+- Ne demande aucune action à l’utilisateur
+- Utile pour vérifier l’état de connexion sans déclencher de demande
+- Défini par [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Gérez les erreurs de méthode non prise en charge dans la version cible du portefeuille. L’autorisation d’accès au compte est distincte de la connectivité RPC et n’autorise pas à l’avance les signatures ou transactions. Pour une connexion de base, utilisez `eth_requestAccounts`.

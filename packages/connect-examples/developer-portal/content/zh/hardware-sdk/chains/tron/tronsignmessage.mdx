@@ -4,9 +4,11 @@ title: tronSignMessage
 
 # tronSignMessage
 
-## TRON：签名消息
+<span id="tron签名消息" />
 
-使用指定 BIP32 路径派生的私钥对消息进行签名。
+## TRON：签名消息 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
+
+使用指定路径派生的密钥请求消息签名。
 
 ```typescript
 const result = await HardwareSDK.tronSignMessage(connectId, deviceId, params);
@@ -16,17 +18,18 @@ const result = await HardwareSDK.tronSignMessage(connectId, deviceId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `messageHex` - _必需_ `string` 十六进制格式的待签名消息
-* `messageType` - _可选_ `string` TRON 消息签名算法类型。推荐使用 `'V2'` 以获得更好的兼容性和安全性。允许值：`'v1' | 'V2'`。除非有遗留系统约束，否则请使用 `'V2'`。
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _必需_ `string`。以十六进制编码的待签名消息。
+
+* `messageType` - `"V2"`。必须显式传入：当前运行时拒绝省略此字段或使用旧版 `"V1"` 的请求，尽管公开类型仍列出这两个值。
 
 ### 示例
 
 ```typescript
-// 原始消息
+// Original message
 const message = "Hello World";
 
-// 转换为十六进制
+// Convert to hex
 const messageHex = Buffer.from(message).toString('hex');
 
 HardwareSDK.tronSignMessage(connectId, deviceId, {
@@ -54,8 +57,8 @@ HardwareSDK.tronSignMessage(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

@@ -1,0 +1,98 @@
+---
+title: "トランザクション"
+description: "OneKey で TRON のトランザクションを送信"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="transactions" />
+
+# トランザクション
+
+プロバイダーに接続し、同じウォレットに関連付けられた TronWeb インスタンスを使用してください。省略されたアドレスとコントラクトメソッドを有効な値に置き換えます。トランザクションの準備前に選択中のネットワークを確認してください。
+
+TRON でトランザクションに署名して送信する方法を説明します。
+
+---
+
+## トランザクションに署名 [#sign-transaction]
+
+ブロードキャストせずにトランザクションに署名します:
+
+```typescript
+// Build transaction
+const tx = await tronWeb.transactionBuilder.sendTrx(
+  'TRecipientAddress...',
+  tronWeb.toSun(10),
+  tronWeb.defaultAddress.base58
+)
+
+// Sign via provider
+const signedTx = await provider.sign(tx)
+
+console.log('Signed transaction:', signedTx)
+
+// Broadcast manually
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## スマートコントラクト操作 [#smart-contract-interaction]
+
+```typescript
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Read (view function)
+const result = await contract.someViewFunction().call()
+
+// Write (requires signing)
+const tx = await contract.someWriteFunction(param1, param2).send({
+  feeLimit: 100_000_000, // 100 TRX
+  callValue: 0,
+})
+```
+
+---
+
+## スマートコントラクトを実行 [#trigger-smart-contract]
+
+```typescript
+const tx = await tronWeb.transactionBuilder.triggerSmartContract(
+  contractAddress,
+  'transfer(address,uint256)',
+  { feeLimit: 100_000_000 },
+  [
+    { type: 'address', value: recipientAddress },
+    { type: 'uint256', value: amount }
+  ],
+  tronWeb.defaultAddress.base58
+)
+
+const signedTx = await provider.sign(tx.transaction)
+const result = await tronWeb.trx.sendRawTransaction(signedTx)
+```
+
+---
+
+## SunWeb の使用 [#using-sunweb]
+
+DappChain (サイドチェーン) の操作向け:
+
+```typescript
+const sunWeb = window.sunWeb
+
+// Main chain to side chain
+await sunWeb.depositTrx(
+  amount,
+  depositFee,
+  feeLimit
+)
+
+// Side chain to main chain
+await sunWeb.withdrawTrx(
+  amount,
+  withdrawFee,
+  feeLimit
+)
+```

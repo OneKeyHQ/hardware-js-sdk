@@ -1,0 +1,38 @@
+---
+description: "Transportfähigkeiten der Geräte vergleichen und die Protokollunterstützung anhand der aktiven Verbindung bestimmen."
+title: "Geräte"
+---
+
+<span id="devices" />
+
+# Geräte
+
+Hardware SDK 1.2.0 unterstützt zwei Protokollfamilien über eine öffentliche API. Wählen Sie hier anhand der Geräteeinschränkungen aus; rufen Sie weiterhin dieselben Methoden auf.
+
+| Gerät | Code | Protokoll | USB | BLE | Air-Gap (QR) |
+| --- | --- | --- | --- | --- | --- |
+| OneKey Classic | `classic` | V1 | Ja | Ja | Nein |
+| OneKey Classic 1s | `classic1s` | V1 | Ja | Ja | Nein |
+| OneKey Classic 1s Pure | `classicpure` | V1 | Ja | Ja | Nein |
+| OneKey Mini | `mini` | V1 | Ja | **Nein** | Nein |
+| OneKey Touch | `touch` | V1 | Ja | Ja | Nein |
+| OneKey Pro | `pro` | V1 | Ja | Ja | Ja |
+| OneKey Pro 2 | `pro2` | **V2** | Ja | Ja | Ja |
+| OneKey Neo | `neo` | **V2** | Ja | Ja | **Nein** (ohne Kamera) |
+
+Das SDK meldet das verbundene Protokoll im Geräteobjekt als `connectProtocol` (`'V1'` oder `'V2'`). Dieser Wert stammt aus einer aktuellen Abfrage, nicht aus einer Zuordnung anhand des Modellnamens.
+
+## Wofür Sie das Modell verwenden sollten [#what-you-should-do-with-the-model]
+
+- Verwenden Sie das Modell für **Funktionen und Nutzererlebnis**: Mini hat kein BLE, Neo hat kein QR-Air-Gap, Pro / Pro 2 unterstützen Air-Gap.
+- Verwenden Sie **nicht** den Modellnamen, um zwischen Protocol V1 und V2 zu entscheiden. Lesen Sie das durch die aktive Verbindung bestätigte Protokoll.
+- Die Firmware-Update-API richtet sich nach der Protokollfamilie: Pro verwendet [`firmwareUpdateV3`](/de/hardware-sdk/device-api/firmwareupdatev3); Pro 2 / Neo verwenden [`firmwareUpdateV4`](/de/hardware-sdk/device-api/firmwareupdatev4).
+
+## Checkliste für Integratoren [#integrator-checklist]
+
+1. Zwischenspeichern: `connectId` **pro Transport**. USB- und BLE-IDs desselben Geräts unterscheiden sich.
+2. Aktualisieren: `deviceId` nach Löschen / Wiederherstellung. Siehe [Kennungen](/de/hardware-sdk/concepts/identifiers).
+3. Führen Sie Aufrufe pro Gerät nacheinander aus. Halten Sie Eingabe- und Signierabläufe seriell, damit Aufforderungen und Ergebnisse ihrem Vorgang zugeordnet bleiben.
+4. Wiederholen Sie nach einem Transportfehler niemals ein Firmware-Update, einen Löschvorgang oder einen anderen Aufruf mit Nebenwirkungen.
+
+Siehe auch: [Chain-Unterstützung](/de/hardware-sdk/concepts/chain-support) · [Protocol V1 und V2](/de/hardware-sdk/concepts/protocol) · [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session)

@@ -1,0 +1,164 @@
+---
+title: "Web3Modal (AppKit)"
+description: "OneKey mit Web3Modal / Reown AppKit integrieren"
+---
+
+import { Callout } from 'nextra/components'
+
+# Web3Modal (AppKit)
+
+Die offizielle Wallet-Verbindungsoberfläche von WalletConnect, jetzt Teil von Reown AppKit. Bietet Unterstützung für mehrere Chains und mobile Wallet-Verbindungen.
+
+<Callout type="info">
+Web3Modal wurde in Reown AppKit umbenannt. Diese Anleitung verwendet die `@reown/appkit`-Pakete. Befolgen Sie beim Aktualisieren einer bestehenden Web3Modal-Integration die Migrationsanleitung von Reown.
+</Callout>
+
+---
+
+## Installation [#installation]
+
+```bash
+npm install @reown/appkit @reown/appkit-adapter-wagmi wagmi@^2 viem@^2 @tanstack/react-query@^5
+```
+
+---
+
+## Grundlegende Einrichtung [#basic-setup]
+
+```tsx filename="App.tsx"
+import { createAppKit } from '@reown/appkit/react'
+import { WagmiProvider } from 'wagmi'
+import { mainnet, polygon, arbitrum, type AppKitNetwork } from '@reown/appkit/networks'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+
+// 1. Get projectId from https://cloud.reown.com
+const projectId = 'YOUR_PROJECT_ID'
+
+// 2. Configure networks
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [mainnet, polygon, arbitrum]
+
+// 3. Create wagmi adapter
+const wagmiAdapter = new WagmiAdapter({
+  projectId,
+  networks,
+})
+
+// 4. Create modal
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks,
+  projectId,
+  metadata: {
+    name: 'My dApp',
+    description: 'My dApp description',
+    url: 'https://mydapp.com', // Must match your deployed dApp origin
+    icons: ['https://mydapp.com/icon.png'],
+  },
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        {/* Use the web component */}
+        <appkit-button />
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+---
+
+## OneKey hervorheben [#feature-onekey]
+
+Fügen Sie diese Optionen dem bestehenden `createAppKit`-Aufruf hinzu, um OneKey zu priorisieren. Prüfen Sie beim Aktualisieren Ihrer Integration die Wallet-ID in der WalletConnect-Wallet-Anleitung:
+
+```tsx
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks,
+  projectId,
+  featuredWalletIds: [
+    // OneKey Wallet ID from WalletConnect Explorer
+    '1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c',
+  ],
+  // Optional: Only show specific wallets
+  includeWalletIds: [
+    '1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c',
+    // Add other wallet IDs as needed
+  ],
+})
+```
+
+---
+
+## Anpassung [#customization]
+
+### Design [#theme]
+
+```tsx
+createAppKit({
+  // ...
+  themeMode: 'dark', // or 'light'
+  themeVariables: {
+    '--w3m-accent': '#00B812', // OneKey green
+    '--w3m-border-radius-master': '8px',
+  },
+})
+```
+
+### Eigene Schaltfläche [#custom-button]
+
+```tsx
+import { useAppKit } from '@reown/appkit/react'
+
+function CustomButton() {
+  const { open } = useAppKit()
+
+  return (
+    <button onClick={() => open()}>
+      Connect Wallet
+    </button>
+  )
+}
+```
+
+---
+
+## Hooks [#hooks]
+
+Verwenden Sie nach dem Verbinden wagmi-Hooks:
+
+```tsx
+import { useAccount, useDisconnect } from 'wagmi'
+import { useAppKit } from '@reown/appkit/react'
+
+function Wallet() {
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+  const { open } = useAppKit()
+
+  if (!isConnected) {
+    return <button onClick={() => open()}>Connect</button>
+  }
+
+  return (
+    <div>
+      <p>{address}</p>
+      <button onClick={() => disconnect()}>Disconnect</button>
+    </div>
+  )
+}
+```
+
+---
+
+## Ressourcen [#resources]
+
+- [Reown-AppKit-Dokumentation](https://docs.reown.com/appkit/overview)
+- [WalletConnect-Wallet-Anleitung - OneKey](https://walletguide.walletconnect.network/?search=onekey)
+- [Projekt-ID erhalten](https://cloud.reown.com)

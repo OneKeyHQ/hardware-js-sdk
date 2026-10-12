@@ -1,4 +1,5 @@
 ---
+description: "Confirm a Solana address and sign serialized messages with a hardened derivation path and explicit wallet binding."
 title: Solana Signer
 ---
 
@@ -33,6 +34,8 @@ npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 
 ## Initialization
 
+The examples use the **standard wallet** consistently. For a hidden wallet, replace `useEmptyPassphrase: true` with the verified `passphraseState` on every address and signing call. Register [UI handlers](/en/hardware-sdk/core-api-guide#events-ui) before protected calls, and check `success` before using any payload. Examples containing declared transaction inputs are preparation fragments, not standalone runnable applications.
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
@@ -40,6 +43,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -54,6 +59,7 @@ if (!deviceId) throw new Error("Device has no wallet identity");
 
 ```ts
 const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/501'/0'/0'",
   showOnOneKey: true,
 });
@@ -118,6 +124,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -126,7 +134,12 @@ const deviceId = state.payload.identity.deviceId;
 if (!deviceId) throw new Error("Device has no wallet identity");
 
 const path = "m/44'/501'/0'/0'";
-await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
+const confirmedAddress = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
 
 // Obtain these bytes from Transaction.serializeMessage() or
 // VersionedTransaction.message.serialize(), with a fresh recent blockhash.
@@ -139,9 +152,8 @@ const { success, payload } = await HardwareSDK.solSignTransaction(connectId, dev
   useEmptyPassphrase: true,
 });
 
-if (success) {
-  // Attach the signature and verify it against the address before broadcasting.
-}
+if (!success) throw new Error(payload.error);
+// Attach the signature and verify it against the confirmed address before broadcasting.
 ```
 
 ## Validation & Troubleshooting
@@ -150,6 +162,6 @@ if (success) {
 - Message/tx: include fresh `recentBlockhash`, correct accounts, and instruction order.
 - Device review: path/account, destination, amount, fee summary must match your UI.
 - Host verify: attach signature with `@solana/web3.js`, confirm the signer equals `solGetAddress` result.
-- Common issues: oversized messages or unsupported instructions; split/adjust if rejected. Serial per device; offer retry/cancel on rejection/timeout.
+- Oversized messages or unsupported instructions: report the error and stop the current request. Splitting or adjusting a transaction requires rebuilding it and obtaining a new user review. Serialize calls per device; offer retry/cancel on rejection or timeout without automatic replay.
 
 See method doc: [solSignTransaction](/en/hardware-sdk/chains/solana/solsigntransaction).

@@ -1,0 +1,68 @@
+---
+title: "nexaSignTransaction"
+---
+
+# nexaSignTransaction
+
+### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.4.0
+  * Classic/Mini: 3.2.0
+
+## Nexa: Transaktion signieren [#nexa-sign-transaction]
+
+Fordert eine Transaktionssignatur mit dem aus dem angegebenen Pfad abgeleiteten Schlüssel an. Der Nutzer prüft und bestätigt die Anfrage auf dem Gerät.
+
+```typescript
+const result = await HardwareSDK.nexaSignTransaction(connectId, deviceId, params);
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `inputs` - _erforderlich_ `Array` Transaktionseingaben
+  * `path` - _erforderlich_ `string` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+  * `message` - _erforderlich_ `string` Serialisierte Transaktion als hexadezimale Zeichenfolge kodiert.
+  * `prefix` - _erforderlich_ `string` Adresspräfix für das vorgesehene Netzwerk. Das SDK liefert keinen Standardwert; das Beispiel wählt ausdrücklich `nexatest`.
+### Beispiele [#examples]
+
+```typescript
+const response = await HardwareSDK.nexaSignTransaction(
+  connectId,
+  deviceId,
+  {
+    inputs: [
+      {
+         path: "m/44'/29223'/0'/0/0",
+         message: '000578c6c76f10156fbc7ee4a8faa7a4e92b6adadc978abf66ae70f13a03b75d36cd7a6acc0967cc9f2f632f585cb7b4297873858c23233792767fd4ae662ec1093bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044026cad0dba749a112e0d2ea420fa68e0218453db6bb0744e44eb51edc76af8bb6871190000000000',
+         prefix: 'nexatest',
+      }
+    ],
+  }
+);
+```
+
+Ergebnis
+
+```typescript
+{
+  success: true,
+  payload: [
+    { index: 0, signature: "signed data" }
+  ]
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

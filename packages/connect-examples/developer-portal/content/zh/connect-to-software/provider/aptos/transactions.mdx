@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+签名前先连接 provider，并确认所选网络。直接注入的 provider 与 Aptos Wallet Standard 适配器使用不同的参数类型，请勿混用示例。请替换省略的地址，并为只读请求初始化 SDK 客户端。
+
 了解如何在 Aptos 上签署和提交交易。
 
 ---
@@ -14,20 +16,20 @@ import { Callout } from 'nextra/components'
 ## 签署并提交交易
 
 ```typescript
-// 简单的 APT 转账
+// Simple APT transfer
 const payload = {
   type: 'entry_function_payload',
   function: '0x1::aptos_account::transfer',
   type_arguments: [],
   arguments: [
-    '0x1234...', // 接收地址
-    '100000000', // 金额（Octas，1 APT = 100000000 Octas）
+    '0x1234...', // Recipient address
+    '100000000', // Amount in Octas (1 APT = 100000000 Octas)
   ],
 }
 
 const response = await provider.signAndSubmitTransaction(payload)
 
-console.log('交易哈希:', response.hash)
+console.log('Transaction hash:', response.hash)
 ```
 
 ---
@@ -44,7 +46,7 @@ const payload = {
 
 const signedTxn = await provider.signTransaction(payload)
 
-// 稍后使用 Aptos SDK 提交
+// Submit later using Aptos SDK
 // const pendingTxn = await client.submitTransaction(signedTxn)
 ```
 
@@ -55,13 +57,11 @@ const signedTxn = await provider.signTransaction(payload)
 用于 BCS 序列化交易的高级用例：
 
 ```typescript
-import { BCS } from 'aptos'
-
-const rawTransaction = /* BCS 序列化的原始交易 */
+const rawTransaction = '<BCS_SERIALIZED_TRANSACTION>'; // Use the encoding expected by your wallet version
 
 const signedTxn = await provider.signTransactionV2({
   transaction: rawTransaction,
-  transactionType: 'simple', // 'simple' 或 'multi_agent'
+  transactionType: 'simple', // 'simple' or 'multi_agent'
   asFeePayer: false,
 })
 ```
@@ -78,13 +78,9 @@ const payload = {
   arguments: ['0x1234...', '100000000'],
 }
 
-const options = {
-  max_gas_amount: '10000',
-  gas_unit_price: '100',
-  expiration_timestamp_secs: Math.floor(Date.now() / 1000) + 600, // 10 分钟
-}
-
-const response = await provider.signAndSubmitTransaction(payload, options)
+// The legacy direct method takes only a payload.
+const response = await provider.signAndSubmitTransaction(payload)
+// For gas options, use signAndSubmitTransactionV2 with the matching Wallet Standard input.
 ```
 
 ---
@@ -94,30 +90,30 @@ const response = await provider.signAndSubmitTransaction(payload, options)
 ### 调用视图函数
 
 ```typescript
-// 视图函数不需要签名
+// View functions don't require signing
 const result = await client.view({
   function: '0x1::coin::balance',
   type_arguments: ['0x1::aptos_coin::AptosCoin'],
   arguments: [accountAddress],
 })
 
-console.log('余额:', result[0])
+console.log('Balance:', result[0])
 ```
 
 ### 调用入口函数
 
 ```typescript
-// 铸造 NFT 示例
+// Mint NFT example
 const payload = {
   type: 'entry_function_payload',
   function: '0x3::token::create_collection_script',
   type_arguments: [],
   arguments: [
-    'My Collection',           // 集合名称
-    'Description',             // 描述
+    'My Collection',           // Collection name
+    'Description',             // Description
     'https://example.com',     // URI
-    '1000',                    // 最大供应量
-    [false, false, false],     // 可变性配置
+    '1000',                    // Maximum supply
+    [false, false, false],     // Mutability config
   ],
 }
 
@@ -150,4 +146,3 @@ const signedTxn = await provider.signTransactionV2({
   asFeePayer: true,
 })
 ```
-

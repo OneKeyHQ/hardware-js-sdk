@@ -1,0 +1,78 @@
+---
+title: "wallet_requestPermissions"
+description: "Solicitar permisos para la dApp"
+---
+
+# wallet_requestPermissions
+
+Solicita permisos para que la dApp acceda a métodos específicos. Forma parte del sistema de permisos de cartera EIP-2255.
+
+---
+
+## Parámetros [#parameters]
+
+`Array` que contiene un objeto de solicitud de permisos:
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `eth_accounts` | `object` | Solicitar acceso a las cuentas del usuario |
+
+---
+
+## Devuelve [#returns]
+
+`Array` de objetos de permiso:
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `parentCapability` | `string` | El nombre del permiso |
+| `date` | `number` | Marca de tiempo de la concesión |
+| `caveats` | `array` | Restricciones del permiso |
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+console.log('Granted permissions:', permissions)
+// [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
+```
+
+### Comprobar un permiso específico [#check-specific-permission]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+const hasAccountsPermission = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Has accounts permission:', hasAccountsPermission)
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| 4001 | El usuario rechazó la solicitud | El usuario denegó la solicitud de permiso |
+| -32602 | Parámetros no válidos | Solicitud de permiso no válida |
+
+---
+
+## Notas [#notes]
+
+- Actualmente, el permiso `eth_accounts` es el único compatible
+- La llamada a este método abre la solicitud de conexión si aún no hay conexión
+- Los permisos se mantienen hasta que el usuario los revoca
+- Definido por [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Gestiona los errores de método no compatible en la versión de cartera de destino. El permiso de cuenta es distinto de la conectividad RPC y no autoriza de antemano firmas ni transacciones. Para una conexión básica, usa `eth_requestAccounts`.

@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Connect the wallet before sending requests. Replace example addresses and manifest URLs with valid values. For authentication, use a server-generated, single-use challenge and verify the proof on your server.
+
 Learn how to detect, connect, and interact with TON using OneKey's provider.
 
 <Callout type="info">
-OneKey implements the TON Connect 2.0 protocol, ensuring compatibility with all TON dApps.
+OneKey implements the TON Connect 2.0 protocol, for the operations documented here.
 </Callout>
 
 ---
@@ -43,7 +45,7 @@ if (connectEvent.event === 'connect') {
   const addressItem = connectEvent.payload.items.find(
     item => item.name === 'ton_addr'
   )
-  console.log('Connected:', addressItem.address)
+  console.log('Connected:', addressItem?.address)
 } else {
   console.error('Connection failed:', connectEvent.payload.message)
 }
@@ -70,7 +72,7 @@ if (connectEvent.event === 'connect') {
   const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
   const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
 
-  console.log('Address:', addressItem.address)
+  console.log('Address:', addressItem?.address)
   console.log('Proof:', proofItem?.proof)
 }
 ```
@@ -160,4 +162,3 @@ function App() {
 ```
 
 OneKey is automatically detected by TON Connect SDK.
-

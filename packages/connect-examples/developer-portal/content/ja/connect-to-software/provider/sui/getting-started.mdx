@@ -1,0 +1,186 @@
+---
+title: "はじめに"
+description: "OneKey の Sui Wallet Standard プロバイダーで Sui に接続"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+署名前に権限を要求し、接続済みアカウントを選択して、有効なチェーンを読み取ってください。これらの例では、現在のプロバイダーが受け入れる `@mysten/wallet-standard@0.14.7` の形式に合う `@mysten/sui@1.28.2` を使用します。
+
+OneKey のプロバイダーを検出して接続し、Sui を操作する方法を説明します。
+
+<Callout type="info">
+OneKey は Sui Wallet Standard を実装し、互換性のある wallet-standard 統合に対応しています。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// Detect OneKey Sui provider
+const provider = window.$onekey?.sui
+
+if (!provider) {
+  throw new Error('OneKey Sui provider not detected')
+}
+```
+
+---
+
+## 権限を確認 [#check-permissions]
+
+```typescript
+// Check if already connected
+const hasPermission = await provider.hasPermissions()
+
+if (hasPermission) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected accounts:', accounts)
+}
+```
+
+---
+
+## 接続を要求 [#request-connection]
+
+```typescript
+// Request permissions to connect
+const result = await provider.requestPermissions()
+
+if (result) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected:', accounts[0].address)
+}
+```
+
+---
+
+## 署名用のアカウントコンテキスト [#account-context-for-signing]
+
+`@mysten/wallet-standard@0.14.7` をインストールします。注入されたプロバイダーの `getAccounts()` は `AccountInfo[]` を返しますが、署名メソッドで必要な `WalletAccount` とは異なります。以下のヘルパーは Wallet Standard 経由で完全なアカウントを取得します。ウォレット登録後、ユーザー操作から呼び出してください。拒否を処理し、アカウントやネットワークが変わったら再接続してください。
+
+```typescript
+import { getWallets, isWalletWithRequiredFeatureSet } from '@mysten/wallet-standard'
+
+async function connectSuiAccount() {
+  const wallet = getWallets().get().find(wallet => wallet.name === 'OneKey Wallet')
+  if (!wallet || !isWalletWithRequiredFeatureSet(wallet)) {
+    throw new Error('OneKey Sui Wallet Standard is not available')
+  }
+
+  const { accounts } = await wallet.features['standard:connect'].connect()
+  const [account] = accounts
+  const chain = await provider.getActiveChain()
+  if (!account || !chain || !account.chains.includes(chain)) {
+    throw new Error('No connected Sui account for the active chain')
+  }
+  return { account, chain }
+}
+```
+
+---
+
+## アカウントを取得 [#get-accounts]
+
+```typescript
+const accounts = await provider.getAccounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Sui address
+    publicKey: account.publicKey, // Public key (hex string)
+  })
+})
+```
+
+---
+
+## 有効なチェーンを取得 [#get-active-chain]
+
+```typescript
+const chain = await provider.getActiveChain()
+
+console.log('Active chain:', chain) // e.g., 'sui:testnet'
+```
+
+---
+
+## 接続状態を確認 [#check-connection-status]
+
+```typescript
+const isConnected = provider.isConnected()
+console.log('Connected:', isConnected)
+```
+
+---
+
+## 切断 [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## イベントリスナー [#event-listeners]
+
+### アカウント変更を監視 [#listen-for-account-changes]
+
+```typescript
+provider.onAccountChange((account) => {
+  if (account) {
+    console.log('Account changed:', account.address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### ネットワーク変更を監視 [#listen-for-network-changes]
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('Network changed:', network)
+})
+```
+
+---
+
+## Sui Wallet Kit との併用 [#using-with-sui-wallet-kit]
+
+この React の例では、以下に固定した互換性のあるパッケージバージョンを使用します:
+
+```bash
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
+```
+
+```tsx
+import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
+import { getFullnodeUrl } from '@mysten/sui/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
+const networks = {
+  mainnet: { url: getFullnodeUrl('mainnet') },
+  testnet: { url: getFullnodeUrl('testnet') },
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networks} defaultNetwork="mainnet">
+        <WalletProvider>
+          <YourApp />
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
+  )
+}
+```
+
+OneKey は Sui Wallet Standard を通じて自動検出されます。

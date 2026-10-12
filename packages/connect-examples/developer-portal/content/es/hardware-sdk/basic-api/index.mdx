@@ -1,0 +1,20 @@
+---
+description: "Encuentra métodos de detección de dispositivos, estado normalizado, selección de cartera, respuesta de interfaz y cancelación."
+title: "API básica"
+---
+
+<span id="basic-api" />
+
+# API básica
+
+Métodos básicos del SDK para detección de dispositivos, administración de sesiones y gestión de eventos.
+
+| Método | Descripción |
+|--------|-------------|
+| [Buscar dispositivos](./search-devices) | Buscar y detectar dispositivos físicos OneKey conectados |
+| [Obtener el estado del dispositivo](./get-device-state) | Instantánea unificada del dispositivo V1/V2 |
+| [Abrir una sesión de cartera](./open-wallet-session) | Abrir o seleccionar la cartera estándar u oculta |
+| [Obtener funciones](./get-features) | **Obsoleto** — usa Obtener el estado del dispositivo |
+| [Obtener el estado de passphrase](./get-passphrase-state) | **Obsoleto** — usa Abrir una sesión de cartera |
+| [Responder a un evento de interfaz](./response-ui-event) | Gestionar eventos de interfaz de las interacciones con el dispositivo |
+| [Cancelar una solicitud](./cancel-request) | Cancelar una operación en curso del dispositivo |

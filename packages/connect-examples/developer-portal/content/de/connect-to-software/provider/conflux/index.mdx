@@ -1,0 +1,370 @@
+---
+title: "Conflux"
+description: "Conflux-Integration über den Fluent-kompatiblen Provider von OneKey"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Conflux
+
+Integrieren Sie die Conflux-Blockchain mit dem Fluent-kompatiblen Provider von OneKey. Zugriff über `window.$onekey.conflux`.
+
+<Callout type="info">
+Der Conflux-Provider von OneKey ist sowohl mit den Schnittstellen von ConfluxPortal als auch von Fluent kompatibel.
+</Callout>
+
+---
+
+## Direktlinks [#quick-links]
+
+- [API-Referenz](#api-reference)
+- [Erste Schritte](getting-started)
+- [Transaktionen](#transactions)
+- [Mit js-conflux-sdk verwenden](#using-with-js-conflux-sdk)
+
+---
+
+## Provider erkennen [#provider-detection]
+
+```typescript
+// Detect OneKey Conflux provider
+const provider = window.$onekey?.conflux
+
+if (!provider) {
+  throw new Error('OneKey Conflux provider not detected')
+}
+
+// Check compatibility flags
+console.log('isConfluxPortal:', provider.isConfluxPortal) // true
+console.log('isFluent:', provider.isFluent) // true
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## Schnellstart [#quick-start]
+
+### Konten anfordern [#request-accounts]
+
+```typescript
+const accounts = await provider.request({
+  method: 'cfx_requestAccounts'
+})
+
+console.log('Connected:', accounts[0])
+```
+
+### Verbindung prüfen [#check-connection]
+
+```typescript
+if (provider.isConnected()) {
+  const accounts = await provider.request({ method: 'cfx_accounts' })
+  console.log('Accounts:', accounts)
+}
+```
+
+---
+
+## Konto und Netzwerk [#account-and-network]
+
+### Chain-ID abrufen [#get-chain-id]
+
+```typescript
+const chainId = await provider.request({ method: 'cfx_chainId' })
+console.log('Chain ID:', chainId) // e.g., '0x405' for mainnet
+```
+
+### Netzwerkversion abrufen [#get-network-version]
+
+```typescript
+const networkId = await provider.request({ method: 'net_version' })
+console.log('Network ID:', networkId) // e.g., '1029' for mainnet
+```
+
+### Guthaben abrufen [#get-balance]
+
+```typescript
+const balance = await provider.request({
+  method: 'cfx_getBalance',
+  params: [address, 'latest_state']
+})
+
+console.log('Balance:', balance) // In Drip (1 CFX = 10^18 Drip)
+```
+
+---
+
+## Transaktionen [#transactions]
+
+### Transaktion senden [#send-transaction]
+
+```typescript
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000', // 1 CFX in Drip (hex)
+    gas: '0x5208', // 21000
+  }]
+})
+
+console.log('Transaction hash:', txHash)
+```
+
+### Mit Gasschätzung senden [#send-with-gas-estimation]
+
+```typescript
+// Estimate gas first
+const gasEstimate = await provider.request({
+  method: 'cfx_estimateGasAndCollateral',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+  }]
+})
+
+// Send with estimated values
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+    gas: gasEstimate.gasLimit,
+    storageLimit: gasEstimate.storageCollateralized,
+  }]
+})
+```
+
+### Vertrag aufrufen [#call-contract]
+
+```typescript
+const result = await provider.request({
+  method: 'cfx_call',
+  params: [{
+    to: contractAddress,
+    data: encodedFunctionCall,
+  }, 'latest_state']
+})
+
+console.log('Result:', result)
+```
+
+---
+
+## Ereignisbehandlung [#event-handling]
+
+### Auf Kontoänderungen reagieren [#listen-for-account-changes]
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('Disconnected')
+  } else {
+    console.log('Account changed:', accounts[0])
+  }
+})
+```
+
+### Auf Chain-Änderungen reagieren [#listen-for-chain-changes]
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Chain changed:', chainId)
+  // Recommend reloading the page
+  window.location.reload()
+})
+```
+
+### Auf Verbindungen reagieren [#listen-for-connection]
+
+```typescript
+provider.on('connect', ({ chainId, networkId }) => {
+  console.log('Connected to:', chainId, networkId)
+})
+
+provider.on('disconnect', () => {
+  console.log('Disconnected')
+})
+```
+
+---
+
+## Mit js-conflux-sdk verwenden [#using-with-js-conflux-sdk]
+
+### Einrichtung [#setup]
+
+```bash
+npm install js-conflux-sdk
+```
+
+### Provider verbinden [#connect-provider]
+
+```typescript
+import { Conflux } from 'js-conflux-sdk'
+
+const conflux = new Conflux({
+  url: 'https://main.confluxrpc.com',
+  networkId: 1029,
+})
+
+// Use OneKey provider for signing
+conflux.provider = provider
+```
+
+### Transaktion mit dem SDK senden [#send-transaction-with-sdk]
+
+```typescript
+// Create and send transaction
+const tx = conflux.cfx.sendTransaction({
+  from: senderAddress,
+  to: recipientAddress,
+  value: Conflux.Drip.fromCFX(1), // 1 CFX
+})
+
+console.log('Transaction:', tx)
+
+// Wait for confirmation
+const receipt = await tx.executed()
+console.log('Receipt:', receipt)
+```
+
+### Vertragsinteraktion [#contract-interaction]
+
+```typescript
+const contract = conflux.Contract({
+  abi: contractABI,
+  address: contractAddress,
+})
+
+// Read
+const result = await contract.someViewFunction().call()
+
+// Write
+const tx = contract.someWriteFunction(param1, param2).sendTransaction({
+  from: senderAddress,
+})
+
+const receipt = await tx.executed()
+```
+
+---
+
+## API-Referenz [#api-reference]
+
+### Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `request({ method, params })` | JSON-RPC-Anfrage senden |
+| `isConnected()` | Verbindungsstatus prüfen |
+| `on(event, callback)` | Ereignisse abonnieren |
+| `off(event, callback)` | Ereignisabonnement beenden |
+
+### RPC-Methoden [#rpc-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `cfx_requestAccounts` | Verbindung anfordern |
+| `cfx_accounts` | Verbundene Konten abrufen |
+| `cfx_chainId` | Chain-ID abrufen |
+| `cfx_sendTransaction` | Transaktion senden |
+| `cfx_call` | Vertrag aufrufen (rein lesend) |
+| `cfx_estimateGasAndCollateral` | Gas schätzen |
+| `cfx_getBalance` | Kontoguthaben abrufen |
+| `cfx_getTransactionByHash` | Transaktion abrufen |
+| `cfx_getTransactionReceipt` | Beleg abrufen |
+| `net_version` | Netzwerk-ID abrufen |
+
+### Ereignisse [#events]
+
+| Ereignis | Parameter | Beschreibung |
+|-------|------------|-------------|
+| `connect` | `{ chainId, networkId }` | Mit Netzwerk verbunden |
+| `disconnect` | - | Getrennt |
+| `chainChanged` | `chainId` | Netzwerk geändert |
+| `accountsChanged` | `accounts[]` | Konten geändert |
+
+### Netzwerke [#networks]
+
+| Netzwerk | Chain-ID (hex) | Netzwerk-ID |
+|---------|---------------|------------|
+| Mainnet | `0x405` | 1029 |
+| Testnet | `0x1` | 1 |
+
+---
+
+## Veraltete Methoden [#deprecated-methods]
+
+Diese Methoden funktionieren weiterhin, sind aber veraltet:
+
+```typescript
+// Deprecated: use request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// Deprecated: use request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// Deprecated: use request({ method: 'cfx_chainId' })
+provider.chainId
+
+// Deprecated: use request({ method: 'net_version' })
+provider.networkVersion
+
+// Deprecated: use request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+try {
+  const accounts = await provider.request({
+    method: 'cfx_requestAccounts'
+  })
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === -32603) {
+    console.log('Internal error')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+### Häufige Fehlercodes [#common-error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| -32700 | Parsing-Fehler |
+| -32600 | Ungültige Anfrage |
+| -32601 | Methode nicht gefunden |
+| -32602 | Ungültige Parameter |
+| -32603 | Interner Fehler |
+
+---
+
+## Adressformat [#address-format]
+
+Conflux verwendet Base32-Adressen (CIP-37):
+
+```typescript
+// Mainnet: cfx:...
+// Testnet: cfxtest:...
+
+// Example mainnet address
+const address = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91'
+
+// Convert between formats using js-conflux-sdk
+import { format } from 'js-conflux-sdk'
+
+const hexAddress = format.hexAddress(address)
+const base32Address = format.address(hexAddress, 1029) // networkId
+```

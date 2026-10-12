@@ -7,7 +7,17 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+The signing examples below use `connectSuiAccount()` from [Getting Started](/en/connect-to-software/provider/sui/getting-started#account-context-for-signing). It returns a Wallet Standard account and its active chain. The examples use `@mysten/sui@1.28.2`. Even the legacy `*TransactionBlock` methods now declare `Transaction` inputs in `@mysten/wallet-standard@0.14.7`.
+
+Request permission before signing, select a connected account, and read the active chain. These examples use `@mysten/sui@1.28.2`, matching `@mysten/wallet-standard@0.14.7` accepted by the current provider.
+
 Learn how to sign messages for authentication.
+
+Initialize the account context before the following examples:
+
+```typescript
+const { account, chain } = await connectSuiAccount()
+```
 
 ---
 
@@ -19,6 +29,8 @@ Sign arbitrary messages for authentication:
 const message = new TextEncoder().encode('Hello, Sui!')
 
 const result = await provider.signPersonalMessage({
+  account,
+  chain,
   message,
 })
 
@@ -36,6 +48,7 @@ console.log({
 const message = new TextEncoder().encode('Hello, Sui!')
 
 const result = await provider.signMessage({
+  account,
   message,
 })
 
@@ -50,16 +63,14 @@ console.log({
 ## Verify Signature
 
 ```typescript
-import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
 
 const message = new TextEncoder().encode('Hello, Sui!')
-const { signature } = await provider.signPersonalMessage({ message })
+const { signature } = await provider.signPersonalMessage({ message, account, chain })
 
-const accounts = await provider.getAccounts()
-const publicKey = accounts[0].publicKey
-
-const isValid = await verifyPersonalMessage(message, signature)
-console.log('Signature valid:', isValid)
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('Expected signer:', isExpectedSigner)
 ```
 
 ---
@@ -87,4 +98,3 @@ try {
 | 4001 | User rejected request |
 | 4100 | Unauthorized |
 | -32603 | Internal error |
-

@@ -1,0 +1,41 @@
+---
+title: "sendBitcoin"
+---
+
+# sendBitcoin
+
+BTC を送信
+
+## メソッド [#method]
+
+```typescript
+declare function sendBitcoin(
+    toAddress: string,
+    satoshis: number,
+    options?: { feeRate?: number; memo?: string; memos?: string[] }
+): Promise<string>;
+```
+
+## パラメーター [#params]
+
+* `toAddress` — _必須_ `string`  送信先アドレス
+* `satoshis` — _必須_ `number` 送信する satoshi の数量
+* `options` — _任意_
+  * `feeRate`  — _任意_ `number` ネットワーク手数料率
+
+## レスポンス [#response]
+
+`txid` — `string`
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const address = "<RECIPIENT_BITCOIN_ADDRESS>"; // Replace with a valid address
+const txid = await provider.sendBitcoin(address, 1000);
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/RwvYZjX)

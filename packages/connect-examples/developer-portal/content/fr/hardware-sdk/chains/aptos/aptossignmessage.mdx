@@ -1,0 +1,69 @@
+---
+title: "aptosSignMessage"
+---
+
+# aptosSignMessage
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 3.0.0
+  * Classic/Mini : 2.6.0
+
+## Aptos : signer un message <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#aptos-sign-message-]
+
+Demande une signature de message avec la clé dérivée du chemin spécifié.
+
+```typescript
+const result = await HardwareSDK.aptosSignMessage(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `payload` - type `AptosMessagePayload`
+  * `address` - _facultatif  `string`_ adresse dérivée du chemin
+  * `chainId` - _facultatif  `string`_ identifiant de la chaîne
+  * `application` - _facultatif  `string`_ URL du site web de la DApp
+  * `nonce` - _obligatoire  `string`_ nombre aléatoire
+  * `message` - _obligatoire_ `string` texte du message à signer
+
+### Exemple [#example]
+
+```typescript
+HardwareSDK.aptosSignMessage(connectId, deviceId, {
+    path: "m/44'/637'/0'/0'/0'",
+    payload: {
+        nonce: "1",
+        message: "hello world"
+    }
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string;
+        fullMessage: string;
+        signature: string;
+        address: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

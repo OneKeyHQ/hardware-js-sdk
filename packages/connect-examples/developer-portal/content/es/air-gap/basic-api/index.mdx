@@ -1,0 +1,31 @@
+---
+title: "API básica"
+---
+
+<span id="basic-api" />
+
+# API básica
+
+Tipos UR básicos usados en todas las integraciones de cadenas para la firma sin conexión Air-Gap.
+
+## Tipos [#types]
+
+| Tipo | Descripción |
+|------|-------------|
+| [CryptoHDKey](./cryptohdkey) | Información de claves deterministas jerárquicas (clave pública extendida) |
+| [CryptoCoinInfo](./cryptocoininfo) | Tipo de criptomoneda e información de red |
+| [CryptoKeypath](./cryptokeypath) | Representación de una ruta de derivación BIP-44 |
+
+## Uso [#usage]
+
+Estos tipos son los componentes básicos de las solicitudes de firma de cada cadena:
+
+- `CryptoHDKey` – Se obtiene del dispositivo y contiene la xpub para derivar direcciones
+- `CryptoKeypath` – Especifica qué clave usar para firmar
+- `CryptoCoinInfo` – Identifica la cadena o red de destino
+
+## Paquetes [#packages]
+
+```bash
+npm install @keystonehq/bc-ur-registry
+```

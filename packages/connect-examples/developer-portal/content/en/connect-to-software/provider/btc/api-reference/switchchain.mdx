@@ -6,25 +6,24 @@ title: switchChain
 
 Switch chain
 
-### Method
+## Method
 
 ```typescript
-async function switchChain(chain: string): {
+declare function switchChain(chain: string): Promise<{
   enum: string;
   name: string;
   network: string;
-}
+}>;
 ```
 
-### Params
+## Params
 
 The chain enum. e.g. `BITCOIN_MAINNET`, `BITCOIN_TESTNET`
 
-### Example
+## Example
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
 
 await provider.switchChain("BITCOIN_TESTNET");
 ```
-

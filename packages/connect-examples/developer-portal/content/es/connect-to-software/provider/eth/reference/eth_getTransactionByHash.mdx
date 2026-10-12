@@ -1,0 +1,109 @@
+---
+title: "eth_getTransactionByHash"
+description: "Obtener los detalles de una transacción por su hash"
+---
+
+# eth_getTransactionByHash
+
+Devuelve la información de una transacción a partir de su hash.
+
+---
+
+## Parámetros [#parameters]
+
+| Índice | Tipo | Descripción |
+|-------|------|-------------|
+| 0 | `string` | Hash de la transacción (32 bytes) |
+
+---
+
+## Devuelve [#returns]
+
+`object | null` - Objeto de transacción o null si no se encuentra
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `hash` | `string` | Hash de la transacción |
+| `nonce` | `string` | Nonce del remitente (hexadecimal) |
+| `blockHash` | `string` | Hash del bloque (null si está pendiente) |
+| `blockNumber` | `string` | Número de bloque (null si está pendiente) |
+| `transactionIndex` | `string` | Índice en el bloque (null si está pendiente) |
+| `from` | `string` | Dirección del remitente |
+| `to` | `string` | Dirección del destinatario (null para la creación de contratos) |
+| `value` | `string` | Valor transferido (wei en hexadecimal) |
+| `gasPrice` | `string` | Precio del gas (hexadecimal) |
+| `gas` | `string` | Límite de gas (hexadecimal) |
+| `input` | `string` | Datos de la transacción |
+| `v` | `string` | ID de recuperación ECDSA |
+| `r` | `string` | Componente r de la firma ECDSA |
+| `s` | `string` | Componente s de la firma ECDSA |
+
+---
+
+## Ejemplo [#example]
+
+```typescript
+const tx = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionByHash',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (tx) {
+  console.log('From:', tx.from)
+  console.log('To:', tx.to)
+  console.log('Value:', BigInt(tx.value).toString())
+  console.log('Status:', tx.blockHash ? 'Mined' : 'Pending')
+}
+```
+
+### Seguir una transacción después de enviarla [#track-transaction-after-sending]
+
+```typescript
+async function sendAndTrack(txParams, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
+  // Send transaction
+  const txHash = await window.$onekey.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [txParams]
+  })
+
+  console.log('Transaction sent:', txHash)
+
+  // Poll for transaction details
+  const checkTx = async () => {
+    if (Date.now() >= deadline) throw new Error("Transaction lookup timed out")
+    const tx = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionByHash',
+      params: [txHash]
+    })
+
+    if (tx && tx.blockHash) {
+      console.log('Transaction mined in block:', parseInt(tx.blockNumber, 16))
+      return tx
+    }
+
+    // Still pending, check again
+    await new Promise(r => setTimeout(r, 2000))
+    return checkTx()
+  }
+
+  return checkTx()
+}
+```
+
+---
+
+## Errores [#errors]
+
+| Código | Mensaje | Descripción |
+|------|---------|-------------|
+| -32602 | Parámetros no válidos | Hash de transacción no válido |
+
+---
+
+## Notas [#notes]
+
+- Devuelve `null` si no se encuentra la transacción
+- Las transacciones pendientes tienen null en `blockHash` y `blockNumber`
+- Para consultar el estado de la transacción (éxito o fallo), usa [eth_getTransactionReceipt](/es/connect-to-software/provider/eth/reference/eth_getTransactionReceipt)
+- Los datos de la transacción persisten incluso después de que se mine

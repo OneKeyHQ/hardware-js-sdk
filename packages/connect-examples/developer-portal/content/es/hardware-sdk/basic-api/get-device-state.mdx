@@ -1,0 +1,68 @@
+---
+description: "Consulta una instantánea normalizada del dispositivo en Protocol V1 y V2, con alcance de estado de ejecución, ajustes o firmware."
+title: "Obtener el estado del dispositivo"
+---
+
+<span id="get-device-state" />
+
+# Obtener el estado del dispositivo
+
+Consulta la instantánea unificada del dispositivo V1 / V2. Usa este método en lugar del obsoleto [`getFeatures`](/es/hardware-sdk/basic-api/get-features).
+
+`getFeatures()` solo se ejecuta en Protocol V1. Pro 2 y Neo deben llamar a `getDeviceState()` y consultar `payload.identity.deviceId`. Para los campos de firmware/versión, usa `scope: 'firmware'` en lugar de `getOnekeyFeatures`.
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+| Parámetro | Tipo | Obligatorio | Notas |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | No | El valor predeterminado es `'runtime'`. El ámbito solo selecciona qué particiones actualiza esta lectura; el payload sigue siendo una instantánea completa |
+
+- `runtime` — estado actual de bloqueo, PIN y passphrase (V1 `GetFeatures`, V2 `DeviceStatusGet` en modo de aplicación)
+- `settings` — actualiza también los ajustes
+- `firmware` — actualiza también la identidad, las versiones y la información de verificación
+
+Bootloader y romloader omiten los comandos de estado no compatibles y devuelven la instantánea disponible.
+
+### Resultado [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    identity: {
+      deviceId: string | null, // seed lifetime — pass as the second SDK argument
+      serialNo: string,
+      deviceType: string,
+      // ...
+    },
+    status: { initialized, unlocked, passphraseProtection, attachToPinEnabled, ... },
+    settings: { language, airgapMode, ... },
+    versions: { firmware, bootloader, ble, applicationP1, applicationP2, ... },
+  }
+}
+```
+
+Consulta `payload.identity.deviceId` como segundo argumento de las llamadas de firma. No guardes de forma persistente el valor de firmware `session_id` de Features de compatibilidad.
+
+Los datos devueltos **no** incluyen el valor de cartera del firmware `session_id` ni mensajes de protocolo en bruto. La identidad de la cartera procede de [`openWalletSession`](/es/hardware-sdk/basic-api/open-wallet-session).
+
+### Error [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+Consulta [Protocol V1 y V2](/es/hardware-sdk/concepts/protocol).

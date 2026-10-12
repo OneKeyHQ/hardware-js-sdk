@@ -1,0 +1,29 @@
+---
+title: "switchNetwork"
+---
+
+# switchNetwork
+
+Demander le passage au réseau Bitcoin spécifié.
+
+## Méthode [#method]
+
+```typescript
+declare function switchNetwork(network: 'livenet' | 'testnet'): Promise<void>;
+```
+
+## Paramètres [#params]
+
+`network` — le réseau cible : `livenet` ou `testnet`. La promesse se résout sans valeur.
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+await provider.switchNetwork("livenet");
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/ZEwMJKJ)

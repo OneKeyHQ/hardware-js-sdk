@@ -1,0 +1,78 @@
+---
+title: "wallet_requestPermissions"
+description: "Berechtigungen für die dApp anfordern"
+---
+
+# wallet_requestPermissions
+
+Fordert Berechtigungen für den Zugriff der dApp auf bestimmte Methoden an. Dies ist Teil des Wallet-Berechtigungssystems EIP-2255.
+
+---
+
+## Parameter [#parameters]
+
+`Array` mit einem Berechtigungsanfrageobjekt:
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `eth_accounts` | `object` | Zugriff auf Nutzerkonten anfordern |
+
+---
+
+## Rückgabe [#returns]
+
+`Array` von Berechtigungsobjekten:
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `parentCapability` | `string` | Der Berechtigungsname |
+| `date` | `number` | Zeitstempel der Erteilung |
+| `caveats` | `array` | Einschränkungen der Berechtigung |
+
+---
+
+## Beispiel [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+console.log('Granted permissions:', permissions)
+// [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
+```
+
+### Bestimmte Berechtigung prüfen [#check-specific-permission]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+const hasAccountsPermission = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Has accounts permission:', hasAccountsPermission)
+```
+
+---
+
+## Fehler [#errors]
+
+| Code | Nachricht | Beschreibung |
+|------|---------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt | Nutzer hat die Berechtigungsanfrage abgelehnt |
+| -32602 | Ungültige Parameter | Ungültige Berechtigungsanfrage |
+
+---
+
+## Hinweise [#notes]
+
+- Derzeit wird nur die Berechtigung `eth_accounts` unterstützt
+- Der Aufruf dieser Methode öffnet den Verbindungsdialog, wenn noch keine Verbindung besteht
+- Berechtigungen bleiben bestehen, bis der Nutzer sie widerruft
+- Spezifiziert durch [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Behandeln Sie Fehler für nicht unterstützte Methoden in der Ziel-Wallet-Version. Kontoberechtigungen unterscheiden sich von der RPC-Verbindung und genehmigen keine Signaturen oder Transaktionen im Voraus. Für eine einfache Verbindung verwenden Sie `eth_requestAccounts`.

@@ -1,0 +1,74 @@
+---
+title: "nervosGetAddress"
+---
+
+# nervosGetAddress
+
+### Nervos: Adresse abrufen [#nervos-get-address]
+
+Leitet die Adresse am angegebenen Pfad ab und gibt sie zurück. Wenn `showOnOneKey` gleich `true` ist, muss der Nutzer die Adresse auf dem Gerät bestätigen.
+
+```typescript
+const result = await HardwareSDK.nervosGetAddress(connectId, deviceId, params);
+```
+
+#### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.9.0
+  * mini: 3.7.0
+
+#### Parameter [#parameters]
+
+connectId: `string`
+
+* Eindeutige Kennung der Verbindung
+
+deviceId: `string`
+
+* Eindeutige Kennung des Hardwaregeräts
+
+params: `object`
+
+* path: _erforderlich_ `string` - BIP32-Pfad der angeforderten Adresse (z. B. "m/44'/309'/0'/0/0")
+* network: _erforderlich_`string` - Netzwerkname (z. B. "ckb")
+* showOnOneKey: _optional_ `boolean` - Ob die Adresse auf dem Gerät angezeigt werden soll
+
+#### Beispiel [#example]
+
+```typescript
+const response = await HardwareSDK.nervosGetAddress('connect1', 'device1', {
+    path: "m/44'/309'/0'/0/0",
+    showOnOneKey: true,
+    network: "ckb"
+});
+
+if (response.success === false) throw new Error(response.payload.error);
+console.log(response.payload.address);
+```
+
+#### Rückgabe [#returns]
+
+Gibt ein Promise zurück, das aufgelöst wird zu:
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Nervos address
+        path: string  // BIP32 path used for derivation
+    }
+}
+```
+
+Fehlerantwort:
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,  // Error message
+        code?: string | number    // Error code
+    }
+}
+```

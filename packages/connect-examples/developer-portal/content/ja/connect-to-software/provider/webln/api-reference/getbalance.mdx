@@ -1,0 +1,35 @@
+---
+title: "getBalance"
+---
+
+# getBalance
+
+アカウント残高を確認
+
+## メソッド [#method]
+
+```typescript
+declare function getBalance(): Promise<BalanceResponse>;
+```
+
+## レスポンス [#response]
+
+```typescript
+interface BalanceResponse {
+    balance: number;
+    currency?: "sats" | "EUR" | "USD"
+}
+```
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const balance = await provider.getBalance();
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/GRzXmqN)

@@ -1,0 +1,63 @@
+---
+title: "signMessage"
+---
+
+# signMessage
+
+## Matrice de prise en charge des portefeuilles et types d’adresses [#wallet--address-type-support-matrix]
+
+| Méthode de signature | Type de portefeuille               | Types d’adresses pris en charge   |
+| -------------- | ------------------------- | ------------------------- |
+| ECDSA          | Logiciel et matériel       | P2PKH, P2SH, P2WPKH, P2TR |
+| BIP322-Simple  | Logiciel                  | P2WPKH, P2TR              |
+| BIP322-Simple  | Matériel (Pro, Classic1S) | P2TR                      |
+
+Signer un message avec la méthode de signature ECDSA ou BIP322-Simple.
+
+## Méthode [#method]
+
+```typescript
+declare function signMessage(
+  message: string,
+  type?: "ecdsa" | "bip322-simple"
+): Promise<string>
+```
+
+## Paramètres [#params]
+
+* `message` — _obligatoire_ `string` Une chaîne à signer
+* `type` — _facultatif_ `string` Type de méthode de signature, "ecdsa" ou "bip322-simple". La valeur par défaut est "ecdsa"
+
+## Valeur de retour [#returns]
+
+`signature` — `string` La signature du message signé
+
+## Exemples [#examples]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+// Sign with ECDSA (default)
+try {
+  const message = "Hello OneKey";
+  const signature = await provider.signMessage(message);
+  console.log("ECDSA signature:", signature);
+} catch (e) {
+  console.error("Error signing with ECDSA:", e);
+}
+
+// Sign with BIP322-Simple
+try {
+  const message = "Hello OneKey";
+  const signature = await provider.signMessage(message, "bip322-simple");
+  console.log("BIP322-Simple signature:", signature);
+} catch (e) {
+  console.error("Error signing with BIP322-Simple:", e);
+}
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/OJdojZM)
+
+> La compatibilité des portefeuilles et des adresses dépend du portefeuille et de la version du micrologiciel. Vérifiez la prise en charge du compte cible avant de vous fier au tableau de compatibilité.

@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 交易
 
+准备交易前，先连接 provider 并读取当前网络。这些示例适用于 Conflux Core Space。请替换省略的地址，并在调用 SDK 方法前初始化客户端。
+
 了解如何在 Conflux 上发送交易。
 
 ---
@@ -19,12 +21,12 @@ const txHash = await provider.request({
   params: [{
     from: senderAddress,
     to: recipientAddress,
-    value: '0xDE0B6B3A7640000', // 1 CFX（以 Drip 为单位，十六进制）
+    value: '0xDE0B6B3A7640000', // 1 CFX in Drip (hex)
     gas: '0x5208', // 21000
   }]
 })
 
-console.log('交易哈希:', txHash)
+console.log('Transaction hash:', txHash)
 ```
 
 ---
@@ -32,7 +34,7 @@ console.log('交易哈希:', txHash)
 ## 带 Gas 估算发送
 
 ```typescript
-// 首先估算 gas
+// Estimate gas first
 const gasEstimate = await provider.request({
   method: 'cfx_estimateGasAndCollateral',
   params: [{
@@ -42,7 +44,7 @@ const gasEstimate = await provider.request({
   }]
 })
 
-// 使用估算值发送
+// Send with estimated values
 const txHash = await provider.request({
   method: 'cfx_sendTransaction',
   params: [{
@@ -68,7 +70,7 @@ const result = await provider.request({
   }, 'latest_state']
 })
 
-console.log('结果:', result)
+console.log('Result:', result)
 ```
 
 ---
@@ -91,25 +93,25 @@ const conflux = new Conflux({
   networkId: 1029,
 })
 
-// 使用 OneKey provider 进行签名
+// Use OneKey provider for signing
 conflux.provider = provider
 ```
 
 ### 使用 SDK 发送交易
 
 ```typescript
-// 创建并发送交易
-const tx = await conflux.cfx.sendTransaction({
+// Create and send transaction
+const tx = conflux.cfx.sendTransaction({
   from: senderAddress,
   to: recipientAddress,
   value: Conflux.Drip.fromCFX(1), // 1 CFX
 })
 
-console.log('交易:', tx)
+console.log('Transaction:', tx)
 
-// 等待确认
+// Wait for confirmation
 const receipt = await tx.executed()
-console.log('收据:', receipt)
+console.log('Receipt:', receipt)
 ```
 
 ### 合约交互
@@ -120,11 +122,11 @@ const contract = conflux.Contract({
   address: contractAddress,
 })
 
-// 读取
+// Read
 const result = await contract.someViewFunction().call()
 
-// 写入
-const tx = await contract.someWriteFunction(param1, param2).sendTransaction({
+// Write
+const tx = contract.someWriteFunction(param1, param2).sendTransaction({
   from: senderAddress,
 })
 
@@ -142,12 +144,11 @@ try {
   })
 } catch (error) {
   if (error.code === 4001) {
-    console.log('用户拒绝了请求')
+    console.log('User rejected the request')
   } else if (error.code === -32603) {
-    console.log('内部错误')
+    console.log('Internal error')
   } else {
-    console.error('错误:', error.message)
+    console.error('Error:', error.message)
   }
 }
 ```
-

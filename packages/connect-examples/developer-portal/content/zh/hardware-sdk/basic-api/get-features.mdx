@@ -1,5 +1,6 @@
 ---
 title: 获取设备特性
+description: 理解已弃用的 getFeatures 投影及 getDeviceState 替代方式。
 ---
 
 import { Callout } from 'nextra/components'
@@ -12,13 +13,13 @@ import { Callout } from 'nextra/components'
 
 ## 获取设备特性
 
-获取设备的所有属性。新代码请读 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（`payload.identity.deviceId`）。
+读取旧版 Protocol V1 的 features 投影。新代码请读 [`getDeviceState`](/zh/hardware-sdk/basic-api/get-device-state)（`payload.identity.deviceId`）。
 
 ```typescript
 const response = await HardwareSDK.getFeatures(connectId);
 ```
 
-> 如果屏幕正在显示其他内容，您也可以调用此方法返回主页。
+此方法读取兼容的 features 投影，不是界面导航或解锁 API；不要依赖它让设备返回主屏幕。
 
 ### 参数
 

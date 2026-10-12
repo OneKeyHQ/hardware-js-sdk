@@ -1,0 +1,32 @@
+---
+title: "BLE natif"
+description: "Choisissez un pont BLE natif pour Android, iOS ou Flutter tout en conservant l’API commune du Hardware SDK."
+---
+
+<span id="native-ble" />
+
+# BLE natif
+
+Utilisez `@onekeyfe/hd-common-connect-sdk` dans un contexte mobile natif pour transmettre les appels de transport matériel via BLE. Le SDK exécute JavaScript dans une WebView ou un moteur JS, tandis que la communication Bluetooth native a lieu dans l’application hôte.
+
+## Quand choisir le BLE natif [#when-to-choose-native-ble]
+
+- Vous contrôlez toute l’expérience de l’application native (Android, iOS, Flutter) et pouvez héberger une WebView ou un environnement JS qui transmet `send`/`receive` via BLE.
+- Vous avez besoin d’un accès précis aux autorisations BLE du système, aux parcours d’appairage ou à une interface personnalisée plus facile à créer en Swift/Kotlin ou Flutter qu’en React Native.
+- Vous souhaitez réutiliser l’API JavaScript de `@onekeyfe/hd-common-connect-sdk` tout en gérant vous-même la pile BLE native.
+
+## Guides des plateformes [#platform-guides]
+
+| Plateforme | Points clés | Guide |
+| --- | --- | --- |
+| Android | Pont Nordic BLE, appairage, autorisations et connexion du pont JS | [Android (natif)](/fr/hardware-sdk/transport/android) |
+| iOS | Configuration CoreBluetooth, utilitaires d’appairage et gestion des événements JS | [iOS (natif)](/fr/hardware-sdk/transport/ios) |
+| Flutter | Connexion du plugin Flutter + exemples de pont hôte natif | [Flutter (natif)](/fr/hardware-sdk/transport/flutter) |
+
+Besoin d’une expérience React Native multiplateforme ? Utilisez plutôt le guide [BLE React Native](/fr/hardware-sdk/transport/react-native-ble).
+
+## Concepts fondamentaux [#core-concepts]
+
+- Lisez [Plugin de transport de bas niveau et protocole](/fr/hardware-sdk/concepts/low-level-plugin) avant de connecter le BLE natif pour comprendre la transmission des notifications BLE brutes et le cadrage V1/V2 géré par le SDK.
+- Abonnez-vous tôt à `UI_EVENT` pour éviter que les confirmations et demandes de PIN/phrase secrète ne bloquent la file de requêtes.
+- Réutilisez le même adaptateur `HardwareSDK` que dans le guide web ; le code natif transmet simplement des paquets BLE au lieu de WebUSB.

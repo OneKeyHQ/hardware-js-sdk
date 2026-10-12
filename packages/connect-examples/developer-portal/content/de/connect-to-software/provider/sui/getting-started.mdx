@@ -1,0 +1,186 @@
+---
+title: "Erste Schritte"
+description: "Über den Sui-Wallet-Standard-Provider von OneKey mit Sui verbinden"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# Erste Schritte
+
+Fordern Sie vor dem Signieren eine Berechtigung an, wählen Sie ein verbundenes Konto aus und lesen Sie die aktive Chain. Diese Beispiele verwenden `@mysten/sui@1.28.2`, passend zu `@mysten/wallet-standard@0.14.7`, das der aktuelle Provider akzeptiert.
+
+Erfahren Sie, wie Sie Sui mit dem Provider von OneKey erkennen, verbinden und damit interagieren.
+
+<Callout type="info">
+OneKey implementiert den Sui Wallet Standard für kompatible Wallet-Standard-Integrationen.
+</Callout>
+
+---
+
+## Provider erkennen [#provider-detection]
+
+```typescript
+// Detect OneKey Sui provider
+const provider = window.$onekey?.sui
+
+if (!provider) {
+  throw new Error('OneKey Sui provider not detected')
+}
+```
+
+---
+
+## Berechtigungen prüfen [#check-permissions]
+
+```typescript
+// Check if already connected
+const hasPermission = await provider.hasPermissions()
+
+if (hasPermission) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected accounts:', accounts)
+}
+```
+
+---
+
+## Verbindung anfordern [#request-connection]
+
+```typescript
+// Request permissions to connect
+const result = await provider.requestPermissions()
+
+if (result) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected:', accounts[0].address)
+}
+```
+
+---
+
+## Kontokontext zum Signieren [#account-context-for-signing]
+
+Installieren Sie `@mysten/wallet-standard@0.14.7`. Das vom Provider injizierte `getAccounts()` gibt zurück: `AccountInfo[]`, nicht das `WalletAccount`, das Signiermethoden benötigen. Die folgende Hilfsfunktion ruft das vollständige Konto über Wallet Standard ab. Rufen Sie sie nach der Wallet-Registrierung über eine Nutzeraktion auf; behandeln Sie Ablehnungen und verbinden Sie sich nach Konto- oder Netzwerkänderungen erneut.
+
+```typescript
+import { getWallets, isWalletWithRequiredFeatureSet } from '@mysten/wallet-standard'
+
+async function connectSuiAccount() {
+  const wallet = getWallets().get().find(wallet => wallet.name === 'OneKey Wallet')
+  if (!wallet || !isWalletWithRequiredFeatureSet(wallet)) {
+    throw new Error('OneKey Sui Wallet Standard is not available')
+  }
+
+  const { accounts } = await wallet.features['standard:connect'].connect()
+  const [account] = accounts
+  const chain = await provider.getActiveChain()
+  if (!account || !chain || !account.chains.includes(chain)) {
+    throw new Error('No connected Sui account for the active chain')
+  }
+  return { account, chain }
+}
+```
+
+---
+
+## Konten abrufen [#get-accounts]
+
+```typescript
+const accounts = await provider.getAccounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Sui address
+    publicKey: account.publicKey, // Public key (hex string)
+  })
+})
+```
+
+---
+
+## Aktive Chain abrufen [#get-active-chain]
+
+```typescript
+const chain = await provider.getActiveChain()
+
+console.log('Active chain:', chain) // e.g., 'sui:testnet'
+```
+
+---
+
+## Verbindungsstatus prüfen [#check-connection-status]
+
+```typescript
+const isConnected = provider.isConnected()
+console.log('Connected:', isConnected)
+```
+
+---
+
+## Trennen [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Ereignis-Listener [#event-listeners]
+
+### Auf Kontoänderungen reagieren [#listen-for-account-changes]
+
+```typescript
+provider.onAccountChange((account) => {
+  if (account) {
+    console.log('Account changed:', account.address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Auf Netzwerkänderungen reagieren [#listen-for-network-changes]
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('Network changed:', network)
+})
+```
+
+---
+
+## Mit Sui Wallet Kit verwenden [#using-with-sui-wallet-kit]
+
+Dieses React-Beispiel verwendet die unten festgelegten kompatiblen Paketversionen:
+
+```bash
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
+```
+
+```tsx
+import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
+import { getFullnodeUrl } from '@mysten/sui/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
+const networks = {
+  mainnet: { url: getFullnodeUrl('mainnet') },
+  testnet: { url: getFullnodeUrl('testnet') },
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networks} defaultNetwork="mainnet">
+        <WalletProvider>
+          <YourApp />
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
+  )
+}
+```
+
+OneKey wird automatisch über den Sui Wallet Standard erkannt.

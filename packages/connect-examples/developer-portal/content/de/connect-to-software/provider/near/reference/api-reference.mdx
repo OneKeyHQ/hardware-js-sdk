@@ -1,0 +1,24 @@
+---
+title: "API-Referenz"
+---
+
+<span id="near-api-reference" />
+
+# NEAR-API-Referenz
+
+Erstellen Sie eine `OneKeyNearProvider`-Instanz wie unter [SDK installieren](/de/connect-to-software/provider/near/integrating/install-the-provider-sdk) gezeigt. Der Provider stellt Hilfsmethoden sowie `request({ method, params })` bereit.
+
+| Vorgang | Methode | Ergebnis |
+| --- | --- | --- |
+| Erweiterung erkennen | `detectWalletInstalled()` | `Promise<boolean>` |
+| Kontozugriff anfordern | `requestSignIn()` / `near_requestAccounts` | `{ accounts: NearAccountInfo[] }` |
+| Freigegebene Konten lesen | `near_accounts` | `{ accounts: NearAccountInfo[] }` |
+| Ausgewähltes Netzwerk lesen | `near_networkInfo` | `{ networkId: string, nodeUrls?: string[] }` |
+| Trennen | `signOut()` / `near_signOut` | Vor dem Aktualisieren des Verbindungsstatus auf den Abschluss warten |
+| Transaktion erstellen | `createTransaction({ receiverId, actions, nonceOffset })` | Eine unsignierte Transaktion |
+| Signieren und senden | `requestSignTransactions({ transactions })` / `near_sendTransactions` | `{ transactionHashes: string[] }` |
+| Nachrichten signieren | `near_signMessages` | `{ signatures: string[] }` |
+
+`NearAccountInfo` enthält `accountId` und `publicKey`, optional mit `allKeys`. Array-Ergebnisse können leer sein, wenn kein Konto freigegeben ist.
+
+Siehe [Transaktionen signieren](/de/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction) für die reine Signieranfrage, [Ereignisse](/de/connect-to-software/provider/near/integrating/watch-accounts-and-network-status) für Zustandsänderungen und [Fehlerbehebung](/de/connect-to-software/provider/near/reference/trouble-shooting) für Fehler. Der RPC-Endpunkt und die Wallet-Version bestimmen, welche zusätzlichen Methoden verfügbar sind.

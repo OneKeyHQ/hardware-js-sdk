@@ -1,0 +1,32 @@
+---
+title: "设备初始化与擦除"
+description: "设备管理与普通的账户发现、签名流程分开。只有在用户明确发起的设备管理界面中才应提供这些操作。首次连接不得自动初始化或擦除设备。"
+---
+
+# 设备初始化与擦除
+
+设备管理与普通的账户发现、签名流程分开。只有在用户明确发起的设备管理界面中才应提供这些操作。首次连接不得自动初始化或擦除设备。
+
+## deviceReset：在设备上创建钱包
+
+`deviceReset(connectId, params)` 请求设备初始化并生成新的恢复材料。当前 SDK 实现使用 Protocol V1，未声明 V2 支持；不能仅根据方法名推断它支持 Pro 2。
+
+| 参数 | 类型 | 含义 |
+| --- | --- | --- |
+| `displayRandom` | `boolean` | 请求额外熵之前显示设备生成的熵。 |
+| `strength` | `number` | 请求的熵强度，SDK 回退值为 `256`；固件也会约束可接受的强度。 |
+| `pinProtection`、`passphraseProtection` | `boolean` | 请求的保护设置。 |
+| `language`、`label` | `string` | 请求的设备语言和名称。 |
+| `u2fCounter` | `number` | U2F 计数器；SDK 回退值为当前 Unix 秒级时间戳。 |
+| `skipBackup`、`noBackup` | `boolean` | 备份流程选项，不代表设备没有种子；不要静默启用。 |
+| `backupType` | `string \| number` | 取决于固件的备份格式。 |
+
+以上选项在公开类型中均为可选。核对目标固件并检查操作返回结果。恢复材料应留在设备上，不要要求用户在主机表单或日志中提供。
+
+## deviceWipe：擦除设备私密数据
+
+`deviceWipe(connectId)` 会移除设备中的私密数据，必须由用户明确确认。当前源码在 Protocol V1 下发送 `WipeDevice`；在 Protocol V2 下打开设备重置设置流程。显示设备提示不代表操作完成，应等待返回并处理取消。
+
+擦除成功后，SDK 会使设备状态失效。应用应清除当前账户选择和钱包绑定，重新发现设备后再执行其他操作。不要复用旧 `deviceId`，也不要假设恢复短语仍可取得。
+
+两种方法都使用 SDK 的 `success` / `payload` 返回结构。处理错误时不要自动重试破坏性操作。实现前阅读 [UI 事件处理](/zh/hardware-sdk/core-api-guide#events-ui) 和[设备标识](/zh/hardware-sdk/concepts/identifiers)。

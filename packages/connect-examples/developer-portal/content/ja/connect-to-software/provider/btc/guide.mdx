@@ -1,0 +1,67 @@
+---
+title: "ガイド"
+---
+
+<span id="guide" />
+
+# ガイド
+
+## 概要 [#overview]
+
+このガイドでは、OneKey Provider API を使って BTC とやり取りできる Web アプリケーションを簡単に構築する方法を説明します。
+
+
+## インストール [#install]
+
+### 1. OneKey ウォレットをダウンロード [#1-download-onekey-wallet]
+
+次をダウンロードします: [OneKey ウォレット](https://onekey.so/download?client=browserExtension)。OneKey ブラウザー拡張機能をインストールしてください。
+
+#### 2. API の注入について [#2-api-injection-explanation]
+
+* OneKey ブラウザー拡張機能は、アクセスした Web サイトに `Provider API` を注入します。
+* 2 種類の API が提供されています: `window.unisat` および `window.$onekey.btc`.
+* `window.$onekey.btc` の使用を推奨します。
+
+> OneKey を明示的に選択するには `window.$onekey.btc` を優先してください。グローバルの `window.unisat` は、複数の拡張機能がインストールされている場合、別のウォレットに属していることがあります。
+
+### Provider API 対応の検出 [#detecting-provider-api-support]
+
+リクエスト前にプロバイダーが利用可能か確認してください:
+
+```javascript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+if (!provider) {
+  throw new Error("No Bitcoin provider is available.");
+}
+```
+
+### OneKey に接続 [#connecting-to-onekey]
+
+以下の API を使用する前に、まず次の `provider.requestAccounts` メソッドで、該当する BTC アカウントへのアクセスをユーザーに要求する必要があります。
+
+```
+await provider.requestAccounts();
+```
+
+他の API は、ユーザーの承認後にのみ呼び出すことができます。
+
+## API [#api]
+
+アプリケーションに必要な操作に対応する API を選択します。
+
+* ユーザーのアカウント情報を取得: [`provider.getAccounts`](/ja/connect-to-software/provider/btc/api-reference/getaccounts)
+* 支払いを送信: [`provider.sendBitcoin`](/ja/connect-to-software/provider/btc/api-reference/sendbitcoin)
+* 任意のメッセージへの署名を要求: [`provider.signMessage`](/ja/connect-to-software/provider/btc/api-reference/signmessage)
+
+**その他のインターフェース**: [詳細を表示](/ja/connect-to-software/provider/btc/api-reference)
+
+## イベント [#event]
+
+* **主な操作**: アカウントの切り替えなど
+* **詳細情報**: [さらに表示](/ja/connect-to-software/provider/btc/event)
+
+## リクエストの処理 [#handling-requests]
+
+ウォレットへのリクエストは async 関数または ES モジュールから実行してください。Promise の拒否をキャッチし、アプリケーションにエラーを表示します。接続、署名、支払いはユーザー操作から要求し、リクエストの処理中は起点となったボタンを無効にしてください。

@@ -1,0 +1,73 @@
+---
+title: "scdoSignMessage"
+---
+
+# scdoSignMessage
+
+#### Voraussetzungen [#requirements]
+
+* Mindest-Firmware-Versionen
+  * Touch: 4.10.0
+
+#### SCDO: Nachricht signieren [#scdo-sign-message]
+
+Signiert eine Nachricht mit dem privaten Schlüssel, der aus dem angegebenen BIP32-Pfad abgeleitet wird.
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+const response = await HardwareSDK.scdoSignMessage(connectId, deviceId, {
+    path: "m/44'/541'/0'/0/0",
+    messageHex: messageHex
+});
+```
+
+**Parameter**
+
+Optionale gemeinsame Parameter
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _erforderlich_ `string` Zu signierende Nachricht im Hexformat
+
+**Beispiel**
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+const response = await HardwareSDK.scdoSignMessage(connectId, deviceId, {
+    path: "m/44'/541'/0'/0/0",
+    messageHex,
+});
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string,
+        address: string
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number  // error code
+    }
+}
+```

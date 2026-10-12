@@ -1,0 +1,71 @@
+---
+title: "benfenSignMessage"
+---
+
+# benfenSignMessage
+
+**要件**
+
+* 最小ファームウェアバージョン
+  * Pro: 4.12.0
+  * Classic 1S / Classic 1S Pure: 3.11.0
+
+### Benfen: メッセージに署名 [#benfen-sign-message]
+
+指定の BIP32 パスから導出した秘密鍵でメッセージに署名します。ユーザーは OneKey デバイス上で操作を確認する必要があります。
+
+```typescript
+const result = await HardwareSDK.benfenSignMessage(connectId, deviceId,{
+  path: "m/44'/728'/0'/0'/0'",
+  messageHex: "68656c6c6f" // "hello" in hex
+});
+```
+
+#### パラメーター [#params]
+
+**任意の共通パラメーター**
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`. [パス形式](/ja/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _必須_ `string` 署名するメッセージ (16 進数形式)
+
+#### 戻り値 [#returns]
+
+* `success` - _boolean_ 成功時は True
+* `payload`
+  * `signature` - _string_ 16 進数形式の署名
+  * `address` - _string_ 署名に使用した BFC 形式のアドレス
+
+例:
+
+```typescript
+const params = {
+  path: "m/44'/728'/0'/0'/0'",
+  messageHex: "68656c6c6f" // "hello" in hex
+};
+
+const response = await HardwareSDK.benfenSignMessage(connectId, deviceId, params);
+```
+
+結果
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+    address: string,
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

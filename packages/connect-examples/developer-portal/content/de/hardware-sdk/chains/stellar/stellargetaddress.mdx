@@ -1,0 +1,87 @@
+---
+title: "stellarGetAddress"
+---
+
+# stellarGetAddress
+
+## Stellar: Adresse abrufen [#stellar-get-address]
+
+Leitet die Adresse am angegebenen Pfad ab und gibt sie zurück. Wenn `showOnOneKey` gleich `true` ist, muss der Nutzer die Adresse auf dem Gerät bestätigen.
+
+```typescript
+const response = await HardwareSDK.stellarGetAddress(connectId, deviceId, params)
+```
+
+### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+**Einzelne Adresse**
+
+* `path` - _erforderlich_ `string | Array<number>`  Ein vollständig gehärteter Stellar-Kontopfad, etwa `m/44'/148'/0'`. [Weitere Informationen](/de/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _optional_ `boolean` Ob die Adresse auf dem Gerät angezeigt werden soll. Standard ist `true`.
+
+**Mehrere Adressen**
+
+* `bundle` - Array von Objekten mit `path` und `showOnOneKey`-Feldern
+
+#### Beispiel [#example]
+
+Adresse des ersten Stellar-Kontos anzeigen:
+
+```typescript
+HardwareSDK.stellarGetAddress(connectId, deviceId, {
+    path: "m/44'/148'/0'"
+});
+```
+
+Ein Bündel von Stellar-Adressen zurückgeben, ohne sie auf dem Gerät anzuzeigen:
+
+```typescript
+HardwareSDK.stellarGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/148'/0'", showOnOneKey: false }, // account 1
+        { path: "m/44'/148'/1'", showOnOneKey: false }, // account 2
+        { path: "m/44'/148'/2'", showOnOneKey: false }  // account 3
+    ]
+});
+```
+
+#### Ergebnis [#result]
+
+Antwort für eine einzelne Adresse
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+Batch-Antwort in derselben Reihenfolge wie die Anfrage
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string }, // account 1
+        { address: string, path: string }, // account 2
+        { address: string, path: string }  // account 3
+    ]
+}
+```
+
+Fehler
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

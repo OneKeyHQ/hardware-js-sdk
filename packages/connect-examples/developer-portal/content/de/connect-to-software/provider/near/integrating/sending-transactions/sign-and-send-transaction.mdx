@@ -1,0 +1,55 @@
+---
+title: "Transaktion signieren und senden"
+---
+
+<span id="sign-and-send-transaction" />
+
+# Transaktion signieren und senden
+
+Nachdem eine Transaktion erstellt wurde, kann die Webanwendung die OneKey-Wallet des Nutzers bitten, die Transaktion mit dem privaten Schlüssel des Kontos und der NEAR-JSON-RPC-Verbindung zu signieren und zu senden.
+
+Der mit Abstand **einfachste** und **empfohlene** Weg dafür ist die Verwendung der `requestSignTransactions`-Methode des Providers; es ist aber auch möglich mit `request`.
+
+In beiden Fällen gibt der Aufruf ein [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) für ein Objekt zurück, das Folgendes enthält: `transactionHashes`.
+
+## requestSignTransactions() [#requestsigntransactions]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.requestSignTransactions({
+  transactions: [transaction], // must be Array type
+});
+console.log('requestSignTransactions', res, res.transactionHashes);
+
+```
+
+## request() [#request]
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transaction], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+Die Transaktion kann auch vor dem Methodenaufruf als **`base64`**-Zeichenfolge serialisiert werden.
+
+```javascript
+// `transaction` is created in the Create Transaction guide.
+
+const transactionSerialized = btoa(String.fromCharCode(...transaction.encode()));
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transactionSerialized], // must be Array type
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+Behandeln Sie abgelehnte Anfragen in einem `try`/`catch`-Block. Ein zurückgegebener Transaktionshash ist eine Kennung, keine Garantie für eine erfolgreiche Ausführung; prüfen Sie das Transaktionsergebnis über die Netzwerk-RPC.

@@ -1,0 +1,37 @@
+---
+title: "sendPayment"
+---
+
+# sendPayment
+
+Solicita al usuario que pague una factura. La aplicación debe proporcionar una factura BOLT-11
+
+## Método [#method]
+
+```typescript
+declare function sendPayment(paymentRequest: string): Promise<SendPaymentResponse>;
+```
+
+* `paymentRequest`: La factura que quieres que pague el usuario (lnbc...)
+
+## Respuesta [#response]
+
+```typescript
+interface SendPaymentResponse {
+  preimage: string;
+}
+```
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+const invoice = "<BOLT11_INVOICE>"; // Replace with a complete invoice.
+await provider.enable();
+const info = await provider.sendPayment(invoice);
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/OJdomvO)

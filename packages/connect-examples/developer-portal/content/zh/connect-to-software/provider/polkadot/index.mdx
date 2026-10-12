@@ -10,7 +10,7 @@ import { Callout, Tabs } from 'nextra/components'
 使用 OneKey 的 Provider 集成 Polkadot 和基于 Substrate 的链。通过 `window.$onekey.polkadot` 或 Polkadot.js 扩展 API 访问。
 
 <Callout type="info">
-OneKey 实现了 Polkadot.js 扩展接口，确保与所有 Substrate dApp 兼容。
+OneKey 通过 Polkadot.js 扩展接口提供本文列出的操作。
 </Callout>
 
 ---
@@ -18,19 +18,19 @@ OneKey 实现了 Polkadot.js 扩展接口，确保与所有 Substrate dApp 兼�
 ## 快速链接
 
 - [API 参考](#api-参考)
-- [连接钱包](#连接钱包)
+- [快速开始](getting-started)
 - [签名](#签名)
-- [配合 Polkadot.js 使用](#配合-polkadotjs-使用)
+- [配合 Polkadot.js 使用](#配合-polkadotjs-api-使用)
 
 ---
 
 ## Provider 检测
 
 ```typescript
-// OneKey 注册为 Polkadot.js 扩展
+// OneKey registers as a Polkadot.js extension
 const provider = window.$onekey?.polkadot
 
-// 或使用标准的 web3Enable API
+// Or use the standard web3Enable API
 import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
 ```
 
@@ -41,12 +41,12 @@ import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
 ### 启用扩展
 
 ```typescript
-// 直接使用 OneKey provider
+// Using OneKey provider directly
 const enabled = await provider.web3Enable('My dApp')
 
 if (enabled) {
   const accounts = await provider.web3Accounts()
-  console.log('账户:', accounts)
+  console.log('Accounts:', accounts)
 }
 ```
 
@@ -55,16 +55,16 @@ if (enabled) {
 ```typescript
 import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
 
-// 启用所有扩展（包括 OneKey）
+// Enable all extensions (including OneKey)
 const extensions = await web3Enable('My dApp')
 
 if (extensions.length === 0) {
-  throw new Error('未找到扩展')
+  throw new Error('No extension found')
 }
 
-// 获取所有账户
+// Get all accounts
 const allAccounts = await web3Accounts()
-console.log('账户:', allAccounts)
+console.log('Accounts:', allAccounts)
 ```
 
 ---
@@ -78,10 +78,10 @@ const accounts = await provider.web3Accounts()
 
 accounts.forEach(account => {
   console.log({
-    address: account.address,     // Substrate 地址
-    name: account.name,           // 账户名称
+    address: account.address,     // Substrate address
+    name: account.name,           // Account name
     type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
-    genesisHash: account.genesisHash, // 可选的链创世块哈希
+    genesisHash: account.genesisHash, // Optional chain genesis
   })
 })
 ```
@@ -90,10 +90,10 @@ accounts.forEach(account => {
 
 ```typescript
 const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
-  console.log('账户已变更:', accounts)
+  console.log('Accounts changed:', accounts)
 })
 
-// 稍后取消订阅: unsubscribe()
+// Later: unsubscribe()
 ```
 
 ---
@@ -107,10 +107,10 @@ const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
 ```typescript
 import { web3FromAddress } from '@polkadot/extension-dapp'
 
-// 获取特定账户的 injector
+// Get injector for specific account
 const injector = await web3FromAddress(accountAddress)
 
-// 签名 payload
+// Sign payload
 const payload = {
   address: accountAddress,
   blockHash: '0x...',
@@ -122,7 +122,7 @@ const payload = {
   specVersion: '0x...',
   tip: '0x...',
   transactionVersion: '0x...',
-  signedExtensions: [...],
+  signedExtensions: [], // Populate from current chain metadata; do not sign this placeholder
   version: 4,
 }
 
@@ -130,7 +130,7 @@ const result = await provider.web3SignPayload(payload)
 
 console.log({
   id: result.id,
-  signature: result.signature, // 十六进制签名
+  signature: result.signature, // Hex signature
 })
 ```
 
@@ -139,7 +139,7 @@ console.log({
 ```typescript
 const payload = {
   address: accountAddress,
-  data: '0x48656c6c6f', // 十六进制编码的消息
+  data: '0x48656c6c6f', // Hex-encoded message
   type: 'bytes',
 }
 
@@ -167,33 +167,34 @@ npm install @polkadot/api @polkadot/extension-dapp
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
 
-// 启用扩展
+// Enable extensions
 await web3Enable('My dApp')
 
-// 获取账户
+// Get accounts
 const accounts = await web3Accounts()
 const account = accounts[0]
+if (!account) throw new Error("No account was selected")
 
-// 连接到链
+// Connect to chain
 const wsProvider = new WsProvider('wss://rpc.polkadot.io')
 const api = await ApiPromise.create({ provider: wsProvider })
 
-// 获取 injector
+// Get injector
 const injector = await web3FromAddress(account.address)
 
-// 创建并签名交易
-const tx = api.tx.balances.transfer(
+// Create and sign transaction
+const tx = api.tx.balances.transferKeepAlive(
   recipientAddress,
-  1000000000000 // 1 DOT (10^12 planck)
+  '10000000000' // 1 DOT = 10^10 planck on Polkadot
 )
 
-// 签名并发送
+// Sign and send
 const hash = await tx.signAndSend(
   account.address,
   { signer: injector.signer }
 )
 
-console.log('交易哈希:', hash.toHex())
+console.log('Transaction hash:', hash.toHex())
 ```
 
 ### 监听交易事件
@@ -204,17 +205,17 @@ await tx.signAndSend(
   { signer: injector.signer },
   ({ status, events }) => {
     if (status.isInBlock) {
-      console.log('已入块:', status.asInBlock.toHex())
+      console.log('In block:', status.asInBlock.toHex())
     }
     if (status.isFinalized) {
-      console.log('已确认:', status.asFinalized.toHex())
+      console.log('Finalized:', status.asFinalized.toHex())
 
       events.forEach(({ event }) => {
         if (api.events.system.ExtrinsicSuccess.is(event)) {
-          console.log('交易成功')
+          console.log('Transaction succeeded')
         }
         if (api.events.system.ExtrinsicFailed.is(event)) {
-          console.log('交易失败')
+          console.log('Transaction failed')
         }
       })
     }
@@ -234,7 +235,7 @@ const response = await provider.web3RpcSend({
   params: [],
 })
 
-console.log('最新区块头:', response.result)
+console.log('Latest header:', response.result)
 ```
 
 ### 订阅 RPC 事件
@@ -246,11 +247,11 @@ const subscriptionId = await provider.web3RpcSubscribe(
     params: [],
   },
   (response) => {
-    console.log('新区块:', response.result)
+    console.log('New block:', response.result)
   }
 )
 
-// 稍后取消订阅
+// Unsubscribe later
 await provider.web3RpcUnSubscribe()
 ```
 
@@ -258,7 +259,7 @@ await provider.web3RpcUnSubscribe()
 
 ```typescript
 const providers = await provider.web3RpcListProviders()
-console.log('可用 providers:', providers)
+console.log('Available providers:', providers)
 ```
 
 ---
@@ -284,10 +285,10 @@ console.log('可用 providers:', providers)
 
 ```typescript
 interface InjectedAccount {
-  address: string          // Substrate 地址
-  name?: string            // 账户名称
+  address: string          // Substrate address
+  name?: string            // Account name
   type?: 'sr25519' | 'ed25519' | 'ecdsa'
-  genesisHash?: string     // 可选的链限制
+  genesisHash?: string     // Optional chain restriction
 }
 
 interface SignerPayloadJSON {
@@ -307,26 +308,26 @@ interface SignerPayloadJSON {
 
 interface SignerPayloadRaw {
   address: string
-  data: string             // 十六进制编码的数据
+  data: string             // Hex-encoded data
   type: 'bytes' | 'payload'
 }
 
 interface SignerResult {
   id: number
-  signature: string        // 十六进制签名
+  signature: string        // Hex signature
 }
 ```
 
 ### 支持的链
 
 | 链 | 说明 |
-|----|------|
+|-------|-------------|
 | Polkadot | 主中继链 |
-| Kusama | 金丝雀网络 |
-| Acala | DeFi 中心 |
-| Moonbeam | EVM 兼容 |
+| Kusama | 先行网络 |
+| Acala | DeFi 平台 |
+| Moonbeam | 兼容 EVM |
 | Astar | 智能合约平台 |
-| 任意 Substrate | 自定义链 |
+| 其他 Substrate 链 | 使用前验证钱包和 runtime 支持情况 |
 
 ---
 
@@ -337,9 +338,9 @@ try {
   const result = await provider.web3SignPayload(payload)
 } catch (error) {
   if (error.message === 'Cancelled') {
-    console.log('用户取消了签名')
+    console.log('User cancelled signing')
   } else {
-    console.error('签名失败:', error)
+    console.error('Signing failed:', error)
   }
 }
 ```

@@ -1,0 +1,70 @@
+---
+title: "lnurl"
+---
+
+# lnurl
+
+Die Ausführung einer [LNURL](https://github.com/lnurl/luds) -Anfrage anfordern. Die Anwendung muss eine [LNURL](https://github.com/lnurl/luds/blob/luds/01.md) -Zeichenfolge übergeben, die beispielsweise vom Anwendungsbackend bereitgestellt werden sollte. Die lnurl-Funktion kann außerdem eine [LUD-16](https://github.com/lnurl/luds/blob/luds/16.md) -statische Kennung (z. B. user@example.com) anstelle einer LNURL-Zeichenfolge akzeptieren.
+
+Die Methode gibt ein Promise zurück, das nach Abschluss des LNURL-Ablaufs aufgelöst wird. Sie gibt die letzte Antwort des LNURL-Servers zurück. Bei LNURL-pay-Anfragen enthält diese auch Zahlungsinformationen (Preimage, Zahlungshash), bei LNURL-auth-Anfragen Authentifizierungsinformationen (Nachricht, Signatur)
+
+## Methode [#method]
+
+```typescript
+declare function lnurl(lnurl: string): Promise<LNURLResponse>;;
+```
+
+## Antwort [#response]
+
+```typescript
+type LNURLResponse =
+  | {
+      status: "OK";
+      data?: unknown
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## LNURL-pay-Antwort [#lnurl-pay-response]
+
+```typescript
+type LNURLPayResponse =
+  | {
+      status: "OK";
+      data: {
+        preimage: string,
+        paymentHash: string,
+        paymentRequest: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## LNURL-auth-Antwort [#lnurl-auth-response]
+
+```typescript
+type LNURLAuthResponse =
+  | {
+      status: "OK";
+      data: {
+        message: string,
+        signature: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## Beispiel [#example]
+
+```typescript
+const lnurl = "<LNURL_OR_LIGHTNING_ADDRESS>";
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+if (!provider || typeof provider.lnurl !== "function") {
+  throw new Error("LNURL is not supported by this provider.");
+}
+
+await provider.enable();
+const result = await provider.lnurl(lnurl); // promise resolves once the LNURL process is finished (e.g. a payment is sent or the login is complete)
+```
+
+Prüfen Sie `result.status`: Eine `ERROR`-Antwort enthält einen Grund in `reason`. Fangen Sie auch abgelehnte Promises ab, einschließlich Verbindungs- oder Nutzerfreigabefehlern. Die optionale `data`-Nutzlast hängt vom LNURL-Ablauf ab; nehmen Sie ohne Prüfung kein festes Format an.

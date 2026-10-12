@@ -1,0 +1,49 @@
+---
+description: "Consulta el estado de publicación del firmware Bluetooth y gestiona la ausencia de metadatos de versiones."
+title: "checkBLEFirmwareRelease"
+---
+
+# checkBLEFirmwareRelease
+
+## Consultar la versión publicada del firmware Bluetooth [#check-bluetooth-firmware-release]
+
+Consulta el estado de la versión actual del firmware Bluetooth del dispositivo.
+
+```typescript
+const response = await HardwareSDK.checkBLEFirmwareRelease(connectId);
+```
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+### Ejemplo [#example]
+
+```typescript
+const response = await HardwareSDK.checkBLEFirmwareRelease(connectId);
+```
+
+Resultado
+
+```typescript
+import type { FirmwareReleaseCheckResult } from '@onekeyfe/hd-core';
+
+type ReleaseResult = {
+  success: true;
+  payload: FirmwareReleaseCheckResult | null;
+};
+```
+
+`payload` puede ser `null`. En caso contrario, contiene `status`, los campos opcionales `shouldUpdate` y `changelog`, y `release` (que puede ser `undefined`). Comprueba que tanto el resultado como los datos de la versión existan antes de usarlos. La estructura de la versión varía según el firmware/componente.
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

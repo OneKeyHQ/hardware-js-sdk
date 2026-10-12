@@ -1,0 +1,56 @@
+---
+title: "btcVerifyMessage"
+---
+
+# btcVerifyMessage
+
+## Bitcoin: メッセージを検証 [#bitcoin-verify-message]
+
+署名者のアドレスと署名を使ってメッセージを検証します。
+
+```typescript
+const result = await HardwareSDK.btcVerifyMessage(connectId, deviceId, params);
+```
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+* `address` - _必須_ `string` 署名者のアドレス、
+* `messageHex` - _必須_ `string` 16 進数の署名対象メッセージ、
+* `signature` - _必須_ `string` base64 形式の署名、
+* `coin` - _必須_ `string` coins.json ファイルで指定されたネットワーク定義を決定します。コインの `shortcut`, `name` または `label` を使用できます。
+
+### 例 [#example]
+
+```typescript
+HardwareSDK.btcVerifyMessage(connectId, deviceId, {
+    address: "3BD8TL6iShVzizQzvo789SuynEKGpLTms9",
+    messageHex: "6578616d706c65206d657373616765",
+    signature: "JO7vL3tOB1qQyfSeIVLvdEw9G1tCvL+lNj78XDAVM4t6UptADs3kXDTO2+2ZeEOLFL4/+wm+BBdSpo3kb3Cnsas=",
+    coin: "btc"
+});
+```
+
+### 結果 [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

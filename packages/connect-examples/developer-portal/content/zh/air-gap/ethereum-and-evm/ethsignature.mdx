@@ -1,57 +1,60 @@
 ---
-title: EthSignature
+title: ETHSignature
 ---
 
-# EthSignature
+# ETHSignature
 
-`EthSignature` 类表示以太坊签名。
-
-用于解析设备返回的签名结果。
+`ETHSignature` 用于解码设备返回的以太坊签名。类名中的 `ETH` 必须大写。
 
 ## 参数
 
-| 参数 | 类型 | 描述 |
-|-----------|------|-------------|
-| `signature` | `Buffer` | 签名数据（65 字节：r + s + v） |
-| `requestId` | `Buffer` | 请求 ID（可选） |
-| `origin` | `string` | 来源信息（可选） |
+构造函数接收 `signature: Buffer`，以及可选的 `requestId: Buffer` 和 `origin: string`。
 
-## UR 示例
+<span id="ur-示例" />
 
-```
-UR:ETH-SIGNATURE/OTADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDFPCATKCPPFYLENGAGLMKMUCAYKFPFSDREOMENTPKBGEONDCHFDNBKOSSTPDWETSGBZDNCMCHKPNYDMKIDPTDRYJSDRTKCTIOFPQZHFLNSKVACLMNIYTKLGISFRWLKTZTREAEAXIYGWJTIHGRIHKKPLGDEEDS
-```
+<span id="解码示例" />
 
-## 解码示例
+## 解码响应
 
-```ts
+每次扫描会话创建一个新的解码器，并对每个摄像头帧调用 `onSignatureFrame`。保留原请求的 `expectedRequestId`，不要接受其他请求的签名。
+
+```typescript
 import { URDecoder } from '@ngraveio/bc-ur';
-import { EthSignature } from '@keystonehq/bc-ur-registry-eth';
+import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
 
-const dec = new URDecoder();
-// 将每个扫描的帧字符串推入解码器
-// dec.receivePart(frame)
+const decoder = new URDecoder();
 
-if (dec.isComplete()) {
-  const ur = dec.resultUR(); // ur.type 应为 'eth-signature'
-  const sig = EthSignature.fromCBOR(ur.cbor);
-  
-  const requestId = sig.getRequestId();
-  const signature = sig.getSignature();
-  
-  // 提取 r, s, v 组件
-  const r = signature.slice(0, 32);
-  const s = signature.slice(32, 64);
-  const v = signature.slice(64, 65);
-  
-  // 附加到交易并广播
+function onSignatureFrame(frame: string, expectedRequestId: string) {
+  decoder.receivePart(frame);
+  if (decoder.isError()) {
+    throw new Error('Could not decode the signature QR code');
+  }
+  if (!decoder.isSuccess()) return;
+
+  const ur = decoder.resultUR();
+  if (ur.type !== 'eth-signature') {
+    throw new Error('Expected an eth-signature response');
+  }
+  const result = ETHSignature.fromCBOR(ur.cbor);
+  const expectedId = Buffer.from(expectedRequestId.replace(/-/g, ''), 'hex');
+  const receivedId = result.getRequestId();
+  if (!receivedId || !receivedId.equals(expectedId)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = result.getSignature();
+  if (signature.length !== 65) {
+    throw new Error('Expected a 65-byte Ethereum signature');
+  }
+  return {
+    r: signature.subarray(0, 32),
+    s: signature.subarray(32, 64),
+    v: signature[64],
+  };
 }
 ```
 
+使用以太坊库，按原始交易类型和链解释 `v`、恢复签名者并组装已签名交易。必须使用发送给设备的同一笔未签名交易，不要把签名附加到重新构造或修改过的交易上。
+
 ## 签名格式
 
-签名为 65 字节：
-- `r`（32 字节）：ECDSA 签名的第一部分
-- `s`（32 字节）：ECDSA 签名的第二部分
-- `v`（1 字节）：恢复 ID
-
+签名共 65 字节：`r` 和 `s` 各占 32 字节，最后 1 字节为 `v`。请按原始交易类型和链解释 `v`。

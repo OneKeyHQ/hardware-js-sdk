@@ -7,10 +7,12 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Enable the extension, select an account, and connect an API client to the intended chain. Construct transaction payloads from current chain metadata; the abbreviated hex values in this guide are placeholders.
+
 Learn how to detect, connect, and interact with Polkadot and Substrate chains.
 
 <Callout type="info">
-OneKey implements the Polkadot.js extension interface, ensuring compatibility with all Substrate dApps.
+OneKey implements the Polkadot.js extension interface, for the operations documented here.
 </Callout>
 
 ---
@@ -109,6 +111,7 @@ await web3Enable('My dApp')
 // Get accounts
 const accounts = await web3Accounts()
 const account = accounts[0]
+if (!account) throw new Error("No account was selected")
 
 // Connect to chain
 const wsProvider = new WsProvider('wss://rpc.polkadot.io')
@@ -118,9 +121,9 @@ const api = await ApiPromise.create({ provider: wsProvider })
 const injector = await web3FromAddress(account.address)
 
 // Create and sign transaction
-const tx = api.tx.balances.transfer(
+const tx = api.tx.balances.transferKeepAlive(
   recipientAddress,
-  1000000000000 // 1 DOT (10^12 planck)
+  '10000000000' // 1 DOT = 10^10 planck on Polkadot
 )
 
 // Sign and send
@@ -131,4 +134,3 @@ const hash = await tx.signAndSend(
 
 console.log('Transaction hash:', hash.toHex())
 ```
-

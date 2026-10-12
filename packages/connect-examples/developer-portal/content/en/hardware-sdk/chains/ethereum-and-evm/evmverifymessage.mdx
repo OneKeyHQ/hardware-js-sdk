@@ -6,7 +6,7 @@ title: evmVerifyMessage
 
 ## Ethereum: verify message
 
-Asks device to verify a message using the signer address and signature.
+Verifies a message using the signer address and signature.
 
 ```typescript
 const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
@@ -17,7 +17,7 @@ const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
 [**Optional common params**](/en/hardware-sdk/concepts/common-params)
 
 * `address` - _required_ `string` signer address. "0x" prefix is optional
-* `messageHex` - _required_ `string` signed message in hex text
+* `messageHex` - _required_ `string` Signed message encoded as a hexadecimal string.
 * `signature` - _required_ `string` signature in hexadecimal format. "0x" prefix is optional
 * `chainId` - _optional_ `number` The ChainId in ETH is a unique identifier for a specific Ethereum network, used to distinguish different versions of the blockchain. [Reference](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
 

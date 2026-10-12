@@ -1,20 +1,21 @@
 ---
+title: React + wagmi
 description: Connect to OneKey from React apps using wagmi and the injected EIP‑1193 provider
 ---
 
 # React + wagmi
 
-This guide shows a minimal, EIP‑1193‑based way to connect OneKey from React apps using wagmi. Core idea: prefer OneKey’s dedicated injection (`window.$onekey.ethereum`), then fall back to multi‑provider list or generic `window.ethereum`.
+This guide shows a minimal, EIP‑1193‑based way to connect OneKey from React apps using wagmi. Use OneKey’s dedicated provider (`window.$onekey.ethereum`) so a button labeled OneKey connects to OneKey.
 
 ## Install
 
 ```bash
-npm i wagmi viem
+npm i wagmi@^2 viem@^2 @tanstack/react-query@^5
 ```
 
 wagmi v2 is built on viem. This guide uses the Injected connector to work with injected wallets (OneKey / other EIP‑1193 providers).
 
-## Create a OneKey‑first injected connector
+## Create a OneKey injected connector
 
 Prefer OneKey’s dedicated injection to avoid ambiguity when multiple wallets are installed.
 
@@ -24,18 +25,14 @@ import { createConfig, http } from 'wagmi'
 import { mainnet, polygon, arbitrum, base, optimism } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
-function getOneKeyFirstProvider(): any {
-  // 1) Prefer OneKey’s dedicated injection
-  const onekey = (window as any)?.$onekey?.ethereum
-  if (onekey) return onekey
+import type { EIP1193Provider } from 'viem'
 
-  // 2) Fallback: find OneKey from multi-provider list
-  const list = (window as any)?.ethereum?.providers
-  const okFromList = list?.find((p: any) => p?.isOneKey || p?.onekey || (typeof p?.isOneKey === 'function' && p.isOneKey()))
-  if (okFromList) return okFromList
-
-  // 3) Final fallback: single injected provider
-  return (window as any)?.ethereum
+function getOneKeyProvider(): EIP1193Provider | undefined {
+  if (typeof window === 'undefined') return undefined
+  const walletWindow = window as Window & {
+    $onekey?: { ethereum?: EIP1193Provider }
+  }
+  return walletWindow.$onekey?.ethereum
 }
 
 export const config = createConfig({
@@ -46,7 +43,7 @@ export const config = createConfig({
         return {
           id: 'onekey',
           name: 'OneKey',
-          provider: getOneKeyFirstProvider,
+          provider: getOneKeyProvider(),
         }
       },
       shimDisconnect: true,
@@ -63,9 +60,10 @@ export const config = createConfig({
 ```
 
 Notes
+
 - Prefer `window.$onekey.ethereum` to keep behavior deterministic in multi‑wallet environments.
-- If OneKey is not installed, the connector falls back to other injected providers.
-- Trigger `eth_requestAccounts` on a user gesture and handle `4001` (user rejected), as in the legacy docs.
+- If OneKey is unavailable, show an install or retry option. Other wallets discovered by wagmi keep their own names.
+- Trigger `eth_requestAccounts` on a user gesture and handle `4001` (user rejected), without retrying automatically.
 
 ## App setup
 
@@ -99,7 +97,7 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi'
 
 export default function App() {
   const { address, isConnected } = useAccount()
-  const { connect, connectors, isPending } = useConnect()
+  const { connect, connectors, isPending, error } = useConnect()
   const { disconnect } = useDisconnect()
 
   if (isConnected) {
@@ -113,6 +111,7 @@ export default function App() {
 
   return (
     <div>
+      {error && <p role="alert">{error.message}</p>}
       {connectors.map((c) => (
         <button key={c.uid} disabled={isPending} onClick={() => connect({ connector: c })}>
           Connect with {c.name}
@@ -125,60 +124,58 @@ export default function App() {
 
 ## Sign and send
 
-```ts
-import { createWalletClient, custom } from 'viem'
+Use the active wagmi connection for signing. Run wallet requests from user actions and display rejected requests in your UI.
 
-const provider = (window as any)?.$onekey?.ethereum
-  || (window as any)?.ethereum?.providers?.find((p: any) => p?.isOneKey || p?.onekey)
-  || (window as any)?.ethereum
+```tsx
+import { useState } from 'react'
+import { useWalletClient } from 'wagmi'
 
-const client = createWalletClient({ transport: custom(provider) })
-const [account] = await provider.request({ method: 'eth_requestAccounts' })
+function SignMessageButton() {
+  const { data: walletClient } = useWalletClient()
+  const [result, setResult] = useState('')
+  const [pending, setPending] = useState(false)
 
-// Personal sign
-await provider.request({ method: 'personal_sign', params: ['0x68656c6c6f', account] })
+  async function sign() {
+    if (!walletClient) return
+    setPending(true)
+    try {
+      const signature = await walletClient.signMessage({ message: 'Hello from my dApp' })
+      setResult(signature)
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : 'Signature request failed')
+    } finally {
+      setPending(false)
+    }
+  }
 
-// EIP-1559 tx
-const txHash = await provider.request({
-  method: 'eth_sendTransaction',
-  params: [{ from: account, to: '0x...', value: '0x...' }],
-})
+  return <>
+    <button disabled={!walletClient || pending} onClick={sign}>Sign message</button>
+    <p role="status">{result}</p>
+  </>
+}
 ```
+
+For transactions, use wagmi's `useSendTransaction` with a validated recipient, amount, and selected chain. A returned transaction hash means it was submitted; wait for a receipt to determine execution success. See [Sending transactions](/en/connect-to-software/provider/eth/sending-transactions).
 
 ## Events and network
 
 - Listen to `accountsChanged` / `chainChanged` and refresh session state accordingly.
 - Network switching/adding: `wallet_switchEthereumChain` and `wallet_addEthereumChain`.
 
-## Mobile & Deeplinks
+## Mobile and discovery
 
-Use OneKey deeplinks for mobile web/WebViews:
+For mobile wallets outside an injected browser, use a WalletConnect connector or [wallet UI library](/en/connect-to-software/wallet-ui/wallet-kits). A [deep link](/en/connect-to-software/mobile-deeplinks) opens the wallet; the WalletConnect session establishes the connection.
 
-- Custom scheme: `onekey-wallet://wc?uri={encodeURIComponent(wcUri)}`
-- Universal link: `https://app.onekey.so/wc/connect/wc?uri={encodeURIComponent(wcUri)}`
+wagmi can discover EIP-6963 wallets through `createConfig`'s `multiInjectedProviderDiscovery` option. For a direct implementation, see [Provider discovery](/en/connect-to-software/provider/eth/provider-api).
 
 ## Troubleshooting
 
-- 4001: user rejected (see legacy docs examples)
+- If the provider is missing, verify that OneKey is installed and enabled for this site, then retry from the Connect button.
+- Handle user rejection (`4001`) by allowing another user-initiated attempt.
+- Run browser provider access on the client. The `typeof window` guard above prevents server-side rendering errors.
+- A simulated disconnect clears wagmi's connection state; it does not necessarily revoke permissions in the wallet.
 
-## Optional: EIP‑6963 (multi‑wallet discovery)
+## Resources
 
-If desired, use EIP‑6963 to discover installed wallets first and prefer OneKey when available. Example:
-
-```ts
-let onekeyProvider: any = null
-const providers: any[] = []
-
-function onAnnounceProvider(event: any) {
-  const { info, provider } = event.detail || {}
-  providers.push({ info, provider })
-  if (info?.name === 'OneKey' || info?.rdns?.includes?.('onekey')) {
-    onekeyProvider = provider
-  }
-}
-
-window.addEventListener('eip6963:announceProvider', onAnnounceProvider)
-window.dispatchEvent(new Event('eip6963:requestProvider'))
-
-// Prefer `onekeyProvider` at app init; otherwise fall back to getOneKeyFirstProvider()
-```
+- [wagmi injected connector](https://wagmi.sh/react/api/connectors/injected)
+- [wagmi wallet client](https://wagmi.sh/react/api/hooks/useWalletClient)

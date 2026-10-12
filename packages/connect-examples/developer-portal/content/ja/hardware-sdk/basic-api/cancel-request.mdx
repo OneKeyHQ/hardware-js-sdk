@@ -1,0 +1,85 @@
+---
+description: "選択した接続の SDK 処理をキャンセルし、キャンセルとトランスポートの終了を区別します。"
+title: "リクエストをキャンセル"
+---
+
+<span id="cancel-request" />
+
+# リクエストをキャンセル
+
+## 概要 [#overview]
+
+`cancel(connectId)` はその接続に関連する待機中および実行中の SDK リクエストをキャンセルし、保留中の SDK UI を閉じます。`connectId` を省略すると、すべての保留中リクエストをキャンセルします。ユーザーが PIN/パスフレーズ入力をキャンセルした場合、フローを離れた場合、アプリケーションのタイムアウト時に使用します。
+
+## メソッド [#method]
+
+```typescript
+HardwareSDK.cancel(connectId);
+// Cancel all pending requests:
+HardwareSDK.cancel();
+```
+
+### パラメーター [#parameters]
+
+| パラメーター | 型 | 必須 | 説明 |
+|-----------|------|----------|-------------|
+| `connectId` | `string` | いいえ | 対象の接続。省略すると、すべての保留中リクエストをキャンセルします。 |
+
+### 戻り値 [#return-value]
+
+`cancel()` の戻り値は `void` です。元のメソッドの Promise を待って結果を確認します。通常、公開 SDK はキャンセルされたリクエストを `success: false` で解決します。キューのキャンセルでは `HardwareErrorCode.CallQueueActionCancelled` (`822`) を使用します。キャンセルより先にデバイス側の拒否やエラーが発生すると、別のコードが返される場合があります。エラーメッセージの文字列を照合したり、すべてのキャンセルが同じコードだと仮定したりしないでください。
+
+## 例 [#examples]
+
+### 基本的なキャンセル [#basic-cancellation]
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+// Use a fully prepared transaction from your application's transaction builder.
+declare const params: EVMSignTransactionParams;
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+
+// Invoke from the user's Cancel action.
+HardwareSDK.cancel(connectId);
+
+const result = await signPromise;
+if (!result.success) {
+  if (result.payload.code === HardwareErrorCode.CallQueueActionCancelled) {
+    // Close the cancelled operation's UI.
+  } else {
+    throw new Error(result.payload.error);
+  }
+}
+```
+
+### タイムアウトによるキャンセル [#cancel-with-timeout]
+
+このタイマーは選択した接続の保留中リクエストをすべてキャンセルするため、デバイスごとに操作を直列化してください。
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+
+async function signWithTimeout(
+  connectId: string,
+  deviceId: string,
+  params: EVMSignTransactionParams,
+  timeoutMs = 60_000,
+) {
+  const timer = setTimeout(() => HardwareSDK.cancel(connectId), timeoutMs);
+  try {
+    return await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+```
+
+## キャンセルとトランスポートの終了 [#cancel-vs-transport-teardown]
+
+キャンセルは操作を中断し、デバイス/リンクのクリーンアップを行う場合があります。接続が引き続き使えることや、次の呼び出しをすぐ開始できることは保証されません。元の結果を待ち、接続が失われた場合はデバイスを再検出して、次のユーザー操作の前に `getDeviceState` で状態を更新してください。署名やファームウェア更新を自動で再実行しないでください。
+
+`HardwareSDK.dispose()` は SDK の終了時やトランスポートの切り替え時に使用し、その後 `init()` を実行してから再利用してください。物理的な切断は `DEVICE.DISCONNECT` で通知され、保留中の公開メソッドの呼び出しは失敗結果を返します。
+
+参照: [再接続と破棄](/ja/hardware-sdk/transport/reconnect) および [エラーコード](/ja/hardware-sdk/core-api-guide#error-codes).

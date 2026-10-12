@@ -250,6 +250,7 @@ export const zh = {
     methodDescriptions: {
       btcGetAddress: '获取 Bitcoin 地址',
       btcGetPublicKey: '获取 Bitcoin 公钥',
+      btcDeriveContextHash: '派生 Babylon context hash（Classic 1s / Pure 固件 3.21.0+）',
       btcSignMessage: '使用 Bitcoin 私钥签名消息',
       btcSignPsbt: '签名部分签名的 Bitcoin 交易 (PSBT)',
       btcSignTransaction: '使用 Bitcoin 私钥签名交易',

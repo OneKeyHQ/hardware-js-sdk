@@ -1,0 +1,32 @@
+---
+title: "Device setup and erase"
+description: "Device management is separate from normal account discovery and signing. Only expose these operations in a clearly identified management flow that the user deliberately starts. A first connection must never initialize or erase a device automatically."
+---
+
+# Device setup and erase
+
+Device management is separate from normal account discovery and signing. Only expose these operations in a clearly identified management flow that the user deliberately starts. A first connection must never initialize or erase a device automatically.
+
+## deviceReset: create a wallet on a device
+
+`deviceReset(connectId, params)` requests device setup and generation of new recovery material. The current SDK implementation uses Protocol V1; it does not declare V2 support. Do not infer Pro 2 support from the method name.
+
+| Parameter | Type | Meaning |
+| --- | --- | --- |
+| `displayRandom` | `boolean` | Show device-generated entropy before requesting additional entropy. |
+| `strength` | `number` | Requested entropy strength. The SDK falls back to `256`; accepted strengths also depend on firmware. |
+| `pinProtection`, `passphraseProtection` | `boolean` | Requested protection settings. |
+| `language`, `label` | `string` | Requested device language and label. |
+| `u2fCounter` | `number` | U2F counter; SDK fallback is the current Unix timestamp in seconds. |
+| `skipBackup`, `noBackup` | `boolean` | Backup-flow options; neither means the device has no seed. Do not silently enable them. |
+| `backupType` | `string \| number` | Firmware-dependent backup format. |
+
+These options are optional in the public type. Check the target firmware and read the operation response. Keep recovery material on the device; do not request it in a host form or log.
+
+## deviceWipe: erase private device data
+
+`deviceWipe(connectId)` removes device private data and requires deliberate user confirmation. In the current source, Protocol V1 sends `WipeDevice`; Protocol V2 opens the device reset settings flow. A device prompt is not evidence that the operation finished: await the response and handle cancellation.
+
+After a successful wipe, the SDK invalidates the device state. Discard the application's selected account and wallet binding, then rediscover the device before another operation. Do not reuse an earlier `deviceId` or assume the recovery phrase remains available.
+
+Both methods use the SDK's `success` / `payload` response envelope. Handle failures without automatically retrying destructive operations. Read [UI event handling](/en/hardware-sdk/core-api-guide#events-ui) and [device identifiers](/en/hardware-sdk/concepts/identifiers) before implementing the flow.

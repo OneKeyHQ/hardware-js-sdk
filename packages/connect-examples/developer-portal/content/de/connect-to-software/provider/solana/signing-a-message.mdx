@@ -1,0 +1,57 @@
+---
+title: "Eine Nachricht signieren"
+---
+
+<span id="signing-a-message" />
+
+# Eine Nachricht signieren
+
+Wenn eine Webanwendung mit OneKey verbunden ist, kann sie den Nutzer auch bitten, eine bestimmte Nachricht zu signieren. Anwendungen können eigene Nachrichten verfassen, die Nutzern im Signaturdialog von OneKey angezeigt werden. Nachrichtensignaturen verursachen keine Netzwerkgebühren und bieten Apps eine bequeme Möglichkeit, die Inhaberschaft einer Adresse zu prüfen.
+
+Um eine Nachricht zum Signieren durch den Nutzer zu senden, muss eine Webanwendung:
+
+1. Die Nachrichtenbytes als `Uint8Array` bereitstellen; verwenden Sie `TextEncoder` für UTF-8-Text.
+2. Das Signieren der kodierten Nachricht über die OneKey-Wallet des Nutzers anfordern.
+
+## signMessage [#signmessage]
+```javascript
+const provider = getProvider();
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const message = `To avoid digital dognappers, sign below to authenticate with CryptoCorgis`;
+const encodedMessage = new TextEncoder().encode(message);
+const signedMessage = await provider.signMessage(encodedMessage, "utf8");
+```
+
+## request [#request]
+```javascript
+const provider = getProvider();
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const message = `To avoid digital dognappers, sign below to authenticate with CryptoCorgis`;
+const encodedMessage = new TextEncoder().encode(message);
+const signedMessage = await provider.request({
+    method: "signMessage",
+    params: {
+         message: bs58.encode(encodedMessage),
+         display: "utf8",
+    },
+});
+```
+
+Das `request`-Beispiel benötigt `import bs58 from "bs58"`. Beide Formen werden zu einem Objekt mit `signature` vom Typ `Uint8Array` und `publicKey` vom Typ `PublicKey` aufgelöst. Die Anzeigeoption steuert die Darstellung; sie ändert nicht die signierten Bytes. Prüfen Sie zur Authentifizierung die Signatur anhand der exakten Nachricht und verwenden Sie eine einmalig verwendbare Challenge.
+
+## Off-Chain-Nachrichten signieren [#off-chain-message-signing]
+
+Der aktuelle Provider-Quellcode unterstützt Version 1 und benötigt die Liste der vorgesehenen Signierenden. Verwenden Sie die Hilfsfunktion, um die Anfrage zu kodieren und die exakten signierten Bytes zurückzugeben. Ältere Wallets unterstützen diese Methode möglicherweise nicht; behandeln Sie abgelehnte Anfragen.
+
+```javascript
+const provider = getProvider();
+if (!provider) throw new Error('OneKey Solana provider is unavailable.');
+const { publicKey } = await provider.connect();
+const result = await provider.solSignOffchainMessage(
+  'Sign in to example.com. Nonce: <SERVER_GENERATED_NONCE>',
+  [publicKey],
+);
+// Verify result.signature against result.signedOffchainMessage and result.publicKey.
+```
+
+Verwenden Sie nicht das ältere Anfrageformat der Version 0. Prüfen Sie Methodenverfügbarkeit und Antwortformat in der von Ihrer Anwendung unterstützten Wallet-Version.

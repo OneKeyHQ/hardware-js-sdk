@@ -1,0 +1,461 @@
+---
+title: "Sui"
+description: "Integración con Sui mediante el proveedor Sui Wallet Standard de OneKey"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Sui
+
+Los siguientes ejemplos de firma usan `connectSuiAccount()` de [Primeros pasos](/es/connect-to-software/provider/sui/getting-started#account-context-for-signing). Devuelve una cuenta de Wallet Standard y su cadena activa. Los ejemplos usan `@mysten/sui@1.28.2`. Incluso los métodos antiguos `*TransactionBlock` ahora declaran entradas `Transaction` en `@mysten/wallet-standard@0.14.7`.
+
+Integra la cadena de bloques Sui mediante el proveedor de OneKey. Accede a través de `window.$onekey.sui`.
+
+<Callout type="info">
+OneKey implementa Sui Wallet Standard para integraciones compatibles con wallet-standard.
+</Callout>
+
+---
+
+## Enlaces rápidos [#quick-links]
+
+- [Referencia de la API](#api-reference)
+- [Primeros pasos](getting-started)
+- [Transacciones](#transactions)
+- [Firma de mensajes](#message-signing)
+
+---
+
+## Detección del proveedor [#provider-detection]
+
+```typescript
+// Detect OneKey Sui provider
+const provider = window.$onekey?.sui
+
+if (!provider) {
+  throw new Error('OneKey Sui provider not detected')
+}
+```
+
+---
+
+## Inicio rápido [#quick-start]
+
+### Comprobar permisos [#check-permissions]
+
+```typescript
+// Check if already connected
+const hasPermission = await provider.hasPermissions()
+
+if (hasPermission) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected accounts:', accounts)
+}
+```
+
+### Solicitar conexión [#request-connection]
+
+```typescript
+// Request permissions to connect
+const result = await provider.requestPermissions()
+
+if (result) {
+  const accounts = await provider.getAccounts()
+  console.log('Connected:', accounts[0].address)
+}
+```
+
+### Desconectar [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Administración de cuentas [#account-management]
+
+### Obtener cuentas [#get-accounts]
+
+```typescript
+const accounts = await provider.getAccounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Sui address
+    publicKey: account.publicKey, // Public key (hex string)
+  })
+})
+```
+
+### Obtener la cadena activa [#get-active-chain]
+
+```typescript
+const chain = await provider.getActiveChain()
+
+console.log('Active chain:', chain) // e.g., 'sui:testnet'
+```
+
+---
+
+## Transacciones [#transactions]
+
+### Firmar y ejecutar un bloque de transacción [#sign-and-execute-transaction-block]
+
+El proveedor inyectado actual no reenvía `options` en `signAndExecuteTransactionBlock`. Consulta el digest devuelto con un cliente Sui en la misma cadena para solicitar efectos, eventos o cambios de objetos.
+
+```typescript
+import { Transaction } from '@mysten/sui/transactions'
+
+// Create transaction block
+const txb = new Transaction()
+
+// Add a transfer
+txb.transferObjects(
+  [txb.object('0xobject_id')],
+  txb.pure.address('RECIPIENT_SUI_ADDRESS')
+)
+
+// Or send SUI
+const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(1000000000)]) // 1 SUI
+txb.transferObjects([coin], txb.pure.address('RECIPIENT_SUI_ADDRESS'))
+
+const { account, chain } = await connectSuiAccount()
+
+// Sign and execute
+const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+
+console.log({
+  digest: result.digest,
+})
+```
+
+### Firmar un bloque de transacción (sin ejecutarlo) [#sign-transaction-block-without-executing]
+
+```typescript
+const txb = new Transaction()
+// ... build transaction
+
+const { account, chain } = await connectSuiAccount()
+
+const signedTxb = await provider.signTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+
+console.log({
+  transactionBlockBytes: signedTxb.transactionBlockBytes,
+  signature: signedTxb.signature,
+})
+
+// Execute later using Sui SDK
+// const result = await suiClient.executeTransactionBlock({
+//   transactionBlock: signedTxb.transactionBlockBytes,
+//   signature: signedTxb.signature,
+// })
+```
+
+### Firmar y ejecutar una transacción (API nueva) [#sign-and-execute-transaction-new-api]
+
+```typescript
+// Using the newer signAndExecuteTransaction API (Transaction type)
+import { Transaction } from '@mysten/sui/transactions'
+
+const tx = new Transaction()
+// ... build transaction
+
+const { account, chain } = await connectSuiAccount()
+
+const result = await provider.signAndExecuteTransaction({
+  account,
+  chain,
+  transaction: tx,
+})
+```
+
+### Firmar una transacción (API nueva) [#sign-transaction-new-api]
+
+```typescript
+import { Transaction } from '@mysten/sui/transactions'
+
+const tx = new Transaction()
+// ... build transaction
+
+const { account, chain } = await connectSuiAccount()
+
+const signedTxn = await provider.signTransaction({
+  account,
+  chain,
+  transaction: tx,
+})
+```
+
+---
+
+## Firma de mensajes [#message-signing]
+
+### Firmar un mensaje personal [#sign-personal-message]
+
+Firma mensajes arbitrarios para autenticación:
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+const { account, chain } = await connectSuiAccount()
+
+const result = await provider.signPersonalMessage({
+  account,
+  chain,
+  message,
+})
+
+console.log({
+  signature: result.signature,   // Base64 encoded signature
+  bytes: result.bytes,           // Signed message bytes
+})
+```
+
+### Firmar un mensaje (heredado) [#sign-message-legacy]
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+const { account, chain } = await connectSuiAccount()
+
+const result = await provider.signMessage({
+  account,
+  message,
+})
+
+console.log({
+  signature: result.signature,
+  messageBytes: result.messageBytes,
+})
+```
+
+### Verificar la firma [#verify-signature]
+
+```typescript
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
+
+const message = new TextEncoder().encode('Hello, Sui!')
+const { account, chain } = await connectSuiAccount()
+const { signature } = await provider.signPersonalMessage({ message, account, chain })
+
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('Expected signer:', isExpectedSigner)
+```
+
+---
+
+## Interacción con contratos inteligentes [#smart-contract-interaction]
+
+### Llamada Move [#move-call]
+
+```typescript
+const txb = new Transaction()
+
+// Call a Move function
+txb.moveCall({
+  target: '0xpackage::module::function',
+  arguments: [
+    txb.pure.string('arg1'),
+    txb.object('0xobject_id'),
+  ],
+  typeArguments: ['0x2::sui::SUI'],
+})
+
+const { account, chain } = await connectSuiAccount()
+
+const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+```
+
+### Publicar un paquete [#publish-package]
+
+```typescript
+const txb = new Transaction()
+
+const [upgradeCap] = txb.publish({
+  modules: compiledModules,
+  dependencies: [
+    '0x1', // Move stdlib
+    '0x2', // Sui framework
+  ],
+})
+
+const { account, chain } = await connectSuiAccount()
+txb.transferObjects([upgradeCap], txb.pure.address(account.address))
+
+const result = await provider.signAndExecuteTransactionBlock({
+  account,
+  chain,
+  transactionBlock: txb,
+})
+```
+
+---
+
+## Referencia de la API [#api-reference]
+
+### Métodos [#methods]
+
+| Método | Descripción |
+|--------|-------------|
+| `hasPermissions()` | Comprobar si está conectado |
+| `requestPermissions()` | Solicitar conexión |
+| `disconnect()` | Desconectar la cartera |
+| `getAccounts()` | Obtener las cuentas conectadas (solo `address`, `publicKey`) |
+| `getActiveChain()` | Obtener la cadena actual |
+| `signAndExecuteTransactionBlock(input)` | Firmar y ejecutar; requiere `account`/`chain` |
+| `signTransactionBlock(input)` | Solo firmar; requiere `account`/`chain` |
+| `signAndExecuteTransaction(input)` | Firmar y ejecutar (API nueva, `Transaction`, requiere `account`/`chain`) |
+| `signTransaction(input)` | Firmar una transacción (API nueva, `Transaction`, requiere `account`/`chain`) |
+| `signMessage(input)` | Firmar un mensaje (heredado, requiere `account`) |
+| `signPersonalMessage(input)` | Firmar un mensaje personal (requiere `account`/`chain`) |
+
+### Tipos [#types]
+
+`getAccounts()` devuelve `AccountInfo[]`. Las entradas de firma requieren la cuenta de Wallet Standard `WalletAccount`, cuyo campo `publicKey` es una matriz de bytes y que también incluye `chains` y `features`. Obtenla mediante `standard:connect`; no conviertas `AccountInfo` a `WalletAccount`.
+
+```typescript
+import type { WalletAccount, IdentifierString } from '@mysten/wallet-standard'
+import type { Transaction } from '@mysten/sui/transactions'
+
+// provider.getAccounts()
+interface AccountInfo {
+  address: string
+  publicKey: string // Hex-encoded public key
+}
+
+interface SignAndExecuteTransactionBlockInput {
+  account: WalletAccount
+  chain: IdentifierString
+  transactionBlock: Transaction
+  options?: {
+    showEffects?: boolean
+    showEvents?: boolean
+    showObjectChanges?: boolean
+    showBalanceChanges?: boolean
+    showInput?: boolean
+    showRawInput?: boolean
+  }
+}
+
+interface SignTransactionBlockOutput {
+  transactionBlockBytes: string
+  signature: string
+}
+
+interface SignPersonalMessageInput {
+  account: WalletAccount
+  chain?: IdentifierString
+  message: Uint8Array
+}
+
+interface SignPersonalMessageOutput {
+  signature: string
+  bytes: string
+}
+```
+
+### Cadenas compatibles [#supported-chains]
+
+| Cadena | Identificador |
+|-------|------------|
+| Red principal | `sui:mainnet` |
+| Red de pruebas | `sui:testnet` |
+| Red de desarrollo | `sui:devnet` |
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  await provider.requestPermissions()
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the connection request')
+  } else {
+    console.error('Connection error:', error.message)
+  }
+}
+```
+
+### Códigos de error habituales [#common-error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| -32603 | Error interno |
+
+---
+
+## Uso con Sui Wallet Kit [#using-with-sui-wallet-kit]
+
+Este ejemplo de React usa las versiones compatibles de los paquetes fijadas a continuación:
+
+```bash
+npm install @mysten/dapp-kit@0.16.0 @mysten/sui@1.28.2 @tanstack/react-query@^5
+```
+
+```tsx
+import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit'
+import { getFullnodeUrl } from '@mysten/sui/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
+const networks = {
+  mainnet: { url: getFullnodeUrl('mainnet') },
+  testnet: { url: getFullnodeUrl('testnet') },
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networks} defaultNetwork="mainnet">
+        <WalletProvider>
+          <YourApp />
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
+  )
+}
+```
+
+OneKey se detecta automáticamente mediante Sui Wallet Standard.
+
+---
+
+## Uso con Sui SDK [#using-with-sui-sdk]
+
+```typescript
+import { SuiClient } from '@mysten/sui/client'
+
+const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
+
+// Get balance
+const balance = await client.getBalance({
+  owner: accountAddress,
+})
+
+// Get objects
+const objects = await client.getOwnedObjects({
+  owner: accountAddress,
+})
+
+// Get transaction
+const txn = await client.getTransactionBlock({
+  digest: txDigest,
+  options: { showEffects: true },
+})
+```

@@ -1,0 +1,73 @@
+---
+title: "Signieren"
+description: "Nachrichten auf TRON mit OneKey signieren"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signieren
+
+Verbinden Sie den Provider und verwenden Sie die TronWeb-Instanz derselben Wallet. Ersetzen Sie verkürzte Adressen und Vertragsmethoden durch gültige Werte. Prüfen Sie vor dem Vorbereiten einer Transaktion das ausgewählte Netzwerk.
+
+Erfahren Sie, wie Sie Nachrichten auf TRON signieren.
+
+---
+
+## Nachricht signieren V1 (Hex) [#sign-message-v1-hex]
+
+Hexkodierte Nachrichten signieren:
+
+```typescript
+const message = tronWeb.toHex('Hello TRON!')
+const signature = await provider.signMessage(message)
+
+console.log('Signature:', signature)
+```
+
+---
+
+## Nachricht signieren V2 (UTF-8) [#sign-message-v2-utf-8]
+
+UTF-8-Nachrichten direkt signieren:
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+console.log('Signature:', signature)
+```
+
+---
+
+## Signatur prüfen [#verify-signature]
+
+```typescript
+const message = 'Hello TRON!'
+const signature = await provider.signMessageV2(message)
+
+// Verify using TronWeb
+const address = await tronWeb.trx.verifyMessageV2(message, signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+try {
+  const result = await provider.request({
+    method: 'tron_requestAccounts'
+  })
+
+  if (result.code === 4001) {
+    console.log('A connection request is already pending')
+  } else if (result.code !== 200) {
+    console.log('Connection was not approved:', result.message)
+  }
+} catch (error) {
+  console.error('Request failed:', error)
+}
+```

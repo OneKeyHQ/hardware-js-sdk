@@ -1,0 +1,76 @@
+---
+title: "Signieren"
+description: "Nachrichten auf Algorand mit OneKey signieren"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signieren
+
+Verbinden Sie den Provider vor dem Signieren. Die Transaktionsbeispiele verwenden Felder im Stil von algosdk 2: `from`/`to`; beachten Sie die installierte SDK-Hauptversion. `algodClient`, Adressen und gruppierte Transaktionen müssen vor der Ausführung der Ausschnitte vorbereitet werden. Browserbeispiele mit `Buffer` benötigen einen ausdrücklichen Import von `buffer` oder einen gleichwertigen Base64-Encoder.
+
+Erfahren Sie, wie Sie Nachrichten zur Authentifizierung auf Algorand signieren.
+
+---
+
+## Beliebige Nachricht signieren [#sign-arbitrary-message]
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // or 'hex'
+)
+
+console.log('Signature:', signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Signatur prüfen [#verify-signature]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// Get public key from address
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('Valid:', isValid)
+```
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === 4100) {
+    console.log('The account or method is not authorized')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## Häufige Fehlercodes [#common-error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| 4100 | Nicht autorisiert |
+| 4200 | Nicht unterstützte Methode |
+| -32602 | Ungültige Parameter |

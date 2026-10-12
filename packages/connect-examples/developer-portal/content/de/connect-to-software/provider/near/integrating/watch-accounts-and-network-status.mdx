@@ -1,0 +1,36 @@
+---
+title: "Konto- & Netzwerkstatus überwachen"
+---
+
+<span id="watch-accounts--network-status" />
+
+# Konto- &amp; Netzwerkstatus überwachen
+
+Der Provider löst Konto- und Netzwerkereignisse aus. Reagieren Sie auf diese Ereignisse, um den Kontostatus und netzwerkspezifische Daten in Ihrer Anwendung zu aktualisieren.
+
+## Ereignis-Listener hinzufügen [#add-event-listeners]
+
+```javascript
+// accountsChanged
+const onAccountsChanged = (payload) => {
+  const accountId = payload?.accounts?.[0]?.accountId || '';
+  console.log('onAccountsChanged', accountId);
+}
+provider.on('accountsChanged', onAccountsChanged);
+
+
+// networkChanged
+const onNetworkChanged = (payload) => {
+  console.log('onNetworkChanged', payload.networkId);
+}
+provider.on('networkChanged', onNetworkChanged);
+```
+
+### Ereignis-Listener entfernen [#remove-event-listeners]
+
+Vergessen Sie außerdem nicht, Listener zu entfernen, sobald Sie sie nicht mehr benötigen (etwa beim Entfernen einer React-Komponente):
+
+```javascript
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('networkChanged', onNetworkChanged);
+```

@@ -1,0 +1,85 @@
+---
+description: "SDK-Vorgänge auf einer ausgewählten Verbindung abbrechen und Abbruch vom Beenden des Transports unterscheiden."
+title: "Anfrage abbrechen"
+---
+
+<span id="cancel-request" />
+
+# Anfrage abbrechen
+
+## Übersicht [#overview]
+
+`cancel(connectId)` bricht wartende und aktive SDK-Anfragen für diese Verbindung ab und schließt ausstehende SDK-Dialoge. Ohne `connectId` werden alle ausstehenden Anfragen abgebrochen. Verwenden Sie dies, wenn der Nutzer einen PIN-/Passphrase-Dialog abbricht, den Ablauf verlässt oder eine Anwendungszeitüberschreitung erreicht wird.
+
+## Methode [#method]
+
+```typescript
+HardwareSDK.cancel(connectId);
+// Cancel all pending requests:
+HardwareSDK.cancel();
+```
+
+### Parameter [#parameters]
+
+| Parameter | Typ | Erforderlich | Beschreibung |
+|-----------|------|----------|-------------|
+| `connectId` | `string` | Nein | Zielverbindung; weglassen, um alle ausstehenden Anfragen abzubrechen. |
+
+### Rückgabewert [#return-value]
+
+`cancel()` gibt zurück: `void`. Warten Sie auf das Promise der ursprünglichen Methode, um ihr Ergebnis zu erhalten. Das öffentliche SDK löst eine abgebrochene Anfrage normalerweise auf mit `success: false`; der Warteschlangenabbruch verwendet `HardwareErrorCode.CallQueueActionCancelled` (`822`). Eine geräteseitige Ablehnung oder ein Fehler, der dem Abbruch zuvorkommt, kann einen anderen Code zurückgeben. Vergleichen Sie keine Fehlermeldungstexte und nehmen Sie nicht an, dass jeder Abbruch denselben Code hat.
+
+## Beispiele [#examples]
+
+### Einfacher Abbruch [#basic-cancellation]
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+// Use a fully prepared transaction from your application's transaction builder.
+declare const params: EVMSignTransactionParams;
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+
+// Invoke from the user's Cancel action.
+HardwareSDK.cancel(connectId);
+
+const result = await signPromise;
+if (!result.success) {
+  if (result.payload.code === HardwareErrorCode.CallQueueActionCancelled) {
+    // Close the cancelled operation's UI.
+  } else {
+    throw new Error(result.payload.error);
+  }
+}
+```
+
+### Abbruch bei Zeitüberschreitung [#cancel-with-timeout]
+
+Dieser Timer bricht alle ausstehenden Anfragen auf der ausgewählten Verbindung ab; führen Sie Vorgänge daher pro Gerät nacheinander aus.
+
+```typescript
+import type { EVMSignTransactionParams } from '@onekeyfe/hd-core';
+
+async function signWithTimeout(
+  connectId: string,
+  deviceId: string,
+  params: EVMSignTransactionParams,
+  timeoutMs = 60_000,
+) {
+  const timer = setTimeout(() => HardwareSDK.cancel(connectId), timeoutMs);
+  try {
+    return await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+```
+
+## Abbruch und Beenden des Transports [#cancel-vs-transport-teardown]
+
+Ein Abbruch unterbricht den Vorgang und kann eine Bereinigung von Gerät/Verbindung auslösen. Er garantiert nicht, dass die Verbindung nutzbar bleibt oder sofort ein neuer Aufruf starten kann. Warten Sie das ursprüngliche Ergebnis ab; erkennen Sie das Gerät bei Verbindungsverlust erneut und aktualisieren Sie `getDeviceState` vor einer neuen Nutzeraktion. Wiederholen Sie Signier- oder Firmware-Update-Vorgänge nicht automatisch.
+
+Verwenden Sie `HardwareSDK.dispose()` beim Beenden des SDKs oder beim Transportwechsel, dann `init()` vor weiterer Verwendung. Eine physische Trennung wird gemeldet über `DEVICE.DISCONNECT`; ausstehende öffentliche Methodenaufrufe geben Fehlerergebnisse zurück.
+
+Siehe [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect) und [Fehlercodes](/de/hardware-sdk/core-api-guide#error-codes).

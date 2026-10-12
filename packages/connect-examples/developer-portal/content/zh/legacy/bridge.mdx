@@ -1,0 +1,21 @@
+---
+title: "OneKey Bridge 历史参考"
+description: "历史集成。新浏览器集成应使用 [WebUSB](/zh/hardware-sdk/transport/web-usb)，不要把安装 Bridge 作为当前 WebUSB 流程的前置条件。"
+---
+
+# OneKey Bridge 历史参考
+
+> 历史集成。新浏览器集成应使用 [WebUSB](/zh/hardware-sdk/transport/web-usb)，不要把安装 Bridge 作为当前 WebUSB 流程的前置条件。
+
+旧 Bridge 传输方式提供了两项检查：
+
+| 方法 | 历史成功返回的 payload | 用途 |
+| --- | --- | --- |
+| `checkBridgeStatus()` | `boolean` | 本地 Bridge 客户端是否正常运行。 |
+| `checkTransportRelease()` | `string` | 本地 Bridge 版本状态，旧文档记录为 `valid` 或 `outdated`。 |
+
+历史文档均使用 `success` 与 `payload`；失败时提供 `payload.error` 和可选错误码。Bridge 检查通过，不代表已经发现设备、获得账户访问权或签名授权。
+
+维护旧流程前，核对应用实际使用的 SDK 版本是否仍导出这些方法及相应传输要求。迁移时移除 Bridge 专用检查和安装提示，参考 [Bridge 迁移至 common-connect WebUSB](/zh/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)。
+
+原始参考：[checkBridgeStatus](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/checkbridgestatus.md)、[checkTransportRelease](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/checktransportrelease.md)。

@@ -1,0 +1,30 @@
+---
+title: "getChain"
+---
+
+# getChain
+
+現在のアカウントのチェーンを取得
+
+## メソッド [#method]
+
+```typescript
+declare function getChain(): Promise<{
+  enum: string;
+  name: string;
+  network: string;
+}>;
+```
+
+## レスポンス [#response]
+
+チェーンオブジェクト。
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const chain = await provider.getChain();
+console.log(chain);
+```

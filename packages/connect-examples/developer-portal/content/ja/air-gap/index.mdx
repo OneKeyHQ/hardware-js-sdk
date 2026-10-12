@@ -1,0 +1,86 @@
+---
+title: "Air-Gap (オフライン QR 署名)"
+---
+
+<span id="air-gap-offline-qr-signing" />
+
+# Air-Gap (オフライン QR 署名)
+
+UR エンコードされた QR コードを使い、デバイスをオフラインのまま保つ署名フローを構築します。
+
+## 仕組み [#how-it-works]
+
+1. **リクエストを構築**: チェーンごとに署名リクエストの UR ペイロードを作成し、アニメーション QR フレームとして描画
+2. **デバイスでスキャン**: デバイスが QR をスキャンし、画面上で詳細を確認して、オフラインで署名
+3. **署名を取得**: デバイスが署名の UR をアニメーション QR として表示
+4. **ブロードキャスト**: アプリがレスポンスをスキャンして検証し、ネットワーク経由でブロードキャスト
+
+## チェーン別クイックスタート [#quick-start-by-chain]
+
+| チェーン | リクエストタイプ (アプリ → デバイス) | レスポンスタイプ (デバイス → アプリ) |
+|-------|-------------|---------------|
+| [Ethereum と EVM](./ethereum-and-evm) | `eth-sign-request` | `eth-signature` |
+| [Bitcoin (PSBT)](./bitcoin) | `crypto-psbt` | `crypto-psbt` |
+| [Solana](./solana) | `sol-sign-request` | `sol-signature` |
+| [Tron](./tron) | `tron-sign-request` | `tron-signature` |
+
+### アカウントのエクスポートタイプ (デバイス → アプリ) [#account-export-types-device--app]
+
+これらの UR タイプは、初期設定時にデバイスからアプリへアカウント情報をエクスポートする際に使用します:
+
+| UR タイプ | 説明 |
+|---------|-------------|
+| `crypto-hdkey` | 単一の HD キーのエクスポート ([BCR-2020-007](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-007-hdkey.md)) |
+| `crypto-multi-accounts` | 複数チェーンのアカウントをまとめてエクスポート |
+
+## API リファレンス [#api-reference]
+
+- [基本 API](./basic-api) – 基本 UR タイプ: `CryptoHDKey`, `CryptoCoinInfo`, `CryptoKeypath`
+
+## パッケージ [#packages]
+
+```bash
+# Keystone SDK & UR registries
+npm install @keystonehq/keystone-sdk @keystonehq/bc-ur-registry-eth
+
+# UR primitives
+npm install @ngraveio/bc-ur
+```
+
+## サードパーティウォレットとの統合 [#third-party-wallet-integration]
+
+既存のウォレットに OneKey Air-Gap を統合する場合は、QR スキャナーがこれらの UR タイプを次のデコーダーに振り分けるようにしてください: **BC-UR v2 デコーダー** (ファウンテン符号化)。従来の v1 デコーダーは使用しないでください。
+
+### スキャナーで受け付ける必要がある UR タイプ [#ur-types-your-scanner-must-accept]
+
+| 方向 | UR タイプ | 使用場面 |
+|-----------|---------|------|
+| デバイス → アプリ | `crypto-psbt` | BTC 署名済み PSBT |
+| デバイス → アプリ | `crypto-hdkey` | 接続時の HD キーのエクスポート |
+| デバイス → アプリ | `crypto-multi-accounts` | 接続時の複数アカウントのエクスポート |
+| デバイス → アプリ | `eth-signature` | ETH 署名レスポンス |
+| デバイス → アプリ | `sol-signature` | SOL 署名済みトランザクション |
+| デバイス → アプリ | `btc-signature` | BTC 署名 (PSBT 以外) |
+| アプリ → デバイス | `eth-sign-request` | ETH 署名リクエスト |
+| アプリ → デバイス | `sol-sign-request` | SOL 署名リクエスト |
+| アプリ → デバイス | `crypto-psbt` | BTC 未署名 PSBT |
+| デバイス → アプリ | `tron-signature` | TRON 署名レスポンス |
+| アプリ → デバイス | `tron-sign-request` | TRON 署名リクエスト |
+
+### よくある落とし穴: UR タイプの振り分け [#common-pitfall-ur-type-routing]
+
+一部のウォレットは **許可リスト** を使用して、最新の BC-UR v2 デコーダーでデコードする UR タイプを決めます (ファウンテン符号には次を使用: `@ngraveio/bc-ur`)。許可リストにないタイプは、まったく異なるエンコード方式を使う従来の v1 デコーダーに渡され、スキャンが進まなくなることがあります。
+
+**スキャナーが「スキャンを続けてください」と表示したまま完了しない場合**, その UR タイプが v2 の許可リストに含まれているか確認してください。
+
+### `onekey-app-call-device` (非公開プロトコル) [#onekey-app-call-device-private-protocol]
+
+この `onekey-app-call-device` UR タイプは **OneKey 内部用プロトコル** で、デバイス管理操作に使用されます (例: `getMultiAccounts`, `verifyAddress`)。サードパーティウォレットでは **このタイプを実装しないでください** — 予告なく変更される場合があります。代わりに標準の Keystone SDK メソッドを使用してください。
+
+## デモと使用例 [#demo--examples]
+
+- **React Native デモ**: [GitHub Air-Gap デモ](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap)
+  - スキャナー: [AirGapScanner.tsx](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/connect-examples/react-native-demo/air-gap/src/components/AirGapScanner.tsx)
+  - チェーン用ヘルパー: [sdk/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap/sdk)
+
+> **注記**: Air-Gap は設計上オフラインで動作します。オンラインのブラウザープレイグラウンドはありません。

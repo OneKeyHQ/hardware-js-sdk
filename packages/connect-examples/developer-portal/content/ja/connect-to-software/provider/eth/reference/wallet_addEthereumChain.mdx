@@ -1,0 +1,135 @@
+---
+title: "wallet_addEthereumChain"
+description: "ウォレットに新しい Ethereum チェーンを追加"
+---
+
+# wallet_addEthereumChain
+
+新しいチェーンの追加をウォレットに要求します。すでに存在するチェーンの場合は、そのチェーンに切り替わることがあります。
+
+---
+
+## パラメーター [#parameters]
+
+`Array` 単一のチェーン設定オブジェクトを含みます:
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `chainId` | `string` | はい | チェーン ID (0x プレフィックス付きの 16 進数文字列) |
+| `chainName` | `string` | はい | 読みやすいチェーン名 |
+| `nativeCurrency` | `object` | はい | ネイティブ通貨の情報 |
+| `nativeCurrency.name` | `string` | はい | 通貨名 |
+| `nativeCurrency.symbol` | `string` | はい | ネイティブ通貨のシンボル |
+| `nativeCurrency.decimals` | `number` | はい | 通貨の小数桁数 (通常は 18) |
+| `rpcUrls` | `string[]` | はい | RPC URL の配列 (1 つ以上) |
+| `blockExplorerUrls` | `string[]` | いいえ | ブロックエクスプローラー URL の配列 |
+| `iconUrls` | `string[]` | いいえ | 任意のアイコン URL。表示はウォレットによって異なります |
+
+---
+
+## 戻り値 [#returns]
+
+`null` 成功時
+
+---
+
+## 例 [#example]
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x89',
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: {
+      name: 'POL',
+      symbol: 'POL',
+      decimals: 18
+    },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com']
+  }]
+})
+```
+
+### Base を追加 [#add-base]
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x2105',
+    chainName: 'Base',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://mainnet.base.org'],
+    blockExplorerUrls: ['https://basescan.org']
+  }]
+})
+```
+
+### Arbitrum を追加 [#add-arbitrum]
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0xa4b1',
+    chainName: 'Arbitrum One',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+    blockExplorerUrls: ['https://arbiscan.io']
+  }]
+})
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーがチェーンの追加を拒否 |
+| -32602 | 無効なパラメーター | 無効なチェーン設定 |
+
+---
+
+## 注意事項 [#notes]
+
+- 有効な RPC エンドポイントを指定し、対象ネットワークが求めるメタデータを使用してください
+- ウォレットは RPC エンドポイントが正しく応答することを検証します
+- チェーンを追加しても、そのチェーンへの切り替えは保証されません。操作後に `eth_chainId` を読み取って確認してください
+- 次で規定されています: [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085)
+
+### 追加と切り替えの組み合わせ [#combined-add-and-switch]
+
+```typescript
+async function switchToChain(chainConfig) {
+  try {
+    await window.$onekey.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: chainConfig.chainId }]
+    })
+  } catch (error) {
+    if (error.code === 4902) {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [chainConfig]
+      })
+      await window.$onekey.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainConfig.chainId }]
+      })
+    } else {
+      throw error
+    }
+  }
+}
+```

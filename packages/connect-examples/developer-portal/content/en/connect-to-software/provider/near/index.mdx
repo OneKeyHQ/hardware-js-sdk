@@ -5,22 +5,22 @@ description: Integrate NEAR Protocol into your dApp with OneKey wallet — detec
 
 # NEAR
 
-Integrate NEAR Protocol into your dApp using OneKey's NEAR provider. OneKey provides a fully compatible NEAR wallet interface that works seamlessly with existing NEAR dApps.
+Integrate NEAR Protocol into your dApp using OneKey's NEAR provider. Use the provider SDK and its supported near-api-js version for the methods documented below.
 
 ## Features
 
 - Account connection and management
 - Transaction signing and sending
 - Message signing
-- Network switching (mainnet/testnet)
-- Full RPC API support
+- Read network state (mainnet/testnet)
+- RPC requests through the selected network endpoint
 
 ## Installation
 
 ```bash
-npm install @onekeyfe/onekey-near-provider
+npm install @onekeyfe/onekey-near-provider near-api-js@^0.44.2
 # or
-yarn add @onekeyfe/onekey-near-provider
+yarn add @onekeyfe/onekey-near-provider near-api-js@^0.44.2
 ```
 
 ## Quick Start
@@ -32,7 +32,7 @@ import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider'
 const provider = new OneKeyNearProvider()
 
 // Request account access
-const accounts = await provider.request({ method: 'near_accounts' })
+const accounts = await provider.requestSignIn()
 console.log('Connected accounts:', accounts)
 
 // Get current network

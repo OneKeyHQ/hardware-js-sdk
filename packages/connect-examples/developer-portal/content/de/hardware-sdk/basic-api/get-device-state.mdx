@@ -1,0 +1,68 @@
+---
+description: "Einen vereinheitlichten Gerätestatus über Protocol V1 und V2 mit Laufzeit-, Einstellungs- oder Firmware-Umfang lesen."
+title: "Gerätestatus abrufen"
+---
+
+<span id="get-device-state" />
+
+# Gerätestatus abrufen
+
+Den vereinheitlichten V1-/V2-Gerätestatus lesen. Verwenden Sie dies anstelle des veralteten [`getFeatures`](/de/hardware-sdk/basic-api/get-features).
+
+`getFeatures()` läuft weiterhin nur auf Protocol V1. Pro 2 und Neo müssen `getDeviceState()` aufrufen und `payload.identity.deviceId` lesen. Für Firmware-/Versionsfelder verwenden Sie `scope: 'firmware'` anstelle von `getOnekeyFeatures`.
+
+```ts
+const res = await HardwareSDK.getDeviceState(connectId);
+```
+
+### Parameter [#params]
+
+[Optionale gemeinsame Parameter](/de/hardware-sdk/concepts/common-params)
+
+| Parameter | Typ | Erforderlich | Hinweise |
+| --- | --- | --- | --- |
+| `scope` | `'runtime' \| 'settings' \| 'firmware'` | Nein | Standardwert ist `'runtime'`. Der Umfang bestimmt nur, welche Teilbereiche diese Abfrage aktualisiert; die Nutzlast bleibt ein vollständiger Status |
+
+- `runtime` — aktueller Sperr-/PIN-/Passphrase-Status (V1 `GetFeatures`, V2 `DeviceStatusGet` im Anwendungsmodus)
+- `settings` — außerdem Einstellungen aktualisieren
+- `firmware` — außerdem Identität, Versionen und Prüfinformationen aktualisieren
+
+Bootloader / Romloader überspringt nicht unterstützte Statusbefehle und gibt den verfügbaren Status zurück.
+
+### Ergebnis [#result]
+
+```ts
+{
+  success: true,
+  payload: {
+    protocol: 'V1' | 'V2',
+    identity: {
+      deviceId: string | null, // seed lifetime — pass as the second SDK argument
+      serialNo: string,
+      deviceType: string,
+      // ...
+    },
+    status: { initialized, unlocked, passphraseProtection, attachToPinEnabled, ... },
+    settings: { language, airgapMode, ... },
+    versions: { firmware, bootloader, ble, applicationP1, applicationP2, ... },
+  }
+}
+```
+
+Lesen Sie `payload.identity.deviceId` für das zweite Argument von Signieraufrufen. Speichern Sie keine Firmware-`session_id` aus den Kompatibilitäts-Features dauerhaft.
+
+Die Nutzlast enthält **nicht** die Firmware-Wallet-`session_id` oder rohe Protokollnachrichten. Die Wallet-Identität stammt aus [`openWalletSession`](/de/hardware-sdk/basic-api/open-wallet-session).
+
+### Fehler [#error]
+
+```ts
+{
+  success: false,
+  payload: {
+    error: string,
+    code?: string | number,
+  }
+}
+```
+
+Siehe [Protocol V1 und V2](/de/hardware-sdk/concepts/protocol).

@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Connect the wallet before sending requests. Replace example addresses and manifest URLs with valid values. For authentication, use a server-generated, single-use challenge and verify the proof on your server.
+
 Learn how to sign data for off-chain verification.
 
 ---
@@ -54,7 +56,7 @@ const connectEvent = await provider.connect(2, {
 if (connectEvent.event === 'connect') {
   const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
 
-  if (proofItem) {
+  if (proofItem && "proof" in proofItem) {
     // Send proof to your backend for verification
     const proof = proofItem.proof
     console.log({
@@ -108,4 +110,3 @@ if ('error' in result) {
 | 100 | Unknown app |
 | 300 | User rejected request |
 | 400 | Method not supported |
-

@@ -1,0 +1,13 @@
+---
+title: "Evento"
+---
+
+<span id="webln-events" />
+
+# Eventos de WebLN
+
+No te bases en eventos de cuenta o red para determinar si una solicitud WebLN tuvo éxito. Espera a que termine cada llamada y gestiona su resultado o rechazo.
+
+Los tipos del proveedor declaran `accountChanged` (en singular) y `disconnect`, pero la implementación actual de WebLN no establece una suscripción a eventos de cambio de cuenta. Las integraciones no deben depender de estas notificaciones sin verificar su comportamiento en la versión de cartera de destino.
+
+Para el flujo de conexión requerido, consulta [Primeros pasos](/es/connect-to-software/provider/webln/guide).

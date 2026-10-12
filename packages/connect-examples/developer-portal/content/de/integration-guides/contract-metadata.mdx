@@ -1,0 +1,22 @@
+---
+title: "Vertragsmetadaten"
+description: "Wallets können Aufrufdaten dekodieren, um bei der Bestätigung einen Methodennamen anzuzeigen. Ein Funktionsselektor besteht aus den ersten vier Bytes des Keccak-256-Hashs seiner kanonischen Signatur, etwa `transfer(address,uint256)`."
+---
+
+<span id="contract-metadata" />
+
+# Vertragsmetadaten
+
+Wallets können Aufrufdaten dekodieren, um bei der Bestätigung einen Methodennamen anzuzeigen. Ein Funktionsselektor besteht aus den ersten vier Bytes des Keccak-256-Hashs seiner kanonischen Signatur, etwa `transfer(address,uint256)`.
+
+## Überprüfbare Metadaten veröffentlichen [#publish-verifiable-metadata]
+
+Veröffentlichen und verifizieren Sie Vertragsquellcode und ABI im entsprechenden Block-Explorer. Halten Sie das ABI für Ihre Anwendung verfügbar, um Aufrufe korrekt zu kodieren. Ein angezeigter Methodenname allein beweist weder Identität noch Verhalten eines Vertrags; Selektoren können kollidieren.
+
+## Signaturregister [#signature-registries]
+
+Die frühere GitBook-Anleitung beschrieb das Registrieren von Signaturen im On-Chain-Register von Parity. Der aktuelle Provider-Quellcode belegt nicht, dass OneKey dieses Register zum Dekodieren von Transaktionen verwendet. Bezahlen Sie keine Registertransaktion in der Annahme, dass sie den OneKey-Bestätigungsbildschirm verändert.
+
+Wenn ein Methodenname fehlt, melden Sie Chain, Vertragsadresse, Methodensignatur, Transaktionshash, sofern verfügbar, und Wallet-Version über den [OneKey-Issue-Tracker](https://github.com/OneKeyHQ/app-monorepo/issues). Fügen Sie niemals private Schlüssel oder Wiederherstellungsphrasen ein.
+
+Für Hardware-Integrationen siehe [Clear Signing](/de/hardware-sdk/signers/evm#clear-signing). Die Gerätedekodierung hängt von Firmware und Calldata ab; Metadaten Ihrer Anwendung überschreiben die Gerätebestätigung nicht.

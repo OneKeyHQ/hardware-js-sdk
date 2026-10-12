@@ -1,0 +1,60 @@
+---
+description: "接続候補を検出し、任意の識別フィールドを処理して、初期化済みデバイスの状態を読み取ります。"
+title: "デバイスを検索"
+---
+
+<span id="search-devices" />
+
+# デバイスを検索
+
+接続候補を検出します。`searchDevices()` は結果オブジェクトを返し、`success` が `true` の場合にのみ、`payload` にデバイス一覧が含まれます。
+
+検出されたことは、デバイスが初期化済み、またはウォレットがロック解除済みである証拠にはなりません。BLE では接続前に広告名と接続 ID が返る場合があります。USB でも識別フィールドが未初期化の記述子が返る場合があります。
+
+## メソッド [#method]
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+if (!result.payload.length) throw new Error('No OneKey device found');
+
+// For this example, select the only connected device.
+// In an app, ask the user to choose when multiple devices are present.
+if (result.payload.length !== 1) throw new Error('Select a device before continuing');
+const { connectId } = result.payload[0];
+if (!connectId) throw new Error('Device connection is unavailable');
+
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+```
+
+WebUSB の許可要求はユーザー操作を起点とするフローで行います。BLE スキャンにはプラットフォームの Bluetooth 権限が必要です。参照: [WebUSB](/ja/hardware-sdk/transport/web-usb) または [React Native BLE](/ja/hardware-sdk/transport/react-native-ble).
+
+## パラメーター [#parameters]
+
+パラメーターオブジェクトは任意です。次の [`searchDevices` 型](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/api/searchDevices.ts) および [共通パラメーター](/ja/hardware-sdk/concepts/common-params) をインストール済み SDK のバージョンで確認してください。
+
+## 結果のフィールド [#result-fields]
+
+| フィールド | 型 | 意味 |
+| --- | --- | --- |
+| `connectId` | `string \| null` | トランスポートのルーティングキー。以降のデバイス呼び出しには null でない値を渡してください。 |
+| `connectProtocol` | `'V1' \| 'V2' \| undefined` | 能動的なプロトコル検査後に取得できます。広告名から推測しないでください。 |
+| `serialNo` | `string \| null \| undefined` | 初期化後、取得可能な場合の物理シリアル番号。 |
+| `deviceId` | `string \| null` | 取得可能な場合の、シードの存続期間に対応する識別情報。次で更新します: `getDeviceState`. |
+| `uuid` | `string` | 非推奨の互換フィールド。初期化前は空の場合があります。物理デバイスの識別には `serialNo` を優先してください。 |
+| `deviceType` | `IDeviceType` | 検出されたモデル。初期化前は不明の場合があります。 |
+| `name` | `string` | 表示名。一意の識別子ではありません。 |
+| `commType` | `OneKeyDeviceCommType` | トランスポートが報告する通信の種類。 |
+
+正確な公開形式は [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts) を参照してください。`path` などの追加の内部フィールドに依存しないでください。
+
+同じ物理デバイスでも、USB と BLE では次の `connectId` 値が異なります。再接続後は再列挙し、ウォレットの関連付けを再利用する前に状態を更新してください。参照: [識別子](/ja/hardware-sdk/concepts/identifiers).
+
+## 失敗時の処理 [#failure-handling]
+
+失敗時の `payload` には `error` と任意の `code` が含まれます。エラー文字列ではなくコードで処理してください。成功した空の一覧は候補が見つからなかったことを意味し、SDK の失敗ではありません。
+
+デバイス一覧全体やデバイスオブジェクトをログに記録しないでください。診断情報は操作の状態と機密性のない件数に限定してください。

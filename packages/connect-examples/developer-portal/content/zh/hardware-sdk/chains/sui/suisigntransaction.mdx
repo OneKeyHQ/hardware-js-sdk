@@ -6,7 +6,7 @@ title: suiSignTransaction
 
 ## Sui：签名交易
 
-使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定路径派生的密钥请求交易签名。用户在设备上核对并确认请求。
 
 ```typescript
 const result = await HardwareSDK.suiSignTransaction(connectId, deviceId, params);
@@ -16,17 +16,14 @@ const result = await HardwareSDK.suiSignTransaction(connectId, deviceId, params)
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
-* `rawTx` - _必需_ `string` 序列化交易字符串。
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `rawTx` - _必需_ `string`。以十六进制字符串编码的序列化交易。
 
+<span id="rawtx-大小限制" />
 
+#### 交易大小与固件
 
-#### rawTx 大小限制
-
-* Classic、Mini 固件版本低于 3.6.0 时，数据大小上限为 4KB。
-* Classic、Mini 固件版本大于或等于 3.6.0 时，数据大小上限为 6KB。
-
-
+支持的固件可通过 SDK 分块接收交易数据。旧版固件接收单个数据包，可能有更小的大小限制。请处理 SDK 返回的固件和数据大小错误，并在目标设备上验证应用需要的交易大小。
 
 ### 示例
 
@@ -47,9 +44,8 @@ const response = await HardwareSDK.suiSignTransaction(
 {
   success: true,
   payload: {
-    path: "m/44'/784'/0'/0'/0'",
     public_key: string,
-    signature: string
+    signature: string,
   }
 }
 ```
@@ -60,8 +56,8 @@ const response = await HardwareSDK.suiSignTransaction(
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

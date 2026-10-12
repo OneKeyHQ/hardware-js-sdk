@@ -10,7 +10,7 @@ import { Callout } from 'nextra/components'
 Blocknative's multi-wallet connection library. Framework-agnostic with support for React, Vue, and vanilla JavaScript.
 
 <Callout type="info">
-OneKey is automatically detected via the injected wallets module. No additional configuration required.
+OneKey is automatically detected via the injected wallets module. Verify detection with the installed OneKey and library versions.
 </Callout>
 
 ---
@@ -42,7 +42,7 @@ const onboard = Onboard({
     },
     {
       id: '0x89',
-      token: 'MATIC',
+      token: 'POL',
       label: 'Polygon',
       rpcUrl: 'https://polygon-rpc.com',
     },
@@ -65,6 +65,8 @@ async function connect() {
 
 ## React Integration
 
+Install the React module with `npm install @web3-onboard/react`.
+
 ```tsx filename="App.tsx"
 import { init, useConnectWallet, useWallets } from '@web3-onboard/react'
 import injectedModule from '@web3-onboard/injected-wallets'
@@ -85,7 +87,7 @@ init({
 
 function App() {
   const [{ wallet, connecting }, connect, disconnect] = useConnectWallet()
-  const connectedWallets = useWallets()
+  // useWallets() is available when managing multiple connections.
 
   if (wallet) {
     return (
@@ -133,7 +135,7 @@ const onboard = Onboard({
 
 ## Get Provider
 
-After connecting, get the provider for transactions:
+This example uses ethers 6 (`npm install ethers@^6`). After connecting, use the selected wallet provider for transactions. Replace the recipient placeholder before sending:
 
 ```javascript
 import { ethers } from 'ethers'
@@ -161,8 +163,7 @@ if (wallets[0]) {
 ```javascript
 const onboard = Onboard({
   // ...
-  theme: 'dark', // or 'light', 'system'
-  // Or custom theme
+  // Use a custom theme object, or replace it with 'dark', 'light', or 'system'.
   theme: {
     '--w3o-background-color': '#1a1a1a',
     '--w3o-foreground-color': '#ffffff',

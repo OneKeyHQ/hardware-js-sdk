@@ -1,0 +1,31 @@
+---
+title: "signSchnorr"
+---
+
+# signSchnorr
+
+## Método [#method]
+
+```typescript
+declare function signSchnorr(sigHash: string): Promise<string>;;
+```
+
+## Parámetros [#params]
+
+* `sigHash` — _obligatorio_ `string`  un hash que se va a firmar
+
+## Respuesta [#response]
+
+Una firma Schnorr del hash proporcionado, usando la cuenta Nostr activa. Es una extensión de OneKey, no un método NIP-07.
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const signature = await provider.signSchnorr("<SIGNATURE_HASH_HEX>")
+```
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/poGOPXB)

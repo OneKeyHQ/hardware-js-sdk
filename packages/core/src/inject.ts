@@ -309,6 +309,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'btcGetAddress' }),
   btcGetPublicKey: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcGetPublicKey' }),
+  btcDeriveContextHash: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcDeriveContextHash' }),
   btcSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcSignMessage' }),
   btcSignPsbt: (connectId, deviceId, params) =>

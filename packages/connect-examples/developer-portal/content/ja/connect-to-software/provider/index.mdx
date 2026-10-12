@@ -1,0 +1,26 @@
+---
+title: "プロバイダー API"
+---
+
+<span id="provider-api" />
+
+# プロバイダー API
+
+対象チェーンのプロバイダーを使用して、アカウント、署名、トランザクションを要求します。各チェーンは独自のメソッド、エンコード方式、イベントを持つため、Ethereum のリクエスト例を Bitcoin や Solana の例と置き換えることはできません。
+
+## ここで得られるもの [#what-this-gives-you]
+
+- **チェーン別リファレンス**: 各プロバイダーの接続、署名、トランザクション、イベントのドキュメントを確認できます。
+- **接続の選択肢**: ウォレット選択画面にはウォレット UI ライブラリを使用するか、注入されたプロバイダーに直接アクセスします。
+- **実装ガイド**: ネットワークとアカウントの状態の確認、リクエスト拒否の処理、イベントリスナーのクリーンアップを行います。
+
+## 対応チェーン [#supported-chains]
+
+- **EVM**: Ethereum、Polygon、BSC、Arbitrum、Optimism、Base など。
+- **Bitcoin**: BTC, Lightning Network (WebLN)
+- **Solana**: SOL
+- **Cosmos**: ATOM と Cosmos SDK チェーン
+- **Move**: Aptos, Sui
+- **その他**: Stellar, TON, TRON, Polkadot, Cardano, Algorand, Conflux, NEAR, Nostr
+
+サイドバーからチェーンを選択すると、プロバイダーメソッド、署名フロー、使用例の詳細を確認できます。

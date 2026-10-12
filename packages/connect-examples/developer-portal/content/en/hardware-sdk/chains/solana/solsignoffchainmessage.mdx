@@ -4,7 +4,7 @@ title: solSignOffchainMessage
 
 # solSignOffchainMessage
 
-Sign a Solana off-chain message. Hardware SDK 1.2.x supports this method on **Protocol V1 and V2** (Classic / Pro / Pro 2 / Neo) through the same public API.
+Sign a Solana off-chain message. The SDK implements this method for **Protocol V1 and V2** through the same public API. Confirm firmware support on the device models used by your integration.
 
 ```ts
 const response = await HardwareSDK.solSignOffchainMessage(connectId, deviceId, {
@@ -19,8 +19,8 @@ const response = await HardwareSDK.solSignOffchainMessage(connectId, deviceId, {
 
 * `path` - _required_ `string | number[]` Solana path, fully hardened
 * `messageHex` - _required_ `string` hex-encoded off-chain message
-* `messageVersion` - _optional_ `number`
-* `messageFormat` - _optional_ `number`
+* `messageVersion` - _optional_ `SolanaOffChainMessageVersion` enum
+* `messageFormat` - _optional_ `SolanaOffChainMessageFormat` enum
 * `applicationDomainHex` - _optional_ `string` 32-byte hex application domain
 * `requiredSigners` - _optional_ `string[]` 32-byte hex public keys, **strictly sorted and unique**
 

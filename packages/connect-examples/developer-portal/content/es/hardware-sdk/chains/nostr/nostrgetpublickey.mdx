@@ -1,0 +1,98 @@
+---
+title: "nostrGetPublicKey"
+---
+
+# nostrGetPublicKey
+
+### Requisitos [#requirements]
+
+* Versiones mínimas de firmware exigidas por el SDK
+  * Touch / Pro (`model_touch`): 4.7.0
+  * Classic / Classic1s / Classic Pure / Mini (`model_mini`): 3.6.0
+
+## Nostr: obtener publicKey [#nostr-get-publickey]
+
+Devuelve la clave pública derivada de la ruta especificada. Usa `showOnOneKey` para solicitar confirmación en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.nostrGetPublicKey(connectId, deviceId, params);
+```
+
+## Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+### Una clave pública [#single-public-key]
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `1`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la clave pública en el dispositivo. El valor predeterminado es `true`.
+
+#### Varias claves públicas [#multiple-public-keys]
+
+* `bundle` - matriz de objetos que incluyen `path`, `showOnOneKey` como campos
+
+### Ejemplo [#example]
+
+Devuelve la clave pública de la primera clave de Nostr:
+
+```typescript
+HardwareSDK.nostrGetPublicKey(connectId, deviceId, {
+    path: "m/44'/1237'/0'/0/0",
+    showOnOneKey: true,
+});
+```
+
+Devuelve un lote de claves públicas de varias claves de Nostr:
+
+```typescript
+HardwareSDK.nostrGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/1237'/0'/0/0" }, // account 1
+        { path: "m/44'/1237'/0'" }, // account 2
+        { path: "m/44'/1237'/0'/0/1" }  // account 3
+    ]
+});
+```
+
+### Resultado [#result]
+
+Respuesta de una clave pública
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        pub?: string, // public key in hexadecimal
+        publickey?: string, // legacy runtime alias
+        npub?: string,        // npub
+    }
+}
+```
+
+Respuesta por lotes de claves públicas
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, pub, publickey, npub }, // account 1
+        { path, pub, publickey, npub }, // account 2
+        { path, pub, publickey, npub }, // account 3
+    ]
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+Usa `pub` para la clave pública. En tiempo de ejecución también se devuelve el alias antiguo `publickey`; el nombre opcional `publicKey` de la declaración actual no describe ese alias.

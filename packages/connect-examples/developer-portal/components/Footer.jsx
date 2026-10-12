@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo } from 'react'
+import { ui } from '../i18n/ui.mjs'
 
-export function Footer() {
+export function Footer({ locale = 'en' }) {
   const versionInfo = useMemo(() => {
     const sdkVersion = process.env.NEXT_PUBLIC_SDK_VERSION || 'dev'
     const commitShort = process.env.NEXT_PUBLIC_COMMIT_SHORT || 'local'
@@ -12,10 +13,11 @@ export function Footer() {
     if (buildTime) {
       try {
         const date = new Date(buildTime)
-        formattedDate = date.toLocaleDateString('en-US', {
+        formattedDate = date.toLocaleDateString(locale, {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
+          timeZone: 'UTC',
         })
       } catch {
         formattedDate = ''
@@ -23,7 +25,7 @@ export function Footer() {
     }
 
     return { sdkVersion, commitShort, formattedDate }
-  }, [])
+  }, [locale])
 
   const currentYear = new Date().getFullYear()
 
@@ -31,9 +33,9 @@ export function Footer() {
     <footer className="nextra-footer pb-6 pt-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 flex-wrap justify-center">
-          <span>Since 2019 - {currentYear}</span>
+          <span>{ui(locale, 'Since 2019', '始于 2019')} - {currentYear}</span>
           <span className="text-zinc-300 dark:text-zinc-600">|</span>
-          <span>OneKey Limited All Rights Reserved</span>
+          <span>{ui(locale, 'OneKey Limited. All rights reserved.', 'OneKey Limited 保留所有权利。')}</span>
           <span className="text-zinc-300 dark:text-zinc-600">·</span>
           <a
             href="https://github.com/OneKeyHQ/hardware-js-sdk"

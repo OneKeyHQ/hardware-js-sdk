@@ -1,0 +1,171 @@
+---
+title: "はじめに"
+description: "OneKey の TronLink 互換プロバイダーで TRON に接続"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+プロバイダーに接続し、同じウォレットに関連付けられた TronWeb インスタンスを使用してください。省略されたアドレスとコントラクトメソッドを有効な値に置き換えます。トランザクションの準備前に選択中のネットワークを確認してください。
+
+OneKey のプロバイダーを検出して接続し、TRON を操作する方法を説明します。
+
+<Callout type="info">
+OneKey は TronLink 互換プロバイダーと TronWeb 統合を公開しています。機能の利用可否はウォレットのバージョンと選択中のネットワークによって異なります。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// OneKey injects both the provider and TronWeb instances
+const provider = window.$onekey?.tron
+
+// TronWeb is available globally after connection
+let tronWeb = provider?.tronWeb
+
+if (!provider) {
+  throw new Error('OneKey TRON provider not detected')
+}
+
+// Check if it's TronLink compatible
+console.log('isTronLink:', provider.isTronLink) // true
+```
+
+---
+
+## アカウントを要求 [#request-accounts]
+
+```typescript
+// Request connection
+const result = await provider.request({
+  method: 'tron_requestAccounts'
+})
+
+if (result.code === 200) {
+  tronWeb = provider.tronWeb
+  if (!tronWeb) throw new Error('OneKey TronWeb is not ready')
+  console.log('Connected!')
+  const address = tronWeb.defaultAddress.base58
+  console.log('Address:', address)
+} else {
+  console.log('Connection rejected:', result.message)
+}
+```
+
+---
+
+## 接続状態を確認 [#check-connection-status]
+
+```typescript
+// Check if TronWeb is ready
+if (provider.ready && tronWeb && tronWeb.defaultAddress.base58) {
+  console.log('Connected:', tronWeb.defaultAddress.base58)
+} else {
+  console.log('Not connected')
+}
+```
+
+---
+
+## TronWeb の使用 [#using-tronweb]
+
+接続後は `provider.tronWeb` を使用して、リクエストを OneKey に関連付けたままにします:
+
+### 残高を取得 [#get-balance]
+
+```typescript
+const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58)
+console.log('Balance:', tronWeb.fromSun(balance), 'TRX')
+```
+
+### TRX を送信 [#send-trx]
+
+```typescript
+const tx = await tronWeb.trx.sendTransaction(
+  'TRecipientAddress...',
+  tronWeb.toSun(10) // 10 TRX
+)
+
+console.log('Transaction:', tx.txid)
+```
+
+### TRC20 トークンを送信 [#send-trc20-token]
+
+```typescript
+const contractAddress = 'TTokenContractAddress...'
+const contract = await tronWeb.contract().at(contractAddress)
+
+// Get decimals
+const decimals = await contract.decimals().call()
+
+// Transfer tokens
+const amount = (100n * 10n ** BigInt(decimals.toString())).toString() // 100 tokens, exact integer
+const tx = await contract.transfer(
+  'TRecipientAddress...',
+  amount
+).send()
+
+console.log('Transaction:', tx)
+```
+
+---
+
+## イベント処理 [#event-handling]
+
+### アカウント変更を監視 [#listen-for-account-changes]
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts[0]) {
+    console.log('Account changed:', accounts[0])
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### ネットワーク変更を監視 [#listen-for-network-changes]
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('Network changed:', chainId)
+  // Recommend page reload for network changes
+})
+```
+
+### Window イベント (TronLink 互換) [#window-events-tronlink-compatible]
+
+```typescript
+// Listen for TronLink initialization
+window.addEventListener('tronLink#initialized', () => {
+  console.log('TronLink initialized')
+})
+
+// Listen for messages
+window.addEventListener('message', (event) => {
+  if (event.source === window && event.data?.isTronLink && event.data?.message) {
+    const { action, data } = event.data.message
+    console.log('TronLink event:', action, data)
+  }
+})
+```
+
+---
+
+## TronLink からの移行 [#migration-from-tronlink]
+
+OneKey は TronLink と互換性があります。検出ロジックを更新してください:
+
+```typescript
+// Before (TronLink only)
+const tronWeb = window.tronWeb
+
+// After (OneKey with TronLink fallback)
+const provider = window.$onekey?.tron || window.tronLink
+const tronWeb = window.tronWeb // Compatibility global; verify which wallet owns it
+```

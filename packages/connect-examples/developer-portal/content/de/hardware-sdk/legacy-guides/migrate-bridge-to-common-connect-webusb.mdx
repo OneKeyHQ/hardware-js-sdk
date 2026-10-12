@@ -1,0 +1,137 @@
+---
+description: "Eine Bridge-Integration auf direktes WebUSB mit dem gemeinsamen SDK und dem aktuellen UI-Ereignisvertrag umstellen."
+title: "Zu common-connect-sdk migrieren"
+---
+
+<span id="migrate-to-common-connect-sdk" />
+
+# Zu common-connect-sdk migrieren
+
+Von Bridge zu WebUSB migrieren und den SDK-Einstieg wechseln zu `@onekeyfe/hd-common-connect-sdk`.
+
+---
+
+## Voraussetzungen [#requirements]
+
+- Chromium-Browser (Chrome/Edge auf dem Desktop)
+- Node.js 18+ (LTS empfohlen)
+
+---
+
+## Änderungen auf einen Blick [#what-changed-at-a-glance]
+
+- SDK-Einstieg: `@onekeyfe/hd-web-sdk` → `@onekeyfe/hd-common-connect-sdk`
+- Initialisierungsoptionen: verwenden Sie `env: 'webusb'`; kein `connectSrc` (ohne Iframe)
+- Berechtigungsablauf: aufrufen: `navigator.usb.requestDevice()` (muss durch eine Nutzeraktion ausgelöst werden) mit dem offiziellen Filter `ONEKEY_WEBUSB_FILTER`
+- Ereignissystem: verwenden Sie `@onekeyfe/hd-core` `UI_EVENT / DEVICE`-Ereignisse für Nutzerinteraktionen (PIN/Passphrase usw.)
+- Bridge-spezifische Logik entfernt: entfernen Sie `checkBridgeStatus()` und alle Bridge-Prüfungen/-Aufforderungen
+- Fachliche APIs weitgehend unverändert: z. B. `searchDevices / getDeviceState / btcGetAddress`
+
+---
+
+## Installieren [#install]
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+---
+
+## Initialisieren (hd-common-connect-sdk + WebUSB) [#initialize-hd-common-connect-sdk--webusb]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({
+  env: 'webusb',
+  debug: false,
+  fetchConfig: true,
+});
+if (!initialized) throw new Error('SDK initialization failed');
+```
+
+- Anders als bei `hd-web-sdk` benötigen Sie hier kein `connectSrc` (keine Iframe-Abhängigkeit).
+- Es wird empfohlen, Folgendes zu aktivieren: `fetchConfig: true`, um Gerätefunktions- und Hinweiskonfigurationen abzurufen.
+
+---
+
+## UI- und Geräteereignisse anbinden (PIN / Passphrase / Anschließen-Abziehen) [#bind-ui-and-device-events-pin--passphrase--plug-unplug]
+
+Verwenden Sie die [Core-API-UI-Handler](/de/hardware-sdk/core-api-guide#events-ui) und registrieren Sie sie vor geschützten Aufrufen. Behalten Sie die Anfragezuordnung bei, antworten Sie nur auf Eingabeanfragen und brechen Sie den ausgewählten Vorgang ab, wenn der Nutzer abbricht. Reine Geräte-PIN- und Tastenaufforderungen benötigen kein `uiResponse`.
+
+Abonnieren Sie `DEVICE.CONNECT` und `DEVICE.DISCONNECT`, um den Verbindungsstatus zu aktualisieren. Protokollieren Sie keine vollständigen Geräte- oder UI-Ereignisnutzlasten.
+
+---
+
+## Autorisierung (WebUSB-Auswahl + offizieller Filter) [#authorization-webusb-picker--official-filter]
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Important: must be triggered by a user gesture (e.g., button click) or the browser will block it
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## Geräte auflisten und erster Aufruf [#enumerate-devices-and-first-call]
+
+```ts
+// 1) Enumerate
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+// Select explicitly in the application when more than one device is available.
+if (list.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = list.payload[0] ?? {};
+if (!connectId) throw new Error("No device connection");
+
+// 2) Confirm deviceId
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const resolvedDeviceId = state.payload.identity.deviceId;
+if (!resolvedDeviceId) throw new Error("Device has no wallet identity");
+
+// 3) Example: get a BTC address
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+
+if (r.success) {
+  console.log('BTC address:', r.payload.address);
+} else {
+  console.error('Error:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## Bereinigung und Checkliste [#cleanup-and-checklist]
+
+- Abhängigkeit austauschen: entfernen Sie `@onekeyfe/hd-web-sdk`, verwenden Sie `@onekeyfe/hd-common-connect-sdk` stattdessen
+- Initialisierungsänderungen:
+  - Alt: `env: 'web'` + `connectSrc: 'https://jssdk.onekey.so/.../'`
+  - Neu: `env: 'webusb'` (kein `connectSrc`)
+- Reine Bridge-Logik entfernen: z. B. `checkBridgeStatus()`, Aufforderungen zur Bridge-Installation/zum Neustart
+- Anbinden: `UI_EVENT / DEVICE`: sicherstellen, dass PIN-/Passphrase- und Geräteanschluss-/Trennereignisse behandelt werden
+- Eine neue USB-Autorisierung erfordert `requestDevice()` über eine Nutzeraktion. Bereits autorisierte Geräte können aufgelistet werden, ohne die Auswahl erneut zu öffnen.
+- Kompatibilitätstipp: Wenn `navigator.usb` fehlt, bitten Sie Nutzer, zu einem WebUSB-fähigen Browser zu wechseln
+
+---
+
+## FAQ [#faq]
+
+- Kein Berechtigungsdialog über HTTP? → Über HTTPS bereitstellen
+- UI-Anfragen hängen? → Frühzeitig abonnieren: `UI_EVENT` und antworten über `uiResponse`
+- Verwenden Sie noch `connectSrc` oder `HdWebSdk.HardwareWebSdk`? → Migriert zu `hd-common-connect-sdk`; Iframe wird nicht mehr benötigt
+- Aufruf von `requestDevice` außerhalb einer Nutzeraktion? → Chrome blockiert dies; ein Klick oder eine ähnliche Aktion muss ihn auslösen
+
+---
+
+## Weiterführende Informationen [#further-reading]
+
+- WebUSB im Detail und vollständiges Beispiel: [WebUSB-Verbindungsanleitung](/de/hardware-sdk/transport/web-usb)
+- Ereignisse und Interaktionen: [Konfigurationsereignis](/de/hardware-sdk/core-api-guide#events-ui)
+- API-Referenzen und Parameter: [Hardware-SDK-API-Referenzen](/de/hardware-sdk/core-api-guide), [Gemeinsame Parameter](/de/hardware-sdk/concepts/common-params), [Fehlercodes](/de/hardware-sdk/core-api-guide#error-codes)

@@ -1,0 +1,95 @@
+---
+description: "Unterstützung von Hardware-Signiermethoden nach Protokoll prüfen und Einschränkungen der Gerätekompatibilitätstests beachten."
+title: "Chain-Unterstützung"
+---
+
+<span id="chain-support" />
+
+# Chain-Unterstützung
+
+Diese Seite ist die **Matrix öffentlicher Hardware-SDK-Methoden**, nicht die Coin-Liste der OneKey-App. Marketingzahlen der App (100+ Chains, 30,000+ Tokens) beziehen sich auf den Wallet-Katalog. Als Integrator sollten Sie nur Methoden zählen, die Sie aufrufen können auf `HardwareSDK`.
+
+Maßgeblich für Pro 2 / Neo ist bei jeder Core-Methode deren `getSupportedProtocols()`. Standard ist ausschließlich Protocol V1. Eine Chain ist auf Pro 2 / Neo nur verfügbar, wenn die Methode `['V1', 'V2']` zurückgibt. Firmware-`min`-Versionen veralten; prüfen Sie die Methodenseite und die Gerätefirmware, statt sie hier zu kopieren.
+
+## Protocol V1 und V2 (Pro 2 / Neo) [#protocol-v1-and-v2-pro-2--neo]
+
+| Familie | Öffentliche Methoden | Classic 1s / Touch / Pro | Mini | Pro 2 / Neo |
+| --- | --- | --- | --- | --- |
+| EVM | `evmGetAddress` `evmGetPublicKey` `evmSignMessage` `evmSignTransaction` `evmSignTypedData` `evmVerifyMessage` | Ja | Ja | **V1+V2** |
+| Bitcoin &amp; Forks | `btcGetAddress` `btcGetPublicKey` `btcSignMessage` `btcSignTransaction` `btcVerifyMessage` `btcSignPsbt` | Ja (siehe Einschränkungen) | Ja | **V1+V2** (Bitcoin). **Neurai ist nur V1** |
+| Solana | `solGetAddress` `solSignMessage` `solSignTransaction` `solSignOffchainMessage` | Ja | Ja | **V1+V2** |
+| Aptos | `aptosGetAddress` `aptosGetPublicKey` `aptosSignMessage` `aptosSignTransaction` `aptosSignInMessage` | Ja (siehe Einschränkungen) | Ja | **V1+V2** |
+| Sui | `suiGetAddress` `suiGetPublicKey` `suiSignMessage` `suiSignTransaction` | Ja | Ja | **V1+V2** |
+| Cosmos | `cosmosGetAddress` `cosmosGetPublicKey` `cosmosSignTransaction` | Ja | Ja | **V1+V2** |
+| NEAR | `nearGetAddress` `nearSignTransaction` | Ja | Ja | **V1+V2** |
+| TON | `tonGetAddress` `tonSignMessage` `tonSignProof` `tonSignData` | Ja. **Classic (nicht 1s): nein** | Adresse ja; **Signieren/Nachweis: nein** | **V1+V2** |
+| TRON | `tronGetAddress` `tronSignMessage` `tronSignTransaction` | Ja | Adresse ja; **Nachricht signieren: nein** | **V1+V2** |
+| Cardano | `cardanoGetAddress` `cardanoGetPublicKey` `cardanoSignMessage` `cardanoSignTransaction` | Ja | Ja | **V1+V2** |
+| Polkadot | `polkadotGetAddress` `polkadotSignTransaction` | Ja | Ja | **V1+V2** |
+| Ripple (XRP) | `xrpGetAddress` `xrpSignTransaction` | Ja | Ja | **V1+V2** |
+| Filecoin | `filecoinGetAddress` `filecoinSignTransaction` | Ja | Ja | **V1+V2** |
+| Conflux | `confluxGetAddress` `confluxSignMessage` `confluxSignMessageCIP23` `confluxSignTransaction` | Ja | Ja | **V1+V2** |
+| Kaspa | `kaspaGetAddress` `kaspaSignTransaction` | Ja | Ja | **V1+V2** |
+| Algorand | `algoGetAddress` `algoSignTransaction` | Ja | Ja | **V1+V2** |
+| NEM | `nemGetAddress` `nemSignTransaction` | Ja | Ja | **V1+V2** |
+| Nostr | `nostrGetPublicKey` `nostrSignEvent` `nostrSignSchnorr` `nostrEncryptMessage` `nostrDecryptMessage` | Ja | Ja | **V1+V2** |
+| Starcoin | `starcoinGetAddress` `starcoinGetPublicKey` `starcoinSignMessage` `starcoinSignTransaction` `starcoinVerifyMessage` | Ja | Ja | **V1+V2** |
+
+## Nur Protocol V1 — auf Pro 2 / Neo nicht unterstützt [#protocol-v1-only--not-supported-on-pro-2--neo]
+
+Diese Methoden deklarieren ausschließlich Protocol V1. **Rufen Sie sie nicht auf Pro 2 oder Neo auf.** Stellar, Alephium und Neo (die Chain, nicht das OneKey-Neo-Gerät) gehören ausdrücklich nicht zum Funktionsumfang von Pro 2 / Neo.
+
+| Familie | Öffentliche Methoden | Hinweise |
+| --- | --- | --- |
+| Stellar | `stellarGetAddress` `stellarSignTransaction` | **Nicht auf Pro 2 / Neo** |
+| Alephium | `alephiumGetAddress` `alephiumSignMessage` `alephiumSignTransaction` | **Nicht auf Pro 2 / Neo**. Signieren auf Classic / Mini / Touch ist in den Ausnahmen der Kompatibilitätstests aufgeführt |
+| Benfen | `benfenGetAddress` `benfenGetPublicKey` `benfenSignMessage` `benfenSignTransaction` | **Nicht auf Pro 2 / Neo**. Classic ist in den Ausnahmen der Kompatibilitätstests aufgeführt |
+| Nexa | `nexaGetAddress` `nexaSignTransaction` | **Nicht auf Pro 2 / Neo** |
+| Dynex | `dnxGetAddress` `dnxSignTransaction` | **Nicht auf Pro 2 / Neo**. Pro / Classic 1s / Mini / Touch sind in den Ausnahmen der Kompatibilitätstests aufgeführt |
+| Nervos | `nervosGetAddress` `nervosSignTransaction` | **Nicht auf Pro 2 / Neo** |
+| SCDO | `scdoGetAddress` `scdoSignMessage` `scdoSignTransaction` | **Nicht auf Pro 2 / Neo**. Classic / Mini / Touch sind in den Ausnahmen der Kompatibilitätstests aufgeführt |
+| Neo (Chain) | `neoGetAddress` `neoSignTransaction` | **Nicht auf Pro 2 / Neo**. Classic / Mini / Touch sind in den Ausnahmen der Kompatibilitätstests aufgeführt. Nicht das OneKey-Neo-Gerät |
+| Lightning | `lnurlAuth` | **Nicht auf Pro 2 / Neo** |
+| Zusätzliche EVM-Funktionen | `evmSignMessageEIP712` | Älterer Pfad für typisierte Daten; bevorzugen Sie `evmSignTypedData` (V1+V2) |
+
+## Geräteeinschränkungen (Kompatibilitätstests) [#device-caveats-compatibility-tests]
+
+Dies sind Methoden-/Modellkombinationen, bei denen die Kompatibilitätstests des Repositorys einen Fehlschlag zulassen. Das ist eine Einschränkung der Testabdeckung, kein neues Hardware-Testergebnis. Bewerben Sie die Unterstützung dieser Kombinationen erst, nachdem Sie die genaue Firmware und Methode auf dem Gerät geprüft haben.
+
+| Modell | Verlassen Sie sich nicht auf |
+| --- | --- |
+| Classic | TON, Alephium, SCDO, Benfen, Neo (Chain), `btcSignPsbt`, `aptosSignInMessage` |
+| Classic 1s / Pure | Dynex |
+| Mini | Alephium-Signieren, Dynex-Signieren, Neo-(Chain)-Signieren, SCDO-Signieren, TON-Signieren/-Nachweis, TRON-Nachrichtensignieren. **Kein BLE** |
+| Touch | Alephium-Signieren, Dynex-Signieren, Neo-(Chain)-Signieren, SCDO-Signieren |
+| Pro | Dynex |
+| Pro 2 | Chain-Methoden mit `['V1', 'V2']` oben. **Mit Kamera** (Air-Gap) |
+| Neo | Dieselben Chain-Methoden wie Pro 2. **Keine Kamera, kein NFC, Fingerabdruck oder Find My** — kein Air-Gap per QR-Code |
+
+EIP-7702 (`authorizationList`) wird auf Classic nicht unterstützt.
+
+## Hilfsfunktion für Adress-Batches [#batch-address-helper]
+
+`allNetworkGetAddress` / `allNetworkGetAddressByLoop` sind V1+V2-Hilfsfunktionen. Sie schlagen auf einer Protocol-V2-Verbindung dennoch für Netzwerke fehl, deren eigene Methode nur V1 unterstützt.
+
+## Bitcoin-Forks [#bitcoin-forks]
+
+`btc*`-Methoden akzeptieren ein `coin` / `coin_name`. Die meisten Forks folgen der Bitcoin-Zeile (V1+V2). **Neurai unterstützt nur Protocol V1.**
+
+## Zur Laufzeit entscheiden [#how-to-decide-at-runtime]
+
+`getSupportedProtocols()` ist ein Hook der Core-Methodenklasse, kein öffentlicher `HardwareSDK`-Aufruf. Verwenden Sie diese Seite zusammen mit dem aktuell verbundenen Gerät:
+
+1. Exportiert das SDK die Methode?
+2. Ist das Gerät `connectProtocol` `'V1'` oder `'V2'`?
+3. Führt diese Seite die Methode als V1+V2 oder nur V1 auf?
+4. Steht dieses Modell in der Einschränkungstabelle?
+5. Erfüllt die Firmware die Versionsangabe auf der Methodenseite?
+
+Verzweigen Sie nicht anhand von USB-PID oder BLE-Namen. Siehe [Protocol V1 und V2](/de/hardware-sdk/concepts/protocol) und [Geräte](/de/hardware-sdk/concepts/devices).
+
+## Weiter [#next]
+
+- Methodenseiten: Verwenden Sie die Auswahl für Chain-Methoden in der Seitenleiste
+- [Anleitungen zum Signieren](/de/hardware-sdk/signers)
+- [Erste Schritte](/de/hardware-sdk/getting-started)

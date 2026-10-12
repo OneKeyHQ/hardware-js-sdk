@@ -1,5 +1,7 @@
 'use client'
 
+import { ui, translateCopy } from '../i18n/ui.mjs'
+
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -20,17 +22,17 @@ const GITHUB_REPO_URL = 'https://github.com/OneKeyHQ/onekey-wallet-skills'
 
 const copyByLocale = {
   en: {
-    eyebrow: 'OneKey Agent Wallet',
+    eyebrow: 'OneKey Agent Wallet · Private beta',
     title: 'Wallets, built for AI agents.',
     subtitle:
-      'Skills let agents read balances, research markets, and prepare transactions. Every fund move ends on a OneKey device the user must approve — with the full transaction shown on screen.',
+      'Skills let agents read balances, research markets, and prepare transactions. Choose an App Transfer or hardware wallet session, review the request, and confirm supported hardware signing on your OneKey device.',
     primaryCta: 'Install skills',
     secondaryCta: 'Explore capabilities',
 
     installEyebrow: 'Install',
-    installTitle: 'One command, every AI agent.',
+    installTitle: 'Install skills for your agent.',
     installSubtitle:
-      'Powered by the open skills CLI. Auto-detects Claude Code, Codex, Cursor, OpenCode, and 50+ more.',
+      'Use the open skills CLI to choose a supported agent and installation scope. Check its current compatibility before installing.',
     installCopyLabel: 'Copy',
     installCopiedLabel: 'Copied',
     installCommandSrLabel: 'Install command',
@@ -71,7 +73,7 @@ const copyByLocale = {
       {
         title: 'Hardware Control',
         description:
-          'Escalate sensitive transfers and swaps to device-side clear signing and physical confirmation.',
+          'Use a hardware-backed session for supported signing requests. The details shown on device depend on the chain, firmware, and CLI version.',
         icon: LockKeyhole,
         href: 'hardware-control',
       },
@@ -85,7 +87,7 @@ const copyByLocale = {
     ],
 
     finalEyebrow: 'Start now',
-    finalTitle: 'Install in one command. Ship in an afternoon.',
+    finalTitle: 'Install skills. Test your first workflow.',
     finalCta: 'Read the quickstart',
     finalSecondary: 'Browse the GitHub repo',
 
@@ -93,17 +95,17 @@ const copyByLocale = {
       'A OneKey hardware wallet displaying a Gnosis Safe transaction flagged as a high-risk delegatecall, awaiting user approval on device.',
   },
   zh: {
-    eyebrow: 'OneKey Agent Wallet',
+    eyebrow: 'OneKey Agent Wallet · 私密测试',
     title: '为 AI Agent 打造的钱包。',
     subtitle:
-      'Skills 让 Agent 读余额、研究行情、准备交易。每一笔资金动作都在 OneKey 设备上最后一审——交易内容完整显示在屏幕上，由用户确认。',
+      'Skills 让 Agent 读余额、研究行情、准备交易。选择 App Transfer 或硬件钱包会话，审阅请求；受支持的硬件签名由用户在 OneKey 设备上确认。',
     primaryCta: '安装 Skills',
     secondaryCta: '查看能力',
 
     installEyebrow: '安装',
-    installTitle: '一条命令，覆盖所有 AI Agent。',
+    installTitle: '为你的 Agent 安装 Skills。',
     installSubtitle:
-      '基于开源 skills CLI。自动识别 Claude Code、Codex、Cursor、OpenCode 等 50+ AI agent。',
+      '通过开源 skills CLI 选择受支持的 Agent 和安装范围，安装前查看其当前兼容列表。',
     installCopyLabel: '复制',
     installCopiedLabel: '已复制',
     installCommandSrLabel: '安装命令',
@@ -143,7 +145,7 @@ const copyByLocale = {
       {
         title: '硬件控制',
         description:
-          '转账、兑换等敏感操作升级到设备端 clear signing 和物理确认。',
+          '通过硬件钱包会话处理受支持的签名请求。设备显示的交易详情取决于链、固件和 CLI 版本。',
         icon: LockKeyhole,
         href: 'hardware-control',
       },
@@ -157,7 +159,7 @@ const copyByLocale = {
     ],
 
     finalEyebrow: '现在开始',
-    finalTitle: '一条命令装好，一个下午跑通。',
+    finalTitle: '安装 Skills，测试第一个流程。',
     finalCta: '查看快速开始',
     finalSecondary: '在 GitHub 查看源码',
 
@@ -166,7 +168,7 @@ const copyByLocale = {
   },
 }
 
-const getCopy = (locale) => copyByLocale[locale] ?? copyByLocale.en
+const getCopy = (locale) => translateCopy(locale, copyByLocale.en)
 
 const getCardHref = (basePath, href) =>
   href.includes('#')
@@ -217,7 +219,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
   const basePath = `/${locale}`
 
   return (
-    <div className="landing-page flex min-h-screen flex-col overflow-x-hidden bg-[#101111] text-white">
+    <div className="landing-page agent-wallet-landing dark flex min-h-screen flex-col overflow-x-hidden bg-[#101111] text-white">
       <main className="flex flex-col">
         {/* HERO — copy + product shot */}
         <section className="relative overflow-hidden">
@@ -350,7 +352,7 @@ export function AgentWalletLanding({ locale = 'en' }) {
                   </p>
                 </div>
                 <span className="mt-7 inline-flex items-center gap-1.5 text-[16px] font-semibold text-[#16D629]">
-                  {locale === 'zh' ? '查看文档' : 'Read docs'}
+                  {ui(locale, "Read docs", "查看文档")}
                   <ArrowUpRight className="size-4" aria-hidden="true" />
                 </span>
               </Link>

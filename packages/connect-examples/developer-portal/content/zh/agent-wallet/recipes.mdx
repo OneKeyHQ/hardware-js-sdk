@@ -1,17 +1,20 @@
 ---
 title: 场景示例
+description: 按阶段读取钱包、准备交易，并在明确确认后签名或执行。
 ---
 
 # 场景示例
 
-这些例子展示用户可以如何跟 AI Agent 说话，以及 OneKey skill 背后应该做什么。
+> 当前为私有测试版。访问资格、支持的命令与钱包流程取决于 OneKey 和 CLI 版本。使用示例前，先检查已安装 CLI 的 schema。
+
+以下示例展示请求背后的预期步骤。运行前先检查 `onekey schema --list` 与具体命令的 schema。示例地址和订单 ID 必须替换为经过核验的实际值；可用能力随测试版本变化。
 
 ## 查看钱包状态
 
 用户：
 
 ```text
-Show my wallet balance and receiving address.
+显示我的钱包余额和收款地址。
 ```
 
 预期流程：
@@ -36,7 +39,7 @@ Next: I can show history, quote a swap, or prepare a transfer.
 用户：
 
 ```text
-What Solana tokens are trending, and is BONK worth a closer look?
+Solana 上有哪些热门代币？进一步研究一下 BONK。
 ```
 
 预期流程：
@@ -54,7 +57,7 @@ Agent 应先回答市场上下文。除非用户在后续明确要求交易，�
 用户：
 
 ```text
-Swap 1 ETH to USDC, but show me the quote before execution.
+将 1 ETH 兑换为 USDC，执行前先让我看报价。
 ```
 
 预期流程：
@@ -76,7 +79,7 @@ onekey swap build --chain eth --from ETH --to USDC --amount 1
 | Estimated output | 来自 quote 结果 |
 | Fees | 可用时来自 quote/build 结果 |
 | Risk | Audit 或 simulation 状态 |
-| Next step | `Proceed? (yes/no)` |
+| Next step | `是否继续？（是/否）` |
 
 只有用户确认后才执行：
 
@@ -89,7 +92,7 @@ onekey swap execute --chain eth --order <orderId>
 用户：
 
 ```text
-Use my OneKey hardware wallet to send 50 USDC to 0x...
+使用我的 OneKey 硬件钱包向 0x... 发送 50 USDC。
 ```
 
 预期流程：
@@ -99,7 +102,12 @@ onekey device search
 onekey auth login --hardware
 onekey auth status
 onekey balance --chain eth --token USDC
-onekey transfer --to 0x... --amount 50 --token USDC --chain eth
+```
+
+展示活动钱包、完整收款地址、链、代币、数量、预计费用和设备确认步骤。只有用户确认转账后才执行：
+
+```bash
+onekey transfer --to <verified-full-address> --amount 50 --token USDC --chain eth
 ```
 
 转账确认必须说明设备确认步骤。如果设备锁定、断开、要求 PIN/passphrase，或拒绝请求，Agent 应停止并报告状态。
@@ -109,7 +117,7 @@ onekey transfer --to 0x... --amount 50 --token USDC --chain eth
 用户：
 
 ```text
-Swap 0.01 BTC to USDC using taproot and sign only.
+使用 Taproot 地址将 0.01 BTC 兑换为 USDC，只签名，不广播。
 ```
 
 预期流程：
@@ -118,6 +126,11 @@ Swap 0.01 BTC to USDC using taproot and sign only.
 onekey wallet address --chain btc --address-type taproot
 onekey swap quote --chain btc --from BTC --to USDC --amount 0.01
 onekey swap build --chain btc --from BTC --to USDC --amount 0.01
+```
+
+展示已准备的订单、地址类型、输入金额、预计输出和费用。即使不广播，签名也需要明确确认。只有用户确认后才执行：
+
+```bash
 onekey swap execute --chain btc --order <orderId> --from-address-type taproot --sign-only
 ```
 

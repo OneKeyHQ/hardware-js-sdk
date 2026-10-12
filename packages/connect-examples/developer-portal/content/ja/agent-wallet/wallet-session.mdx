@@ -1,0 +1,71 @@
+---
+title: "Agent Wallet セッション"
+description: "App Transfer またはハードウェアウォレットのセッションを接続、確認、終了します。"
+---
+
+<span id="agent-wallet-session" />
+
+# Agent Wallet セッション
+
+Agent Wallet セッションは、AI エージェントが `onekey` CLI を通じて使用する、有効なウォレットのコンテキストです。現在の CLI ソースでは、このフローは App Transfer / App Bot Wallet ログインとして公開されています。
+
+## 利用可能になる機能 [#what-it-unlocks]
+
+セッションが有効になると、エージェントは読み取り専用フローと書き込みフローで同じウォレットコンテキストを使用できます:
+
+| 機能 | 例 |
+| --- | --- |
+| ウォレットの状態 | `onekey balance --chain eth` |
+| 受取アドレス | `onekey get-address` |
+| 履歴 | `onekey history --chain eth --detail` |
+| 市場情報 | `onekey token trending --chain sol` |
+| スワップの準備 | `onekey swap quote --chain eth --from ETH --to USDC --amount 1` |
+| 安全確認 | `onekey security audit --chain eth --token 0x...` |
+
+このため、ユーザーは秘密鍵を貼り付けたり、各プロンプトにアドレスを手動で渡したりする必要がありません。エージェントは有効なセッションを読み取り、使用するウォレットを説明してください。
+
+## ログイン [#login]
+
+```bash
+onekey auth login --app-transfer
+```
+
+OneKey GUI がペイロードを提供します。CLI はセッションをローカルの OneKey CLI 保管庫にインポートし、保護対象の情報には OS の認証情報ストアを使用します。
+
+CLI は自動化用の `payload` パラメーターも公開しています。App Transfer ペイロードは認証情報として扱い、エージェントのチャット、ドキュメント、ログ、共有シェル履歴に貼り付けないでください。認証情報のインポートを自動化する前に、次を確認してください: `onekey schema auth-login` および現在の CLI ガイダンス。
+
+## ステータス [#status]
+
+各種類の操作の前に `auth status` を実行します:
+
+```bash
+onekey auth status
+```
+
+現在のスキーマは次を報告します:
+
+| フィールド | 意味 |
+| --- | --- |
+| `authStatus` | `authenticated` または `unauthenticated` |
+| `loginMethod` | `app_transfer` または `hardware` |
+| `walletKind` | `hd` は App Transfer セッション用、 `hw` はハードウェアセッション用 |
+| `displayAddress` | ユーザーに表示する有効なウォレットアドレス |
+| `storageBackend` | CLI が使用する OS の認証情報ストア |
+
+## ライフサイクル [#lifecycle]
+
+| 手順 | エージェントの動作 |
+| --- | --- |
+| あらゆる操作の前 | `onekey auth status` を実行し、未認証の状態を明確に報告します。 |
+| 読み取り専用操作の前 | 有効なアドレスとチェーンのデフォルト値を使用し、不足するチェーンやトークンの情報のみを尋ねます。 |
+| 資金移動操作の前 | 有効なアドレス、チェーン、金額、受取人、手数料/リスクの状態を表示し、確認を求めます。 |
+| セッション変更後 | 次を再実行します: `onekey auth status`; 以前のアドレスが引き続き有効だと仮定しないでください。 |
+| ログアウト時 | 古いウォレットコンテキストの使用を直ちに停止します。 |
+
+## ログアウト [#logout]
+
+```bash
+onekey auth logout
+```
+
+エージェントは、ユーザーが有効なセッションの終了を明示的に求めた場合にのみログアウトを呼び出してください。

@@ -1,7 +1,7 @@
 .markdown {
   font-size: 14px;
   line-height: 22px;
-  color: #d3dff0;
+  color: var(--clr-text);
   font-family: inherit;
   overflow-wrap: anywhere;
   background: transparent;
@@ -9,7 +9,7 @@
 
 .markdown::selection,
 .markdown *::selection {
-  background: rgba(59, 130, 246, 0.18) !important;
+  background: color-mix(in srgb, var(--clr-accent) 18%, transparent) !important;
   color: inherit !important;
 }
 
@@ -25,7 +25,7 @@
 .markdown h2,
 .markdown h3 {
   margin: 10px 0 6px;
-  color: #f3f7ff;
+  color: var(--clr-text);
   font-family: inherit;
   font-weight: 600;
 }
@@ -47,24 +47,24 @@
 
 .markdown p {
   margin: 0 0 8px;
-  color: #d3dff0;
+  color: var(--clr-text);
   font-size: 14px;
   line-height: 22px;
   overflow-wrap: anywhere;
 }
 
 .markdown strong {
-  color: #f8fbff;
+  color: var(--clr-text);
   font-weight: 600;
 }
 
 .markdown em {
-  color: #c2d2ea;
+  color: var(--clr-text);
 }
 
 .markdown mark {
   background: rgba(250, 204, 21, 0.25);
-  color: #fff6d1;
+  color: var(--clr-text);
   border-radius: 4px;
   padding: 0 3px;
 }
@@ -72,7 +72,7 @@
 .markdown ul,
 .markdown ol {
   margin: 0 0 8px 18px;
-  color: #d3dff0;
+  color: var(--clr-text);
   font-size: 14px;
   line-height: 22px;
 }
@@ -83,23 +83,23 @@
 }
 
 .markdown a {
-  color: #8bc5ff;
+  color: var(--clr-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: rgba(139, 197, 255, 0.58);
+  text-decoration-color: color-mix(in srgb, var(--clr-accent) 58%, transparent);
 }
 
 .markdown a:hover {
-  color: #b8ddff;
-  text-decoration-color: rgba(184, 221, 255, 0.86);
+  color: var(--clr-accent);
+  text-decoration-color: color-mix(in srgb, var(--clr-accent) 86%, transparent);
 }
 
 .markdown blockquote {
   margin: 7px 0;
   padding: 6px 10px;
-  border-left: 2px solid rgba(148, 163, 184, 0.62);
-  color: #c4d1e7;
-  background: rgba(15, 23, 42, 0.56);
+  border-left: 2px solid var(--clr-border-hi);
+  color: var(--clr-text);
+  background: var(--clr-surface);
   border-radius: 6px;
 }
 
@@ -107,11 +107,11 @@
   display: block;
   overflow-x: auto;
   margin: 8px 0;
-  border: 1px solid rgba(148, 163, 184, 0.34);
+  border: 1px solid var(--clr-border-hi);
   border-radius: 8px;
-  background: rgba(6, 11, 22, 0.7);
+  background: var(--clr-surface);
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  scrollbar-color: var(--clr-border-hi) transparent;
 }
 
 .tableWrap::-webkit-scrollbar {
@@ -123,7 +123,7 @@
 }
 
 .tableWrap::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.38);
+  background: var(--clr-border-hi);
   border-radius: 999px;
 }
 
@@ -139,8 +139,8 @@
 
 .markdown th,
 .markdown td {
-  border-right: 1px solid rgba(148, 163, 184, 0.3);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  border-right: 1px solid var(--clr-border-hi);
+  border-bottom: 1px solid var(--clr-border-hi);
   padding: 7px 10px;
   text-align: left;
   vertical-align: top;
@@ -160,20 +160,20 @@
 
 .markdown th {
   font-weight: 600;
-  color: #f3f7ff;
-  background: rgba(15, 23, 42, 0.76);
+  color: var(--clr-text);
+  background: var(--clr-surface);
 }
 
 .markdown td {
-  color: #d3dff0;
+  color: var(--clr-text);
   overflow-wrap: anywhere;
 }
 
 .inlineCode {
-  border: 1px solid rgba(148, 163, 184, 0.38) !important;
+  border: 1px solid var(--clr-border-hi) !important;
   border-radius: 6px !important;
-  background: rgba(15, 23, 42, 0.72) !important;
-  color: #e9f3ff !important;
+  background: var(--clr-surface) !important;
+  color: var(--clr-text) !important;
   padding: 1px 5px !important;
   font-size: 0.84em !important;
   font-weight: 500 !important;
@@ -183,7 +183,7 @@
 .codeBlock {
   margin: 8px 0;
   border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.34);
+  border: 1px solid var(--clr-border-hi);
   overflow: hidden;
   background: rgba(2, 6, 23, 0.9);
 }
@@ -192,8 +192,8 @@
   height: 30px;
   padding: 0 10px 0 11px;
   background: #111827;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  color: #dbe7fb;
+  border-bottom: 1px solid var(--clr-border-hi);
+  color: #e5e7eb;
   font-size: 11px;
   line-height: 16px;
   font-weight: 600;
@@ -206,7 +206,7 @@
 .codeCopy {
   border: 0;
   background: transparent;
-  color: #dbe7fb;
+  color: #e5e7eb;
   font-size: 11px;
   line-height: 16px;
   font-weight: 500;
@@ -217,7 +217,7 @@
 }
 
 .codeCopy:hover {
-  color: #f8fafc;
+  color: #e5e7eb;
 }
 
 .codeScroll {
@@ -225,7 +225,7 @@
   overflow-y: hidden;
   background: #0f172a;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  scrollbar-color: var(--clr-border-hi) transparent;
 }
 
 /* Neutralize Prism's global CSS (loaded by Nextra for MDX pages) which
@@ -260,7 +260,7 @@
 }
 
 .codeScroll::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.38);
+  background: var(--clr-border-hi);
   border-radius: 999px;
 }
 

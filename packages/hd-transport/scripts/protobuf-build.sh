@@ -54,6 +54,36 @@ grep -hv -e '^import ' -e '^syntax' -e '^package' -e 'option java_' "$SRC_PATH"/
 | sed 's/^option /\/\/ option /' \
 | grep -v '    reserved ' >> "$V1_TMP_PROTO"
 
+# Classic 1s exposes these messages before the shared firmware submodule includes them.
+# Wire contract: https://onekeygroup.slack.com/archives/C0A7BUG1DT6/p1791598732003599
+node - "$V1_TMP_PROTO" <<'NODE'
+const fs = require('fs');
+const protoPath = process.argv[2];
+let proto = fs.readFileSync(protoPath, 'utf8');
+proto = proto.replace('enum MessageType {', `enum MessageType {
+    MessageType_BabylonDeriveContextHash = 10054 [(bitcoin_only) = true, (wire_in) = true];
+    MessageType_BabylonDerivedContextHash = 10055 [(bitcoin_only) = true, (wire_out) = true];`);
+proto += `
+enum CanonicalBitcoinNetwork {
+    BITCOIN_MAINNET = 0;
+    BITCOIN_TESTNET = 1;
+    BITCOIN_SIGNET = 2;
+    BITCOIN_REGTEST = 3;
+}
+message BabylonDeriveContextHash {
+    repeated uint32 address_n = 1;
+    required InputScriptType script_type = 2;
+    required bytes app_name = 3;
+    required bytes context = 4;
+    required CanonicalBitcoinNetwork network = 5;
+}
+message BabylonDerivedContextHash {
+    required bytes secret = 1;
+}
+`;
+fs.writeFileSync(protoPath, proto);
+NODE
+
 npx pbjs -t json -p "$DIST_PATH" -o "$DIST_PATH/messages.json" --keep-case "$V1_TMP_PROTO"
 cp "$DIST_PATH/messages.json" "$CORE_MESSAGES_DIR/messages.json"
 

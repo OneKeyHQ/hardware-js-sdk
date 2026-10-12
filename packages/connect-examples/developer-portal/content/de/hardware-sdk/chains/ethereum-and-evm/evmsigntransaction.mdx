@@ -1,0 +1,200 @@
+---
+title: "evmSignTransaction"
+---
+
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE-SDK / ETHEREUM &amp; EVM</div>
+
+# evmSignTransaction
+
+<span id="ethereum-sign-transaction" />
+
+Eine auf dem Gerät bestätigte Signatur für eine Legacy- oder EIP-1559-Transaktion (Typ 2) anfordern. Das Gerät leitet den Schlüssel aus Ihrem BIP32-Pfad ab; Ihre Anwendung serialisiert und überträgt das Ergebnis. Dekodierte Transaktionsdetails hängen von Firmware und Calldata ab.
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+```
+
+<div className="doc-method-flow"><span>01 <strong>Vorbereiten</strong></span><span aria-hidden="true">→</span><span>02 <strong>Auf dem Gerät bestätigen</strong></span><span aria-hidden="true">→</span><span>03 <strong>Serialisieren &amp; senden</strong></span></div>
+
+## Vor dem Aufruf [#before-you-call]
+
+- [SDK initialisieren und ein Gerät auswählen](/de/hardware-sdk/getting-started).
+- Registrieren Sie [UI-Ereignishandler](/de/hardware-sdk/core-api-guide#events-ui) und wählen Sie die vorgesehene Wallet ausdrücklich aus.
+- Aktuelle Nonce-, Gas- und Gebührenwerte aus dem Zielnetzwerk abrufen.
+
+## Parameter [#params]
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>erforderlich</b></div><p>Die bei der Geräteerkennung zurückgegebene Verbindungskennung.</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>erforderlich</b></div><p>Die von getDeviceState zurückgegebene Wallet-Identität.</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>erforderlich</b></div><p>BIP32-Ableitungspfad mit mindestens drei Pfadkomponenten.</p></div>
+<div className="doc-parameter"><div><code>params.transaction</code><span>object</span><b>erforderlich</b></div><p>Eine Legacy- oder EIP-1559-Transaktion. Numerische Mengen verwenden Hex-Zeichenfolgen; chainId ist eine Zahl.</p></div>
+</div>
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+### Transaktionsfelder [#transaction-fields]
+
+| Feld | Typ | Beschreibung |
+| --- | --- | --- |
+| `chainId` | `number` | Chain-ID des Zielnetzwerks. Befindet sich innerhalb von transaction. |
+| `to` | `string` | Zieladresse; bei ERC-20-Aufrufen der Token-Vertrag. |
+| `value` | `string` | Hexkodierter Betrag in Wei. Bei ERC-20-Aufrufen 0x0 verwenden. |
+| `nonce` | `string` | Transaktionszähler des sendenden Kontos als hexadezimale Mengenangabe. |
+| `gasLimit` | `string` | Gaslimit als hexadezimale Mengenangabe. |
+| `data` | `string · optional` | Vollständige hexkodierte Calldata; ohne Calldata 0x verwenden. |
+| `maxFeePerGas` | `string · EIP-1559` | Maximale Gesamtgebühr pro Gas in hexkodierten Wei. |
+| `maxPriorityFeePerGas` | `string · EIP-1559` | Maximale Prioritätsgebühr pro Gas in hexkodierten Wei. |
+| `gasPrice` | `string · Legacy` | Legacy-Gaspreis in hexkodierten Wei. |
+
+Diese Seite behandelt `EVMTransaction` und `EVMTransactionEIP1559`. Siehe [HD-Pfade](/de/hardware-sdk/concepts/common-params#hd-path) zur Pfadformatierung. Stellen Sie sicher, dass Ihre Ziel-RPC den Transaktionstyp unterstützt.
+
+EIP-1559 benötigt beide Gebührenfelder; Legacy verwendet `gasPrice`. Übergeben Sie nicht `type: 2` an das SDK; wählen Sie den Typ beim Serialisieren der signierten Transaktion.
+
+## Clear Signing [#clear-signing]
+
+Verwenden Sie dieselbe Methode für native Überweisungen, ERC-20-Transfers, Freigaben/Widerrufe und Vertragsaufrufe. Bei ERC-20-Aufrufen ist `to` der Token-Vertrag und `value` ist null; Calldata enthält Empfänger bzw. ausgabeberechtigte Adresse (Spender) und Token-Betrag. Unterstützende Firmware dekodiert erkannte Formate automatisch. Es gibt keinen `clearSigning`-, Token-Metadaten- oder Vertragsbezeichnungsparameter.
+
+Siehe die [Clear-Signing-Anleitung](/de/hardware-sdk/signers/evm#clear-signing) zur Eingabe-/Anzeigematrix und zum Verhalten bei unbekannten Verträgen. Für EIP-712- und Safe-Eigentümersignaturen verwenden Sie [evmSignTypedData](/de/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).
+
+## Beispiele [#examples]
+
+Die folgenden Fragmente setzen ein initialisiertes SDK und eine ausgewählte Wallet voraus. Ersetzen Sie den Beispielempfänger und rufen Sie vor dem Signieren Nonce, Gas und Gebühren aus dem Zielnetzwerk ab.
+
+<span id="eip1559-after-the-london-upgrade" />
+
+EIP-1559 benötigt beide: `maxFeePerGas` und `maxPriorityFeePerGas`. Legacy verwendet `gasPrice`.
+
+<Tabs items={['EIP-1559', 'Legacy']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
+    transaction: {
+        to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+        value: '0xf4240',
+        data: '0x',
+        chainId: 1,
+        nonce: '0x0',
+        maxFeePerGas: '0x77359400',
+        maxPriorityFeePerGas: '0x3b9aca00',
+        gasLimit: '0x5208',
+    },
+});
+
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    useEmptyPassphrase: true,
+    transaction: {
+        to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+        value: "0xf4240",
+        data: "0x",
+        chainId: 1,
+        nonce: "0x0",
+        gasLimit: "0x5208",
+        gasPrice: "0xbebc200"
+    },
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+Diese Beispiele wählen die Standard-Wallet. Übergeben Sie für eine versteckte Wallet dieselben gemeinsamen Wallet-Parameter, die beim Bestätigen des Kontos verwendet wurden.
+
+## Antwort [#response]
+
+Prüfen Sie `success` vor dem Lesen der Nutzlast. Eine erfolgreiche Antwort enthält `v`, `r` und `s`; das SDK überträgt die Transaktion nicht.
+
+<Tabs items={['Erfolg', 'Fehler']} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string, // hexadecimal string with "0x" prefix
+        r: string, // hexadecimal string with "0x" prefix
+        s: string, // hexadecimal string with "0x" prefix
+    }
+}
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## Signierte Transaktion serialisieren [#serialize-the-signed-transaction]
+
+Das SDK gibt eine Signatur zurück; Ihre Anwendung setzt die Transaktion zusammen und überträgt sie. Dieses Beispiel verwendet ethers-v5-Pakete. Lassen Sie die ursprünglichen Transaktionsfelder nach dem Signieren durch den Nutzer unverändert.
+
+```typescript
+import type { UnsignedTransaction } from '@ethersproject/transactions';
+import { TransactionTypes, serialize } from '@ethersproject/transactions';
+import { splitSignature } from '@ethersproject/bytes';
+import { keccak256 } from '@ethersproject/keccak256';
+
+// Illustrative fee values: populate nonce, gas, and fees from your network.
+const transaction = {
+  to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+  value: '0x0',
+  data: '0x',
+  chainId: 1,
+  nonce: '0x0',
+  maxFeePerGas: '0x14',
+  maxPriorityFeePerGas: '0x0',
+  gasLimit: '0x5208',
+};
+
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction,
+});
+if (result.success === false) throw new Error(result.payload.error);
+
+const unsignedTx: UnsignedTransaction = {
+  ...transaction,
+  nonce: Number.parseInt(transaction.nonce, 16),
+  type: TransactionTypes.eip1559,
+};
+const signature = splitSignature({
+  v: Number(result.payload.v),
+  r: result.payload.r,
+  s: result.payload.s,
+});
+const rawTx = serialize(unsignedTx, signature);
+const txid = keccak256(rawTx);
+// Submit rawTx using your Ethereum provider after verifying the signed result.
+```
+
+Für eine Legacy-Transaktion verwenden Sie `gasPrice` anstelle der beiden EIP-1559-Gebührenfelder und serialisieren sie als Legacy-Transaktion.

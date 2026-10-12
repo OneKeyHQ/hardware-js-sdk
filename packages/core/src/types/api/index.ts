@@ -73,6 +73,7 @@ import type { evmSignTypedData } from './evmSignTypedData';
 import type { evmVerifyMessage } from './evmVerifyMessage';
 import type { btcGetAddress } from './btcGetAddress';
 import type { btcGetPublicKey } from './btcGetPublicKey';
+import type { btcDeriveContextHash } from './btcDeriveContextHash';
 import type { btcSignMessage } from './btcSignMessage';
 import type { btcSignPsbt } from './btcSignPsbt';
 import type { btcSignTransaction } from './btcSignTransaction';
@@ -286,6 +287,7 @@ export type CoreApi = {
    */
   btcGetAddress: typeof btcGetAddress;
   btcGetPublicKey: typeof btcGetPublicKey;
+  btcDeriveContextHash: typeof btcDeriveContextHash;
   btcSignMessage: typeof btcSignMessage;
   btcSignPsbt: typeof btcSignPsbt;
   btcSignTransaction: typeof btcSignTransaction;

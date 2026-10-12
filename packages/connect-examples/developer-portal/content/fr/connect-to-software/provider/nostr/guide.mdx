@@ -1,0 +1,52 @@
+---
+title: "Guide"
+---
+
+# Guide
+
+## Vue d’ensemble [#overview]
+
+Ce guide explique comment utiliser l’API du fournisseur OneKey pour créer facilement des applications réseau utilisant le protocole Nostr.
+
+L’API du fournisseur OneKey est définie par [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md).
+
+## Installation [#install]
+
+### 1. Télécharger OneKey Wallet [#1-download-onekey-wallet]
+
+Téléchargez [OneKey Wallet](https://onekey.so/download?client=browserExtension). Installez l’extension de navigateur OneKey.
+
+#### 2. Explication de l’injection de l’API [#2-api-injection-explanation]
+
+* L’extension de navigateur OneKey injecte `Provider API` dans les sites web visités.
+* Deux types d’API sont proposés : `window.nostr` et `window.$onekey.nostr`.
+* Il est recommandé d’utiliser `window.$onekey.nostr`.
+
+> Privilégiez `window.$onekey.nostr` pour sélectionner spécifiquement OneKey. Le fournisseur global `window.nostr` peut appartenir à un autre portefeuille lorsque plusieurs extensions sont installées.
+
+### Détecter la prise en charge de l’API du fournisseur [#detecting-provider-api-support]
+
+Vérifiez qu’un fournisseur est disponible avant d’effectuer des requêtes :
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+if (!provider) {
+  throw new Error("No provider is available.");
+}
+```
+
+## API [#api]
+
+Choisissez une API pour l’opération requise par votre application.
+
+**Autres interfaces** : [Voir les détails](/fr/connect-to-software/provider/nostr/api-reference)
+
+## Événement [#event]
+
+* **Opérations principales** : Comme le changement de compte
+* **Plus d’informations** : [En savoir plus](/fr/connect-to-software/provider/nostr/event)
+
+## Gestion des requêtes [#handling-requests]
+
+Exécutez les requêtes de portefeuille depuis une fonction asynchrone ou un module ES. Interceptez les promesses rejetées et affichez l’erreur dans votre application. Demandez les connexions, signatures et paiements à partir d’une action utilisateur, et désactivez le bouton déclencheur tant qu’une demande est en cours.

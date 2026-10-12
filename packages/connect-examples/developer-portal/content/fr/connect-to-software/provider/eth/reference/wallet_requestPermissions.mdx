@@ -1,0 +1,78 @@
+---
+title: "wallet_requestPermissions"
+description: "Demander des autorisations pour la dApp"
+---
+
+# wallet_requestPermissions
+
+Demande l’autorisation pour la dApp d’accéder à des méthodes précises. Cette fonctionnalité fait partie du système d’autorisations de portefeuille EIP-2255.
+
+---
+
+## Paramètres [#parameters]
+
+`Array` contenant un objet de demande d’autorisation :
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `eth_accounts` | `object` | Demander l’accès aux comptes utilisateur |
+
+---
+
+## Valeur de retour [#returns]
+
+`Array` d’objets d’autorisation :
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `parentCapability` | `string` | Le nom de l’autorisation |
+| `date` | `number` | Horodatage de l’octroi |
+| `caveats` | `array` | Restrictions de l’autorisation |
+
+---
+
+## Exemple [#example]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+console.log('Granted permissions:', permissions)
+// [{ parentCapability: 'eth_accounts', date: 1234567890, caveats: [...] }]
+```
+
+### Vérifier une autorisation précise [#check-specific-permission]
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_requestPermissions',
+  params: [{ eth_accounts: {} }]
+})
+
+const hasAccountsPermission = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Has accounts permission:', hasAccountsPermission)
+```
+
+---
+
+## Erreurs [#errors]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | L’utilisateur a rejeté la demande | L’utilisateur a refusé la demande d’autorisation |
+| -32602 | Paramètres non valides | Demande d’autorisation non valide |
+
+---
+
+## Remarques [#notes]
+
+- Actuellement, seule l’autorisation `eth_accounts` est prise en charge
+- L’appel de cette méthode déclenche la demande de connexion si l’utilisateur n’est pas déjà connecté
+- Les autorisations persistent jusqu’à leur révocation par l’utilisateur
+- Défini par [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Gérez les erreurs de méthode non prise en charge dans la version cible du portefeuille. L’autorisation d’accès au compte est distincte de la connectivité RPC et n’autorise pas à l’avance les signatures ou transactions. Pour une connexion de base, utilisez `eth_requestAccounts`.

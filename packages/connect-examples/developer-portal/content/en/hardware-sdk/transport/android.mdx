@@ -1,296 +1,78 @@
 ---
-title: "Android: Connect via Bluetooth (Native)"
+description: "Bridge the OneKey SDK to Android BLE with permission handling and completed GATT connection and notification flows."
+title: "Android: Connect via Bluetooth"
 ---
 
-# Android: Connect via Bluetooth (Native)
+# Android: Connect via Bluetooth
 
-> **Note:**
-> Demo: Native Android example (WebView + JSBridge + Nordic BLE) → [native-android-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example)
-> This guide builds on the [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin) — read that first for BLE message format and protocol details.
+Run `@onekeyfe/hd-common-connect-sdk` in a WebView and bridge its low-level transport to native BLE. Start with the [native Android example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example) and the [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin) contract.
 
+The native layer owns permissions, bonding, GATT connection, characteristic I/O and cleanup. The SDK owns protocol detection, framing and signing. Do not add a second V1/V2 decoder in the native bridge.
 
-This guide shows how to integrate `@onekeyfe/hd-common-connect-sdk` in a native Android host via a low-level adapter. The JavaScript bundle runs in a WebView; transport calls are forwarded to native (Nordic BLE) and bridged back to JS.
+## Permissions
 
-## Critical: BLE Connection Flow
+For an app targeting Android 12 or newer, request `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` at runtime. `BLUETOOTH_ADVERTISE` is unnecessary for a client that only scans and connects.
 
-Android BLE requires a specific connection sequence. **Skipping steps will cause silent failures.**
+Use `neverForLocation` only if the app does not derive location from BLE scanning. Older Android versions need the applicable legacy Bluetooth and location permissions. Do not request Android 12-only permissions unconditionally on older devices. Follow the [Android Bluetooth permission guide](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions) for your target SDK and location use.
 
-```
-1. ensureBonded()           // Bond BEFORE connecting (60s timeout)
-2. connect()                // GATT connection (15s timeout)
-3. delay(500ms)             // Wait for stability
-4. discoverServices()       // Service discovery
-5. delay(500ms)             // Wait after discovery
-6. startNotifications()     // With retry mechanism (3 attempts)
-```
+Do not start scanning while permission is pending. Return a permission failure to the JS caller if the user declines, and allow a later user-initiated retry.
 
-### Why Bonding First?
+## Build and load the JavaScript bundle
 
-OneKey devices require a secure BLE bond. Without bonding:
-- `startNotifications()` may fail silently
-- Device responds but SDK reports "Device not found"
-- Intermittent connection drops
+From the hardware-js-sdk checkout:
 
-### Connection Code Example
-
-```kotlin
-suspend fun connectWithBonding(deviceAddress: String) {
-    // Step 1: Ensure bonded
-    val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
-    if (device.bondState != BluetoothDevice.BOND_BONDED) {
-        device.createBond()
-        // Wait for bonding (user must confirm pairing dialog)
-        delay(60000) // or use BroadcastReceiver for BOND_BONDED
-    }
-
-    // Step 2: GATT connect
-    val gatt = device.connectGatt(context, false, gattCallback)
-
-    // Step 3: Wait for stability
-    delay(500)
-
-    // Step 4: Discover services (triggered in onConnectionStateChange)
-    gatt.discoverServices()
-
-    // Step 5: Wait after discovery
-    delay(500)
-
-    // Step 6: Start notifications with retry
-    startNotificationsWithRetry(gatt, maxRetries = 3)
-}
-
-suspend fun startNotificationsWithRetry(gatt: BluetoothGatt, maxRetries: Int) {
-    repeat(maxRetries) { attempt ->
-        try {
-            gatt.setCharacteristicNotification(notifyCharacteristic, true)
-            // Write descriptor to enable notifications
-            val descriptor = notifyCharacteristic.getDescriptor(CCCD_UUID)
-            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            gatt.writeDescriptor(descriptor)
-            return // Success
-        } catch (e: Exception) {
-            delay((attempt + 1) * 1000L) // Incremental backoff
-        }
-    }
-    throw Exception("Failed to start notifications after $maxRetries attempts")
-}
-```
-
-### Recommended Timeouts
-
-| Operation | Timeout |
-|-----------|---------|
-| Bonding (user confirmation) | 60 seconds |
-| GATT connect | 15 seconds |
-| Post-connect delay | 500ms |
-| Service discovery | 15 seconds |
-| Post-discovery delay | 500ms |
-| Notification setup | 15 seconds |
-| Retry backoff | 1s, 2s, 3s |
-
-Key libraries:
-- WebView JS bridge: `com.smallbuer:jsbridge:1.0.7`
-- Nordic BLE (Kotlin, ≥ 1.1.0):
-  - `no.nordicsemi.android.kotlin.ble:scanner:1.1.0`
-  - `no.nordicsemi.android.kotlin.ble:client:1.1.0`
-  - Reason: `includeStoredBondedDevices` in `BleScannerSettings` requires > 1.0.9
-
-OneKey BLE UUIDs: See [Low-Level Transport Plugin - Quick Reference](/en/hardware-sdk/concepts/low-level-plugin#quick-reference)
-
-## Step 1. Gradle and Manifest
-
-Gradle (app/build.gradle.kts):
-```kotlin
-dependencies {
-  implementation("com.smallbuer:jsbridge:1.0.7")
-  implementation("no.nordicsemi.android.kotlin.ble:scanner:1.1.0")
-  implementation("no.nordicsemi.android.kotlin.ble:client:1.1.0")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-}
-```
-
-Android 12+ permissions (AndroidManifest.xml):
-```xml
-<uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-
-<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
-<uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
-```
-
-Runtime permissions (Kotlin):
-```kotlin
-private fun ensureBluetoothPermissions(): Boolean {
-  val needs = mutableListOf<String>()
-  if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) needs += android.Manifest.permission.BLUETOOTH_SCAN
-  if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) needs += android.Manifest.permission.BLUETOOTH_CONNECT
-  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) needs += android.Manifest.permission.ACCESS_FINE_LOCATION
-  if (needs.isNotEmpty()) {
-    ActivityCompat.requestPermissions(this, needs.toTypedArray(), 1001)
-    return false
-  }
-  return true
-}
-```
-
-## Step 2. Build the web bundle (already implemented in the demo)
-
-Inside the hardware-js-sdk repo:
 ```bash
 cd packages/connect-examples/native-android-example/web
-yarn && yarn build   # emits web/web_dist/
+yarn
+yarn build
 ```
 
-Copy the entire output folder into your Android project:
-- Copy `web/web_dist/` → `app/src/main/assets/web_dist/`
-- The entry file will be available as: `app/src/main/assets/web_dist/index.html`
+Copy `web_dist/` to `app/src/main/assets/web_dist/`. Register the native bridge handlers before loading `file:///android_asset/web_dist/index.html`. Keep asset paths intact and load only your app's trusted bundle into a WebView with access to the device bridge.
 
-No further JS work is required in the native app; the demo’s web bundle already initializes `env: 'lowlevel'` and wires the low-level adapter.
+The demo supplies its dependencies and bridge implementation. Use its package/Gradle configuration as the starting point instead of combining snippets from different Nordic BLE library versions.
 
-## Step 3. WebView + Bridge (register before loading)
+## Complete the BLE connection before resolving
 
-```kotlin
-class MainActivity : AppCompatActivity() {
-  lateinit var webview: BridgeWebView
+A fixed delay does not establish that bonding, GATT connection, discovery or notification subscription succeeded. Follow callbacks or the BLE library's suspending completion APIs:
 
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_main)
+1. Complete required bonding and report user rejection or timeout.
+2. Wait for the GATT connection to succeed.
+3. Discover the OneKey service and both required characteristics.
+4. Enable notifications and wait for descriptor/subscription completion.
+5. Resolve the bridge's `connect` call only after the connection can send and receive.
 
-    webview = findViewById(R.id.webview)
-    configureWebView()
+Android exposes operation results through [`BluetoothGattCallback`](https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback). A successful call to start an operation is not its completion. Bound each pending operation with a timeout; on failure close the connection and reject its pending bridge calls.
 
-    // Register native handlers BEFORE loading html
-    registerHandlers()
+| Purpose | UUID |
+| --- | --- |
+| Service | `00000001-0000-1000-8000-00805f9b34fb` |
+| Write | `00000002-0000-1000-8000-00805f9b34fb` |
+| Notify | `00000003-0000-1000-8000-00805f9b34fb` |
 
-    // Load built HTML bundle copied into assets/web_dist/
-    webview.loadUrl("file:///android_asset/web_dist/index.html")
-  }
+## Bridge contract
 
-  private fun configureWebView() {
-    val s = webview.settings
-    s.javaScriptEnabled = true
-    s.domStorageEnabled = true
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) s.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-  }
-}
-```
+| Method | Completion condition |
+| --- | --- |
+| `enumerate()` | Return a deduplicated snapshot of candidates; stop the scan and complete the request once. |
+| `connect(uuid)` | Connection, characteristics and notifications are ready. |
+| `send(uuid, data, options)` | Validate hex, write bytes in order, honor `withoutResponse`, and propagate write failures. |
+| `receive(uuid)` | Return the next queued notification chunk as hex, including chunks received before a reader started waiting. |
+| `disconnect(uuid)` | Cancel subscriptions, close the selected connection, reject pending reads and discard old notification data. |
 
-## Step 4. BLE scan (include stored bonded devices)
+Keep queues and callbacks per connection. Reject a missing characteristic rather than treating a nullable write as a success. Send WebView bridge callbacks on the appropriate UI thread.
 
-```kotlin
-private val ONEKEY_SERVICE_UUID: UUID = UUID.fromString("00000001-0000-1000-8000-00805f9b34fb")
-private val bleScanner by lazy { BleScanner(this) }
-private val aggregator = BleScanResultAggregator()
+Expose the actual BLE write capacity through `getProtocolV2PacketCapacity` when implementing Protocol V2. Do not return the ATT MTU including its overhead. See the full [plugin interface](/en/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface).
 
-data class OneKeyDeviceInfo(val id: String, val name: String)
+## SDK and UI lifecycle
 
-private fun startScan(onResult: (List<OneKeyDeviceInfo>) -> Unit) {
-  if (!ensureBluetoothPermissions()) return
+The bundle initializes `env: 'lowlevel'` with your plugin. Check the initialization result, discover a connection, then call `getDeviceState(connectId)` for the seed-lifetime `deviceId`.
 
-  val settings = BleScannerSettings(
-    scanMode = BleScanMode.LOW_LATENCY,
-    filter = BleScanFilter(serviceUUIDs = listOf(FilteredServiceUuid(ONEKEY_SERVICE_UUID))),
-    includeStoredBondedDevices = true,               // requires Nordic BLE >= 1.1.0
-  )
+Register [UI event handling](/en/hardware-sdk/core-api-guide#events-ui) before protected calls. Reply only to input requests and copy their response correlation. `REQUEST_BUTTON` and device-only PIN prompts are notifications; a native “OK” button cannot confirm the operation on the hardware.
 
-  aggregator.reset()
-  bleScanner.scan(settings)
-    .map { aggregator.aggregate(it) }
-    .onEach { results ->
-      val devices = results.mapNotNull { r -> r.device }
-        .distinctBy { it.address }
-        .map { OneKeyDeviceInfo(id = it.address, name = it.name ?: "") }
-      onResult(devices)
-    }
-    .launchIn(lifecycleScope)
-}
-```
+Pass `useEmptyPassphrase: true` for the standard wallet or the selected hidden wallet's `passphraseState` on address and signing calls. Serialize calls per device.
 
-Bridge handler for `enumerate`:
-```kotlin
-private fun registerHandlers() {
-  webview.registerHandler("enumerate", BridgeHandler { _, cb ->
-    startScan { list -> cb.onCallBack(Gson().toJson(list)) }
-  })
+## Verify the integration
 
-  // The rest of handlers are shown below
-}
-```
+Test permission denial, bonding cancellation, discovery failure, notification failure, locked-device input, unplug/disconnect and reconnect on a physical device. Confirm an address on the device and inspect the SDK result. Finding a BLE advertisement alone is not an end-to-end pass.
 
-## Step 5. Connect, characteristics, notifications
-
-```kotlin
-private var connection: ClientBleGatt? = null
-private var writeCh: ClientBleGattCharacteristic? = null
-private var notifyCh: ClientBleGattCharacteristic? = null
-
-webview.registerHandler("connect", BridgeHandler { data, cb ->
-  if (!ensureBluetoothPermissions()) return@BridgeHandler
-  val json = JsonParser.parseString(data).asJsonObject
-  val mac = json.get("uuid").asString
-
-  lifecycleScope.launch(Dispatchers.IO) {
-    val gatt = ClientBleGatt.getInstance(this@MainActivity, mac)
-    connection = gatt
-
-    writeCh = gatt.getCharacteristic(ONEKEY_SERVICE_UUID, UUID.fromString("00000002-0000-1000-8000-00805f9b34fb"))
-    notifyCh = gatt.getCharacteristic(ONEKEY_SERVICE_UUID, UUID.fromString("00000003-0000-1000-8000-00805f9b34fb"))
-
-    notifyCh?.getNotifications()?.onEach { packet ->
-      // Forward hex to JS receiver
-      val hex = DataByteArray(packet.value).toHexString()
-      webview.callHandler("monitorCharacteristic", hex)
-    }?.launchIn(lifecycleScope)
-
-    withContext(Dispatchers.Main) { cb.onCallBack("{\"success\":true}") }
-  }
-})
-```
-
-## Step 6. Send / disconnect
-
-```kotlin
-webview.registerHandler("send", BridgeHandler { data, cb ->
-  val json = JsonParser.parseString(data).asJsonObject
-  val hex = json.get("data").asString
-  val bytes = DataByteArray.from(hex).value
-  lifecycleScope.launch(Dispatchers.IO) {
-    writeCh?.write(bytes)
-    withContext(Dispatchers.Main) { cb.onCallBack("{\"success\":true}") }
-  }
-})
-
-webview.registerHandler("disconnect", BridgeHandler { _, cb ->
-  connection?.disconnect()
-  cb.onCallBack("{\"success\":true}")
-})
-```
-
-## Step 7. JavaScript bundle (low-level adapter)
-
-The demo’s web project already builds a bundle that initializes the SDK with `env: 'lowlevel'` and wires the low-level adapter. You typically do NOT need to write extra JS — just build and copy `web/web_dist/` into `app/src/main/assets/web_dist/` and load `file:///android_asset/web_dist/index.html`.
-
-If you customize the adapter, the core idea remains: initialize with `env: 'lowlevel'` and forward `enumerate/connect/disconnect/send/receive` via the bridge.
-
-## Step 8. UI events (PIN / Passphrase)
-
-Handle `UI_EVENT` in your JS bundle and respond with `HardwareSDK.uiResponse`. See [Config Event](/en/hardware-sdk/core-api-guide#events-ui) for event wiring and the WebUSB guide for minimal, production-ready dialogs.
-
-- PIN on device: `payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'`
-- Passphrase on device: `{ passphraseOnDevice: true, value: '' }`
-
-## Step 9. Checklist
-
-- Nordic BLE library version ≥ 1.1.0 to use `includeStoredBondedDevices`.
-- Register handlers before loading the HTML to avoid race conditions.
-- Request runtime permissions on Android 12+ before scanning/connecting.
-- Persist `connectId` (MAC) and cache `deviceId` via `getDeviceState(connectId)` after the first connection.
-
-## References
-
-- [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin) — BLE protocol, message format, UUID reference
+Do not automatically replay signing or firmware updates after a timeout. See [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).

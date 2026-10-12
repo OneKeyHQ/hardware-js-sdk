@@ -1,0 +1,93 @@
+---
+title: "aptosGetAddress"
+---
+
+# aptosGetAddress
+
+## Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 3.0.0
+  * Classic/Mini: 2.6.0
+
+## Aptos: obtener una dirección [#aptos-get-address]
+
+Deriva y devuelve la dirección de la ruta especificada. Cuando `showOnOneKey` es `true`, el usuario debe confirmar la dirección en el dispositivo.
+
+```typescript
+const response = await HardwareSDK.aptosGetAddress(connectId, deviceId, params)
+```
+
+### Parámetros [#params]
+
+[Parámetros comunes opcionales](/es/hardware-sdk/concepts/common-params)
+
+**Una dirección**
+
+* `path` - _obligatorio_ `string | Array<number>`  La longitud mínima del SDK es `3`. [más información](/es/hardware-sdk/concepts/common-params#hd-path)
+* `showOnOneKey` - _opcional_ `boolean` Si se muestra la dirección en el dispositivo. El valor predeterminado es `true`.
+
+**Varias direcciones**
+
+* `bundle` - matriz de objetos que incluyen `path` y `showOnOneKey` como campos
+
+#### Ejemplo [#example]
+
+Muestra la dirección de la primera cuenta de Aptos:
+
+```typescript
+HardwareSDK.aptosGetAddress(connectId, deviceId, {
+    path: "m/44'/637'/0'/0'/0'"
+});
+```
+
+Devuelve un conjunto de direcciones de Aptos sin mostrarlas en el dispositivo:
+
+```typescript
+HardwareSDK.aptosGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/637'/0'/0'/0'", showOnOneKey: false }, // account 1
+        { path: "m/44'/637'/1'/0'/0'", showOnOneKey: false }, // account 2
+        { path: "m/44'/637'/2'/0'/0'", showOnOneKey: false }  // account 3
+    ]
+});
+```
+
+#### Resultado [#result]
+
+Respuesta de una dirección
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // displayed address
+        path: string // serialized BIP32 path
+    }
+}
+```
+
+Respuesta por lotes, en el mismo orden que la solicitud
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string }, // account 1
+        { address: string, path: string }, // account 2
+        { address: string, path: string }  // account 3
+    ]
+}
+```
+
+Error
+
+```
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

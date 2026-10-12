@@ -1,0 +1,76 @@
+---
+title: "Signature"
+description: "Signer des messages sur Algorand avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signature
+
+Connectez le fournisseur avant de signer. Les exemples de transaction utilisent les champs de style algosdk 2 `from`/`to` ; adaptez-les à la version majeure du SDK que vous installez. `algodClient`, les adresses et les transactions groupées doivent être préparés avant d’exécuter les extraits. Les exemples de navigateur utilisant `Buffer` nécessitent une importation explicite de `buffer` ou un encodeur base64 équivalent.
+
+Découvrez comment signer des messages pour l’authentification sur Algorand.
+
+---
+
+## Signer un message arbitraire [#sign-arbitrary-message]
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // or 'hex'
+)
+
+console.log('Signature:', signature)
+console.log('Signer:', address)
+```
+
+---
+
+## Vérifier la signature [#verify-signature]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// Get public key from address
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('Valid:', isValid)
+```
+
+---
+
+## Gestion des erreurs [#error-handling]
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the request')
+  } else if (error.code === 4100) {
+    console.log('The account or method is not authorized')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## Codes d’erreur courants [#common-error-codes]
+
+| Code | Description |
+|------|-------------|
+| 4001 | Demande rejetée par l’utilisateur |
+| 4100 | Non autorisé |
+| 4200 | Méthode non prise en charge |
+| -32602 | Paramètres non valides |

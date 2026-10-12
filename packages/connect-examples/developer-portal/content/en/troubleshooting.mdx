@@ -1,0 +1,64 @@
+---
+title: Troubleshooting
+description: Diagnose wallet connection, hardware discovery, signing, and QR integration problems.
+---
+
+# Troubleshooting
+
+First identify the failing layer: the OneKey wallet provider, the hardware transport, or QR encoding and decoding. Record the method, error code, SDK or wallet version, and the step that failed.
+
+## A dApp cannot find OneKey
+
+- Confirm OneKey is installed and enabled in the browser profile you are testing. Reload the dApp after installation.
+- Detect the provider in browser code, after the page is available. Do not access `window` during server rendering.
+- Use the provider for your chain. Do not assume an unrelated wallet's injected provider belongs to OneKey.
+- Follow the [dApp quickstart](/en/connect-to-software) or your [wallet UI library's guide](/en/connect-to-software/wallet-ui/web3modal).
+
+## Account access or signing is rejected
+
+A rejection is a valid user outcome. Clear the pending state and let the user retry explicitly; do not keep opening permission or signing prompts.
+
+If the account or network changes, refresh your app's state before creating the next request. For Ethereum, see [Accessing accounts](/en/connect-to-software/provider/eth/accessing-accounts) and the [Provider API](/en/connect-to-software/provider/eth).
+
+## A USB device is not listed
+
+1. Check that your browser supports WebUSB and that the page is served in a secure context.
+2. Open the USB chooser from a user action, such as a Connect button, and select the intended device.
+3. Check the cable and close another app or browser tab that may be using the device.
+4. Re-run discovery and handle an empty result before calling a device method.
+
+Follow the [WebUSB guide](/en/hardware-sdk/transport/web-usb). Requirements differ for [native mobile](/en/hardware-sdk/transport/native-ble) and [React Native BLE](/en/hardware-sdk/transport/react-native-ble); browser USB instructions do not apply to every transport.
+
+## A request waits indefinitely
+
+Check whether the SDK is waiting for a UI response, such as a PIN or passphrase choice, or for confirmation on the device. Register handlers before starting a call and respond to the specific request as described in the [Core API guide](/en/hardware-sdk/core-api-guide).
+
+Keep device operations serialized. If the user cancels or the transport disconnects, clear your pending UI state and report the outcome. Do not automatically replay a signing request or a device-changing operation after an uncertain result.
+
+## A method is unsupported
+
+Verify the method against the [device and chain support reference](/en/hardware-sdk/concepts/chain-support), then check your SDK and firmware versions. Support for one chain, device, or transport does not imply support for every method.
+
+## A QR response does not decode
+
+Check that you are using the expected registry type and that all fragments of a multipart QR response have been received. Match the returned response to the original request where the format provides a request identifier. See the [Ethereum and EVM QR guide](/en/air-gap/ethereum-and-evm).
+
+## Report an issue
+
+Choose the repository that owns the failing integration:
+
+| Problem | Where to report it |
+| --- | --- |
+| Hardware SDK, transports, or this developer portal | [Hardware SDK issues](https://github.com/OneKeyHQ/hardware-js-sdk/issues) |
+| Injected wallet provider | [Cross-inpage provider issues](https://github.com/OneKeyHQ/cross-inpage-provider/issues) |
+| OneKey app or browser extension behavior | [App issues](https://github.com/OneKeyHQ/app-monorepo/issues) |
+| Help using a OneKey product | [OneKey Help Center](https://help.onekey.so/) |
+
+Include:
+
+- The expected behavior and the actual behavior.
+- A minimal reproduction with test data, plus the exact steps.
+- SDK/package version, runtime, operating system, transport, and device model/firmware where relevant.
+- The method name, error code, and a sanitized error message.
+
+Do not post recovery phrases, private keys, PINs, passphrases, credentials, session identifiers, or unredacted wallet logs. For a suspected security vulnerability, follow the affected repository's security policy rather than disclosing exploit details in a public issue.

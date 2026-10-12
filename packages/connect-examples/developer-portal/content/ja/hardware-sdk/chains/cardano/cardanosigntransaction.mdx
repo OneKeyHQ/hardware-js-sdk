@@ -1,0 +1,363 @@
+---
+title: "cardanoSignTransaction"
+---
+
+# cardanoSignTransaction
+
+## 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+### Cardano: トランザクションに署名 <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a> [#cardano-sign-transaction-]
+
+トランザクションの署名を要求します。ユーザーはデバイス上でリクエストを確認して承認します。
+
+```javascript
+const response = await HardwareSDK.cardanoSignTransaction(connectId, deviceId, params);
+```
+
+### パラメーター <a href="#params" id="params"></a> [#params-]
+
+[任意の共通パラメーター](/ja/hardware-sdk/concepts/common-params)
+
+CardanoSignTransaction 型
+
+* `signingMode` - _必須_ CardanoTxSigningMode
+* `inputs` - _必須_ CardanoInput の `Array`
+* `outputs` - _必須_ CardanoOutput の `Array`
+* `fee` - _必須_ `String`
+* `protocolMagic` - _必須_ `Integer` メインネットは 764824073、Preprod テストネットは 1、Preview テストネットは 2
+* `networkId` - _必須_ `Integer` メインネットは 1、テストネットは 0
+* `ttl` - _任意_ `String`
+* `validityIntervalStart` - _任意_ `String`
+* `certificates` - _任意_ CardanoCertificate の `Array`
+* `withdrawals` - _任意_ CardanoWithdrawal の `Array`
+* `auxiliaryData` - _任意_ CardanoAuxiliaryData
+* `mint` - _任意_ CardanoMint
+* `scriptDataHash` - _任意_ `String`
+* `collateralInputs` - _任意_ CardanoCollateralInput の `Array`
+* `requiredSigners` - _任意_ CardanoRequiredSigner の `Array`
+* `collateralReturn` - _任意_ CardanoOutput
+* `totalCollateral` - _任意_ `String`
+* `referenceInputs` - _任意_ CardanoReferenceInput の `Array`
+* `additionalWitnessRequests` - _任意_ `string | Array<number>` (パス) の `Array`。マルチシグおよびトークン発行のウィットネス要求に使用します。これらはトランザクションのパラメーターから決定できないためです。
+* `metadata` - _削除済み_ - 代わりに `auxiliaryData` を使用
+* `derivationType` - _任意_ `CardanoDerivationType` 列挙型。使用する導出タイプを決定します。デフォルトは ICARUS=1。
+* `includeNetworkId` - _任意_ `Boolean`。`networkId` をトランザクション本体に明示的にシリアライズするかどうかを指定します。デフォルトは `false`。
+
+#### CardanoTxSigningMode <a href="#cardanotxsigningmode" id="cardanotxsigningmode"></a> [#cardanotxsigningmode-]
+
+**`ORDINARY_TRANSACTION`**
+
+資金の送金、ステークの委任、報酬の引き出しを行う通常のユーザートランザクションを表します。`inputs`、`certificates`、`withdrawals` に含まれるパスから導出した鍵でウィットネスを作成します。また、トークン発行を含む場合は、`additionalWitnessRequests` に含まれるパスから導出した鍵でもウィットネスを作成します。
+
+トランザクションは
+
+* _推奨:_ すべての `inputs` に有効な `path` プロパティを指定すること
+* _禁止:_ プール登録証明書を含めること
+* `collateralInputs`、`collateralReturn`、`totalCollateral`、`referenceInputs` を含めることは_禁止_されています
+* _必須:_ 証明書と引き出しのステーク認証情報にパスを含めること (キーハッシュやスクリプトハッシュは不可)
+* _許可:_ 1852 と 1855 のパスのみを含めること
+* _禁止:_ トークンの発行/バーンを行わないトランザクションに 1855 のウィットネス要求を含めること
+
+#### ステークプール登録証明書の詳細 <a href="#stake-pool-registration-certificate-specifics" id="stake-pool-registration-certificate-specifics"></a> [#stake-pool-registration-certificate-specifics-]
+
+OneKey は、プール所有者としてステークプール登録証明書に署名できます。トランザクションには外部の入力 (プール運営者のものなど) が含まれる可能性があり、OneKey はそれが本当に外部の入力かを検証できません。そのため、支出用の鍵での署名を許可すると、ユーザーが支出を意図しなかった入力から資金を失うリスクがあります。また、引き出しが含まれている場合に、意図せず署名するリスクもあります。これらを軽減するため、ステークプール登録トランザクションには特別な検証ルールを設け、OneKey 上でも検証します。ルールは次のとおりです:
+
+1. トランザクションに他の証明書を含めてはいけません。別のステークプール登録も不可です
+2. トランザクションに引き出しを含めてはいけません
+3. 入力はすべて外部のものとし、path は undefined または null でなければなりません
+4. 所有者のうち正確に 1 人をステーキングパスで渡し、残りは bech32 エンコードされた報酬アドレスで渡してください
+
+#### ガバナンス登録 (Catalyst など) <a href="#governance-registration-catalyst-and-other" id="governance-registration-catalyst-and-other"></a> [#governance-registration-catalyst-and-other-]
+
+OneKey はガバナンス登録を含む補助データ付きトランザクションへの署名に対応しています。ガバナンス登録は以前 [CIP-15](https://cips.cardano.org/cips/cip15/) に従っていましたが、現在は [CIP-36](https://cips.cardano.org/cips/cip36/) に置き換えられています。現在、OneKey は CIP-15 と CIP-36 の両形式に対応し、目的の標準を `format` フィールドで指定できます (デフォルトは CIP-15)。相違点は次のとおりです:
+
+* CIP-36 では、投票公開鍵を 1 つだけ指定する代わりに、異なる投票力を持つ複数の投票公開鍵へ委任できます (CardanoCVoteRegistrationDelegation)。OneKey ファームウェアが 1 件のガバナンス登録で対応する委任は最大 32 件です。
+* CIP-36 の登録には votingPurpose フィールドが含まれます。0 は Catalyst 投票用、1 はその他の用途です。値を指定しない場合、OneKey はデフォルトで 0 をシリアライズします (CIP-36 形式の場合)。
+
+現在、OneKey は 1694 の導出パスに対応していません。
+
+### 例 <a href="#transaction-examples" id="transaction-examples"></a> [#examples-]
+
+**通常のトランザクション**
+
+```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
+HardwareSDK.cardanoSignTransaction(connectId, deviceId, {
+    signingMode: PROTO.CardanoTxSigningMode.ORDINARY_TRANSACTION,
+    inputs: [
+        {
+            path: "m/1852'/1815'/0'/0/1",
+            prev_hash: '1af8fa0b754ff99253d983894e63a2b09cbb56c833ba18c3384210163f63dcfc',
+            prev_index: 0,
+        },
+    ],
+    outputs: [
+        {
+            address: 'Ae2tdPwUPEZCanmBz5g2GEwFqKTKpNJcGYPKfDxoNeKZ8bRHr8366kseiK2',
+            amount: '3003112',
+        },
+        {
+            addressParameters: {
+                addressType: PROTO.CardanoAddressType.BASE,
+                path: "m/1852'/1815'/0'/0/0",
+                stakingPath: "m/1852'/1815'/0'/2/0",
+            },
+            amount: '7120787',
+        },
+        {
+            format: PROTO.CardanoTxOutputSerializationFormat.ARRAY_LEGACY,
+            address:
+                'addr1q84sh2j72ux0l03fxndjnhctdg7hcppsaejafsa84vh7lwgmcs5wgus8qt4atk45lvt4xfxpjtwfhdmvchdf2m3u3hlsd5tq5r',
+            amount: '2000000',
+            tokenBundle: [
+                {
+                    policyId: '95a292ffee938be03e9bae5657982a74e9014eb4960108c9e23a5b39',
+                    tokenAmounts: [
+                        {
+                            assetNameBytes: '74652474436f696e',
+                            amount: '7878754',
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            address: 'addr1w9rhu54nz94k9l5v6d9rzfs47h7dv7xffcwkekuxcx3evnqpvuxu0',
+            amount: '1',
+            datumHash: '3b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b7',
+        },
+        {
+            format: PROTO.CardanoTxOutputSerializationFormat.MAP_BABBAGE,
+            address: 'addr1w9rhu54nz94k9l5v6d9rzfs47h7dv7xffcwkekuxcx3evnqpvuxu0',
+            amount: '1',
+            inlineDatum:
+                '3b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b7',
+            referenceScript:
+                '3b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b73b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b7',
+        },
+    ],
+    fee: '42',
+    ttl: '10',
+    validityIntervalStart: '20',
+    certificates: [
+        {
+            type: PROTO.CardanoCertificateType.STAKE_REGISTRATION,
+            path: "m/1852'/1815'/0'/2/0",
+        },
+        {
+            type: PROTO.CardanoCertificateType.STAKE_DEREGISTRATION,
+            path: "m/1852'/1815'/0'/2/0",
+        },
+        {
+            type: PROTO.CardanoCertificateType.STAKE_DELEGATION,
+            path: "m/1852'/1815'/0'/2/0",
+            pool: 'f61c42cbf7c8c53af3f520508212ad3e72f674f957fe23ff0acb4973',
+        },
+    ],
+    withdrawals: [
+        {
+            path: "m/1852'/1815'/0'/2/0",
+            amount: '1000',
+        },
+    ],
+    auxiliaryData: {
+        hash: 'ea4c91860dd5ec5449f8f985d227946ff39086b17f10b5afb93d12ee87050b6a',
+    },
+    scriptDataHash: 'd593fd793c377ac50a3169bb8378ffc257c944da31aa8f355dfa5a4f6ff89e02',
+    protocolMagic: 764824073,
+    networkId: 1,
+    includeNetworkId: false,
+});
+```
+
+**ステークプールの登録**
+
+```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
+HardwareSDK.cardanoSignTransaction(connectId, deviceId, {
+    signingMode: PROTO.CardanoTxSigningMode.POOL_REGISTRATION_AS_OWNER,
+    inputs: [
+        {
+            // notice no path is provided here
+            prev_hash: '3b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b7',
+            prev_index: 0,
+        },
+    ],
+    outputs: [{
+        address:
+            'addr1q84sh2j72ux0l03fxndjnhctdg7hcppsaejafsa84vh7lwgmcs5wgus8qt4atk45lvt4xfxpjtwfhdmvchdf2m3u3hlsd5tq5r',
+        amount: '1000000',
+    }],
+    fee: '300000',
+    ttl: '500000000',
+    protocolMagic: 764824073,
+    networkId: 1,
+    includeNetworkId: false,
+    certificates: [
+        {
+            type: PROTO.CardanoCertificateType.STAKE_POOL_REGISTRATION,
+            poolParameters: {
+                poolId: 'f61c42cbf7c8c53af3f520508212ad3e72f674f957fe23ff0acb4973',
+                vrfKeyHash: '198890ad6c92e80fbdab554dda02da9fb49d001bbd96181f3e07f7a6ab0d0640',
+                pledge: '500000000', // amount in lovelace
+                cost: '340000000', // amount in lovelace
+                margin: {
+                    // numerator/denominator should be <= 1 which is translated then to a percentage
+                    numerator: '1',
+                    denominator: '2',
+                },
+                rewardAccount: 'stake1uya87zwnmax0v6nnn8ptqkl6ydx4522kpsc3l3wmf3yswygwx45el', // bech32-encoded stake pool reward account
+                owners: [
+                    {
+                        stakingKeyPath: "m/1852'/1815'/0'/2/0", // this is the path to the owner's key that will be signing the tx on OneKey
+                    },
+                    {
+                        stakingKeyHash: '3a7f09d3df4cf66a7399c2b05bfa234d5a29560c311fc5db4c490711', // other owner
+                    },
+                ],
+                relays: [
+                    {
+                        type: PROTO.CardanoPoolRelayType.SINGLE_HOST_IP,
+                        ipv4Address: '192.168.0.1',
+                        ipv6Address: '2001:0db8:85a3:0000:0000:8a2e:0370:7334', // ipv6 address in full form
+                        port: 1234,
+                    },
+                    {
+                        type: PROTO.CardanoPoolRelayType.SINGLE_HOST_IP,
+                        ipv6Address: '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
+                        port: 1234,
+                    },
+                    {
+                        type: PROTO.CardanoPoolRelayType.SINGLE_HOST_IP,
+                        ipv4Address: '192.168.0.1',
+                        port: 1234,
+                    },
+                    {
+                        type: PROTO.CardanoPoolRelayType.SINGLE_HOST_NAME,
+                        hostName: 'www.test.test',
+                        port: 1234,
+                    },
+                    {
+                        type: PROTO.CardanoPoolRelayType.MULTIPLE_HOST_NAME,
+                        hostName: 'www.test2.test', // max 64 characters long
+                    },
+                ],
+                metadata: {
+                    url: 'https://www.test.test', // max 64 characters long
+                    hash: '914c57c1f12bbf4a82b12d977d4f274674856a11ed4b9b95bd70f5d41c5064a6',
+                },
+            },
+        },
+    ],
+});
+```
+
+**ガバナンス投票キーの登録**
+
+```javascript
+import { PROTO } from "@onekeyfe/hd-core";
+
+HardwareSDK.cardanoSignTransaction(connectId, deviceId, {
+    signingMode: PROTO.CardanoTxSigningMode.ORDINARY_TRANSACTION,
+    inputs: [
+        {
+            path: "m/1852'/1815'/0'/0/0",
+            prev_hash: '3b40265111d8bb3c3c608d95b3a0bf83461ace32d79336579a1939b3aad1c0b7',
+            prev_index: 0,
+        },
+    ],
+    outputs: [
+        {
+            address:
+                'addr1q84sh2j72ux0l03fxndjnhctdg7hcppsaejafsa84vh7lwgmcs5wgus8qt4atk45lvt4xfxpjtwfhdmvchdf2m3u3hlsd5tq5r',
+            amount: '3003112',
+        },
+    ],
+    fee: '42',
+    ttl: '10',
+    auxiliaryData: {
+        cVoteRegistrationParameters: {
+            votePublicKey: '1af8fa0b754ff99253d983894e63a2b09cbb56c833ba18c3384210163f63dcfc',
+            stakingPath: "m/1852'/1815'/0'/2/0",
+            paymentAddressParameters: {
+                addressType: PROTO.CardanoAddressType.REWARD,
+                stakingPath: "m/1852'/1815'/0'/2/0",
+            },
+            nonce: '22634813',
+        },
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+    includeNetworkId: false,
+});
+```
+
+#### 結果 <a href="#result" id="result"></a> [#result-]
+
+メモリー制約により OneKey の Cardano 実装にトランザクションのストリーミングが導入されたため、`CardanoSignTransaction` の呼び出し結果として、シリアライズ済みトランザクション全体は返されなくなりました。代わりに、トランザクションハッシュ、ウィットネス、補助データの追加情報が返されます。クライアント側でシリアライズ済みトランザクションを組み立てる必要があります。
+
+CardanoSignedTxData 型
+
+```javascript
+{
+    success: true,
+    payload: {
+        hash: string,
+        witnesses: CardanoSignedTxWitness[],
+        auxiliaryDataSupplement?: CardanoAuxiliaryDataSupplement,
+    }
+}
+```
+
+#### 例: [#example]
+
+```javascript
+{
+    success: true,
+    payload: {
+        hash: "73e09bdebf98a9e0f17f86a2d11e0f14f4f8dae77cdf26ff1678e821f20c8db6",
+        witnesses: [
+            {
+                type: PROTO.CardanoTxWitnessType.BYRON_WITNESS,
+                pubKey: '89053545a6c254b0d9b1464e48d2b5fcf91d4e25c128afb1fcfc61d0843338ea',
+                signature:
+                    'da07ac5246e3f20ebd1276476a4ae34a019dd4b264ffc22eea3c28cb0f1a6bb1c7764adeecf56bcb0bc6196fd1dbe080f3a7ef5b49f56980fe5b2881a4fdfa00',
+                chainCode:
+                    '26308151516f3b0e02bb1638142747863c520273ce9bd3e5cd91e1d46fe2a635',
+            },
+            {
+                type: PROTO.CardanoTxWitnessType.SHELLEY_WITNESS,
+                pubKey: '5d010cf16fdeff40955633d6c565f3844a288a24967cf6b76acbeb271b4f13c1',
+                signature:
+                    '622f22d03bc9651ddc5eb2f5dc709ac4240a64d2b78c70355dd62106543c407d56e8134c4df7884ba67c8a1b5c706fc021df5c4d0ff37385c30572e73c727d00',
+                chainCode: null,
+            },
+        ],
+        auxiliaryDataSupplement: {
+            type: 1,
+            auxiliaryDataHash:
+                'a943e9166f1bb6d767b175384d3bd7d23645170df36fc1861fbf344135d8e120',
+            cVoteRegistrationSignature:
+                '74f27d877bbb4a5fc4f7c56869905c11f70bad0af3de24b23afaa1d024e750930f434ecc4b73e5d1723c2cb8548e8bf6098ac876487b3a6ed0891cb76994d409',
+        },
+    }
+}
+```
+
+エラー
+
+```javascript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

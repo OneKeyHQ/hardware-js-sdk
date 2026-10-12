@@ -1,0 +1,22 @@
+---
+title: "WalletConnect セッション"
+description: "dApp から別のウォレットアプリに接続する場合は、WalletConnect 対応の接続ライブラリを使用します。アプリに必要なプロジェクト ID、アプリのメタデータ、チェーン、メソッド、イベントを設定してください。"
+---
+
+<span id="walletconnect-sessions" />
+
+# WalletConnect セッション
+
+dApp から別のウォレットアプリに接続する場合は、WalletConnect 対応の接続ライブラリを使用します。アプリに必要なプロジェクト ID、アプリのメタデータ、チェーン、メソッド、イベントを設定してください。
+
+EVM の接続 UI は次から始めます: [RainbowKit](/ja/connect-to-software/wallet-ui/rainbowkit) または [Web3Modal / AppKit](/ja/connect-to-software/wallet-ui/web3modal)。選んだガイドに記載されたバージョンに従ってください。
+
+## 単一のセッションコンテキストを維持 [#keep-one-session-context]
+
+接続後は、選択したコネクターのプロバイダーをアカウントアクセス、リクエスト、イベントに使います。WalletConnect セッションは `window.$onekey.ethereum` を注入しません。その名前空間はブラウザープロバイダー統合のものです。
+
+セッションの拒否、期限切れ、切断、アカウント/チェーン変更を処理します。署名リクエストの準備前にアカウントとネットワークを再確認し、拒否された許可プロンプトを自動再試行しないでください。
+
+## 従来の Aptos 統合 [#historical-aptos-integration]
+
+古い Aptos のカスタムメソッドフローは WalletConnect v1 を使用していました。その `@1` URI と `sendCustomRequest` 呼び出しは、現在の WalletConnect の実装例ではありません。[従来のリファレンス](/ja/legacy/aptos-walletconnect)を参照してください。ブラウザー統合には [Aptos Wallet Adapter](/ja/connect-to-software/wallet-ui/aptos-wallet-adapter) を使用してください。

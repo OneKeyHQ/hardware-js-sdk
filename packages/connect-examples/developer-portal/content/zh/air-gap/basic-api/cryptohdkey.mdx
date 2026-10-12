@@ -6,7 +6,7 @@ title: CryptoHDKey
 
 `CryptoHDKey` 类表示分层确定性密钥信息。
 
-这是 OneKey 硬件提供的指令，包含扩展公钥信息。
+OneKey 可以将该注册表对象导出为二维码，钱包据此使用公钥数据派生地址。
 
 ## 参数
 
@@ -42,13 +42,16 @@ import { URDecoder } from '@ngraveio/bc-ur';
 import { CryptoHDKey } from '@keystonehq/bc-ur-registry';
 
 const dec = new URDecoder();
-// 将每个扫描的帧字符串推入解码器
+// push each scanned frame string into the decoder
 // dec.receivePart(frame)
 
-if (dec.isComplete()) {
-  const ur = dec.resultUR(); // ur.type 应为 'crypto-hdkey'
+if (dec.isError()) throw new Error('Could not decode account QR code');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'crypto-hdkey') throw new Error('Expected crypto-hdkey');
   const hdkey = CryptoHDKey.fromCBOR(ur.cbor);
-  
+  if (hdkey.isPrivateKey()) throw new Error('Expected a public account export');
+
   const name = hdkey.getName();
   const note = hdkey.getNote();
   const chainCode = hdkey.getChainCode();
@@ -56,4 +59,3 @@ if (dec.isComplete()) {
   const xfp = origin?.getSourceFingerprint();
 }
 ```
-

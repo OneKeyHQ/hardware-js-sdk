@@ -1,0 +1,62 @@
+---
+title: "nostrSignSchnorr"
+---
+
+# nostrSignSchnorr
+
+### Requisitos [#requirements]
+
+El SDK actual declara estos requisitos de firmware: `model_touch` ≥ 4.7.0 y `model_mini` ≥ 3.6.0. Son claves de rangos del SDK; confirma su correspondencia con los modelos de dispositivos y la compatibilidad del firmware publicado para tu integración.
+
+## Nostr: firmar con Schnorr [#nostr-sign-schnorr]
+
+Solicita una firma Schnorr del hash proporcionado con la clave de la ruta especificada. El usuario confirma la solicitud en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.nostrSignSchnorr(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `5`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `hash` - _obligatorio_ `string`. Un hash de 32 bytes codificado en hexadecimal.
+
+### Ejemplos [#examples]
+
+```typescript
+const response = await HardwareSDK.nostrSignSchnorr(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/1237'/0'/0/0",
+    hash: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+  }
+);
+```
+
+Resultado
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string;
+    rawHash: string,
+    signature: string,
+  }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

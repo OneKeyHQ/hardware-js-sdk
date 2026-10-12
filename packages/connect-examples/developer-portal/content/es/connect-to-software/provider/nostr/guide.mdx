@@ -1,0 +1,54 @@
+---
+title: "Guía"
+---
+
+<span id="guide" />
+
+# Guía
+
+## Descripción general [#overview]
+
+Esta guía explica cómo usar la API del proveedor de OneKey para crear fácilmente aplicaciones de red que usen el protocolo Nostr.
+
+La API del proveedor de OneKey está definida por [NIP-07](https://github.com/nostr-protocol/nips/blob/master/07.md).
+
+## Instalación [#install]
+
+### 1. Descargar OneKey Wallet [#1-download-onekey-wallet]
+
+Descarga [OneKey Wallet](https://onekey.so/download?client=browserExtension). Instala la extensión de navegador OneKey.
+
+#### 2. Explicación de la inyección de API [#2-api-injection-explanation]
+
+* La extensión de navegador de OneKey inyecta `Provider API` en los sitios web visitados.
+* Se ofrecen dos tipos de API: `window.nostr` y `window.$onekey.nostr`.
+* Se recomienda usar `window.$onekey.nostr`.
+
+> Usa preferentemente `window.$onekey.nostr` para seleccionar OneKey específicamente. La variable global `window.nostr` puede pertenecer a otra cartera cuando hay varias extensiones instaladas.
+
+### Detectar la compatibilidad con la API del proveedor [#detecting-provider-api-support]
+
+Comprueba que haya un proveedor disponible antes de realizar solicitudes:
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+if (!provider) {
+  throw new Error("No provider is available.");
+}
+```
+
+## API [#api]
+
+Elige una API para la operación que necesite tu aplicación.
+
+**Más interfaces**: [Ver detalles](/es/connect-to-software/provider/nostr/api-reference)
+
+## Evento [#event]
+
+* **Operaciones principales**: Por ejemplo, cambiar de cuenta
+* **Más información**: [Ver más](/es/connect-to-software/provider/nostr/event)
+
+## Gestión de solicitudes [#handling-requests]
+
+Ejecuta las solicitudes de cartera desde una función asíncrona o un módulo ES. Captura las promesas rechazadas y muestra el error en tu aplicación. Solicita conexiones, firmas y pagos a partir de una acción del usuario, y desactiva el botón que los inicia mientras haya una solicitud pendiente.

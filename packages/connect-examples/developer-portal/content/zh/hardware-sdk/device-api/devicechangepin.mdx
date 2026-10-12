@@ -1,12 +1,13 @@
 ---
 title: deviceChangePin
+description: 在用户明确请求后进入设备 PIN 修改流程。
 ---
 
 # deviceChangePin
 
 ## 修改设备 PIN 码
 
-修改设备的 PIN 码。
+用户主动请求后，打开设备 PIN 修改流程。受保护步骤由用户在设备上完成，不要收集或记录真实设备 PIN 来代替这个流程。
 
 ```typescript
 const result = await HardwareSDK.deviceChangePin(connectId, params);
@@ -16,14 +17,15 @@ const result = await HardwareSDK.deviceChangePin(connectId, params);
 
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
-* `remove` - _可选_ `boolean` 请求移除 PIN 码。
+* `remove` - _可选_ `boolean`。`false` 修改 PIN；`true` 请求在支持的 Protocol V1 设备上移除 PIN。Protocol V2 拒绝 `remove: true`。
 
 ## 示例
 
 ```typescript
-HardwareSDK.deviceChangePin(connectId, {
+const result = await HardwareSDK.deviceChangePin(connectId, {
     remove: false
 });
+if (!result.success) throw new Error(result.payload.error);
 ```
 
 ## 返回结果

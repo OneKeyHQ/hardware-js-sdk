@@ -1,0 +1,35 @@
+---
+title: "Auf Konten zugreifen"
+---
+
+<span id="accessing-accounts" />
+
+# Auf Konten zugreifen
+
+Erkennen Sie einen Ethereum-Provider, bevor Sie Kontozugriff anfordern; siehe [Provider-API](/de/connect-to-software/provider/eth/provider-api). Rufen Sie `eth_requestAccounts` über eine Nutzeraktion wie eine Verbinden-Schaltfläche auf. Verwenden Sie `eth_accounts`, wenn Sie nur die Konten benötigen, die bereits für Ihre Website freigegeben sind.
+
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
+
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  const address = accounts[0];
+  if (!address) throw new Error('No account was selected.');
+  console.log('Connected address:', address);
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('The user declined the connection request.');
+  } else {
+    console.error(error);
+  }
+}
+```
+
+Deaktivieren Sie die Verbinden-Schaltfläche, solange die Anfrage aussteht. Ein verbundenes Konto genehmigt keine Transaktionen oder Signaturen im Voraus. Übergeben Sie die ausgewählte Adresse an `eth_sendTransaction`, `personal_sign`, oder `eth_signTypedData_v4`, wie von der jeweiligen Methode gefordert.
+
+Reagieren Sie auf `accountsChanged` und behandeln Sie ein leeres Array, indem Sie das verbundene Konto in Ihrer Anwendung entfernen.
+
+## Demo [#demo]
+
+[Beispiel öffnen](https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark)

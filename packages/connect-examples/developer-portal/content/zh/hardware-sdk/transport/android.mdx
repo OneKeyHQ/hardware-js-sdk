@@ -1,296 +1,98 @@
 ---
 title: Android：通过蓝牙连接（原生）
+description: 通过真实 GATT 回调完成 Android BLE 连接与有序数据传输。
 ---
 
 # Android：通过蓝牙连接（原生）
 
-> **注意：**
-> 演示：原生 Android 示例（WebView + JSBridge + Nordic BLE）→ [native-android-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example)
-> 本页基于《[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)》— 建议先阅读，了解 BLE 消息格式和协议详情。
+在 WebView 中运行 `@onekeyfe/hd-common-connect-sdk`，通过底层传输插件桥接到原生 BLE。以[原生 Android 示例](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example)和[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)契约为起点。
 
+原生层负责权限、配对、GATT 连接、特征读写和清理；SDK 负责协议探测、帧处理和签名。不要在原生桥中再实现一套 V1/V2 解码器。
 
-本指南展示如何通过底层适配器在原生 Android 宿主中集成 `@onekeyfe/hd-common-connect-sdk`。JavaScript 包在 WebView 中运行；传输调用被转发到原生（Nordic BLE）并桥接回 JS。
+<span id="步骤-1-gradle-和-manifest" />
 
-## 关键：BLE 连接流程
+## 权限
 
-Android BLE 需要特定的连接顺序。**跳过步骤会导致静默失败。**
+面向 Android 12 及以上版本的应用，需要在运行时请求 `BLUETOOTH_SCAN` 和 `BLUETOOTH_CONNECT`。仅扫描和连接的客户端不需要 `BLUETOOTH_ADVERTISE`。
 
-```
-1. ensureBonded()           // 连接前先配对 (60s 超时)
-2. connect()                // GATT 连接 (15s 超时)
-3. delay(500ms)             // 等待稳定
-4. discoverServices()       // 服务发现
-5. delay(500ms)             // 发现后等待
-6. startNotifications()     // 带重试机制 (3 次尝试)
-```
+只有应用不通过 BLE 扫描推断位置时，才能使用 `neverForLocation`。较旧的 Android 版本需要相应的旧版蓝牙和位置权限；不要在旧设备上无条件请求 Android 12 才提供的权限。按目标 SDK 和位置用途核对 [Android 蓝牙权限指南](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions)。
 
-### 为什么要先配对？
+权限请求未完成前不要开始扫描。用户拒绝时，应向 JS 调用方返回权限失败结果，并允许用户之后主动重试。
 
-OneKey 设备需要安全的 BLE 配对。不配对会导致：
-- `startNotifications()` 可能静默失败
-- 设备有响应但 SDK 报告"设备未找到"
-- 间歇性连接断开
+<span id="步骤-2-构建-web-包演示中已实现" />
+<span id="步骤-3-webview--桥接加载前注册" />
 
-### 连接代码示例
+## 构建并加载 JavaScript 包
 
-```kotlin
-suspend fun connectWithBonding(deviceAddress: String) {
-    // 步骤 1: 确保已配对
-    val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
-    if (device.bondState != BluetoothDevice.BOND_BONDED) {
-        device.createBond()
-        // 等待配对 (用户必须确认配对对话框)
-        delay(60000) // 或使用 BroadcastReceiver 监听 BOND_BONDED
-    }
+在 hardware-js-sdk 仓库中运行：
 
-    // 步骤 2: GATT 连接
-    val gatt = device.connectGatt(context, false, gattCallback)
-
-    // 步骤 3: 等待稳定
-    delay(500)
-
-    // 步骤 4: 发现服务 (在 onConnectionStateChange 中触发)
-    gatt.discoverServices()
-
-    // 步骤 5: 发现后等待
-    delay(500)
-
-    // 步骤 6: 带重试启动通知
-    startNotificationsWithRetry(gatt, maxRetries = 3)
-}
-
-suspend fun startNotificationsWithRetry(gatt: BluetoothGatt, maxRetries: Int) {
-    repeat(maxRetries) { attempt ->
-        try {
-            gatt.setCharacteristicNotification(notifyCharacteristic, true)
-            // 写入描述符以启用通知
-            val descriptor = notifyCharacteristic.getDescriptor(CCCD_UUID)
-            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            gatt.writeDescriptor(descriptor)
-            return // 成功
-        } catch (e: Exception) {
-            delay((attempt + 1) * 1000L) // 递增退避
-        }
-    }
-    throw Exception("$maxRetries 次尝试后启动通知失败")
-}
-```
-
-### 推荐超时时间
-
-| 操作 | 超时 |
-|------|------|
-| 配对 (用户确认) | 60 秒 |
-| GATT 连接 | 15 秒 |
-| 连接后延迟 | 500ms |
-| 服务发现 | 15 秒 |
-| 发现后延迟 | 500ms |
-| 通知设置 | 15 秒 |
-| 重试退避 | 1s, 2s, 3s |
-
-关键库：
-- WebView JS 桥接：`com.smallbuer:jsbridge:1.0.7`
-- Nordic BLE（Kotlin，>= 1.1.0）：
-  - `no.nordicsemi.android.kotlin.ble:scanner:1.1.0`
-  - `no.nordicsemi.android.kotlin.ble:client:1.1.0`
-  - 原因：`BleScannerSettings` 中的 `includeStoredBondedDevices` 需要 > 1.0.9
-
-OneKey BLE UUID：参见 [底层传输插件 - 快速参考](/zh/hardware-sdk/concepts/low-level-plugin#快速参考)
-
-## 步骤 1. Gradle 和 Manifest
-
-Gradle（app/build.gradle.kts）：
-```kotlin
-dependencies {
-  implementation("com.smallbuer:jsbridge:1.0.7")
-  implementation("no.nordicsemi.android.kotlin.ble:scanner:1.1.0")
-  implementation("no.nordicsemi.android.kotlin.ble:client:1.1.0")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-}
-```
-
-Android 12+ 权限（AndroidManifest.xml）：
-```xml
-<uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-
-<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
-<uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
-```
-
-运行时权限（Kotlin）：
-```kotlin
-private fun ensureBluetoothPermissions(): Boolean {
-  val needs = mutableListOf<String>()
-  if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) needs += android.Manifest.permission.BLUETOOTH_SCAN
-  if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) needs += android.Manifest.permission.BLUETOOTH_CONNECT
-  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) needs += android.Manifest.permission.ACCESS_FINE_LOCATION
-  if (needs.isNotEmpty()) {
-    ActivityCompat.requestPermissions(this, needs.toTypedArray(), 1001)
-    return false
-  }
-  return true
-}
-```
-
-## 步骤 2. 构建 Web 包（演示中已实现）
-
-在 hardware-js-sdk 仓库中：
 ```bash
 cd packages/connect-examples/native-android-example/web
-yarn && yarn build   # 输出 web/web_dist/
+yarn
+yarn build
 ```
 
-将整个输出文件夹复制到您的 Android 项目中：
-- 复制 `web/web_dist/` → `app/src/main/assets/web_dist/`
-- 入口文件将可用于：`app/src/main/assets/web_dist/index.html`
+将 `web_dist/` 复制到 `app/src/main/assets/web_dist/`。加载 `file:///android_asset/web_dist/index.html` 前，先注册原生桥接处理器。保持资源相对路径不变；具有设备桥接能力的 WebView 只加载应用自己可信的资源包。
 
-原生应用中不需要进一步的 JS 工作；演示的 Web 包已经使用 `env: 'lowlevel'` 初始化并连接了底层适配器。
+演示包含所需依赖和完整桥接实现。以它的 package 和 Gradle 配置为起点，不要混用不同 Nordic BLE 版本的零散代码。
 
-## 步骤 3. WebView + 桥接（加载前注册）
+<span id="关键ble-连接流程" />
+<span id="为什么要先配对" />
+<span id="连接代码示例" />
+<span id="推荐超时时间" />
+<span id="步骤-4-ble-扫描包括存储的已绑定设备" />
+<span id="步骤-5-连接特征通知" />
 
-```kotlin
-class MainActivity : AppCompatActivity() {
-  lateinit var webview: BridgeWebView
+## 完成 BLE 连接后再返回成功
 
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_main)
+固定延迟不能证明配对、GATT 连接、服务发现或通知订阅已经成功。应等待回调或 BLE 库提供的异步完成接口：
 
-    webview = findViewById(R.id.webview)
-    configureWebView()
+1. 完成所需配对，处理用户拒绝和超时。
+2. 等待 GATT 连接成功。
+3. 发现 OneKey 服务及所需的写入、通知特征。
+4. 启用通知，并等待描述符写入或订阅完成。
+5. 只有连接具备实际收发能力后，才完成桥接的 `connect` 请求。
 
-    // 在加载 HTML 之前注册原生处理程序
-    registerHandlers()
+Android 通过 [`BluetoothGattCallback`](https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback) 返回操作结果。成功发起操作不等于操作已完成。为每个待处理操作设置超时；失败时关闭连接，并拒绝其待处理桥接请求。
 
-    // 加载复制到 assets/web_dist/ 的构建 HTML 包
-    webview.loadUrl("file:///android_asset/web_dist/index.html")
-  }
+| 用途 | UUID |
+| --- | --- |
+| 服务 | `00000001-0000-1000-8000-00805f9b34fb` |
+| 写入 | `00000002-0000-1000-8000-00805f9b34fb` |
+| 通知 | `00000003-0000-1000-8000-00805f9b34fb` |
 
-  private fun configureWebView() {
-    val s = webview.settings
-    s.javaScriptEnabled = true
-    s.domStorageEnabled = true
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) s.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-  }
-}
-```
+<span id="步骤-6-发送--断开" />
+<span id="步骤-7-javascript-包底层适配器" />
 
-## 步骤 4. BLE 扫描（包括存储的已绑定设备）
+## 桥接契约
 
-```kotlin
-private val ONEKEY_SERVICE_UUID: UUID = UUID.fromString("00000001-0000-1000-8000-00805f9b34fb")
-private val bleScanner by lazy { BleScanner(this) }
-private val aggregator = BleScanResultAggregator()
+| 方法 | 完成条件 |
+| --- | --- |
+| `enumerate()` | 返回去重后的候选设备快照；停止扫描，每个请求只完成一次。 |
+| `connect(uuid)` | 连接、特征及通知均已就绪。 |
+| `send(uuid, data, options)` | 校验十六进制数据，按顺序写入字节，遵守 `withoutResponse`，传回写入失败。 |
+| `receive(uuid)` | 返回队列中的下一个原始通知块，格式为十六进制；读者开始等待前收到的块也必须保留。 |
+| `disconnect(uuid)` | 取消订阅、关闭所选连接、拒绝待处理读取，并丢弃旧通知数据。 |
 
-data class OneKeyDeviceInfo(val id: String, val name: String)
+每条连接独立维护队列和回调。缺少特征时应返回失败，不能把可空写入当作成功。WebView 桥接回调应切换到所需的 UI 线程。
 
-private fun startScan(onResult: (List<OneKeyDeviceInfo>) -> Unit) {
-  if (!ensureBluetoothPermissions()) return
+实现 Protocol V2 时，通过 `getProtocolV2PacketCapacity` 暴露真实的 BLE 写入容量，不要返回包含 ATT 开销的 MTU。完整接口见[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-接口)。
 
-  val settings = BleScannerSettings(
-    scanMode = BleScanMode.LOW_LATENCY,
-    filter = BleScanFilter(serviceUUIDs = listOf(FilteredServiceUuid(ONEKEY_SERVICE_UUID))),
-    includeStoredBondedDevices = true,               // 需要 Nordic BLE >= 1.1.0
-  )
+<span id="步骤-8-ui-事件pin--passphrase" />
 
-  aggregator.reset()
-  bleScanner.scan(settings)
-    .map { aggregator.aggregate(it) }
-    .onEach { results ->
-      val devices = results.mapNotNull { r -> r.device }
-        .distinctBy { it.address }
-        .map { OneKeyDeviceInfo(id = it.address, name = it.name ?: "") }
-      onResult(devices)
-    }
-    .launchIn(lifecycleScope)
-}
-```
+## SDK 与 UI 生命周期
 
-`enumerate` 的桥接处理程序：
-```kotlin
-private fun registerHandlers() {
-  webview.registerHandler("enumerate", BridgeHandler { _, cb ->
-    startScan { list -> cb.onCallBack(Gson().toJson(list)) }
-  })
+资源包用 `env: 'lowlevel'` 和你的插件初始化 SDK。检查初始化结果，发现连接后调用 `getDeviceState(connectId)` 读取种子生命周期内的 `deviceId`。
 
-  // 其余处理程序如下所示
-}
-```
+受保护调用前注册 [UI 事件处理器](/zh/hardware-sdk/core-api-guide#events-ui)。只回答输入请求，并转发其响应关联字段。`REQUEST_BUTTON` 和设备端 PIN 提示是通知；原生界面的“确定”按钮不能代替硬件确认。
 
-## 步骤 5. 连接、特征、通知
+标准钱包的地址和签名调用传 `useEmptyPassphrase: true`；隐藏钱包传入所选钱包的 `passphraseState`。同一设备的调用按顺序执行。
 
-```kotlin
-private var connection: ClientBleGatt? = null
-private var writeCh: ClientBleGattCharacteristic? = null
-private var notifyCh: ClientBleGattCharacteristic? = null
+<span id="步骤-9-检查清单" />
+<span id="参考" />
 
-webview.registerHandler("connect", BridgeHandler { data, cb ->
-  if (!ensureBluetoothPermissions()) return@BridgeHandler
-  val json = JsonParser.parseString(data).asJsonObject
-  val mac = json.get("uuid").asString
+## 验证集成
 
-  lifecycleScope.launch(Dispatchers.IO) {
-    val gatt = ClientBleGatt.getInstance(this@MainActivity, mac)
-    connection = gatt
+在真机上覆盖权限拒绝、配对取消、发现失败、通知订阅失败、锁定设备输入、断连和重连。让用户在设备上确认地址，并检查 SDK 结果。仅发现 BLE 广播不代表端到端流程通过。
 
-    writeCh = gatt.getCharacteristic(ONEKEY_SERVICE_UUID, UUID.fromString("00000002-0000-1000-8000-00805f9b34fb"))
-    notifyCh = gatt.getCharacteristic(ONEKEY_SERVICE_UUID, UUID.fromString("00000003-0000-1000-8000-00805f9b34fb"))
-
-    notifyCh?.getNotifications()?.onEach { packet ->
-      // 将十六进制转发给 JS 接收器
-      val hex = DataByteArray(packet.value).toHexString()
-      webview.callHandler("monitorCharacteristic", hex)
-    }?.launchIn(lifecycleScope)
-
-    withContext(Dispatchers.Main) { cb.onCallBack("{\"success\":true}") }
-  }
-})
-```
-
-## 步骤 6. 发送 / 断开
-
-```kotlin
-webview.registerHandler("send", BridgeHandler { data, cb ->
-  val json = JsonParser.parseString(data).asJsonObject
-  val hex = json.get("data").asString
-  val bytes = DataByteArray.from(hex).value
-  lifecycleScope.launch(Dispatchers.IO) {
-    writeCh?.write(bytes)
-    withContext(Dispatchers.Main) { cb.onCallBack("{\"success\":true}") }
-  }
-})
-
-webview.registerHandler("disconnect", BridgeHandler { _, cb ->
-  connection?.disconnect()
-  cb.onCallBack("{\"success\":true}")
-})
-```
-
-## 步骤 7. JavaScript 包（底层适配器）
-
-演示的 Web 项目已经构建了一个使用 `env: 'lowlevel'` 初始化 SDK 并连接底层适配器的包。您通常不需要编写额外的 JS — 只需构建并将 `web/web_dist/` 复制到 `app/src/main/assets/web_dist/` 并加载 `file:///android_asset/web_dist/index.html`。
-
-如果您自定义适配器，核心思想保持不变：使用 `env: 'lowlevel'` 初始化并通过桥接转发 `enumerate/connect/disconnect/send/receive`。
-
-## 步骤 8. UI 事件（PIN / Passphrase）
-
-在您的 JS 包中处理 `UI_EVENT` 并使用 `HardwareSDK.uiResponse` 响应。参见 [事件配置](/zh/hardware-sdk/core-api-guide#events-ui) 了解事件连接，以及 WebUSB 指南了解最小的、生产就绪的对话框。
-
-- 设备上的 PIN：`payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'`
-- 设备上的 Passphrase：`{ passphraseOnDevice: true, value: '' }`
-
-## 步骤 9. 检查清单
-
-- Nordic BLE 库版本 >= 1.1.0 以使用 `includeStoredBondedDevices`。
-- 在加载 HTML 之前注册处理程序以避免竞态条件。
-- 在 Android 12+ 上扫描/连接之前请求运行时权限。
-- 持久化 `connectId`（MAC）并在首次连接后通过 `getDeviceState(connectId)` 缓存 `deviceId`。
-
-## 参考
-
-- [底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin) — BLE 协议、消息格式、UUID 参考
+超时后不要自动重放签名或固件升级。参见[重连与释放](/zh/hardware-sdk/transport/reconnect)。

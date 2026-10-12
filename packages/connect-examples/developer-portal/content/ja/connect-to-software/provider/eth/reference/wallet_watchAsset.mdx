@@ -1,0 +1,146 @@
+---
+title: "wallet_watchAsset"
+description: "ウォレットの追跡リストにトークンを追加"
+---
+
+# wallet_watchAsset
+
+新しいトークンの追跡をウォレットに要求します。指定したトークンをウォレットの追跡トークン一覧に追加するようユーザーに求めます。
+
+---
+
+## パラメーター [#parameters]
+
+`object` 次を含みます:
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `type` | `string` | はい | トークンの種類。このページでは次を使用: `ERC20` |
+| `options` | `object` | はい | トークンの詳細 |
+| `options.address` | `string` | はい | トークンのコントラクトアドレス |
+| `options.symbol` | `string` | はい | トークンのシンボル (1-11 文字) |
+| `options.decimals` | `number` | はい | トークンの小数桁数 |
+| `options.image` | `string` | いいえ | トークン画像の URL |
+
+---
+
+## 戻り値 [#returns]
+
+`boolean` - トークンが追加された場合は `true`、それ以外の場合は `false`
+
+---
+
+## 例 [#example]
+
+```typescript
+const wasAdded = await window.$onekey.ethereum.request({
+  method: 'wallet_watchAsset',
+  params: {
+    type: 'ERC20',
+    options: {
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      symbol: 'USDC',
+      decimals: 6,
+      image: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png'
+    }
+  }
+})
+
+if (wasAdded) {
+  console.log('Token added to wallet')
+} else {
+  console.log('User declined to add token')
+}
+```
+
+### 複数のトークンを追加 [#add-multiple-tokens]
+
+```typescript
+const tokens = [
+  {
+    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    symbol: 'USDC',
+    decimals: 6
+  },
+  {
+    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    symbol: 'USDT',
+    decimals: 6
+  },
+  {
+    address: '<TOKEN_CONTRACT_ADDRESS>',
+    symbol: 'DAI',
+    decimals: 18
+  }
+]
+
+async function addTokens(tokenList) {
+  for (const token of tokenList) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: token
+        }
+      })
+    } catch (error) {
+      console.error(`Failed to add ${token.symbol}:`, error)
+    }
+  }
+}
+```
+
+### 独自プロジェクトのトークンを追加 [#add-custom-project-token]
+
+```typescript
+async function suggestToken() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  // Different addresses per network
+  const tokenAddresses = {
+    '0x1': '0x...MainnetAddress',
+    '0x89': '0x...PolygonAddress',
+    '0xa4b1': '0x...ArbitrumAddress'
+  }
+
+  const address = tokenAddresses[chainId]
+  if (!address) {
+    throw new Error('Token not available on this network')
+  }
+
+  return window.$onekey.ethereum.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address,
+        symbol: 'TOKEN',
+        decimals: 18,
+        image: 'https://example.com/token-logo.png'
+      }
+    }
+  })
+}
+```
+
+---
+
+## エラー [#errors]
+
+| コード | メッセージ | 説明 |
+|------|---------|-------------|
+| 4001 | ユーザーがリクエストを拒否 | ユーザーがトークンの追加を拒否 |
+| -32602 | 無効なパラメーター | 無効なトークンパラメーター |
+
+---
+
+## 注意事項 [#notes]
+
+- このページでは次を扱います: `ERC20`; その他のトークンタイプは対象ウォレットのバージョンで確認してください
+- ウォレットがすでにそのトークンを追跡している場合があります (その場合も戻り値は `true`)
+- 画像 URL は HTTPS で、アクセス可能である必要があります
+- 良好な UX のため、シンボルはオンチェーンのシンボルと一致させてください
+- 次で規定されています: [EIP-747](https://eips.ethereum.org/EIPS/eip-747)

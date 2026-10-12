@@ -1,0 +1,138 @@
+---
+title: "はじめに"
+description: "OneKey の Polkadot.js 互換プロバイダーで Polkadot に接続"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="getting-started" />
+
+# はじめに
+
+拡張機能を有効にし、アカウントを選択して、目的のチェーンに API クライアントを接続します。現在のチェーンメタデータからトランザクションペイロードを構築してください。このガイドの省略された 16 進数値はプレースホルダーです。
+
+Polkadot と Substrate チェーンの検出、接続、操作の方法を説明します。
+
+<Callout type="info">
+OneKey は、ここで説明する操作について Polkadot.js 拡張機能インターフェースを実装しています。
+</Callout>
+
+---
+
+## プロバイダーの検出 [#provider-detection]
+
+```typescript
+// OneKey registers as a Polkadot.js extension
+const provider = window.$onekey?.polkadot
+
+// Or use the standard web3Enable API
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+```
+
+---
+
+## 拡張機能を有効化 [#enable-extension]
+
+```typescript
+// Using OneKey provider directly
+const enabled = await provider.web3Enable('My dApp')
+
+if (enabled) {
+  const accounts = await provider.web3Accounts()
+  console.log('Accounts:', accounts)
+}
+```
+
+---
+
+## Polkadot.js Extension API の使用 (推奨) [#using-polkadotjs-extension-api-recommended]
+
+```typescript
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+// Enable all extensions (including OneKey)
+const extensions = await web3Enable('My dApp')
+
+if (extensions.length === 0) {
+  throw new Error('No extension found')
+}
+
+// Get all accounts
+const allAccounts = await web3Accounts()
+console.log('Accounts:', allAccounts)
+```
+
+---
+
+## アカウントを取得 [#get-accounts]
+
+```typescript
+const accounts = await provider.web3Accounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Substrate address
+    name: account.name,           // Account name
+    type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
+    genesisHash: account.genesisHash, // Optional chain genesis
+  })
+})
+```
+
+---
+
+## アカウント変更を購読 [#subscribe-to-account-changes]
+
+```typescript
+const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
+  console.log('Accounts changed:', accounts)
+})
+
+// Later: unsubscribe()
+```
+
+---
+
+## Polkadot.js API との併用 [#using-with-polkadotjs-api]
+
+### セットアップ [#setup]
+
+```bash
+npm install @polkadot/api @polkadot/extension-dapp
+```
+
+### 接続してトランザクションに署名 [#connect-and-sign-transaction]
+
+```typescript
+import { ApiPromise, WsProvider } from '@polkadot/api'
+import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
+
+// Enable extensions
+await web3Enable('My dApp')
+
+// Get accounts
+const accounts = await web3Accounts()
+const account = accounts[0]
+if (!account) throw new Error("No account was selected")
+
+// Connect to chain
+const wsProvider = new WsProvider('wss://rpc.polkadot.io')
+const api = await ApiPromise.create({ provider: wsProvider })
+
+// Get injector
+const injector = await web3FromAddress(account.address)
+
+// Create and sign transaction
+const tx = api.tx.balances.transferKeepAlive(
+  recipientAddress,
+  '10000000000' // 1 DOT = 10^10 planck on Polkadot
+)
+
+// Sign and send
+const hash = await tx.signAndSend(
+  account.address,
+  { signer: injector.signer }
+)
+
+console.log('Transaction hash:', hash.toHex())
+```

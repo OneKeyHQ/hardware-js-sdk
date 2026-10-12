@@ -1,0 +1,398 @@
+---
+title: "Aptos"
+description: "Aptos-Integration über den Petra-kompatiblen Provider von OneKey"
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Aptos
+
+Integrieren Sie die Aptos-Blockchain mit dem Petra-kompatiblen Provider von OneKey. Zugriff über `window.$onekey.aptos`.
+
+<Callout type="info">
+OneKey stellt Petra-kompatible Methoden und einen Aptos-Wallet-Standard-Adapter bereit. Ihre Methodensignaturen unterscheiden sich; verwenden Sie die für Ihre Integration dokumentierte Schnittstelle.
+</Callout>
+
+---
+
+## Direktlinks [#quick-links]
+
+- [API-Referenz](#api-reference)
+- [Erste Schritte](getting-started)
+- [Transaktionen](#transactions)
+- [Nachrichten signieren](#message-signing)
+
+---
+
+## Provider erkennen [#provider-detection]
+
+```typescript
+// Detect OneKey Aptos provider
+const provider = window.$onekey?.aptos
+
+if (!provider) {
+  throw new Error('OneKey Aptos provider not detected')
+}
+
+// Check provider info
+console.log('Provider:', provider.isOneKey ? 'OneKey' : 'Unknown')
+```
+
+---
+
+## Schnellstart [#quick-start]
+
+### Wallet verbinden [#connect-wallet]
+
+```typescript
+// Connect and get account info
+const response = await provider.connect()
+
+console.log({
+  address: response.address,     // Account address
+  publicKey: response.publicKey, // Public key
+})
+```
+
+### Verbindungsstatus prüfen [#check-connection-status]
+
+```typescript
+const isConnected = await provider.isConnected()
+console.log('Connected:', isConnected)
+```
+
+### Trennen [#disconnect]
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## Kontoverwaltung [#account-management]
+
+### Aktuelles Konto abrufen [#get-current-account]
+
+```typescript
+const account = await provider.account()
+
+console.log({
+  address: account.address,
+  publicKey: account.publicKey,
+})
+```
+
+### Netzwerkinformationen abrufen [#get-network-info]
+
+```typescript
+const network = await provider.getNetwork()
+
+console.log({
+  name: network.name,       // 'mainnet', 'testnet', 'devnet'
+  chainId: network.chainId, // Network chain ID
+  url: network.url,         // RPC URL
+})
+```
+
+### Auf Kontoänderungen reagieren [#listen-for-account-changes]
+
+```typescript
+provider.onAccountChange((newAccount) => {
+  if (newAccount) {
+    console.log('Account changed:', newAccount)
+  } else {
+    console.log('Wallet disconnected')
+  }
+})
+```
+
+### Auf Netzwerkänderungen reagieren [#listen-for-network-changes]
+
+```typescript
+provider.onNetworkChange((network) => {
+  console.log('Network changed:', network)
+})
+```
+
+---
+
+## Transaktionen [#transactions]
+
+### Transaktion signieren und einreichen [#sign-and-submit-transaction]
+
+```typescript
+// Simple APT transfer
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: [
+    '0x1234...', // Recipient address
+    '100000000', // Amount in Octas (1 APT = 100000000 Octas)
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+
+console.log('Transaction hash:', response.hash)
+```
+
+### Transaktion signieren (ohne Einreichung) [#sign-transaction-without-submitting]
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::coin::transfer',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const signedTxn = await provider.signTransaction(payload)
+
+// Submit later using Aptos SDK
+// const pendingTxn = await client.submitTransaction(signedTxn)
+```
+
+### Transaktion signieren V2 (BCS-serialisiert) [#sign-transaction-v2-bcs-serialized]
+
+Für fortgeschrittene Anwendungsfälle mit BCS-serialisierten Transaktionen:
+
+```typescript
+const rawTransaction = '<BCS_SERIALIZED_TRANSACTION>'; // Use the encoding expected by your wallet version
+
+const signedTxn = await provider.signTransactionV2({ transaction: rawTransaction, transactionType: 'simple' })
+```
+
+### Transaktionsoptionen [#transaction-options]
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: ['0x1234...', '100000000'],
+}
+
+// The legacy direct method takes only a payload.
+const response = await provider.signAndSubmitTransaction(payload)
+// For gas options, use signAndSubmitTransactionV2 with the matching Wallet Standard input.
+```
+
+---
+
+## Nachrichten signieren [#message-signing]
+
+### Nachricht signieren [#sign-message]
+
+Beliebige Nachrichten zur Authentifizierung oder Überprüfung signieren:
+
+```typescript
+const message = 'Welcome to MyApp!\n\nClick to sign in.\n\nNonce: abc123'
+
+const response = await provider.signMessage({
+  message,
+  nonce: 12345, // Example only; obtain a single-use challenge from your server
+})
+
+console.log({
+  signature: response.signature,   // Hex-encoded signature
+  fullMessage: response.fullMessage, // Full signed message
+  prefix: response.prefix,         // Message prefix used
+})
+```
+
+### Nachricht prüfen (Off-Chain) [#verify-message-off-chain]
+
+```typescript
+import nacl from 'tweetnacl'
+
+const { signature, fullMessage } = await provider.signMessage({
+  message: 'Hello Aptos',
+  nonce: 12345,
+})
+
+const account = await provider.account()
+const pubKeyBytes = Buffer.from(account.publicKey.slice(2), 'hex')
+const signatureBytes = Buffer.from(signature.slice(2), 'hex')
+const messageBytes = Buffer.from(fullMessage)
+
+const isValid = nacl.sign.detached.verify(messageBytes, signatureBytes, pubKeyBytes)
+console.log('Signature valid:', isValid)
+```
+
+---
+
+## Smart-Contract-Interaktion [#smart-contract-interaction]
+
+### View-Funktion aufrufen [#call-view-function]
+
+```typescript
+// View functions don't require signing
+const result = await client.view({
+  function: '0x1::coin::balance',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: [accountAddress],
+})
+
+console.log('Balance:', result[0])
+```
+
+### Entry-Funktion aufrufen [#call-entry-function]
+
+```typescript
+// Mint NFT example
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x3::token::create_collection_script',
+  type_arguments: [],
+  arguments: [
+    'My Collection',           // Collection name
+    'Description',             // Description
+    'https://example.com',     // URI
+    '1000',                    // Maximum supply
+    [false, false, false],     // Mutability config
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+```
+
+---
+
+## API-Referenz [#api-reference]
+
+### Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `connect()` | Wallet verbinden und Konto abrufen |
+| `disconnect()` | Wallet trennen |
+| `isConnected()` | Verbindungsstatus prüfen |
+| `account()` | Aktuelle Kontoinformationen abrufen |
+| `network()` | Den aktuellen Netzwerknamen als Zeichenfolge abrufen |
+| `signMessage(request)` | Beliebige Nachricht signieren |
+| `signAndSubmitTransaction(payload)` | Transaktion signieren und einreichen |
+| `signTransaction(payload)` | Transaktion signieren, ohne sie einzureichen |
+| `signTransactionV2(params)` | BCS-serialisierte Transaktion signieren |
+| `onAccountChange(callback)` | Auf Kontoänderungen reagieren |
+| `onNetworkChange(callback)` | Auf Netzwerkänderungen reagieren |
+
+### Typen [#types]
+
+```typescript
+interface AptosAccount {
+  address: string    // Hex address with 0x prefix
+  publicKey: string  // Ed25519 public key
+}
+
+interface AptosNetwork {
+  name: string       // Network name
+  chainId: number    // Chain ID
+  url: string        // RPC URL
+}
+
+interface SignMessageRequest {
+  message: string    // Message to sign
+  nonce: number      // Required by the direct provider API
+  address?: boolean  // Include address in message
+  application?: boolean // Include app info
+  chainId?: boolean  // Include chain ID
+}
+
+interface SignMessageResponse {
+  signature: string     // Hex signature
+  fullMessage: string   // Complete signed message
+  prefix: string        // APTOS prefix
+  address?: string      // Signer address
+  application?: string  // Application info
+  chainId?: number      // Chain ID
+  nonce: number         // Nonce used
+}
+
+interface TransactionPayload {
+  type: 'entry_function_payload' | 'script_payload' | 'module_bundle_payload'
+  function: string       // Module::function format
+  type_arguments: string[]
+  arguments: any[]
+}
+```
+
+### Unterstützte Netzwerke [#supported-networks]
+
+| Netzwerk | Beschreibung |
+|---------|-------------|
+| Mainnet | Produktionsnetzwerk |
+| Testnet | Testumgebung |
+| Devnet | Entwicklungsumgebung |
+
+---
+
+## Fehlerbehandlung [#error-handling]
+
+```typescript
+try {
+  await provider.connect()
+} catch (error) {
+  switch (error.code) {
+    case 4001:
+      console.log('User rejected the request')
+      break
+    case 4100:
+      console.log('The account or method is not authorized')
+      break
+    case 4200:
+      console.log('Unsupported method')
+      break
+    default:
+      console.error('Error:', error.message)
+  }
+}
+```
+
+### Häufige Fehlercodes [#common-error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| 4100 | Nicht autorisiert |
+| 4200 | Nicht unterstützte Methode |
+| 4201 | Nicht unterstütztes Netzwerk |
+| -32603 | Interner Fehler |
+
+---
+
+## Mit dem Aptos Wallet Adapter verwenden [#using-with-aptos-wallet-adapter]
+
+Verwenden Sie für React-Anwendungen den offiziellen Aptos Wallet Adapter:
+
+```bash
+npm install @aptos-labs/wallet-adapter-react
+```
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+Verwenden Sie eine mit Wallet Standard kompatible Adapterversion und prüfen Sie, ob OneKey in deren Liste erkannter Wallets erscheint.
+
+---
+
+## Migration von Petra [#migration-from-petra]
+
+Der Aptos-Provider von OneKey ist Petra-kompatibel. Aktualisieren Sie Ihre Provider-Erkennung:
+
+```typescript
+// Before (Petra only)
+const provider = window.petra
+
+// After (OneKey with Petra fallback)
+const provider = window.$onekey?.aptos || window.petra
+```

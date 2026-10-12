@@ -1,0 +1,67 @@
+---
+title: "polkadotSignTransaction"
+---
+
+# polkadotSignTransaction
+
+### Requisitos [#requirements]
+
+* Versiones mínimas de firmware
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+
+## Polkadot: firmar transacción [#polkadot-sign-transaction]
+
+Solicita una firma de transacción con la clave derivada de la ruta especificada. El usuario revisa y confirma la solicitud en el dispositivo.
+
+```typescript
+const result = await HardwareSDK.polkadotSignTransaction(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `network` - _obligatorio_ `string` Nombre de la red, por ejemplo `polkadot`
+* `prefix` - _obligatorio_ `number` Prefijo de dirección SS58; usa `0` para Polkadot
+* `rawTx` - _obligatorio_ `string` Transacción serializada y codificada como cadena hexadecimal.
+
+### Ejemplos [#examples]
+
+```typescript
+const response = await HardwareSDK.polkadotSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/354'/0'/0'/0'",
+    network: "polkadot",
+    prefix: 0,
+    rawTx: "040300388671dd546ba19495211c8cdc200600f9798cf078fca0fb4749ebbc0579c12a0700e40b5402350128009a24000012000000e143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423ee356a704dbe75762aaae87b0f4702aafd09e67eed5d09a3a4b0e7da6c37b6f54"
+  }
+);
+```
+
+Resultado
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/354'/0'/0'/0'",
+    signature: "signed data"
+  }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

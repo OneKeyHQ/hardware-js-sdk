@@ -1,0 +1,29 @@
+---
+title: "Solución de problemas"
+---
+
+<span id="troubleshooting" />
+
+# Resolución de problemas
+
+Al enviar solicitudes a OneKey para [Establecer una conexión](/es/connect-to-software/provider/near/integrating/establishing-a-connection), [Enviar transacciones](/es/connect-to-software/provider/near/integrating/sending-transactions), [Firmar mensajes](/es/connect-to-software/provider/near/integrating/signing-messages), o [Llamadas RPC](/es/connect-to-software/provider/near/integrating/rpc-api-calling), OneKey puede responder con un error. Estos son los códigos de error y sus significados. Se basan en los errores correspondientes de [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474#error-codes) y [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors) en Ethereum.
+
+| **Código** | **Título**             | **Descripción**                                                          |
+| -------- | --------------------- | ------------------------------------------------------------------------ |
+| 4001     | Solicitud rechazada por el usuario | El usuario rechazó la solicitud a través de OneKey.                                |
+| 4100     | Sin autorización          | El usuario no ha autorizado el método o la cuenta solicitados. |
+| 4500     | Tiempo de espera de la solicitud agotado       | Se agotó el tiempo de espera de la solicitud al proveedor.                            |
+| -32603   | Error interno        | Se produjo un error dentro de OneKey.                                      |
+| -32000   | Entrada no válida         | Faltan parámetros o no son válidos.                                           |
+| -32601   | Método no encontrado      | OneKey no reconoce el método.                                    |
+
+Normalmente, estos errores son fáciles de interpretar e incluyen un código y una explicación. Por ejemplo:
+
+```javascript
+try {
+  await provider.requestSignTransactions({ transactions: [transaction] });
+} catch (err) {
+  //  {code: 4100, message: 'The requested method and/or account has not been authorized by the user.'}
+}
+
+```

@@ -1,4 +1,5 @@
 ---
+title: Solana
 description: 通过 OneKey Provider 进行 Solana 集成 — 检测、连接、发送交易和签名消息
 slug: /dapp/chains/solana
 ---
@@ -17,11 +18,11 @@ slug: /dapp/chains/solana
 ## 最小示例
 
 ```js
-// 检测
+// Detect
 const provider = window?.$onekey?.solana || window?.solana
-if (!provider?.isOneKey) throw new Error('未检测到 OneKey Solana Provider')
+if (!provider?.isOneKey) throw new Error('OneKey Solana provider not detected')
 
-// 连接
+// Connect
 const { publicKey } = await provider.connect()
 console.log(publicKey.toString())
 ```

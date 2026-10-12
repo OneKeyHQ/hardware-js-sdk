@@ -1,0 +1,27 @@
+---
+title: "enable"
+---
+
+# enable
+
+Para empezar a interactuar, primero debes obtener los permisos correspondientes. La llamada a `provider.enable()` solicita acceso a la cuenta Lightning del usuario. Espera su aprobación antes de invocar otro método. Los pagos y las solicitudes de firma posteriores pueden requerir una aprobación independiente.
+
+## Método [#method]
+
+```typescript
+declare function enable(): Promise<void>;
+```
+
+
+## Ejemplo [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable()
+```
+
+
+## Demostración [#demo]
+
+[Abrir ejemplo](https://codepen.io/OneKeyHQ/pen/dyaqWoy)

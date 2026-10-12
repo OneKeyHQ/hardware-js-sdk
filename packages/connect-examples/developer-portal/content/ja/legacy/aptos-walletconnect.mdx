@@ -1,0 +1,22 @@
+---
+title: "Aptos WalletConnect v1"
+description: "従来のカスタムメソッド統合。WalletConnect v1 の `@1` URI、Bridge URL、`sendCustomRequest` は現在の WalletConnect SDK と互換性がありません。ブラウザー統合には [Aptos Wallet Adapter](/en/connect-to-software/wallet-ui/aptos-wallet-adapter) を使用してください。"
+---
+
+# Aptos WalletConnect v1
+
+> 従来のカスタムメソッド統合。WalletConnect v1 の `@1` URI、Bridge URL、`sendCustomRequest` は現在の WalletConnect SDK と互換性がありません。ブラウザー統合には [Aptos Wallet Adapter](/ja/connect-to-software/wallet-ui/aptos-wallet-adapter) を使用してください。
+
+古い統合は接続 URI に次の `network` パラメーターを追加し、ユーザーの同意後に以下のカスタムメソッドを使用していました:
+
+| 方法 | 従来の役割 |
+| --- | --- |
+| `account` | アカウントの公開鍵とアドレスを返す。 |
+| `network` | 選択中のネットワーク名を返す。 |
+| `getChainId` | チェーン ID を返す。 |
+| `signAndSubmitTransaction` | Aptos トランザクションペイロードに署名して送信。 |
+| `signMessage` | nonce と任意のアドレス、アプリケーション、チェーンのコンテキストを含むメッセージに署名。 |
+
+`signMessage` のレスポンスには `fullMessage`、`signature`、任意のコンテキストが含まれていました。実際に返された署名対象メッセージと、意図した nonce/アカウントを検証し、プレフィックスなしの入力だけを検証しないでください。Ethereum のイベント名を仮定しないでください。従来の統合にはイベント仕様の記載がありませんでした。
+
+このアーカイブは、これらのカスタムメソッドに対応する WalletConnect v2 の代替を保証しません。既存アプリの保守では、旧バージョンの互換性テストを維持してください。従来の完全なリクエスト/レスポンス例は次に残っています: [元のリファレンス](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-software/using-walletconnect/aptos/wallet-connect-api.md).

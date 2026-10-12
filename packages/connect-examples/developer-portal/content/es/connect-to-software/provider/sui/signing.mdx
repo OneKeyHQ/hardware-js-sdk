@@ -1,0 +1,102 @@
+---
+title: "Firma"
+description: "Firma mensajes en Sui con OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Firma
+
+Los siguientes ejemplos de firma usan `connectSuiAccount()` de [Primeros pasos](/es/connect-to-software/provider/sui/getting-started#account-context-for-signing). Devuelve una cuenta de Wallet Standard y su cadena activa. Los ejemplos usan `@mysten/sui@1.28.2`. Incluso los métodos antiguos `*TransactionBlock` ahora declaran entradas `Transaction` en `@mysten/wallet-standard@0.14.7`.
+
+Solicita permiso antes de firmar, selecciona una cuenta conectada y consulta la cadena activa. Estos ejemplos usan `@mysten/sui@1.28.2`, que coincide con `@mysten/wallet-standard@0.14.7` aceptado por el proveedor actual.
+
+Aprende a firmar mensajes para autenticación.
+
+Inicializa el contexto de cuenta antes de los siguientes ejemplos:
+
+```typescript
+const { account, chain } = await connectSuiAccount()
+```
+
+---
+
+## Firmar un mensaje personal [#sign-personal-message]
+
+Firma mensajes arbitrarios para autenticación:
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+
+const result = await provider.signPersonalMessage({
+  account,
+  chain,
+  message,
+})
+
+console.log({
+  signature: result.signature,   // Base64 encoded signature
+  bytes: result.bytes,           // Signed message bytes
+})
+```
+
+---
+
+## Firmar un mensaje (heredado) [#sign-message-legacy]
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+
+const result = await provider.signMessage({
+  account,
+  message,
+})
+
+console.log({
+  signature: result.signature,
+  messageBytes: result.messageBytes,
+})
+```
+
+---
+
+## Verificar la firma [#verify-signature]
+
+```typescript
+import { verifyPersonalMessageSignature } from '@mysten/sui/verify'
+
+const message = new TextEncoder().encode('Hello, Sui!')
+const { signature } = await provider.signPersonalMessage({ message, account, chain })
+
+const signerKey = await verifyPersonalMessageSignature(message, signature)
+const isExpectedSigner = signerKey.toSuiAddress() === account.address
+console.log('Expected signer:', isExpectedSigner)
+```
+
+---
+
+## Gestión de errores [#error-handling]
+
+```typescript
+try {
+  await provider.requestPermissions()
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('User rejected the connection request')
+  } else {
+    console.error('Connection error:', error.message)
+  }
+}
+```
+
+---
+
+## Códigos de error habituales [#common-error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| 4001 | El usuario rechazó la solicitud |
+| 4100 | Sin autorización |
+| -32603 | Error interno |

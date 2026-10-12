@@ -1,0 +1,61 @@
+---
+title: "Bitcoin (PSBT)"
+---
+
+# Bitcoin (PSBT)
+
+アニメーション UR コードを使ったオフライン署名のための PSBT データ処理。
+
+## データ型 [#data-types]
+
+- リクエスト/レスポンスの UR タイプ: `crypto-psbt`
+- 関連項目: [基本 API](/ja/air-gap/basic-api) (UR の基本要素と構造)
+
+## フロー [#flow]
+
+1. ウォレットのバックエンドで未署名の PSBT を構築
+2. PSBT → UR にエンコード (`crypto-psbt`) してアニメーション QR として表示
+3. デバイスがスキャン → 署名済み PSBT を `crypto-psbt` 形式で返却
+4. ファイナライズしてブロードキャスト
+
+> **ヒント**: PSBT のサイズは QR として実用的な範囲に収め、必要に応じて複数のフレームに分割してください。
+
+## 例 [#examples]
+
+`@keystonehq/bc-ur-registry` および `@ngraveio/bc-ur` をインストールします。例には Buffer の実装が必要です。対象デバイスとファームウェアで PSBT への対応を確認してください。
+
+ウォレットは、未署名のトランザクションデータと、デバイスからエクスポートした実際のアカウントパスおよびマスターフィンガープリントを提供します。QR レンダラーはタイマーで `nextFrame()` を定期的に呼び出し、署名ダイアログが閉じたら停止します。これらのスニペットは転送データのエンコードとデコードを行うもので、トランザクションを送信するものではありません。
+
+
+### 未署名 PSBT → アニメーション QR にエンコード [#encode-unsigned-psbt--animated-qr]
+
+```ts
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
+
+
+const psbtBytes = Buffer.from(unsignedPsbtBase64, 'base64');
+const req = new CryptoPSBT(psbtBytes);
+const encoder = req.toUREncoder(200);
+const nextFrame = () => encoder.nextPart(); // Call from your QR animation timer.
+```
+
+### アニメーション QR → 署名済み PSBT にデコード [#decode-animated-qr--signed-psbt]
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
+
+const dec = new URDecoder();
+// For each scanned frame string from camera:
+// dec.receivePart(frameString)
+
+if (dec.isError()) throw new Error('QR decoding failed');
+if (dec.isSuccess()) {
+  const ur = dec.resultUR();
+  if (ur.type !== 'crypto-psbt') throw new Error('Expected crypto-psbt');
+  const psbt = CryptoPSBT.fromCBOR(ur.cbor);
+  const signedPsbt = psbt.getPSBT();      // Buffer of PSBT (signed or partially signed)
+  // Check that the unsigned transaction, inputs, and outputs match the original PSBT.
+  // Verify signatures before finalizing and broadcasting with your backend.
+}
+```

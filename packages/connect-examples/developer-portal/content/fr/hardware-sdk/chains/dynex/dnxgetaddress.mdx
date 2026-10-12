@@ -1,0 +1,97 @@
+---
+title: "dnxGetAddress"
+---
+
+# dnxGetAddress
+
+### Dynex : obtenir une adresse [#dynex-get-address]
+
+Dérive et renvoie l’adresse au chemin spécifié. Lorsque `showOnOneKey` vaut `true`, l’utilisateur doit confirmer l’adresse sur l’appareil.
+
+```typescript
+const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
+```
+
+#### Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * classic : 3.8.0
+
+#### Paramètres [#parameters]
+
+connectId : `string`
+
+* Identifiant unique de la connexion
+
+deviceId : `string`
+
+* Identifiant unique de l’appareil matériel
+
+params : `object`
+
+* path : `string` - Chemin BIP32 (par exemple "m/44'/29538'/0'/0/0") \[obligatoire\]
+* showOnOneKey : `boolean` - Indique s’il faut afficher l’adresse sur l’appareil (par défaut : true)
+
+Pour les adresses par lot :
+
+* bundle : Tableau d’objets avec les paramètres ci-dessus
+
+#### Exemple [#example]
+
+```typescript
+// Get single address
+const response = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    path: "m/44'/29538'/0'/0/0",
+    showOnOneKey: true
+});
+
+// Get multiple addresses
+const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    bundle: [
+        { path: "m/44'/29538'/0'/0/0", showOnOneKey: false },
+        { path: "m/44'/29538'/0'/0/1", showOnOneKey: false }
+    ]
+});
+```
+
+#### Valeur de retour [#returns]
+
+Réponse de réussite pour une seule adresse :
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Dynex address
+        path: string        // BIP32 path used
+    }
+}
+```
+
+Réponse de réussite pour plusieurs adresses :
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string },
+        { address: string, path: string }
+    ]
+}
+```
+
+Réponse d’erreur :
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code?: string | number
+    }
+}
+```
+
+#### Exigences du micrologiciel [#firmware-requirements]
+
+* Version minimale du micrologiciel : 3.8.0

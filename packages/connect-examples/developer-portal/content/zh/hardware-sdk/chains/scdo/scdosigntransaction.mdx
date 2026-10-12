@@ -6,7 +6,7 @@ title: scdoSignTransaction
 
 #### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.10.0
 
 #### SCDO：签名交易
@@ -22,8 +22,8 @@ const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
     to: "1S0118a02f993fc7a4348fd36b7f7a596948f02b31",
     value: "0xf4240",
     timestamp: "0",
-    data: "0x", // 可选
-    txType: 0   // 可选
+    data: "0x", // optional
+    txType: 0   // optional
 });
 ```
 
@@ -31,7 +31,7 @@ const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
 
 可选通用参数
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 3。[更多信息](/zh/hardware-sdk/concepts/common-params#hd-path)
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。 [路径格式](/zh/hardware-sdk/concepts/common-params#hd-path)
 * `nonce` - _必需_ `string` 十六进制格式的交易 nonce
 * `gasPrice` - _必需_ `string` 十六进制格式的交易 gas 价格
 * `gasLimit` - _必需_ `string` 十六进制格式的交易 gas 限制
@@ -61,8 +61,8 @@ const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
 {
     success: true,
     payload: {
-        signature: string,
-        data_length: number,
+        signature?: string,
+        data_length?: number,
         path: string
     }
 }
@@ -74,8 +74,8 @@ const response = await HardwareSDK.scdoSignTransaction(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number  // 错误码
+        error: string, // error message
+        code?: string | number  // error code
     }
 }
 ```

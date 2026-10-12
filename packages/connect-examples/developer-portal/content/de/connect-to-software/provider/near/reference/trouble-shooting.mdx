@@ -1,0 +1,29 @@
+---
+title: "Fehlerbehebung"
+---
+
+<span id="troubleshooting" />
+
+# Fehlerbehebung
+
+Bei Anfragen an OneKey unter [Verbindung herstellen](/de/connect-to-software/provider/near/integrating/establishing-a-connection), [Transaktionen senden](/de/connect-to-software/provider/near/integrating/sending-transactions), [Nachrichten signieren](/de/connect-to-software/provider/near/integrating/signing-messages), oder [RPC-Aufrufe](/de/connect-to-software/provider/near/integrating/rpc-api-calling) kann OneKey mit einem Fehler antworten. Hier finden Sie die Fehlercodes und ihre Bedeutungen. Sie basieren auf den entsprechenden Fehlern in [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474#error-codes) und [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors) auf Ethereum.
+
+| **Code** | **Titel**             | **Beschreibung**                                                          |
+| -------- | --------------------- | ------------------------------------------------------------------------ |
+| 4001     | Anfrage vom Nutzer abgelehnt | Der Nutzer hat die Anfrage in OneKey abgelehnt.                                |
+| 4100     | Nicht autorisiert          | Die angeforderte Methode und/oder das Konto wurde vom Nutzer nicht autorisiert. |
+| 4500     | Zeitüberschreitung der Anfrage       | Die Zeit für die Provider-Anfrage wurde überschritten.                            |
+| -32603   | Interner Fehler        | Innerhalb von OneKey ist ein Fehler aufgetreten.                                      |
+| -32000   | Ungültige Eingabe         | Fehlende oder ungültige Parameter.                                           |
+| -32601   | Methode nicht gefunden      | OneKey erkennt die Methode nicht.                                    |
+
+Diese Fehler lassen sich normalerweise leicht auswerten und enthalten sowohl einen Code als auch eine Erklärung. Zum Beispiel:
+
+```javascript
+try {
+  await provider.requestSignTransactions({ transactions: [transaction] });
+} catch (err) {
+  //  {code: 4100, message: 'The requested method and/or account has not been authorized by the user.'}
+}
+
+```

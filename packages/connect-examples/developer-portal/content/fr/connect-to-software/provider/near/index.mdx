@@ -1,0 +1,82 @@
+---
+title: "Fournisseur NEAR"
+description: "Intégrez NEAR Protocol à votre dApp avec le portefeuille OneKey — détecter le fournisseur, connecter des comptes, envoyer des transactions et signer des messages"
+---
+
+# NEAR
+
+Intégrez NEAR Protocol à votre dApp à l’aide du fournisseur NEAR OneKey. Utilisez le SDK du fournisseur et sa version prise en charge de near-api-js pour les méthodes documentées ci-dessous.
+
+## Fonctionnalités [#features]
+
+- Connexion et gestion des comptes
+- Signature et envoi de transactions
+- Signature de message
+- Lecture de l’état du réseau (mainnet/testnet)
+- Requêtes RPC via le point de terminaison du réseau sélectionné
+
+## Installation [#installation]
+
+```bash
+npm install @onekeyfe/onekey-near-provider near-api-js@^0.44.2
+# or
+yarn add @onekeyfe/onekey-near-provider near-api-js@^0.44.2
+```
+
+## Démarrage rapide [#quick-start]
+
+```typescript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider'
+
+// Create provider instance
+const provider = new OneKeyNearProvider()
+
+// Request account access
+const accounts = await provider.requestSignIn()
+console.log('Connected accounts:', accounts)
+
+// Get current network
+const network = await provider.request({ method: 'near_network' })
+console.log('Current network:', network)
+```
+
+## Documentation [#documentation]
+
+### Premiers pas [#getting-started]
+- [Introduction](introduction) - Vue d’ensemble du fournisseur NEAR
+- [Installer le SDK du fournisseur](integrating/install-the-provider-sdk) - Instructions de configuration
+
+### Guides d’intégration [#integration-guides]
+- [Détecter le fournisseur](integrating/detecting-the-provider) - Vérifier si OneKey est installé
+- [Établir une connexion](integrating/establishing-a-connection) - Se connecter aux comptes utilisateur
+- [Accès aux comptes](integrating/accessing-accounts) - Obtenir les informations du compte
+- [Détecter le réseau du fournisseur](integrating/detecting-provider-network) - Vérifier le réseau actuel
+- [Surveiller l’état des comptes et du réseau](integrating/watch-accounts-and-network-status) - S’abonner aux changements
+
+### Transactions et signature [#transactions--signing]
+- [Envoi de transactions](integrating/sending-transactions) - Créer et envoyer des transactions
+- [Signature de messages](integrating/signing-messages) - Signer des messages arbitraires
+- [Appels de l’API RPC](integrating/rpc-api-calling) - Accès RPC direct
+
+### Avancé [#advanced]
+- [Journalisation de débogage](integrating/debug-logging) - Activer le mode débogage
+- [Migrer depuis NEAR Web Wallet](integrating/migrate-from-near-web-wallet) - Guide de migration
+
+### Référence [#reference]
+- [Référence de l’API](reference/api-reference) - Documentation complète de l’API
+- [Dépannage](reference/trouble-shooting) - Problèmes courants et solutions
+- [Exemples et démonstration](resources/example-and-demo) - Exemple de code
+- [FAQ](resources/faq) - Questions fréquentes
+
+## Gestion des erreurs [#error-handling]
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | Refus de l’utilisateur | L’utilisateur a refusé la demande |
+| -32602 | Paramètres non valides | Les paramètres de la méthode sont non valides |
+| -32603 | Erreur interne | Erreur JSON-RPC interne |
+
+## Ressources connexes [#related-resources]
+
+- [Documentation NEAR](https://docs.near.org/)
+- [GitHub OneKey](https://github.com/OneKeyHQ)

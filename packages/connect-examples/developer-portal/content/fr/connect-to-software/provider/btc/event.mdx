@@ -1,0 +1,28 @@
+---
+title: "Événement"
+---
+
+<span id="bitcoin-events" />
+
+# Événements Bitcoin
+
+Le fournisseur émet `accountsChanged` avec un `string[]` et `chainChanged` avec un identifiant de réseau. Un tableau de comptes vide signifie que le site n’a plus de compte exposé. Utilisez le même gestionnaire lors de la suppression d’un écouteur.
+
+```javascript
+const provider = window.$onekey?.btc;
+if (!provider) throw new Error('OneKey Bitcoin provider is unavailable.');
+
+const onAccountsChanged = (accounts) => {
+  console.log('Connected accounts:', accounts);
+};
+const onChainChanged = (networkId) => {
+  console.log('Selected network:', networkId);
+  // Refresh network-dependent data before preparing another transaction.
+};
+provider.on('accountsChanged', onAccountsChanged);
+provider.on('chainChanged', onChainChanged);
+
+// Run during cleanup, for example when a component unmounts.
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('chainChanged', onChainChanged);
+```

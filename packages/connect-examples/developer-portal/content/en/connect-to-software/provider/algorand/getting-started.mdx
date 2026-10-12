@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Getting Started
 
+Connect the provider before signing. The transaction examples use the algosdk 2-style `from`/`to` fields; match the SDK major version you install. `algodClient`, addresses, and grouped transactions must be prepared before running the snippets. Browser examples using `Buffer` need an explicit `buffer` import or an equivalent base64 encoder.
+
 Learn how to detect, connect, and interact with Algorand using OneKey's provider.
 
 <Callout type="info">
@@ -101,12 +103,11 @@ provider.on('disconnect', () => {
 
 ```typescript
 // Get pre-configured clients
-const algodClient = await provider.getAlgodv2Client()
-const indexerClient = await provider.getIndexerClient()
+const algodTransport = await provider.getAlgodv2Client()
+const indexerTransport = await provider.getIndexerClient()
 
-// Use clients
-const status = await algodClient.status().do()
-console.log('Network status:', status)
+// These are BaseHTTPClient transports, not Algodv2 or Indexer SDK instances.
+// Use the manual setup below for SDK methods such as status().do().
 ```
 
 ### Manual Client Setup
@@ -126,4 +127,3 @@ const indexerClient = new algosdk.Indexer(
   ''
 )
 ```
-

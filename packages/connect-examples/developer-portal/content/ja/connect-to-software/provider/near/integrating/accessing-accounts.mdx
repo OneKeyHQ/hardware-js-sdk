@@ -1,0 +1,22 @@
+---
+title: "アカウントへのアクセス"
+---
+
+<span id="accessing-accounts" />
+
+# アカウントへのアクセス
+
+ウォレットの接続を確立すると、OneKey ウォレットに接続されたアカウントにアクセスできます。
+
+ユーザーアカウントは、OneKey で識別子やトランザクションの署名など、さまざまな用途に使われます。
+
+```javascript
+const res = await provider.request({
+  method: 'near_accounts',
+});
+const accountId = res?.accounts?.[0]?.accountId || '';
+const publicKey = res?.accounts?.[0]?.publicKey || '';
+
+// An empty accounts array means no account is exposed to this site
+console.log('near_accounts', res?.accounts, accountId, publicKey);
+```

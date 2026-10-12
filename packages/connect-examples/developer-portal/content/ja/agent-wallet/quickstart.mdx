@@ -1,0 +1,87 @@
+---
+title: "クイックスタート"
+description: "OneKey ウォレットスキルをインストールし、セッションに接続して、読み取り専用のリクエストを試します。"
+---
+
+<span id="quickstart" />
+
+# クイックスタート
+
+> プライベートベータです。アクセス、対応コマンド、ウォレットフローは OneKey と CLI のバージョンによって異なります。これらの例を使用する前に、インストール済み CLI のスキーマを確認してください。
+
+まず AI クライアントに OneKey ウォレットスキルをインストールします。その後は、自然言語でウォレットに関する質問ができます。スキルが裏側で CLI の事前確認、スキーマの検出、安全なコマンドの振り分けを行います。
+
+読み取り専用のリクエストは、結果をすぐに返してください。見積もり、構築、監査、シミュレーションでは、資金を動かさずに実行結果の見込みを説明します。送金、スワップの実行、承認、ブロードキャスト、署名には、明示的な確認のやり取りが必要です。
+
+## 1. スキルをインストール [#1-install-the-skills]
+
+### Claude Code [#claude-code]
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Codex [#codex]
+
+Codex に次のように伝えます:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### Cursor [#cursor]
+
+スキルパックをクローンし、Cursor にプラグインディレクトリを指定します:
+
+```bash
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
+```
+
+### OpenCode と OpenClaw [#opencode-and-openclaw]
+
+各クライアントのインストールガイドは、次の [`onekey-wallet-skills`](https://github.com/OneKeyHQ/onekey-wallet-skills) リポジトリを参照してください。どのクライアントでも、wallet、swap、market、security の同じ 4 つのスキルを使用します。
+
+## 2. Agent Wallet に接続 [#2-connect-an-agent-wallet]
+
+AI クライアントに次のように依頼します:
+
+```text
+Connect my OneKey Agent Wallet.
+```
+
+スキルは OneKey GUI の App Transfer を通じてローカルセッションをペアリングし、有効なウォレットの概要を示します。`onekey` CLI がない場合、スキルの事前確認でインストールしてから続行します。ユーザーが CLI コマンドを手動で設定する必要はありません。
+
+## 3. 読み取り専用のプロンプトを試す [#3-try-read-only-prompts]
+
+まず資金を動かさないプロンプトを試します:
+
+| AI クライアントへの依頼 | 使用するスキル |
+| --- | --- |
+| `Show my wallet balance.` | ウォレット |
+| `Show my receiving address for ETH.` | ウォレット |
+| `What tokens are trending right now?` | 市場情報 |
+| `What is the price of SOL?` | 市場情報 |
+| `Is this token safe before I buy it?` | セキュリティ |
+
+回答では、ウォレットの状態、ルート、リスク、役立つ次の手順 1 つを、結果から先に示してください。生のターミナル出力をそのまま表示しないでください。
+
+## 4. 取引前に見積もりを取得 [#4-quote-before-trading]
+
+次のように依頼します:
+
+```text
+Quote a swap from 1 ETH to USDC. Do not execute yet.
+```
+
+スワップスキルは見積もりを取得し、関連する安全確認を行い、想定ルートと受取額を表示して、実行前に停止してください。その後の確認、たとえば `Yes, execute the swap` では、すでに確認した注文だけを実行してください。
+
+## 5. ハードウェアで確認 [#5-use-hardware-confirmation]
+
+リスクの高い操作では、次のように依頼します:
+
+```text
+Use my OneKey hardware wallet for this transfer.
+```
+
+ウォレットスキルはハードウェアを利用するセッションに切り替わり、対応する署名リクエストではユーザーがデバイス上で内容を確認して承認する必要があります。表示できる Clear Signing の詳細は、チェーン、ファームウェア、CLI のバージョンによって異なります。ハードウェアログイン後は、ウォレット、送金、スワップ、署名のプロンプトが有効なハードウェアセッションを使用します。資金移動を準備する前に、そのアドレスを確認してください。

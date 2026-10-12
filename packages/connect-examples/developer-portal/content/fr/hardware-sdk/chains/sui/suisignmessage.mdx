@@ -1,0 +1,65 @@
+---
+title: "suiSignMessage"
+---
+
+# suiSignMessage
+
+### Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.6.0
+  * Classic/Mini : 3.4.0
+
+### Sui : signer un message [#sui-sign-message]
+
+Demande une signature de message avec la clé dérivée du chemin spécifié.
+
+```typescript
+const result = await HardwareSDK.suiSignMessage(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [en savoir plus](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _obligatoire_ `string` Message à signer, encodé sous forme de chaîne hexadécimale.
+
+### Exemple [#example]
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.suiSignMessage(connectId, deviceId, {
+    path: "m/44'/784'/0'/0'/0'",
+    messageHex,
+});
+```
+
+#### Résultat [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string,
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

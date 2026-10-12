@@ -1,0 +1,37 @@
+---
+title: "Instalar el SDK del proveedor"
+---
+
+<span id="install-the-provider-sdk" />
+
+# Instalar el SDK del proveedor
+
+> Instala la [extensión de navegador de OneKey](https://onekey.so/download/) antes de usar el SDK.
+
+Ofrecemos un SDK llamado [onekey-near-provider](https://www.npmjs.com/package/@onekeyfe/onekey-near-provider) como paquete npm, que también requiere tener instalado [near-api-js](https://www.npmjs.com/package/near-api-js).
+
+Puedes consultar el código fuente del SDK en [GitHub](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/providers/onekey-near-provider), con ejemplos de código completos [aquí](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example).
+
+```bash
+# with npm
+npm install near-api-js@^0.44.2 @onekeyfe/onekey-near-provider
+
+# with yarn
+yarn add near-api-js@^0.44.2 @onekeyfe/onekey-near-provider
+
+```
+
+El código fuente del proveedor declara `near-api-js` `^0.44.2` como dependencia par. Estos ejemplos usan esa API heredada; instalar otra versión principal puede romper la integración. Comprueba las dependencias pares de la versión del proveedor que instales.
+
+Crea el proveedor en código que se ejecute en el navegador.
+
+```javascript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider';
+
+const provider = new OneKeyNearProvider();
+
+```
+
+> **Precaución:** El SDK del proveedor no es compatible con SSR.
+>
+> Si usas [next.js](https://nextjs.org/) con SSR, consulta esta documentación sobre  [importación dinámica sin SSR](https://nextjs.org/docs/app/guides/lazy-loading#skipping-ssr).

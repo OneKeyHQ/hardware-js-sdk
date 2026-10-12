@@ -1,0 +1,86 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den Conflux-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des Conflux-Providers von OneKey.
+
+---
+
+## Methoden [#methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `request({ method, params })` | JSON-RPC-Anfrage senden |
+| `isConnected()` | Verbindungsstatus prüfen |
+| `on(event, callback)` | Ereignisse abonnieren |
+| `off(event, callback)` | Ereignisabonnement beenden |
+
+---
+
+## RPC-Methoden [#rpc-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `cfx_requestAccounts` | Verbindung anfordern |
+| `cfx_accounts` | Verbundene Konten abrufen |
+| `cfx_chainId` | Chain-ID abrufen |
+| `cfx_sendTransaction` | Transaktion senden |
+| `cfx_call` | Vertrag aufrufen (rein lesend) |
+| `cfx_estimateGasAndCollateral` | Gas schätzen |
+| `cfx_getBalance` | Kontoguthaben abrufen |
+| `cfx_getTransactionByHash` | Transaktion abrufen |
+| `cfx_getTransactionReceipt` | Beleg abrufen |
+| `net_version` | Netzwerk-ID abrufen |
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Parameter | Beschreibung |
+|-------|------------|-------------|
+| `connect` | `{ chainId, networkId }` | Mit Netzwerk verbunden |
+| `disconnect` | - | Getrennt |
+| `chainChanged` | `chainId` | Netzwerk geändert |
+| `accountsChanged` | `accounts[]` | Konten geändert |
+
+---
+
+## Veraltete Methoden [#deprecated-methods]
+
+Diese Methoden funktionieren weiterhin, sind aber veraltet:
+
+```typescript
+// Deprecated: use request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// Deprecated: use request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// Deprecated: use request({ method: 'cfx_chainId' })
+provider.chainId
+
+// Deprecated: use request({ method: 'net_version' })
+provider.networkVersion
+
+// Deprecated: use request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## Fehlercodes [#error-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 4001 | Nutzer hat die Anfrage abgelehnt |
+| -32700 | Parsing-Fehler |
+| -32600 | Ungültige Anfrage |
+| -32601 | Methode nicht gefunden |
+| -32602 | Ungültige Parameter |
+| -32603 | Interner Fehler |

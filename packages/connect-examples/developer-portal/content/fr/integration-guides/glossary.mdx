@@ -1,0 +1,83 @@
+---
+title: "Glossaire"
+description: "Ces termes apparaissent dans les guides d’intégration du portefeuille et du matériel OneKey. Les formats et comportements peuvent varier selon la blockchain ; suivez la référence de la chaîne que vous intégrez."
+---
+
+<span id="glossary" />
+
+# Glossaire
+
+Ces termes apparaissent dans les guides d’intégration du portefeuille et du matériel OneKey. Les formats et comportements peuvent varier selon la blockchain ; suivez la référence de la chaîne que vous intégrez.
+
+## Portefeuille [#wallet]
+
+Une application ou un appareil qui gère les clés et aide les utilisateurs à consulter leurs comptes et autoriser des opérations. Les actifs et l’état des transactions sont enregistrés sur la blockchain, pas stockés dans l’application de portefeuille.
+
+## Compte [#account]
+
+Une identité blockchain associée à un état. Sur Ethereum, les comptes externes sont contrôlés par des clés privées ; les comptes de contrat le sont par du code. Tous les comptes ne sont pas des paires de clés publique/privée.
+
+## Adresse [#address]
+
+Un identifiant utilisé pour recevoir des actifs ou interagir avec un compte ou un contrat. Une adresse Ethereum contient 20 octets, généralement écrits sous la forme `0x` suivie de 40 caractères hexadécimaux. Une adresse n’est pas une clé publique.
+
+## Clé publique [#public-key]
+
+La partie publique d’une paire de clés cryptographiques. Elle sert à vérifier les signatures et, selon la chaîne, à dériver les adresses. Son encodage et sa longueur dépendent du schéma de signature et du format.
+
+## Clé privée [#private-key]
+
+Donnée secrète utilisée pour autoriser des opérations par signature. Ne demandez jamais à un utilisateur de coller une clé privée dans une dApp, un formulaire d’intégration, un journal ou un rapport d’issue.
+
+## Phrase de récupération [#recovery-phrase]
+
+Une séquence de mots utilisée pour sauvegarder les données à partir desquelles un portefeuille dérive ses clés. BIP-39 définit les phrases mnémoniques et leur conversion en graine. Traitez la phrase comme un secret ; ne la demandez pas pendant un parcours d’intégration.
+
+## Graine [#seed]
+
+Entrée de la dérivation hiérarchique des clés. Selon BIP-39, une graine est dérivée de la phrase mnémonique et d’une phrase secrète facultative. Elle n’est pas interchangeable avec la clé privée d’un seul compte.
+
+## Chemin de dérivation [#derivation-path]
+
+Une séquence d’indices identifiant une clé dans un portefeuille hiérarchique. La chaîne, le compte, le type d’adresse et la branche de monnaie rendue peuvent influer sur le chemin. Utilisez le chemin attendu par la méthode et la chaîne que vous intégrez.
+
+## Phrase secrète [#passphrase]
+
+Une valeur facultative utilisée avec une phrase de récupération pour dériver un autre portefeuille. Une phrase secrète différente peut produire un portefeuille différent ; ce n’est pas simplement un autre nom pour le PIN de l’appareil.
+
+## PIN [#pin]
+
+Un code protégeant l’accès à un appareil matériel. Il est distinct de la phrase de récupération et de la phrase secrète. Suivez le parcours PIN propre à l’appareil fourni par le SDK.
+
+## Fournisseur [#provider]
+
+Une interface JavaScript par laquelle une dApp demande à un portefeuille des comptes, des informations blockchain ou une signature. Les fournisseurs Ethereum suivent généralement EIP-1193. Les autres chaînes utilisent des interfaces de fournisseur différentes.
+
+## Transport [#transport]
+
+La connexion utilisée pour échanger des données avec un appareil, par exemple USB ou Bluetooth. Un transport fonctionnel ne suffit pas à établir l’accès à un compte ou à autoriser une signature.
+
+## Signature et diffusion [#signature-and-broadcast]
+
+Signer autorise un message ou une transaction à l’aide d’une clé. Diffuser envoie une transaction signée à un réseau. Ce sont des opérations distinctes ; vérifiez si l’API concernée signe uniquement ou diffuse également.
+
+## Isolation réseau [#air-gap]
+
+Un mode de communication sans liaison filaire ou radio directe entre l’appareil de signature et l’application. Dans l’intégration QR, les requêtes et réponses sont échangées sous forme de données QR. L’application a toujours besoin d’une connexion réseau pour diffuser les transactions.
+
+## Keystore [#keystore]
+
+Une représentation chiffrée des données de clés et des paramètres nécessaires à leur déchiffrement. La protection d’un keystore dépend de ses paramètres de chiffrement et de son mot de passe ; les données chiffrées n’ont pas de longueur fixe universelle.
+
+## Hexadécimal [#hexadecimal]
+
+Notation en base 16 utilisant les chiffres `0–9` et les lettres `a–f`. Les API peuvent exiger un `0x` comme préfixe, l’omettre ou accepter des octets à la place. Suivez l’encodage documenté de chaque paramètre.
+
+## Références [#references]
+
+- [Comptes Ethereum](https://ethereum.org/en/developers/docs/accounts/)
+- [Norme de fournisseur EIP-1193](https://eips.ethereum.org/EIPS/eip-1193)
+- [Portefeuilles hiérarchiques BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
+- [Codes mnémoniques BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+
+Le glossaire précédent était adapté de [MyCrypto](https://support.mycrypto.com/getting-started/ethereum-glossary.html).

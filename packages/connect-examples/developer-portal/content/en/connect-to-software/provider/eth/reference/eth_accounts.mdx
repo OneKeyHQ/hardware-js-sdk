@@ -5,7 +5,7 @@ description: Get connected Ethereum accounts
 
 # eth_accounts
 
-Returns a list of addresses owned by client that the caller is permitted to access. Unlike `eth_requestAccounts`, this method does not trigger a connection popup.
+Returns a list of addresses exposed by the wallet that the caller is permitted to access. Unlike `eth_requestAccounts`, this method does not trigger a connection popup.
 
 ---
 
@@ -17,7 +17,7 @@ None
 
 ## Returns
 
-`string[]` - An array of Ethereum addresses, or empty array if not connected.
+`string[]` - An array of Ethereum addresses, or an empty array if no account is exposed to the site.
 
 ---
 

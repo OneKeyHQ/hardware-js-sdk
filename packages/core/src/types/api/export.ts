@@ -1,5 +1,6 @@
 export type { BTCAddress, BTCGetAddressParams } from './btcGetAddress';
 export type { BTCPublicKey, BTCGetPublicKeyParams } from './btcGetPublicKey';
+export type { BTCDeriveContextHashParams } from './btcDeriveContextHash';
 export type { BTCSignMessageParams } from './btcSignMessage';
 export type { BTCVerifyMessageParams } from './btcVerifyMessage';
 export type {

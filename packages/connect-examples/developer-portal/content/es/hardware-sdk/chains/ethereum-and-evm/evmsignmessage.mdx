@@ -1,0 +1,65 @@
+---
+title: "evmSignMessage"
+---
+
+# evmSignMessage
+
+### Ethereum: firmar un mensaje [#ethereum-sign-message]
+
+Solicita una firma de mensaje con la clave derivada de la ruta especificada.
+
+* **Sigue el estándar personal\_sign de EIP-191**
+* **No se usa para firmar datos tipados EIP-712.**
+* **Usa** [**evmSignTypedData**](/es/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata) **para firmar EIP-712 (v3 y v4)**
+
+```typescript
+const result = await HardwareSDK.evmSignMessage(connectId, deviceId, params);
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `3`. [leer más](/es/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _obligatorio_ `string` Mensaje que se va a firmar, codificado como cadena hexadecimal.
+* `chainId` - _opcional_ `number` ChainId en ETH es un identificador único de una red Ethereum específica, usado para distinguir distintas versiones de la cadena de bloques. [Referencia](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
+
+### Ejemplo [#example]
+
+```typescript
+// Original message
+const message = "Hello OneKey";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.evmSignMessage(connectId, deviceId, {
+    path: "m/44'/60'/0'",
+    messageHex: messageHex,
+    chainId: 1
+});
+```
+
+#### Resultado [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string,
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

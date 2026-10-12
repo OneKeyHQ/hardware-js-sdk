@@ -1,0 +1,136 @@
+---
+title: "Référence de l’API"
+description: "Référence complète de l’API du fournisseur Aptos OneKey"
+---
+
+<span id="api-reference" />
+
+# Référence de l’API
+
+Référence des méthodes et types du fournisseur Aptos OneKey.
+
+---
+
+## Méthodes [#methods]
+
+| Méthode | Description |
+|--------|-------------|
+| `connect()` | Connecter le portefeuille et obtenir le compte |
+| `disconnect()` | Déconnecter le portefeuille |
+| `isConnected()` | Vérifier l’état de connexion |
+| `account()` | Obtenir les informations du compte actuel |
+| `network()` | Obtenir le nom du réseau actuel |
+| `getNetwork()` | Obtenir les informations complètes du réseau |
+| `getNetworkURL()` | Obtenir l’URL RPC du réseau |
+| `signMessage(request)` | Signer un message arbitraire |
+| `signAndSubmitTransaction(payload)` | Signer et soumettre une transaction |
+| `signTransaction(payload)` | Signer une transaction sans la soumettre |
+| `signTransactionV2(params)` | Signer une transaction sérialisée en BCS |
+| `signAndSubmitTransactionV2(params)` | Signer et soumettre (Standard V1.1.0) |
+| `signIn(payload)` | Processus de connexion AIP |
+| `onAccountChange(callback)` | Écouter les changements de compte |
+| `onNetworkChange(callback)` | Écouter les changements de réseau |
+| `onDisconnect(callback)` | Écouter la déconnexion |
+
+---
+
+## Types [#types]
+
+### Informations du compte [#account-info]
+
+```typescript
+interface AptosAccountInfo {
+  address: string    // Hex address with 0x prefix
+  publicKey: string  // Ed25519 public key
+}
+```
+
+### Informations du réseau [#network-info]
+
+```typescript
+interface AptosNetwork {
+  name: string       // Network name
+  chainId: number    // Chain ID
+  url: string        // RPC URL
+}
+```
+
+### Requête de signature de message [#sign-message-request]
+
+```typescript
+interface SignMessageRequest {
+  message: string    // Message to sign
+  nonce: number      // Required by the direct provider API
+  address?: boolean  // Include address in message
+  application?: boolean // Include app info
+  chainId?: boolean  // Include chain ID
+}
+```
+
+### Réponse de signature de message [#sign-message-response]
+
+```typescript
+interface SignMessageResponse {
+  signature: string     // Hex signature
+  fullMessage: string   // Complete signed message
+  prefix: string        // APTOS prefix
+  address?: string      // Signer address
+  application?: string  // Application info
+  chainId?: number      // Chain ID
+  nonce: number         // Nonce used
+}
+```
+
+### Données de transaction [#transaction-payload]
+
+```typescript
+interface TransactionPayload {
+  type: 'entry_function_payload' | 'script_payload' | 'module_bundle_payload'
+  function: string       // Module::function format
+  type_arguments: string[]
+  arguments: any[]
+}
+```
+
+### Paramètres Sign Transaction V2 [#sign-transaction-v2-params]
+
+```typescript
+interface SignTransactionV2Params {
+  transaction: string        // BCS serialized transaction
+  transactionType: 'simple' | 'multi_agent'
+  asFeePayer?: boolean       // Sign as fee payer
+}
+```
+
+---
+
+## Réseaux pris en charge [#supported-networks]
+
+| Réseau | Description |
+|---------|-------------|
+| Mainnet | Réseau de production |
+| Testnet | Environnement de test |
+| Devnet | Environnement de développement |
+
+---
+
+## Événements [#events]
+
+| Événement | Paramètres de rappel | Description |
+|-------|---------------------|-------------|
+| `accountChanged` | `address: string \| null` | Compte modifié |
+| `accountChangedV2` | `account: AptosAccountInfo \| null` | Compte modifié (informations complètes) |
+| `networkChange` | `network: string \| null` | Réseau modifié |
+| `disconnect` | - | Portefeuille déconnecté |
+
+---
+
+## Codes d’erreur [#error-codes]
+
+| Code | Description |
+|------|-------------|
+| 4001 | Demande rejetée par l’utilisateur |
+| 4100 | Non autorisé |
+| 4200 | Méthode non prise en charge |
+| 4201 | Réseau non pris en charge |
+| -32603 | Erreur interne |

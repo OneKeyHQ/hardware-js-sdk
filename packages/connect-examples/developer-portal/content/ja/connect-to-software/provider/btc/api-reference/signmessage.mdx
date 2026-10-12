@@ -1,0 +1,63 @@
+---
+title: "signMessage"
+---
+
+# signMessage
+
+## ウォレットとアドレスタイプの対応表 [#wallet--address-type-support-matrix]
+
+| 署名方式 | ウォレットの種類               | 対応アドレスタイプ   |
+| -------------- | ------------------------- | ------------------------- |
+| ECDSA          | ソフトウェアとハードウェア       | P2PKH, P2SH, P2WPKH, P2TR |
+| BIP322-Simple  | ソフトウェア                  | P2WPKH, P2TR              |
+| BIP322-Simple  | ハードウェア (Pro、Classic1S) | P2TR                      |
+
+ECDSA または BIP322-Simple の署名方式でメッセージに署名します。
+
+## メソッド [#method]
+
+```typescript
+declare function signMessage(
+  message: string,
+  type?: "ecdsa" | "bip322-simple"
+): Promise<string>
+```
+
+## パラメーター [#params]
+
+* `message` — _必須_ `string` 署名する文字列
+* `type` — _任意_ `string` 署名方式の種類。"ecdsa" または "bip322-simple"。デフォルトは "ecdsa"
+
+## 戻り値 [#returns]
+
+`signature` — `string` メッセージの署名
+
+## 例 [#examples]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+// Sign with ECDSA (default)
+try {
+  const message = "Hello OneKey";
+  const signature = await provider.signMessage(message);
+  console.log("ECDSA signature:", signature);
+} catch (e) {
+  console.error("Error signing with ECDSA:", e);
+}
+
+// Sign with BIP322-Simple
+try {
+  const message = "Hello OneKey";
+  const signature = await provider.signMessage(message, "bip322-simple");
+  console.log("BIP322-Simple signature:", signature);
+} catch (e) {
+  console.error("Error signing with BIP322-Simple:", e);
+}
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/OJdojZM)
+
+> ウォレットとアドレスの互換性は、ウォレットおよびファームウェアのバージョンによって異なります。対応表に依存する前に、対象アカウントでの対応状況を確認してください。

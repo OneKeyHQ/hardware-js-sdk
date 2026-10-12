@@ -1,0 +1,79 @@
+---
+title: "confluxSignTransaction"
+---
+
+# confluxSignTransaction
+
+## Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 3.0.0
+  * Classic/Mini : 2.4.0
+
+### Conflux : signer une transaction <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a> [#conflux-sign-transaction-]
+
+Demande une signature de transaction. L’utilisateur vérifie et confirme la demande sur l’appareil.
+
+```typescript
+const response = await HardwareSDK.confluxSignTransaction(connectId, deviceId, params)
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [Format du chemin](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _obligatoire_ type `ConfluxTransaction`
+  * `to` - _obligatoire  `string`_ adresse sous forme de chaîne hexadécimale
+  * `value` - _obligatoire  `string`_ montant converti en chaîne hexadécimale BigInt
+  * `gasLimit` - _obligatoire  `string`_ limite de gas convertie en chaîne hexadécimale BigInt
+  * `gasPrice` - _obligatoire  `string`_ prix du gas converti en chaîne hexadécimale BigInt
+  * `nonce` - _obligatoire  `string`_ nonce converti en chaîne hexadécimale BigInt
+  * `epochHeight` - _obligatoire  `string`_ hauteur d’époque convertie en chaîne hexadécimale BigInt
+  * `storageLimit` - _obligatoire  `string`_ limite de stockage convertie en chaîne hexadécimale BigInt
+  * `chainId` - _facultatif  `number`_ identifiant de la chaîne
+  * `data` - _facultatif  `string`_ données hexadécimales
+
+### Exemple [#example]
+
+```typescript
+HardwareSDK.confluxSignTransaction(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    transaction: {
+        to: "0x1386b4185a223ef49592233b69291bbe5a80c527",
+        value: "0xf4240",
+        data: "0x01",
+        chainId: 1,
+        nonce: "0x00",
+        epochHeight: "0x00",
+        gasPrice: "0xbebc200",
+        gasLimit: "0x5208",
+        storageLimit: "0x5208",
+    }
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string;
+        r: string;
+        s: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

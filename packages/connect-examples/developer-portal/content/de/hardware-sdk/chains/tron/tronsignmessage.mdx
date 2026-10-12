@@ -1,0 +1,62 @@
+---
+title: "tronSignMessage"
+---
+
+# tronSignMessage
+
+## TRON: Nachricht signieren <a href="#ethereum-sign-message" id="ethereum-sign-message"></a> [#tron-sign-message-]
+
+Fordert eine Nachrichtensignatur mit dem aus dem angegebenen Pfad abgeleiteten Schlüssel an.
+
+```typescript
+const result = await HardwareSDK.tronSignMessage(connectId, deviceId, params);
+```
+
+### Parameter [#params]
+
+[**Optionale gemeinsame Parameter**](/de/hardware-sdk/concepts/common-params)
+
+* `path` - _erforderlich_ `string | Array<number>` Die SDK-Mindestlänge ist `3`. [Pfadformat](/de/hardware-sdk/concepts/common-params#hd-path)
+* `messageHex` - _erforderlich_ `string` Zu signierende Nachricht als hexadezimale Zeichenfolge kodiert.
+
+* `messageType` - `"V2"`. Geben Sie dies ausdrücklich an: Die aktuelle Laufzeit lehnt fehlende Werte und ältere `"V1"`-Anfragen ab. Der öffentliche Typ enthält weiterhin beide Werte.
+
+### Beispiel [#example]
+
+```typescript
+// Original message
+const message = "Hello World";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.tronSignMessage(connectId, deviceId, {
+    path: "m/44'/195'/0'/0/0",
+    messageHex,
+    messageType: 'V2'
+});
+```
+
+Ergebnis
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+Fehler
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

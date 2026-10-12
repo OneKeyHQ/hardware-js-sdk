@@ -14,7 +14,7 @@ const result = await HardwareSDK.dnxSignTransaction(connectId, deviceId, params)
 
 #### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Classic: 3.8.0
 
 #### 参数
@@ -59,7 +59,9 @@ const response = await HardwareSDK.dnxSignTransaction('connect1', 'device1', {
 });
 ```
 
-#### 返回结果
+<span id="返回结果" />
+
+#### 返回值
 
 成功响应：
 
@@ -67,14 +69,14 @@ const response = await HardwareSDK.dnxSignTransaction('connect1', 'device1', {
 {
     success: true,
     payload: {
-        path: string,              // 用于签名的 BIP32 路径
+        path: string,              // BIP32 path used for signing
         txKey: {
-            ephemeralTxSecKey: string,  // 交易私钥
-            ephemeralTxPubKey: string   // 交易公钥
+            ephemeralTxSecKey: string,  // Transaction secret key
+            ephemeralTxPubKey: string   // Transaction public key
         },
-        computedKeyImages: string[],    // 计算的密钥镜像数组
-        signatures: string[],           // 签名数组
-        outputKeys: string[]            // 输出密钥数组
+        computedKeyImages: string[],    // Array of computed key images
+        signatures: string[],           // Array of signatures
+        outputKeys: string[]            // Array of output keys
     }
 }
 ```

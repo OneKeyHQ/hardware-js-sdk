@@ -1,0 +1,244 @@
+---
+title: "Aptos Wallet Adapter"
+description: "Integra OneKey con Aptos Wallet Adapter en dApps de React"
+---
+
+import { Callout } from 'nextra/components'
+
+# Aptos Wallet Adapter
+
+Biblioteca oficial de conexión de carteras de Aptos para React. Las versiones compatibles de OneKey se registran mediante Aptos Wallet Standard.
+
+<Callout type="info">
+El adaptador detecta las carteras que registran funciones de Aptos Wallet Standard. Verifica que OneKey aparezca en `wallets` antes de ofrecer la conexión y prueba las versiones de cartera y adaptador que distribuyas.
+</Callout>
+
+---
+
+## Instalación [#installation]
+
+```bash
+npm install @aptos-labs/wallet-adapter-react @aptos-labs/ts-sdk
+```
+
+---
+
+## Configuración básica [#basic-setup]
+
+Envuelve tu aplicación con `AptosWalletAdapterProvider`:
+
+```tsx filename="App.tsx"
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider autoConnect={true}>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## Conexión de cartera [#wallet-connection]
+
+### Botón de conexión [#connect-button]
+
+```tsx filename="ConnectButton.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function ConnectButton() {
+  const { connect, disconnect, account, connected, wallets } = useWallet()
+
+  if (connected && account) {
+    return (
+      <div>
+        <p>Connected: {account.address.toString().slice(0, 6)}...{account.address.toString().slice(-4)}</p>
+        <button onClick={disconnect}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {wallets?.map((wallet) => (
+        <button
+          key={wallet.name}
+          onClick={() => connect(wallet.name)}
+        >
+          <img src={wallet.icon} alt={wallet.name} width={24} />
+          {wallet.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+### Modal de selección de carteras [#wallet-selection-modal]
+
+Este ejemplo mínimo muestra una lista personalizada de carteras. Para producción, añade gestión del foco del diálogo y del teclado, o usa un componente de diálogo accesible:
+
+```tsx filename="WalletModal.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { useState } from 'react'
+
+function WalletModal() {
+  const { wallets, connect } = useWallet()
+  const [isOpen, setIsOpen] = useState(false)
+  const [error, setError] = useState('')
+
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>Connect Wallet</button>
+
+      {isOpen && (
+        <div className="modal">
+          <h2>Select Wallet</h2>
+          {error && <p role="alert">{error}</p>}
+          {wallets?.map((wallet) => (
+            <button
+              key={wallet.name}
+              onClick={async () => {
+                try {
+                  await connect(wallet.name)
+                  setIsOpen(false)
+                } catch (error) {
+                  setError(error instanceof Error ? error.message : 'Connection failed')
+                }
+              }}
+            >
+              <img src={wallet.icon} alt={wallet.name} width={24} />
+              {wallet.name}
+            </button>
+          ))}
+          <button onClick={() => setIsOpen(false)}>Close</button>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+---
+
+## Transacciones [#transactions]
+
+### Firmar y enviar una transacción [#sign-and-submit-transaction]
+
+Sustituye el destinatario abreviado y captura las solicitudes rechazadas o fallidas en tu interfaz. El cliente y la cartera deben usar la misma red.
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk'
+
+function TransferAPT() {
+  const { account, network, signAndSubmitTransaction } = useWallet()
+
+  const config = new AptosConfig({ network: Network.MAINNET })
+  const aptos = new Aptos(config)
+
+  const handleTransfer = async () => {
+    if (!account) return
+    if (network?.name !== Network.MAINNET) throw new Error('Select Aptos mainnet first')
+
+    const response = await signAndSubmitTransaction({
+      sender: account.address,
+      data: {
+        function: '0x1::aptos_account::transfer',
+        functionArguments: [
+          '0x1234...', // recipient address
+          100000000,   // amount in octas (1 APT = 100000000)
+        ],
+      },
+    })
+
+    // Wait for transaction
+    const result = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    })
+
+    console.log('Transaction confirmed:', result)
+  }
+
+  return <button onClick={handleTransfer}>Transfer APT</button>
+}
+```
+
+### Firmar un mensaje [#sign-message]
+
+Para autenticación, sustituye el nonce de ejemplo por un desafío de un solo uso emitido por el servidor y verifica la respuesta firmada en tu servidor.
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function SignMessage() {
+  const { signMessage, account } = useWallet()
+
+  const handleSign = async () => {
+    const response = await signMessage({
+      message: 'Welcome to My dApp!',
+      nonce: crypto.randomUUID(),
+    })
+
+    console.log('Signature:', response.signature)
+    console.log('Full message:', response.fullMessage)
+  }
+
+  return <button disabled={!account} onClick={handleSign}>Sign Message</button>
+}
+```
+
+---
+
+## Configuración de red [#network-configuration]
+
+Configura la red en el proveedor:
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+import { Network } from '@aptos-labs/ts-sdk'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider
+      autoConnect={true}
+      dappConfig={{
+        network: Network.MAINNET,
+        // Optional: specify additional networks
+        aptosApiKeys: {
+          [Network.MAINNET]: 'YOUR_API_KEY',
+          [Network.TESTNET]: 'YOUR_TESTNET_KEY',
+        },
+      }}
+    >
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## Referencia de hooks [#hooks-reference]
+
+| Hook o miembro devuelto | Descripción |
+|------|-------------|
+| `useWallet()` | Hook principal para conexión de carteras y transacciones |
+| `account` | Cuenta conectada actualmente |
+| `connected` | Estado de conexión |
+| `wallets` | Lista de carteras disponibles |
+| `connect(walletName)` | Conectar a una cartera específica |
+| `disconnect()` | Desconectar la cartera actual |
+| `signAndSubmitTransaction(payload)` | Firmar y enviar una transacción |
+| `signMessage(request)` | Firmar un mensaje arbitrario |
+| `network` | Información de la red actual |
+
+---
+
+## Recursos [#resources]
+
+- [Documentación de Aptos Wallet Adapter](https://aptos.dev/en/build/sdks/wallet-adapter)
+- [SDK de TypeScript de Aptos](https://aptos.dev/en/build/sdks/ts-sdk)
+- [API del proveedor de Aptos](/es/connect-to-software/provider/aptos)

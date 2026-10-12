@@ -1,0 +1,97 @@
+---
+title: "cosmosGetPublicKey"
+---
+
+# cosmosGetPublicKey
+
+## 要件 [#requirements]
+
+* 最小ファームウェアバージョン
+  * Touch: 4.0.0
+  * Classic/Mini: 2.10.0
+
+## Cosmos: 公開鍵を取得 [#cosmos-get-public-key]
+
+指定パスから導出した公開鍵を返します。`showOnOneKey` を使用すると、デバイス上での確認を要求できます。
+
+```typescript
+const result = await HardwareSDK.cosmosGetPublicKey(connectId, deviceId, params);
+```
+
+## パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 単一の公開鍵 [#single-public-key]
+
+* `path` - _必須_ `string | Array<number>` SDK の最小長は `3`.
+* `curve` - _任意_ `string` 楕円曲線アルゴリズム。デフォルトは `secp256k1`
+* `showOnOneKey` - _任意_ `boolean` 公開鍵をデバイスに表示するかどうか。デフォルトは `true`.
+
+#### 複数の公開鍵 [#multiple-public-keys]
+
+* `bundle` - `path`, `showOnOneKey` , `curve` フィールドを持つオブジェクトの配列
+
+### 例 [#example]
+
+最初の Cosmos アカウントの公開鍵を返します:
+
+```typescript
+HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
+    path: "m/44'/118'/0'/0/0",
+    curve: 'secp256k1',
+    showOnOneKey: true
+});
+```
+
+複数の cosmos アカウントの公開鍵をまとめて返します:
+
+```typescript
+HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/118'/0'/0/0" }, // account 1
+        { path: "m/44'/118'/1'/0/0" }, // account 2
+        { path: "m/44'/118'/2'/0/0" }, // account 3
+    ]
+});
+```
+
+### 結果 [#result]
+
+単一公開鍵のレスポンス
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // serialized BIP32 path
+        pub: string
+    }
+}
+```
+
+
+公開鍵のバッチレスポンス
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path: serializedPath, pub }, // account 1
+        { path: serializedPath, pub }, // account 2
+        { path: serializedPath, pub }, // account 3
+    ]
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

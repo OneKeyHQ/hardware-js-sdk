@@ -1,0 +1,90 @@
+---
+title: "Referencia de la API"
+description: "Referencia completa de la API del proveedor de Cardano de OneKey"
+---
+
+<span id="api-reference" />
+
+# Referencia de la API
+
+Referencia de los métodos y tipos del proveedor de Cardano de OneKey.
+
+---
+
+## Interfaz de cartera (CIP-30) [#wallet-interface-cip-30]
+
+| Propiedad/método | Descripción |
+|-----------------|-------------|
+| `name` | Nombre de la cartera ('OneKey') |
+| `icon` | URL del icono de la cartera |
+| `apiVersion` | Versión de la API |
+| `isEnabled()` | Comprobar si está habilitada |
+| `enable()` | Solicitar acceso a la cartera |
+
+---
+
+## API para dApps (tras habilitar) [#dapp-api-after-enable]
+
+| Método | Descripción |
+|--------|-------------|
+| `getNetworkId()` | Obtener la red (0=red de pruebas, 1=red principal) |
+| `getBalance()` | Obtener el saldo total (CBOR) |
+| `getUtxos(amount?, paginate?)` | Obtener UTxO |
+| `getUsedAddresses()` | Obtener las direcciones usadas |
+| `getUnusedAddresses()` | Obtener las direcciones sin usar |
+| `getChangeAddress()` | Obtener la dirección de cambio |
+| `getRewardAddresses()` | Obtener las direcciones de staking |
+| `signTx(tx, partialSign?)` | Devolver las partes firmadas de un conjunto de testigos |
+| `signData(addr, payload)` | Firmar datos (CIP-8) |
+| `submitTx(tx)` | Enviar una transacción |
+
+---
+
+## API experimental [#experimental-api]
+
+| Método | Descripción |
+|--------|-------------|
+| `experimental.getCollateral()` | Obtener UTxO de garantía |
+| `experimental.on(event, cb)` | Suscribirse a eventos |
+| `experimental.off()` | Cancelar la suscripción |
+
+---
+
+## Tipos [#types]
+
+```typescript
+type Cbor = string // Hex-encoded CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 hex
+  key: string       // COSE_Key hex
+}
+
+type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
+```
+
+---
+
+## Eventos [#events]
+
+| Evento | Descripción |
+|-------|-------------|
+| `accountChange` | Cuenta cambiada |
+
+---
+
+## Códigos de error [#error-codes]
+
+| Código | Descripción |
+|------|-------------|
+| -1 | Solicitud no válida |
+| -2 | Error interno |
+| -3 | Solicitud rechazada |
+| -4 | Cuenta cambiada |
+
+La implementación actual del proveedor devuelve una matriz vacía desde `experimental.getCollateral()`. No deduzcas que hay garantía Plutus disponible solo porque exista el método. El campo de información de la cartera `isEnabled()` tampoco sustituye una llamada correcta a `enable()`. Los errores específicos de las operaciones CIP-30 difieren de los errores generales de la API anteriores.

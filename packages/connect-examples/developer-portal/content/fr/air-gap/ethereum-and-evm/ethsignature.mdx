@@ -1,0 +1,50 @@
+---
+title: "ETHSignature"
+---
+
+# ETHSignature
+
+`ETHSignature` décode une signature Ethereum renvoyée par l’appareil. Le nom de la classe utilise les majuscules `ETH`.
+
+Son constructeur accepte `signature: Buffer`, un élément facultatif `requestId: Buffer`, et un élément facultatif `origin: string`.
+
+## Décoder la réponse [#decode-the-response]
+
+Créez un nouveau décodeur pour chaque session de scan. Appelez `onSignatureFrame` pour chaque image de la caméra. Conservez `expectedRequestId` provenant de la demande initiale ; n’acceptez pas de signature provenant d’une autre demande.
+
+```typescript
+import { URDecoder } from '@ngraveio/bc-ur';
+import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
+
+const decoder = new URDecoder();
+
+function onSignatureFrame(frame: string, expectedRequestId: string) {
+  decoder.receivePart(frame);
+  if (decoder.isError()) {
+    throw new Error('Could not decode the signature QR code');
+  }
+  if (!decoder.isSuccess()) return;
+
+  const ur = decoder.resultUR();
+  if (ur.type !== 'eth-signature') {
+    throw new Error('Expected an eth-signature response');
+  }
+  const result = ETHSignature.fromCBOR(ur.cbor);
+  const expectedId = Buffer.from(expectedRequestId.replace(/-/g, ''), 'hex');
+  const receivedId = result.getRequestId();
+  if (!receivedId || !receivedId.equals(expectedId)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = result.getSignature();
+  if (signature.length !== 65) {
+    throw new Error('Expected a 65-byte Ethereum signature');
+  }
+  return {
+    r: signature.subarray(0, 32),
+    s: signature.subarray(32, 64),
+    v: signature[64],
+  };
+}
+```
+
+Utilisez votre bibliothèque Ethereum pour interpréter `v` selon le type et la chaîne de la transaction d’origine, retrouver le signataire et assembler la transaction signée. Réutilisez exactement la transaction non signée envoyée à l’appareil. N’associez pas cette signature à une transaction reconstruite ou modifiée.

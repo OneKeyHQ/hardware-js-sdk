@@ -1,0 +1,81 @@
+---
+title: "Glossary"
+description: "These terms appear in OneKey's wallet and hardware integration guides. Formats and behavior can differ by blockchain; follow the reference for the chain you are integrating."
+---
+
+# Glossary
+
+These terms appear in OneKey's wallet and hardware integration guides. Formats and behavior can differ by blockchain; follow the reference for the chain you are integrating.
+
+## Wallet
+
+An application or device that manages keys and helps users view accounts and authorize operations. Assets and transaction state are recorded on the blockchain, not stored inside the wallet application.
+
+## Account
+
+A blockchain identity with associated state. In Ethereum, externally owned accounts are controlled by private keys; contract accounts are controlled by code. Not every account is a public/private key pair.
+
+## Address
+
+An identifier used to receive assets or interact with an account or contract. An Ethereum address is 20 bytes, commonly written as `0x` followed by 40 hexadecimal characters. An address is not the same thing as a public key.
+
+## Public key
+
+The public part of a cryptographic key pair. It is used to verify signatures and, depending on the chain, derive addresses. Encoding and length depend on the signature scheme and format.
+
+## Private key
+
+Secret material used to authorize operations by signing. Never ask a user to paste a private key into a dApp, integration form, log, or issue report.
+
+## Recovery phrase
+
+A sequence of words used to back up the material from which a wallet derives keys. BIP-39 defines mnemonic phrases and their conversion to a seed. Treat the phrase as a secret; do not request it during an integration flow.
+
+## Seed
+
+Input to hierarchical key derivation. Under BIP-39, a seed is derived from the mnemonic and an optional passphrase. It is not interchangeable with a single account's private key.
+
+## Derivation path
+
+A sequence of indexes identifying a key within a hierarchical wallet. The chain, account, address type, and change branch can affect the path. Use the path expected by the method and chain you are integrating.
+
+## Passphrase
+
+An optional value used with a recovery phrase to derive a different wallet. A different passphrase can produce a different wallet; it is not simply an alternative spelling of the device PIN.
+
+## PIN
+
+A code used to protect access to a hardware device. It is distinct from the recovery phrase and passphrase. Follow the device-specific PIN flow provided by the SDK.
+
+## Provider
+
+A JavaScript interface through which a dApp requests accounts, blockchain information, or signing from a wallet. Ethereum providers commonly follow EIP-1193. Other chains use different provider interfaces.
+
+## Transport
+
+The connection used to exchange data with a device, such as USB or Bluetooth. A working transport does not by itself establish account access or authorize a signature.
+
+## Signature and broadcast
+
+Signing authorizes a message or transaction using a key. Broadcasting sends a signed transaction to a network. These are separate operations; check whether the specific API signs only or also broadcasts.
+
+## Air gap
+
+A communication flow without a direct wired or radio connection between the signing device and the application. In the QR integration, requests and responses are exchanged as QR data. The application still needs a network connection to broadcast transactions.
+
+## Keystore
+
+An encrypted representation of key material and the parameters needed to decrypt it. A keystore's protection depends on its encryption settings and password; encrypted data does not have a universal fixed length.
+
+## Hexadecimal
+
+Base-16 notation using digits `0–9` and letters `a–f`. APIs may require a `0x` prefix, omit it, or accept bytes instead. Follow each parameter's documented encoding.
+
+## References
+
+- [Ethereum accounts](https://ethereum.org/en/developers/docs/accounts/)
+- [EIP-1193 provider standard](https://eips.ethereum.org/EIPS/eip-1193)
+- [BIP-32 hierarchical wallets](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
+- [BIP-39 mnemonic codes](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+
+The earlier glossary was adapted from [MyCrypto](https://support.mycrypto.com/getting-started/ethereum-glossary.html).

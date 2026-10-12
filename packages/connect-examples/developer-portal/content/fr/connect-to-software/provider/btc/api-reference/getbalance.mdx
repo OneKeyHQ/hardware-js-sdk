@@ -1,0 +1,37 @@
+---
+title: "getBalance"
+---
+
+# getBalance
+
+Obtenir le solde du compte actuel.
+
+## Méthode [#method]
+
+```typescript
+declare function getBalance(): Promise<BalanceInfo | number>;
+```
+
+## Réponse [#response]
+
+Renvoie le solde du compte. Le type du fournisseur autorise aussi un résultat numérique pour des raisons de compatibilité ; vérifiez la structure du résultat avant d’accéder aux champs.
+
+```typescript
+type BalanceInfo = {
+    confirmed: number;
+    unconfirmed: number;
+    total: number
+};
+```
+
+## Exemple [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const balance = await provider.getBalance();
+```
+
+## Démonstration [#demo]
+
+[Ouvrir l’exemple](https://codepen.io/OneKeyHQ/pen/qBgMXXJ)

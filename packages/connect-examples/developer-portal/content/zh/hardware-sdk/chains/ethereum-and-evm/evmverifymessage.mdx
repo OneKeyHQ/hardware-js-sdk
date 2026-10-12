@@ -17,7 +17,7 @@ const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
 [**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
 
 * `address` - _必需_ `string` 签名者地址。"0x" 前缀是可选的
-* `messageHex` - _必需_ `string` 十六进制文本格式的已签名消息
+* `messageHex` - _必需_ `string` 十六进制格式的已签名消息
 * `signature` - _必需_ `string` 十六进制格式的签名。"0x" 前缀是可选的
 * `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
 
@@ -49,8 +49,8 @@ HardwareSDK.evmVerifyMessage(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

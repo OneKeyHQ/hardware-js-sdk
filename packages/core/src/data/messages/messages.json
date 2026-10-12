@@ -12485,6 +12485,8 @@
         "(has_bitcoin_only_values)": true
       },
       "values": {
+        "MessageType_BabylonDeriveContextHash": 10054,
+        "MessageType_BabylonDerivedContextHash": 10055,
         "MessageType_Initialize": 0,
         "MessageType_Ping": 1,
         "MessageType_Success": 2,
@@ -12947,6 +12949,55 @@
         "MessageType_UnLockDevice": 10030,
         "MessageType_UnLockDeviceResponse": 10031,
         "MessageType_UpgradeFileHeader": 10050
+      }
+    },
+    "CanonicalBitcoinNetwork": {
+      "values": {
+        "BITCOIN_MAINNET": 0,
+        "BITCOIN_TESTNET": 1,
+        "BITCOIN_SIGNET": 2,
+        "BITCOIN_REGTEST": 3
+      }
+    },
+    "BabylonDeriveContextHash": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "script_type": {
+          "rule": "required",
+          "type": "InputScriptType",
+          "id": 2
+        },
+        "app_name": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "context": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "network": {
+          "rule": "required",
+          "type": "CanonicalBitcoinNetwork",
+          "id": 5
+        }
+      }
+    },
+    "BabylonDerivedContextHash": {
+      "fields": {
+        "secret": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
       }
     },
     "google": {

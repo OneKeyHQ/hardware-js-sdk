@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # Signing
 
+Call `enable()` before using the dApp API. Addresses returned by the CIP-30 API are hex-encoded bytes; transaction and value parameters are hex-encoded CBOR. Browser examples using `Buffer` require an explicit `buffer` import or a byte conversion helper.
+
 Learn how to sign data for authentication on Cardano.
 
 ---
@@ -50,8 +52,8 @@ const coseKey = COSEKey.from_bytes(
 const signedPayload = coseSign1.payload()
 
 // Verify signature
-const publicKey = coseKey.header(0) // Get Ed25519 key
-// Verification logic...
+// Parsing COSE is not verification. Use a CIP-8 verifier to check the
+// protected headers, signing structure, payload, signature, and address binding.
 ```
 
 ---
@@ -62,10 +64,10 @@ const publicKey = coseKey.header(0) // Get Ed25519 key
 try {
   const api = await window.cardano.onekey.enable()
 } catch (error) {
-  if (error.code === -1) {
-    console.log('User rejected connection')
-  } else if (error.code === -2) {
-    console.log('Account not found')
+  if (error.code === -3) {
+    console.log('The wallet refused the request')
+  } else if (error.code === -4) {
+    console.log('The account changed; reconnect and retry')
   } else {
     console.error('Error:', error.message)
   }
@@ -78,7 +80,7 @@ try {
 
 | Code | Description |
 |------|-------------|
-| -1 | User rejected |
-| -2 | Account not found |
-| -3 | Invalid network |
-
+| -1 | Invalid request |
+| -2 | Internal error |
+| -3 | Refused request |
+| -4 | Account changed |

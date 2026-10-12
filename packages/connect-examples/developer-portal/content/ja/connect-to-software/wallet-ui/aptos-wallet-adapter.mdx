@@ -1,0 +1,244 @@
+---
+title: "Aptos Wallet Adapter"
+description: "React dApp で OneKey と Aptos Wallet Adapter を統合"
+---
+
+import { Callout } from 'nextra/components'
+
+# Aptos Wallet Adapter
+
+React 向けの公式 Aptos ウォレット接続ライブラリ。対応バージョンの OneKey は Aptos Wallet Standard を通じて登録されます。
+
+<Callout type="info">
+アダプターは Aptos Wallet Standard の機能を登録したウォレットを検出します。接続を提供する前に、OneKey が `wallets` に表示されることを確認し、リリースするウォレットとアダプターのバージョンでテストしてください。
+</Callout>
+
+---
+
+## インストール [#installation]
+
+```bash
+npm install @aptos-labs/wallet-adapter-react @aptos-labs/ts-sdk
+```
+
+---
+
+## 基本設定 [#basic-setup]
+
+アプリケーションを `AptosWalletAdapterProvider` でラップします:
+
+```tsx filename="App.tsx"
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider autoConnect={true}>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## ウォレット接続 [#wallet-connection]
+
+### 接続ボタン [#connect-button]
+
+```tsx filename="ConnectButton.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function ConnectButton() {
+  const { connect, disconnect, account, connected, wallets } = useWallet()
+
+  if (connected && account) {
+    return (
+      <div>
+        <p>Connected: {account.address.toString().slice(0, 6)}...{account.address.toString().slice(-4)}</p>
+        <button onClick={disconnect}>Disconnect</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {wallets?.map((wallet) => (
+        <button
+          key={wallet.name}
+          onClick={() => connect(wallet.name)}
+        >
+          <img src={wallet.icon} alt={wallet.name} width={24} />
+          {wallet.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+### ウォレット選択モーダル [#wallet-selection-modal]
+
+この最小限の例は独自のウォレット一覧を表示します。本番ではダイアログのフォーカス管理とキーボード操作を追加するか、アクセシビリティに対応したダイアログコンポーネントを使用してください:
+
+```tsx filename="WalletModal.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { useState } from 'react'
+
+function WalletModal() {
+  const { wallets, connect } = useWallet()
+  const [isOpen, setIsOpen] = useState(false)
+  const [error, setError] = useState('')
+
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>Connect Wallet</button>
+
+      {isOpen && (
+        <div className="modal">
+          <h2>Select Wallet</h2>
+          {error && <p role="alert">{error}</p>}
+          {wallets?.map((wallet) => (
+            <button
+              key={wallet.name}
+              onClick={async () => {
+                try {
+                  await connect(wallet.name)
+                  setIsOpen(false)
+                } catch (error) {
+                  setError(error instanceof Error ? error.message : 'Connection failed')
+                }
+              }}
+            >
+              <img src={wallet.icon} alt={wallet.name} width={24} />
+              {wallet.name}
+            </button>
+          ))}
+          <button onClick={() => setIsOpen(false)}>Close</button>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+---
+
+## トランザクション [#transactions]
+
+### トランザクションに署名して送信 [#sign-and-submit-transaction]
+
+省略された受取人を置き換え、拒否または失敗したリクエストを UI で処理してください。クライアントとウォレットは同じネットワークを使用する必要があります。
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk'
+
+function TransferAPT() {
+  const { account, network, signAndSubmitTransaction } = useWallet()
+
+  const config = new AptosConfig({ network: Network.MAINNET })
+  const aptos = new Aptos(config)
+
+  const handleTransfer = async () => {
+    if (!account) return
+    if (network?.name !== Network.MAINNET) throw new Error('Select Aptos mainnet first')
+
+    const response = await signAndSubmitTransaction({
+      sender: account.address,
+      data: {
+        function: '0x1::aptos_account::transfer',
+        functionArguments: [
+          '0x1234...', // recipient address
+          100000000,   // amount in octas (1 APT = 100000000)
+        ],
+      },
+    })
+
+    // Wait for transaction
+    const result = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    })
+
+    console.log('Transaction confirmed:', result)
+  }
+
+  return <button onClick={handleTransfer}>Transfer APT</button>
+}
+```
+
+### メッセージに署名 [#sign-message]
+
+認証では、例の nonce をサーバー発行の 1 回限りのチャレンジに置き換え、署名されたレスポンスをサーバーで検証してください。
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function SignMessage() {
+  const { signMessage, account } = useWallet()
+
+  const handleSign = async () => {
+    const response = await signMessage({
+      message: 'Welcome to My dApp!',
+      nonce: crypto.randomUUID(),
+    })
+
+    console.log('Signature:', response.signature)
+    console.log('Full message:', response.fullMessage)
+  }
+
+  return <button disabled={!account} onClick={handleSign}>Sign Message</button>
+}
+```
+
+---
+
+## ネットワーク設定 [#network-configuration]
+
+プロバイダーでネットワークを設定します:
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+import { Network } from '@aptos-labs/ts-sdk'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider
+      autoConnect={true}
+      dappConfig={{
+        network: Network.MAINNET,
+        // Optional: specify additional networks
+        aptosApiKeys: {
+          [Network.MAINNET]: 'YOUR_API_KEY',
+          [Network.TESTNET]: 'YOUR_TESTNET_KEY',
+        },
+      }}
+    >
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## フックのリファレンス [#hooks-reference]
+
+| フックまたは返されるメンバー | 説明 |
+|------|-------------|
+| `useWallet()` | ウォレット接続とトランザクションの主要フック |
+| `account` | 現在接続中のアカウント |
+| `connected` | 接続状態 |
+| `wallets` | 利用可能なウォレットの一覧 |
+| `connect(walletName)` | 特定のウォレットに接続 |
+| `disconnect()` | 現在のウォレットを切断 |
+| `signAndSubmitTransaction(payload)` | トランザクションに署名して送信 |
+| `signMessage(request)` | 任意のメッセージに署名 |
+| `network` | 現在のネットワーク情報 |
+
+---
+
+## リソース [#resources]
+
+- [Aptos Wallet Adapter ドキュメント](https://aptos.dev/en/build/sdks/wallet-adapter)
+- [Aptos TypeScript SDK](https://aptos.dev/en/build/sdks/ts-sdk)
+- [Aptos Provider API](/ja/connect-to-software/provider/aptos)

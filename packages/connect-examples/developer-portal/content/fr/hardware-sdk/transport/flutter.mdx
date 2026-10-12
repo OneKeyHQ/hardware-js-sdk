@@ -1,0 +1,47 @@
+---
+description: "Connectez un hôte Flutter à OneKey via un environnement JavaScript et un pont de transport BLE natif."
+title: "Flutter : connexion par Bluetooth (natif)"
+---
+
+<span id="flutter-connect-via-bluetooth-native" />
+
+# Flutter : connexion par Bluetooth (natif)
+
+> Ce guide s’appuie sur le [Plugin de transport de bas niveau](/fr/hardware-sdk/concepts/low-level-plugin) pour l’interface d’E/S BLE et les limites de Protocol V1/V2 — lisez-le d’abord.
+
+Pour les applications Flutter qui chargent un bundle JS via WebView ou un moteur JS et communiquent avec `@onekeyfe/hd-common-connect-sdk` via un adaptateur de bas niveau.
+
+## Étape 1. Choisir un environnement d’exécution [#step-1-choose-a-runtime]
+
+- WebView : stable et largement pris en charge ; API de pont identique aux enveloppes natives iOS/Android
+- Moteur JS : par exemple `flutter_js`, exécuter le bundle JS compilé directement dans Dart
+
+## Étape 2. Construire le bundle JS [#step-2-build-the-js-bundle]
+
+Compilez dans les exemples natifs du dépôt hardware-js-sdk (voir les répertoires `web/`) et produisez les ressources `web_dist/`.
+
+## Étape 3. Charger le bundle JS [#step-3-load-the-js-bundle]
+
+Chargez les ressources `web_dist/` dans Flutter (via WebView ou un moteur JS).
+
+## Étape 4. Implémenter le pont de messagerie [#step-4-implement-the-messaging-bridge]
+
+Exposez `enumerate/connect/disconnect/send/receive` du natif vers JS, en conservant les mêmes signatures. Transmettez les blocs de notification BLE non modifiés en hexadécimal à une file par connexion consommée par `receive(uuid)`. Le SDK gère le cadrage et le réassemblage V1/V2.
+
+## Étape 5. Gérer les événements d’interface [#step-5-handle-ui-events]
+
+Affichez des boîtes de dialogue natives pour les demandes de saisie et des instructions pour les demandes sur l’appareil. Seules les demandes de saisie reçoivent `HardwareSDK.uiResponse` ; préservez leur corrélation de réponse. Les confirmations par bouton et les demandes de PIN uniquement sur l’appareil sont des notifications. Consultez [Connexion de l’interface](/fr/hardware-sdk/core-api-guide#events-ui).
+
+## UUID BLE [#ble-uuids]
+
+- `serviceUuid = 00000001-0000-1000-8000-00805f9b34fb`
+- `writeCharacteristic = 00000002-0000-1000-8000-00805f9b34fb`
+- `notifyCharacteristic = 00000003-0000-1000-8000-00805f9b34fb`
+
+## Références [#references]
+
+- Cadrage du protocole : [Voir le plugin de transport de bas niveau](/fr/hardware-sdk/concepts/low-level-plugin#ble-protocol-native-mobile)
+- Événements d’interface : [Événements](/fr/hardware-sdk/core-api-guide#events-ui), [PIN](/fr/hardware-sdk/concepts/pin), [Phrase secrète](/fr/hardware-sdk/concepts/passphrase)
+- Détails des plateformes : [BLE iOS](/fr/hardware-sdk/transport/ios), [BLE Android](/fr/hardware-sdk/transport/android)
+
+Une fois connecté, l’usage des API de chaîne est identique à WebUSB : fournissez `connectId` et (si nécessaire) `deviceId`.

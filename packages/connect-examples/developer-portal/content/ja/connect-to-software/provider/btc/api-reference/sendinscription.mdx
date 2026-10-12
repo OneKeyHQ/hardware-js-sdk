@@ -1,0 +1,42 @@
+---
+title: "sendInscription"
+---
+
+# sendInscription
+
+インスクリプションを送信
+
+## メソッド [#method]
+
+```typescript
+declare function sendInscription(
+    toAddress: string,
+    inscriptionId: string,
+    options?: { feeRate: number }
+): Promise<string>;
+```
+
+## パラメーター [#params]
+
+* `toAddress` — _必須_ `string`  送信先アドレス
+* `inscriptionId` — _必須_ `string` インスクリプションの ID
+* `options` — _任意_
+  * `feeRate`  — _必須_ `number` ネットワーク手数料率
+
+## レスポンス [#response]
+
+`txid` — `string`
+
+## 例 [#example]
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const address = "<RECIPIENT_BITCOIN_ADDRESS>";
+const inscription = "<INSCRIPTION_ID>";
+const txid = await provider.sendInscription(address, inscription);
+```
+
+## デモ [#demo]
+
+[例を開く](https://codepen.io/OneKeyHQ/pen/MWLqvVE)

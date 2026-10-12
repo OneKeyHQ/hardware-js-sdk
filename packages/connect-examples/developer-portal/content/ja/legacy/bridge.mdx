@@ -1,0 +1,23 @@
+---
+title: "OneKey Bridge リファレンス"
+description: "従来の統合です。新しいブラウザー統合には [WebUSB](/en/hardware-sdk/transport/web-usb) を使用してください。現在の WebUSB フローの前提条件に Bridge のインストールを含めないでください。"
+---
+
+<span id="onekey-bridge-reference" />
+
+# OneKey Bridge リファレンス
+
+> 従来の統合です。新しいブラウザー統合には [WebUSB](/ja/hardware-sdk/transport/web-usb) を使用してください。現在の WebUSB フローの前提条件に Bridge のインストールを含めないでください。
+
+以前の Bridge トランスポートには 2 つのチェックがありました:
+
+| 方法 | 従来の成功ペイロード | 目的 |
+| --- | --- | --- |
+| `checkBridgeStatus()` | `boolean` | ローカル Bridge クライアントが動作しているかどうか。 |
+| `checkTransportRelease()` | `string` | ローカル Bridge のバージョン状態。次として記載: `valid` または `outdated`. |
+
+どちらの従来のリファレンスも `success` と `payload` を使用し、失敗時には `payload.error` と任意のエラーコードを含みます。Bridge チェックの成功は、デバイス検出、ウォレットアクセス、署名許可の証拠にはなりません。
+
+保守前に、アプリが使う正確な SDK バージョンで、これらのエクスポートとトランスポート要件を検証してください。移行では Bridge 固有のチェックとプロンプトを削除し、次に従います: [Bridge から common-connect WebUSB へ](/ja/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb).
+
+元のリファレンス: [checkBridgeStatus](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/checkbridgestatus.md), [checkTransportRelease](https://github.com/OneKeyHQ/docs/blob/e0c478d44297c73dfbf1fc888d15c94fc3bf9e9b/connect-to-hardware/hardware-sdk/api-reference/device-api/checktransportrelease.md).

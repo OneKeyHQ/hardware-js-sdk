@@ -1,0 +1,169 @@
+---
+description: "Solana アドレスを確認し、ハード化された導出パスと明示的なウォレット関連付けでシリアライズ済みメッセージに署名します。"
+title: "Solana 署名者"
+---
+
+<span id="solana-signer" />
+
+# Solana 署名者
+
+Solana ハードウェア署名ガイド。対応するハード化パスによるアドレス確認と、メッセージ/シリアライズ済みの `rawTx` によるトランザクション署名を扱います。hardware-js-sdk (Promise レスポンス + UI イベント) に合わせています。
+
+## インデックス [#index]
+
+1. [仕組み](#how-it-works)
+2. [インストール](#installation)
+3. [初期化](#initialization)
+4. [一般的なシナリオ](#common-scenarios)
+   - [アドレスを取得](#scenario-1-get-address)
+   - [トランザクションに署名](#scenario-2-sign-transaction)
+5. [操作と状態](#interaction--status)
+6. [例](#example)
+7. [検証とトラブルシューティング](#validation--troubleshooting)
+
+## 仕組み [#how-it-works]
+
+OneKey Solana 署名者は `HardwareSDK` を使ってデバイスと通信します。16 進数エンコードされた Solana メッセージのバイト列を `rawTx` に渡すと、デバイスが送信元/送信先、金額、手数料の概要を表示し、署名を返します。ホストは `@solana/web3.js` で署名を添付し、`solGetAddress` が返す `address` を base58 からデコードした公開鍵に対して検証します。
+
+- ファームウェアが対応するハード化パスを使用してください。例: `m/44'/501'/account'/0'`.
+- メッセージ/トランザクションに新しい recent blockhash を含めてください。
+
+## インストール [#installation]
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## 初期化 [#initialization]
+
+例では一貫して**標準ウォレット**を使用します。隠しウォレットの場合は、アドレス取得と署名の各呼び出しで `useEmptyPassphrase: true` を検証済みの `passphraseState` に置き換えます。保護された呼び出しの前に [UI ハンドラー](/ja/hardware-sdk/core-api-guide#events-ui)を登録し、ペイロードを使用する前に `success` を確認してください。トランザクション入力を宣言している例は準備用のコードであり、単体で実行できるアプリケーションではありません。
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+```
+
+## 一般的なシナリオ [#common-scenarios]
+
+### シナリオ 1: アドレスを取得 [#scenario-1-get-address]
+
+```ts
+const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/501'/0'/0'",
+  showOnOneKey: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.address and res.payload.path are strings.
+```
+
+**パラメーター**
+
+- `path`: 必須。推奨パスは `44'/501'/account'/0'`.
+- `showOnOneKey?`: 任意。デバイスに表示して確認します。
+
+**戻り値**
+
+```ts
+type AddressResult =
+  | { success: true; payload: { address: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+---
+
+### シナリオ 2: トランザクションに署名 [#scenario-2-sign-transaction]
+
+```ts
+const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  rawTx,
+  useEmptyPassphrase: true,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature is hex; res.payload.path is the serialized path.
+```
+
+**パラメーター**
+
+- `path`: 必須。SDK の最小長は 3 で、ファームウェアのパスポリシーに従います。
+- `rawTx`: 必須。16 進数エンコードされたシリアライズ済みメッセージのバイト列。トランザクションの署名エンベロープは除きます。実行時に必須です。
+- `useEmptyPassphrase?`: 任意。標準ウォレットを強制します。隠しウォレットには `passphraseState` を渡します。
+
+**戻り値**
+
+```ts
+type SignResult =
+  | { success: true; payload: { signature: string; path: string } }
+  | { success: false; payload: { error: string; code?: string | number } };
+```
+
+## 操作と状態 [#interaction--status]
+
+- API は完了時に解決され、ユーザー向けプロンプトは `UI_REQUEST` で表示されます (デバイスのロック解除、トランザクションの確認)。
+- デバイスごとに呼び出しを直列実行し、`passphraseState` または `useEmptyPassphrase: true` を再利用します。`keepSession` は引き続きトランスポートを保持するもので、ウォレットを関連付けるものではありません。
+
+## 例 [#example]
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+const initialized = await HardwareSDK.init({ env: 'webusb', debug: false });
+if (!initialized) throw new Error('SDK initialization failed');
+
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+if (!devices.payload.length) throw new Error("No device");
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
+const { connectId } = devices.payload[0];
+if (!connectId) throw new Error("Missing connectId");
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error("Device has no wallet identity");
+
+const path = "m/44'/501'/0'/0'";
+const confirmedAddress = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path,
+  showOnOneKey: true,
+  useEmptyPassphrase: true,
+});
+if (!confirmedAddress.success) throw new Error(confirmedAddress.payload.error);
+
+// Obtain these bytes from Transaction.serializeMessage() or
+// VersionedTransaction.message.serialize(), with a fresh recent blockhash.
+declare const messageBytes: Uint8Array;
+const rawTx = Array.from(messageBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+
+const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path,
+  rawTx,
+  useEmptyPassphrase: true,
+});
+
+if (!success) throw new Error(payload.error);
+// Attach the signature and verify it against the confirmed address before broadcasting.
+```
+
+## 検証とトラブルシューティング [#validation--troubleshooting]
+
+- パス: SDK は最低 3 要素を確認し、ファームウェアが対応する導出パスを制限します。例では次を使用します: `m/44'/501'/account'/0'`.
+- メッセージ/トランザクション: 新しい `recentBlockhash` を含め、アカウントと命令の順序を正しく設定してください。
+- デバイスでの確認: パス/アカウント、送信先、金額、手数料の概要が UI と一致する必要があります。
+- ホスト側の検証: `@solana/web3.js` で署名を添付し、署名者が `solGetAddress` の結果と一致するか確認します。
+- サイズ超過のメッセージや未対応命令: エラーを報告し、現在のリクエストを停止します。トランザクションの分割や調整には、再構築とユーザーの再確認が必要です。デバイスごとに呼び出しを直列化し、拒否やタイムアウトでは再試行/キャンセルを提示して、自動再実行しないでください。
+
+メソッドのドキュメント: [solSignTransaction](/ja/hardware-sdk/chains/solana/solsigntransaction).

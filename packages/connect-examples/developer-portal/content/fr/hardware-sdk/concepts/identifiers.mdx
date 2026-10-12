@@ -1,0 +1,100 @@
+---
+description: "Distinguez les ID de connexion, numéros de série physiques, identités de graine, empreintes de portefeuille caché et sessions internes."
+title: "Identifiants"
+---
+
+<span id="identifiers" />
+
+# Identifiants
+
+Utilisez `connectId` pour orienter une requête, `deviceId` pour la lier à la graine actuelle de l’appareil, et `passphraseState` pour la lier à un portefeuille caché. Ces valeurs ne sont pas interchangeables.
+
+## Référence des identifiants [#identifier-reference]
+
+| Champ | Rôle | Où le lire | Comment l’utiliser |
+| --- | --- | --- | --- |
+| `connectId` | Clé d’orientation du transport | Une entrée du résultat réussi `searchDevices().payload` | Premier argument des méthodes d’appareil et de portefeuille. Réénumérez après reconnexion. |
+| `serialNo` | Identité physique du matériel, lorsqu’elle est disponible | Découverte après initialisation ; `getDeviceState().payload.identity.serialNo` | Afficher ou identifier l’unité indépendamment d’USB/BLE. Ne pas utiliser comme clé d’orientation. |
+| `deviceId` | Identité actuelle liée à la durée de vie de la graine | `getDeviceState().payload.identity.deviceId` ; résultat réussi de `openWalletSession` | Deuxième argument des méthodes de portefeuille. Détecter une réinitialisation, une récupération ou un portefeuille différent. |
+| `passphraseState` | Empreinte du portefeuille caché | Résultat réussi de `openWalletSession` pour l’ouverture d’un portefeuille caché | Transmettre dans chaque demande d’adresse/signature de ce portefeuille caché. Persister avec `deviceId`. |
+| `uuid` | Identifiant de compatibilité obsolète | Certains résultats d’appareil/de recherche | Privilégiez `serialNo` pour l’identité du matériel et `connectId` pour l’orientation. Peut être vide avant l’initialisation. |
+| micrologiciel `session_id` | Identifiant interne de déverrouillage | Géré dans le SDK Core | Ne pas le lire, le journaliser, le persister ni l’envoyer dans des appels publics. |
+| `name`, `label`, `deviceType` | Informations d’affichage et de capacités | Découverte/état de l’appareil | Ce ne sont ni des identifiants uniques ni des preuves du protocole ou de l’identité du portefeuille. |
+
+## `connectId` — la clé d’orientation [#connectid--the-routing-key]
+
+<div id="connectid" />
+
+Les connexions USB et BLE à la même unité physique ont des valeurs de `connectId` différentes. Conservez des enregistrements de connexion distincts par transport. Un ID de connexion n’est pas nécessairement le numéro de série physique : un descripteur USB peut fournir un chemin d’orientation avant que l’identité matérielle soit disponible.
+
+Traitez cette valeur comme opaque. Les formats BLE dépendent de la plateforme hôte (par exemple une adresse Android ou un UUID de périphérique iOS). Ne la convertissez jamais au format d’un autre transport et ne l’utilisez pas comme preuve d’authenticité de l’appareil.
+
+`searchDevices` peut renvoyer `connectId: null`. Sélectionnez un candidat disposant d’un ID de connexion utilisable avant d’appeler l’appareil.
+
+## `deviceId` — le contrôle d’identité du portefeuille [#deviceid--the-wallet-identity-check]
+
+```ts
+const state = await HardwareSDK.getDeviceState(connectId);
+if (!state.success) throw new Error(state.payload.error);
+const deviceId = state.payload.identity.deviceId;
+if (!deviceId) throw new Error('Device has no wallet identity');
+
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+Le portefeuille standard et les portefeuilles cachés de la même graine partagent l’identité liée à la durée de vie de la graine `deviceId`. Un portefeuille caché nécessite aussi son `passphraseState`.
+
+En cas de `DeviceCheckDeviceIdError`, arrêtez l’opération et actualisez l’état de l’appareil. Demandez à l’utilisateur de confirmer le portefeuille souhaité avant de mettre à jour une association existante ; remplacer silencieusement l’ID en cache pourrait diriger une requête ultérieure vers un autre portefeuille.
+
+### `device_id` par rapport à `deviceId` [#device_id-versus-deviceid]
+
+`device_id` est le champ historique des résultats Protocol V1 `getFeatures()`. Le nouveau code lit le champ normalisé `identity.deviceId` depuis `getDeviceState()`, qui prend en charge les deux familles de protocoles. La découverte peut renvoyer `deviceId: null` avant l’initialisation.
+
+## Association de portefeuille caché [#hidden-wallet-binding]
+
+```ts
+const opened = await HardwareSDK.openWalletSession(connectId, {
+  mode: 'select-hidden',
+});
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
+  throw new Error('A hidden wallet was not opened');
+}
+
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: opened.payload.passphraseState,
+  showOnOneKey: true,
+});
+if (!address.success) throw new Error(address.payload.error);
+```
+
+Ne persistez l’association qu’après une réponse réussie. Protégez-la comme une donnée applicative liée au portefeuille ; ne persistez jamais la phrase secrète elle-même ni les identifiants de session du micrologiciel.
+
+L’omission de `passphraseState` ne lie pas un appel au portefeuille caché prévu. Utilisez soit une empreinte vérifiée de portefeuille caché, soit `useEmptyPassphrase: true` pour le portefeuille standard, jamais les deux.
+
+En cas d’incohérence d’association, arrêtez-vous et laissez l’utilisateur sélectionner de nouveau le portefeuille souhaité. N’écrasez pas l’association pour rejouer automatiquement une demande de signature.
+
+## Signatures de méthodes [#method-signatures]
+
+| Modèle | Exemples |
+| --- | --- |
+| Cycle de vie du SDK, sans argument de connexion | `init`, `searchDevices`, `on`/`off`, `dispose` |
+| Sélection de l’appareil ou du portefeuille, `connectId` | `getDeviceState`, `openWalletSession`, `deviceSettings`, `deviceVerify` |
+| Opération de portefeuille, `connectId` + `deviceId` | `evmGetAddress`, `btcSignTransaction`, `solSignTransaction` |
+| Opération sur portefeuille caché | L’opération de portefeuille plus `passphraseState` dans ses paramètres |
+
+Certaines méthodes permettent d’omettre les identifiants pour des raisons de compatibilité. Respectez la signature publique de chaque méthode et sélectionnez un appareil précis dans les applications multi-appareils. La corrélation des réponses d’interface utilise une identité de requête distincte ; copiez `responseCorrelation` depuis l’événement comme décrit dans [Événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui).
+
+## Voir aussi [#related]
+
+- [Rechercher des appareils](/fr/hardware-sdk/basic-api/search-devices)
+- [Obtenir l’état de l’appareil](/fr/hardware-sdk/basic-api/get-device-state)
+- [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session)
+- [Paramètres communs](/fr/hardware-sdk/concepts/common-params)
+- [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect)

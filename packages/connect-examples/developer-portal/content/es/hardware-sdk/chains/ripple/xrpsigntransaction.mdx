@@ -1,0 +1,82 @@
+---
+title: "xrpSignTransaction"
+---
+
+# xrpSignTransaction
+
+### Ripple: firmar transacción [#ripple-sign-transaction]
+
+Solicita una firma de transacción. El usuario revisa y confirma la solicitud en el dispositivo.
+
+```typescript
+const response = await HardwareSDK.xrpSignTransaction(connectId, deviceId, params)
+```
+
+### Parámetros [#params]
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatorio_ `string | Array<number>` La longitud mínima del SDK es `5`. [Formato de ruta](/es/hardware-sdk/concepts/common-params#hd-path)
+* `transaction` - _obligatorio_ `XrpTransaction` (tipo)
+
+#### Tipo XrpTransaction [#xrptransaction-type]
+
+```typescript
+type XrpTransaction = {
+    fee: string;
+    flags?: number;
+    sequence: number;
+    maxLedgerVersion?: number; // Proto: "last_ledger_sequence"
+    payment: XrpPayment;
+}
+
+type XrpPayment = {
+    amount: number;
+    destination: string;
+    destinationTag?: number;
+}
+```
+
+En tiempo de ejecución, el SDK actual espera `{ path, transaction }` y valida `transaction.payment.amount` como número. Su declaración TypeScript exportada no coincide con esa estructura de ejecución. El ejemplo siguiente sigue el contrato de ejecución; revisa la declaración de la versión del SDK que tienes instalada antes de compilar la integración. Los importes se expresan en drops.
+
+### Ejemplo [#example]
+
+```typescript
+HardwareSDK.xrpSignTransaction(connectId, deviceId, {
+    path: "m/44'/144'/0'/0/0",
+    transaction: {
+        fee: '12',
+        flags: 0,
+        sequence: 32841006,
+        maxLedgerVersion: 32841630,
+        payment: {
+            amount: 1000000,
+            destination: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
+        }
+    }
+});
+```
+
+Resultado
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        serializedTx: string;
+    }
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

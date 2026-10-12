@@ -126,6 +126,30 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'btcDeriveContextHash',
+    description: 'Derive a Babylon context hash on Classic 1s / Pure firmware 3.21.0 or later.',
+    presupposes: [
+      {
+        title: 'Derive Context Hash (Mainnet)',
+        value: {
+          path: "m/84'/0'/0'/0/0",
+          appName: 'babylon-example',
+          context: '48656c6c6f',
+          network: 'bitcoin-mainnet',
+        },
+      },
+      {
+        title: 'Derive Context Hash (Testnet)',
+        value: {
+          path: "m/84'/1'/0'/0/0",
+          appName: 'babylon-example',
+          context: '48656c6c6f',
+          network: 'bitcoin-testnet',
+        },
+      },
+    ],
+  },
+  {
     method: 'btcSignMessage',
     description: 'Sign a message with your Bitcoin private key.',
     presupposes: [

@@ -1,4 +1,5 @@
 ---
+title: WebLN
 description: WebLN integration via OneKey — enable, getInfo, makeInvoice, sendPayment, sign/verify message
 slug: /dapp/chains/webln
 ---
@@ -16,7 +17,7 @@ Use OneKey’s WebLN provider to interact with Lightning-enabled apps.
 ## Minimal pattern
 
 ```js
-const provider = window?.$onekey?.webln || window?.webln
+const provider = window.$onekey?.webln
 if (!provider) throw new Error('OneKey WebLN provider not detected')
 
 await provider.enable()
@@ -25,7 +26,7 @@ const info = await provider.getInfo()
 
 ## Events
 
-- See [Events](event) for account/network updates
+- See [Events](event) for notification limitations
 
 ## Common errors
 

@@ -1,10 +1,11 @@
 ---
 title: 核心接口指南
+description: 掌握请求参数、设备选择、钱包身份、UI 事件与错误处理。
 ---
 
 # 硬件 SDK 核心接口指南
 
-生命周期 how-to：init → search → 事件 → 第一次受保护调用 → cleanup。
+本指南按生命周期介绍：初始化 → 发现设备 → 事件处理 → 第一次受保护调用 → 清理。
 
 参数表在 [通用参数](/zh/hardware-sdk/concepts/common-params)。机型和协议差异在 [设备](/zh/hardware-sdk/concepts/devices) 和 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。
 
@@ -44,7 +45,7 @@ sequenceDiagram
   App->>SDK: openWalletSession(standard 或 select-hidden)
   SDK-->>App: deviceId + passphraseState
   App->>SDK: 地址 / 签名带 passphraseState 或 useEmptyPassphrase
-  SDK->>Device: DeviceSessionGet
+  SDK->>Device: 恢复所选钱包上下文
   Device-->>SDK: session
   SDK-->>App: 结果
 ```
@@ -61,7 +62,7 @@ sequenceDiagram
 **运行时要求**
 
 - `webusb` — HTTPS + 用户手势
-- `react-native` — BLE 权限（Android 上常常还要定位）
+- `react-native` — 系统蓝牙权限；位置权限取决于 Android 版本和扫描用途
 - `lowlevel` — 宿主侧 BLE 适配器，转发原始通知数据块
 - 固件 — Bootloader 下部分 API 会失败
 
@@ -87,6 +88,8 @@ if (!initialized) throw new Error('SDK initialization failed');
 
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success || !devices.payload.length) throw new Error('No device');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error("Missing connectId");
 
@@ -121,7 +124,7 @@ PIN / passphrase 交互见 [PIN](/zh/hardware-sdk/concepts/pin) 和 [Passphrase]
 ## 事件处理
 <div id="events-ui" />
 
-在应用入口订一次。只对输入类请求调用 `uiResponse`。
+在应用入口订阅一次。只对输入请求调用 `uiResponse`。请求包含 `payload.responseCorrelation` 时，将其中字段展开到每次响应顶层，用于关联待处理交互。取消或 UI 关闭后使弹窗回调失效；用户取消输入时取消所选连接上的操作。不要记录 UI 事件 payload 或输入值。
 
 **需要 `uiResponse` 的 UI 请求**
 
@@ -169,12 +172,13 @@ const handleUiEvent = (msg: UiEventMessage) => {
         return;
       }
       openPinModal(({ value }) =>
-        HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: value })
+        HardwareSDK.uiResponse({ ...msg.payload.responseCorrelation, type: UI_RESPONSE.RECEIVE_PIN, payload: value })
       );
       return;
     case UI_REQUEST.REQUEST_PASSPHRASE:
       if (msg.payload.deviceOnly) {
         HardwareSDK.uiResponse({
+          ...msg.payload.responseCorrelation,
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
           payload: { value: '', passphraseOnDevice: true, save: false },
         });
@@ -182,6 +186,7 @@ const handleUiEvent = (msg: UiEventMessage) => {
       }
       openPassphraseModal(({ value, onDevice, save }) =>
         HardwareSDK.uiResponse({
+          ...msg.payload.responseCorrelation,
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
           payload: { value: onDevice ? "" : value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
         })
@@ -205,7 +210,7 @@ HardwareSDK.on(UI_EVENT, handleUiEvent);
 | Method/Firmware (400–418) | 参数错误、必须升级、forbidden path | 校验 HD Path；[固件升级](/zh/hardware-sdk/firmware-update) |
 | Transport (600–603) | 传输未配置、并发调用 | 检查 `env`，串行调用 |
 | Bluetooth (700–722) | 扫描/权限/连接/超时 | 权限与距离；绑定过期不要死循环 |
-| Runtime/Bridge (800–822) | PIN 取消、Bridge 超时 | 重试或启动 Bridge |
+| Runtime/Bridge (800–822) | PIN 取消、Bridge 超时 | 尊重取消结果；恢复连接时不自动重放签名 |
 | Web device (901–902) | WebUSB 未授权 | HTTPS + 用户手势 |
 
 认 `payload.code`，不要解析 `payload.error` 文案。定义见 [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts)。

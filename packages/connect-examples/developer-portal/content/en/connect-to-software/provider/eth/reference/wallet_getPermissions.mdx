@@ -82,3 +82,5 @@ if (!hasAccounts) {
 - Does not prompt the user for any action
 - Useful for checking connection state without triggering a prompt
 - Specified by [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)
+
+Handle unsupported-method errors in the target wallet version. Account permission is distinct from RPC connectivity and does not pre-approve signatures or transactions. For basic connection, use `eth_requestAccounts`.

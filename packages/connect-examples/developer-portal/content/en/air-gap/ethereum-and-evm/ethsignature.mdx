@@ -1,57 +1,50 @@
 ---
-title: EthSignature
+title: ETHSignature
 ---
 
-# EthSignature
+# ETHSignature
 
-The `EthSignature` class represents an Ethereum signature.
+`ETHSignature` decodes an Ethereum signature returned by the device. The class name uses uppercase `ETH`.
 
-Used to parse the signed result returned by the device.
+Its constructor accepts `signature: Buffer`, an optional `requestId: Buffer`, and an optional `origin: string`.
 
-## Parameters
+## Decode the response
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `signature` | `Buffer` | The signature data (65 bytes: r + s + v) |
-| `requestId` | `Buffer` | The request ID (optional) |
-| `origin` | `string` | The origin information (optional) |
+Create a new decoder for each scanning session. Call `onSignatureFrame` for every camera frame. Keep `expectedRequestId` from the original request; do not accept a signature from another request.
 
-## UR Example
-
-```
-UR:ETH-SIGNATURE/OTADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDFPCATKCPPFYLENGAGLMKMUCAYKFPFSDREOMENTPKBGEONDCHFDNBKOSSTPDWETSGBZDNCMCHKPNYDMKIDPTDRYJSDRTKCTIOFPQZHFLNSKVACLMNIYTKLGISFRWLKTZTREAEAXIYGWJTIHGRIHKKPLGDEEDS
-```
-
-## Decoding Example
-
-```ts
+```typescript
 import { URDecoder } from '@ngraveio/bc-ur';
-import { EthSignature } from '@keystonehq/bc-ur-registry-eth';
+import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
 
-const dec = new URDecoder();
-// push each scanned frame string into the decoder
-// dec.receivePart(frame)
+const decoder = new URDecoder();
 
-if (dec.isComplete()) {
-  const ur = dec.resultUR(); // ur.type should be 'eth-signature'
-  const sig = EthSignature.fromCBOR(ur.cbor);
-  
-  const requestId = sig.getRequestId();
-  const signature = sig.getSignature();
-  
-  // Extract r, s, v components
-  const r = signature.slice(0, 32);
-  const s = signature.slice(32, 64);
-  const v = signature.slice(64, 65);
-  
-  // Attach to transaction and broadcast
+function onSignatureFrame(frame: string, expectedRequestId: string) {
+  decoder.receivePart(frame);
+  if (decoder.isError()) {
+    throw new Error('Could not decode the signature QR code');
+  }
+  if (!decoder.isSuccess()) return;
+
+  const ur = decoder.resultUR();
+  if (ur.type !== 'eth-signature') {
+    throw new Error('Expected an eth-signature response');
+  }
+  const result = ETHSignature.fromCBOR(ur.cbor);
+  const expectedId = Buffer.from(expectedRequestId.replace(/-/g, ''), 'hex');
+  const receivedId = result.getRequestId();
+  if (!receivedId || !receivedId.equals(expectedId)) {
+    throw new Error('Signature request ID does not match');
+  }
+  const signature = result.getSignature();
+  if (signature.length !== 65) {
+    throw new Error('Expected a 65-byte Ethereum signature');
+  }
+  return {
+    r: signature.subarray(0, 32),
+    s: signature.subarray(32, 64),
+    v: signature[64],
+  };
 }
 ```
 
-## Signature Format
-
-The signature is 65 bytes:
-- `r` (32 bytes): First part of ECDSA signature
-- `s` (32 bytes): Second part of ECDSA signature
-- `v` (1 byte): Recovery ID
-
+Use your Ethereum library to interpret `v` for the original transaction type and chain, recover the signer, and assemble the signed transaction. Reuse the exact unsigned transaction that was sent to the device. Do not attach this signature to a newly constructed or modified transaction.

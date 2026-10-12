@@ -2,36 +2,22 @@
 title: 事件
 ---
 
-# 事件
+<span id="accountschanged" />
+<span id="chainchanged-已弃用" />
 
-OneKey 浏览器扩展 Provider 实现了 [Node.js `EventEmitter`](https://nodejs.org/api/events.html) API。
+# Nostr 事件
 
-本节详细介绍通过该 API 发出的事件。
-
-网上有大量关于 `EventEmitter` 的指南，你可以像这样监听事件：
-
-## accountsChanged
-
-当切换账户时触发。
+OneKey provider 发出的 `accountChanged` 事件不携带参数。收到事件后，应清除缓存的账户状态，并在需要时重新获取当前公钥。通信桥断开时，还会发出 `disconnect`。这些事件是 OneKey 对 NIP-07 的扩展。
 
 ```javascript
-window.nostr.on('accountsChanged', (accounts) => {
-    // 处理新账户，或没有账户的情况。
-    // "accounts" 始终是一个数组，但可能为空。
-});
-window.nostr.off('accountsChanged');
-```
+const provider = window.$onekey?.nostr;
+if (!provider) throw new Error('OneKey Nostr provider is unavailable.');
 
-## chainChanged **（已弃用）**
+const onAccountChanged = () => {
+  // Clear the cached public key and any account-specific UI.
+};
+provider.on('accountChanged', onAccountChanged);
 
-当链变更时触发。
-
-```
-window.nostr.on('chainChanged', (chainId) => {
-    // 处理新链。
-    // 正确处理链变更可能比较复杂。
-    // 我们建议重新加载页面，除非你有充分的理由不这样做。
-    window.location.reload();
-});
-window.nostr.off('chainChanged');
+// Run during cleanup.
+provider.off('accountChanged', onAccountChanged);
 ```

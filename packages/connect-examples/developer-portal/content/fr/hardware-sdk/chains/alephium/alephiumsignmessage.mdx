@@ -1,0 +1,76 @@
+---
+title: "alephiumSignMessage"
+---
+
+# alephiumSignMessage
+
+### Exigences [#requirements]
+
+* Versions minimales du micrologiciel
+  * Touch : 4.10.0
+
+### Alephium : signer un message [#alephium-sign-message]
+
+Signer un message avec la clé privée dérivée du chemin BIP32 spécifié. L’utilisateur doit confirmer l’action sur l’appareil OneKey.
+
+```typescript
+// Original message
+const message = "Hello Alephium";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+const result = await HardwareSDK.alephiumSignMessage(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    messageHex,  // "Hello Alephium" in hex
+    messageType: "alephium"
+});
+```
+
+#### Paramètres [#params]
+
+[Paramètres communs facultatifs](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`
+* `messageHex` - _obligatoire_ `string` message à signer au format hexadécimal
+* `messageType` - _obligatoire_ `"alephium" | "sha256" | "blake2b" | "identity"`. Mode de signature de message.
+
+#### Exemple [#example]
+
+```typescript
+// Original message
+const message = "Hello Alephium";
+
+// Convert to hex
+const messageHex = Buffer.from(message).toString('hex');
+
+const response = await HardwareSDK.alephiumSignMessage(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    messageHex,
+    messageType: "alephium"
+});
+```
+
+Résultat
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

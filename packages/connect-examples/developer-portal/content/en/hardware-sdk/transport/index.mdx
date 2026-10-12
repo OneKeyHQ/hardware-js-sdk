@@ -1,10 +1,11 @@
 ---
+description: "Choose WebUSB, React Native BLE, or a native BLE adapter for your OneKey integration."
 title: Transport
 ---
 
 # Choose a transport
 
-Hardware SDK 1.2.0 uses one JavaScript API. `init({ env })` selects the **transport**, not Protocol V1 vs V2.
+Hardware SDK 1.2.x uses one JavaScript API. `init({ env })` selects the **transport**, not Protocol V1 vs V2.
 
 | Platform | Transport | Package | `env` | Guide |
 | --- | --- | --- | --- | --- |
@@ -15,7 +16,7 @@ Hardware SDK 1.2.0 uses one JavaScript API. `init({ env })` selects the **transp
 | Flutter host | BLE via low-level plugin | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Flutter](/en/hardware-sdk/transport/flutter) |
 | Native BLE overview | BLE | `@onekeyfe/hd-common-connect-sdk` | `lowlevel` | [Native BLE](/en/hardware-sdk/transport/native-ble) |
 
-USB covers every OneKey device. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — **not Mini**. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
+USB requires a compatible device interface and firmware; validate connection and signing on your target platform. BLE is Pro, Pro 2, Neo, Touch, Classic 1s / Pure — **not Mini**. Air-Gap QR is a separate product path: [Air-Gap](/en/air-gap).
 
 ```mermaid
 flowchart TB
@@ -29,7 +30,7 @@ flowchart TB
 
 | Layer | What it is | How you choose it |
 | --- | --- | --- |
-| **Transport** | How bytes move: USB, BLE, or a native 64-byte plugin | `init({ env })` — `webusb` / BLE SDK / `lowlevel` |
+| **Transport** | How bytes move: USB, BLE, or a native BLE plugin | `init({ env })` — `webusb` / BLE SDK / `lowlevel` |
 | **Protocol** | On-wire V1 vs V2 after the link is up | SDK probe. Read `connectProtocol`. Do **not** infer from USB PID or BLE name |
 
 A Pro 2 on USB and a Pro 2 on BLE are both Protocol V2. A Classic on USB is Protocol V1. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol) and [Devices](/en/hardware-sdk/concepts/devices).
@@ -42,4 +43,4 @@ Do not use OneKey Bridge (`env: 'web'` + `checkBridgeStatus`) for new WebUSB app
 2. PIN / events: [Core API Guide](/en/hardware-sdk/core-api-guide)
 3. Drops and `dispose()`: [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
 4. Firmware: [Firmware Update](/en/hardware-sdk/firmware-update)
-5. Custom 64-byte bridge: [Low-level transport](/en/hardware-sdk/concepts/low-level-plugin)
+5. Custom BLE bridge: [Low-level transport](/en/hardware-sdk/concepts/low-level-plugin)

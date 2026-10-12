@@ -1,0 +1,77 @@
+---
+description: "従来の Protocol V1 の機能読み取りを維持しつつ、新しい統合を getDeviceState に移行します。"
+title: "機能を取得"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="get-features" />
+
+# 機能を取得
+
+<Callout type="warning">
+  **非推奨。Protocol V1 のみ。** Protocol V1 と V2 には [`getDeviceState`](/ja/hardware-sdk/basic-api/get-device-state) を使用してください。Classic / Mini / Touch / Pro は引き続きこのメソッドを呼び出せますが、Pro 2 と Neo は拒否します。
+</Callout>
+
+## デバイスの機能を取得 [#get-device-features]
+
+従来の Protocol V1 の機能情報を読み取ります。新しいコードでは [`getDeviceState`](/ja/hardware-sdk/basic-api/get-device-state) の `payload.identity.deviceId` を読み取ってください。
+
+```typescript
+const response = await HardwareSDK.getFeatures(connectId);
+```
+
+このメソッドは従来の機能情報を読み取ります。画面遷移やロック解除の API として使用せず、デバイスをホーム画面に戻す動作にも依存しないでください。
+
+### パラメーター [#params]
+
+[**任意の共通パラメーター**](/ja/hardware-sdk/concepts/common-params)
+
+### 例 [#example]
+
+```typescript
+const response = await HardwareSDK.getFeatures(connectId);
+```
+
+結果
+
+```typescript
+{
+    success: true,
+    payload: {
+        major_version: number, // major version number
+        minor_version: number, // middle version number
+        patch_version: number, // patch version number
+        bootloader_mode: null,
+        device_id: string,
+        pin_protection: boolean,
+        passphrase_protection: boolean, // enable passphrase
+        language: string,
+        label: string, // device name
+        initialized: boolean, // device initialization status
+        model: string,
+        safety_checks: string,
+        ble_name: string, // bluetooth name
+        ble_ver: string, // bluetooth firmware version
+        ble_enable: string,
+        se_enable: boolean,
+        se_ver: string,
+        backup_only: boolean,
+        onekey_version: string, // firmware Version
+        onekey_serial: string, // device Serial Number
+        bootloader_version: string, // bootloader version
+  }
+}
+```
+
+エラー
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

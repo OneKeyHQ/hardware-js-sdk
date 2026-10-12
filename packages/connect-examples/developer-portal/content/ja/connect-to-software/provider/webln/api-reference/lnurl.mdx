@@ -1,0 +1,70 @@
+---
+title: "lnurl"
+---
+
+# lnurl
+
+[LNURL](https://github.com/lnurl/luds) リクエストの実行を要求します。アプリケーションは [LNURL](https://github.com/lnurl/luds/blob/luds/01.md) 文字列を渡す必要があり、たとえばバックエンドから提供します。lnurl 関数は、LNURL 文字列の代わりに [LUD-16](https://github.com/lnurl/luds/blob/luds/16.md) の静的識別子 (例: user@example.com) も受け付けます。
+
+このメソッドは LNURL フローの完了時に解決される Promise を返します。LNURL サーバーの最後のレスポンスを返し、LNURL-pay では支払い情報 (preimage、支払いハッシュ)、LNURL-auth では認証情報 (メッセージ、署名) も含みます。
+
+## メソッド [#method]
+
+```typescript
+declare function lnurl(lnurl: string): Promise<LNURLResponse>;;
+```
+
+## レスポンス [#response]
+
+```typescript
+type LNURLResponse =
+  | {
+      status: "OK";
+      data?: unknown
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## LNURL-pay レスポンス [#lnurl-pay-response]
+
+```typescript
+type LNURLPayResponse =
+  | {
+      status: "OK";
+      data: {
+        preimage: string,
+        paymentHash: string,
+        paymentRequest: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## LNURL-auth レスポンス [#lnurl-auth-response]
+
+```typescript
+type LNURLAuthResponse =
+  | {
+      status: "OK";
+      data: {
+        message: string,
+        signature: string
+      }
+    }
+  | { status: "ERROR"; reason: string };
+```
+
+## 例 [#example]
+
+```typescript
+const lnurl = "<LNURL_OR_LIGHTNING_ADDRESS>";
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+if (!provider || typeof provider.lnurl !== "function") {
+  throw new Error("LNURL is not supported by this provider.");
+}
+
+await provider.enable();
+const result = await provider.lnurl(lnurl); // promise resolves once the LNURL process is finished (e.g. a payment is sent or the login is complete)
+```
+
+`result.status` を確認してください。`ERROR` レスポンスには `reason` が含まれます。接続やユーザー承認の失敗を含め、Promise の拒否もキャッチしてください。任意の `data` ペイロードは LNURL フローによって異なります。確認せずに固定の形式を仮定しないでください。

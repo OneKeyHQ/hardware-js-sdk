@@ -1,0 +1,80 @@
+---
+description: "権限処理と GATT 接続・通知フローの完了を管理し、OneKey SDK を Android BLE に橋渡しします。"
+title: "Android: Bluetooth で接続"
+---
+
+<span id="android-connect-via-bluetooth" />
+
+# Android: Bluetooth で接続
+
+WebView で `@onekeyfe/hd-common-connect-sdk` を実行し、低レベルトランスポートをネイティブ BLE に橋渡しします。まず[ネイティブ Android の例](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example)と[低レベルトランスポートプラグイン](/ja/hardware-sdk/concepts/low-level-plugin)の仕様を参照してください。
+
+ネイティブ層は権限、ボンディング、GATT 接続、特性の I/O、クリーンアップを担当します。SDK はプロトコル検出、フレーミング、署名を担当します。ネイティブブリッジに別の V1/V2 デコーダーを追加しないでください。
+
+## 権限 [#permissions]
+
+Android 12 以降を対象とするアプリでは、実行時に `BLUETOOTH_SCAN` と `BLUETOOTH_CONNECT` を要求します。スキャンと接続のみを行うクライアントに `BLUETOOTH_ADVERTISE` は不要です。
+
+`neverForLocation` は BLE スキャンから位置情報を取得しない場合にのみ使用します。古い Android では適切な従来の Bluetooth/位置情報権限が必要です。古いデバイスに Android 12 専用の権限を無条件に要求しないでください。対象 SDK と位置情報の用途に合わせ、[Android Bluetooth 権限ガイド](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions)に従ってください。
+
+権限の承認待ち中にスキャンを開始しないでください。拒否された場合は JS の呼び出し元に権限エラーを返し、後でユーザー操作から再試行できるようにします。
+
+## JavaScript バンドルのビルドと読み込み [#build-and-load-the-javascript-bundle]
+
+hardware-js-sdk のチェックアウトから実行:
+
+```bash
+cd packages/connect-examples/native-android-example/web
+yarn
+yarn build
+```
+
+`web_dist/` を `app/src/main/assets/web_dist/` にコピーします。`file:///android_asset/web_dist/index.html` を読み込む前に、ネイティブブリッジのハンドラーを登録してください。アセットパスを維持し、デバイスブリッジにアクセスできる WebView には、アプリの信頼できるバンドルだけを読み込んでください。
+
+デモには依存関係とブリッジの実装が含まれます。異なる Nordic BLE ライブラリのバージョンのスニペットを混ぜず、デモのパッケージ/Gradle 設定を出発点にしてください。
+
+## 解決前に BLE 接続を完了 [#complete-the-ble-connection-before-resolving]
+
+固定時間の待機では、ボンディング、GATT 接続、検出、通知購読の成功は確認できません。コールバックまたは BLE ライブラリの中断可能な完了 API に従ってください:
+
+1. 必要なボンディングを完了し、ユーザーの拒否やタイムアウトを報告します。
+2. GATT 接続の成功を待ちます。
+3. OneKey サービスと必要な 2 つの特性を検出します。
+4. 通知を有効にし、記述子/購読の完了を待ちます。
+5. ブリッジの次の `connect` 呼び出しは、送受信可能になってから解決します。
+
+Android は操作の結果を次で公開します: [`BluetoothGattCallback`](https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback)。操作開始の呼び出しに成功しても、操作の完了ではありません。各保留操作にタイムアウトを設定し、失敗時には接続を閉じて、保留中のブリッジ呼び出しを拒否してください。
+
+| 目的 | UUID |
+| --- | --- |
+| サービス | `00000001-0000-1000-8000-00805f9b34fb` |
+| 書き込み | `00000002-0000-1000-8000-00805f9b34fb` |
+| 通知 | `00000003-0000-1000-8000-00805f9b34fb` |
+
+## ブリッジの仕様 [#bridge-contract]
+
+| 方法 | 完了条件 |
+| --- | --- |
+| `enumerate()` | 重複を除いた候補のスナップショットを返し、スキャンを停止して、リクエストを一度だけ完了します。 |
+| `connect(uuid)` | 接続、特性、通知の準備が完了。 |
+| `send(uuid, data, options)` | 16 進数を検証し、`withoutResponse` に従ってバイトを順に書き込み、書き込みエラーを伝播します。 |
+| `receive(uuid)` | 次のキュー内通知チャンクを 16 進数で返します。読み取り待機開始前に受信したチャンクも含めます。 |
+| `disconnect(uuid)` | 購読をキャンセルし、選択した接続を閉じ、保留中の読み取りを拒否して、古い通知データを破棄します。 |
+
+キューとコールバックは接続ごとに保持します。特性がない場合は拒否し、null 許容の書き込みを成功扱いにしないでください。WebView ブリッジのコールバックは適切な UI スレッドで送信します。
+
+Protocol V2 を実装する場合は、実際の BLE 書き込み容量を `getProtocolV2PacketCapacity` で公開してください。オーバーヘッドを含む ATT MTU を返さないでください。完全な仕様は[プラグインインターフェース](/ja/hardware-sdk/concepts/low-level-plugin#lowleveltransportsharedplugin-interface)を参照してください。
+
+## SDK と UI のライフサイクル [#sdk-and-ui-lifecycle]
+
+バンドルではプラグインを指定して `env: 'lowlevel'` で初期化します。初期化結果を確認して接続を検出し、`getDeviceState(connectId)` を呼び出して、シードの存続期間に対応する `deviceId` を取得します。
+
+保護された呼び出しの前に [UI イベント処理](/ja/hardware-sdk/core-api-guide#events-ui)を登録してください。入力リクエストだけに返信し、応答の関連付け情報をコピーしてください。`REQUEST_BUTTON` とデバイス専用の PIN プロンプトは通知です。ネイティブの「OK」ボタンでハードウェア上の操作を承認することはできません。
+
+アドレス取得と署名の呼び出しには、標準ウォレットの場合は `useEmptyPassphrase: true`、選択した隠しウォレットの場合は `passphraseState` を渡します。デバイスごとに直列化してください。
+
+## 統合を検証 [#verify-the-integration]
+
+実機で、権限拒否、ボンディングのキャンセル、検出失敗、通知失敗、ロック中デバイスの入力、取り外し/切断、再接続をテストしてください。デバイス上でアドレスを確認し、SDK の結果を検査します。BLE 広告が見つかっただけでは、一連の動作の合格にはなりません。
+
+タイムアウト後に署名やファームウェア更新を自動再実行しないでください。参照: [再接続と破棄](/ja/hardware-sdk/transport/reconnect).

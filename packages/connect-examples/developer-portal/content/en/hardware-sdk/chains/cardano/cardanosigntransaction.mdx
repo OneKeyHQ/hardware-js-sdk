@@ -4,15 +4,15 @@ title: cardanoSignTransaction
 
 # cardanoSignTransaction
 
-## Use requirement
+## Requirements
 
-* Firmware version required
+* Minimum firmware versions
   * Touch: 4.1.0
   * Classic/Mini: 3.0.0
 
 ### Cardano: Sign transaction <a href="#cardano-sign-transaction" id="cardano-sign-transaction"></a>
 
-Asks device to sign given transaction. User is asked to confirm all transaction details on OneKey.
+Requests a transaction signature. The user reviews and confirms the request on the device.
 
 ```javascript
 const response = await HardwareSDK.cardanoSignTransaction(connectId, deviceId, params);
@@ -51,7 +51,7 @@ CardanoSignTransaction type
 
 **`ORDINARY_TRANSACTION`**
 
-Represents an ordinary user transaction transferring funds, delegating stake or withdrawing rewards. The transaction will be witnessed by keys derived from paths included in the `inputs`, `certificates` and `withdrawals`. Additionaly, if token minting is present, transaction will also be witnessed by keys derived from paths included in `additionalWitnessRequests`.
+Represents an ordinary user transaction transferring funds, delegating stake or withdrawing rewards. The transaction will be witnessed by keys derived from paths included in the `inputs`, `certificates` and `withdrawals`. Additionally, if token minting is present, transaction will also be witnessed by keys derived from paths included in `additionalWitnessRequests`.
 
 The transaction
 
@@ -64,7 +64,7 @@ The transaction
 
 #### Stake pool registration certificate specifics <a href="#stake-pool-registration-certificate-specifics" id="stake-pool-registration-certificate-specifics"></a>
 
-OneKey supports signing of stake pool registration certificates as a pool owner. The transaction may contain external inputs (e.g. belonging to the pool operator) and OneKey is not able to verify whether they are actually external or not, so if we allowed signing the transaction with a spending key, there is the risk of losing funds from an input that the user did not intend to spend from. Moreover there is the risk of inadvertedly signing a withdrawal in the transaction if there's any. To mitigate those risks, we introduced special validation rules for stake pool registration transactions which are validated on OneKey as well. The validation rules are the following:
+OneKey supports signing of stake pool registration certificates as a pool owner. The transaction may contain external inputs (e.g. belonging to the pool operator) and OneKey is not able to verify whether they are actually external or not, so if we allowed signing the transaction with a spending key, there is the risk of losing funds from an input that the user did not intend to spend from. Moreover there is the risk of inadvertently signing a withdrawal in the transaction if there's any. To mitigate those risks, we introduced special validation rules for stake pool registration transactions which are validated on OneKey as well. The validation rules are the following:
 
 1. The transaction must not contain any other certificates, not even another stake pool registration
 2. The transaction must not contain any withdrawals
@@ -361,5 +361,3 @@ Error
     }
 }
 ```
-
-\

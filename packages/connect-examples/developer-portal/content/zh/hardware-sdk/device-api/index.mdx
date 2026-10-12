@@ -1,8 +1,11 @@
 ---
 title: 设备 API
+description: 查询设备与固件信息，并按用户请求执行受保护的设备操作。
 ---
 
 # 设备 API
+
+提供设备变更入口前，先用只读方法获取状态。修改 PIN、设置、bootloader 和固件需要用户明确操作，并完成相应的设备确认。
 
 ### 方法列表
 
@@ -10,7 +13,6 @@ title: 设备 API
 * [checkFirmwareRelease](./checkfirmwarerelease)
 * [deviceChangePin](./devicechangepin)
 * [deviceSettings](./devicesettings)
-* [deviceSupportFeatures](./devicesupportfeatures)
 * [deviceSupportFeatures](./devicesupportfeatures)
 * [deviceUpdateReboot](./deviceupdatereboot)
 * [deviceVerify](./deviceverify)

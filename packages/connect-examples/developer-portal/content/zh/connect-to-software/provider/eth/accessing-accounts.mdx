@@ -2,21 +2,34 @@
 title: 访问账户
 ---
 
+<span id="访问账户" />
+
 # 访问账户
 
-## 访问账户
+请求账户权限前，先检测 Ethereum provider，参见 [Provider API](/zh/connect-to-software/provider/eth/provider-api)。`eth_requestAccounts` 应由用户点击“连接”等操作触发。仅需读取已向本站开放的账户时，使用 `eth_accounts`。
 
-用户账户在以太坊中有多种用途，包括作为标识符和用于签署交易。为了请求用户签名或让用户批准交易，必须能够访问用户的账户。以下 `wallet methods` 涉及签名或交易批准，都需要将发送账户作为函数参数。
+```javascript
+const provider = window.$onekey?.ethereum;
+if (!provider) throw new Error('OneKey Ethereum provider is unavailable.');
 
-* `eth_sendTransaction`
-* `eth_sign`（不安全，不建议使用）
-* `eth_personalSign`
-* `eth_signTypedData`
+try {
+  const accounts = await provider.request({ method: 'eth_requestAccounts' });
+  const address = accounts[0];
+  if (!address) throw new Error('No account was selected.');
+  console.log('Connected address:', address);
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('The user declined the connection request.');
+  } else {
+    console.error(error);
+  }
+}
+```
 
+请求处理期间禁用“连接”按钮。账户已连接，不代表用户预先批准了交易或签名。请按各方法的要求，将所选地址传给 `eth_sendTransaction`、`personal_sign` 或 `eth_signTypedData_v4`。
 
+监听 `accountsChanged`；收到空数组时，清除应用中的已连接账户状态。
 
-**连接账户示例：**
+## 演示
 
-
-<iframe src="https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codesandbox.io/embed/ethereum-provider-demo-rwgl5l?fontsize=14&hidenavigation=1&theme=dark)

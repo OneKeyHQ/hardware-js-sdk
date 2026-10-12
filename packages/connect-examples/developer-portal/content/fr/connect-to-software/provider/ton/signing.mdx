@@ -1,0 +1,114 @@
+---
+title: "Signature"
+description: "Signer des données sur TON avec OneKey"
+---
+
+import { Callout } from 'nextra/components'
+
+<span id="signing" />
+
+# Signature
+
+Connectez le portefeuille avant d’envoyer des requêtes. Remplacez les adresses et URL de manifeste d’exemple par des valeurs valides. Pour l’authentification, utilisez un défi à usage unique généré par le serveur et vérifiez la preuve sur votre serveur.
+
+Découvrez comment signer des données pour une vérification hors chaîne.
+
+---
+
+## Signer des données arbitraires [#sign-arbitrary-data]
+
+Signer des cellules de données pour une vérification hors chaîne :
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // Custom schema identifier
+      cell: cellBoc.toString('base64'), // Base64 encoded cell to sign
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Signature:', result.result.signature) // Base64 signature
+  console.log('Timestamp:', result.result.timestamp) // UNIX timestamp
+}
+```
+
+---
+
+## Signer une preuve (authentification) [#sign-proof-authentication]
+
+Demander une preuve d’authentification pendant la connexion :
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // Nonce for replay protection
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem && "proof" in proofItem) {
+    // Send proof to your backend for verification
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## Gestion des erreurs [#error-handling]
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('User rejected the transaction')
+      break
+    case 1:
+      console.log('Bad request - check parameters')
+      break
+    case 400:
+      console.log('Method not supported')
+      break
+    default:
+      console.error('Error:', result.error.message)
+  }
+} else {
+  console.log('Success:', result.result)
+}
+```
+
+---
+
+## Codes d’erreur [#error-codes]
+
+| Code | Description |
+|------|-------------|
+| 0 | Erreur inconnue |
+| 1 | Requête incorrecte |
+| 100 | Application inconnue |
+| 300 | Demande rejetée par l’utilisateur |
+| 400 | Méthode non prise en charge |

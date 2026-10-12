@@ -1,0 +1,107 @@
+---
+title: btcDeriveContextHash
+description: "Deriva un hash de contexto Babylon en Classic 1s o Classic 1s Pure seleccionando explícitamente la billetera, la aplicación y la red."
+---
+
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / BITCOIN / BABYLON</div>
+
+# btcDeriveContextHash
+
+Deriva en el dispositivo un hash de contexto Babylon de 32 bytes para la clave Bitcoin, la aplicación, el contexto y la red seleccionados. La respuesta contiene un `secret` sensible para que lo utilice tu aplicación.
+
+Disponible en el SDK `1.2.8-alpha.6`. Requiere **Classic 1s o Classic 1s Pure con firmware 3.21.0 o posterior** y **Protocol V1**. Las demás familias de dispositivos y Protocol V2 no son compatibles.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, params);
+```
+
+<div className="doc-method-flow"><span>01 <strong>Preparar el contexto</strong></span><span aria-hidden="true">→</span><span>02 <strong>Confirmar en el dispositivo</strong></span><span aria-hidden="true">→</span><span>03 <strong>Usar el secreto</strong></span></div>
+
+## Antes de la llamada [#before-you-call]
+
+- [Inicializa el SDK y selecciona un dispositivo](/es/hardware-sdk/getting-started).
+- Registra los [controladores de eventos de interfaz](/es/hardware-sdk/core-api-guide#events-ui) y selecciona explícitamente la [sesión de billetera](/es/hardware-sdk/concepts/wallet-session) deseada.
+- Antes de la llamada, obtén la aprobación del usuario para la aplicación solicitante y su origen. El llamante proporciona `appName`; tu aplicación debe determinar qué sitio o aplicación solicita acceso.
+
+## Parámetros [#params]
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>obligatorio</b></div><p>El identificador de conexión devuelto por la búsqueda de dispositivos.</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>obligatorio</b></div><p>La identidad de la billetera devuelta por getDeviceState u openWalletSession.</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>obligatorio</b></div><p>Ruta BIP32 de la clave Bitcoin conectada, con al menos 3 componentes. El tipo de script se infiere de la ruta. Usa la ruta de la clave conectada, no la ruta interna de derivación IKM.</p></div>
+<div className="doc-parameter"><div><code>params.appName</code><span>string</span><b>obligatorio</b></div><p>1–64 caracteres ASCII que coincidan con [a-z0-9-].</p></div>
+<div className="doc-parameter"><div><code>params.context</code><span>string</span><b>obligatorio</b></div><p>Cadena hexadecimal en minúsculas, de longitud par y sin prefijo 0x, que representa 1–1024 bytes. Un contexto vacío no es válido. El SDK envía los bytes decodificados al dispositivo.</p></div>
+<div className="doc-parameter"><div><code>params.network</code><span>string</span><b>obligatorio</b></div><p>Exactamente bitcoin-mainnet, bitcoin-testnet, bitcoin-signet o bitcoin-regtest. Tanto testnet3 como testnet4 usan bitcoin-testnet. La red no se infiere de la ruta.</p></div>
+</div>
+
+[**Parámetros comunes opcionales**](/es/hardware-sdk/concepts/common-params)
+
+## Ejemplo [#example]
+
+Este fragmento presupone un SDK inicializado y una billetera estándar seleccionada. Sustituye los valores de ejemplo `path`, `appName`, `context` y `network` por los aprobados por el usuario. El contexto siguiente es un ejemplo de datos codificados en hexadecimal.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  appName: 'babylon-example',
+  context: '48656c6c6f',
+  network: 'bitcoin-mainnet',
+  useEmptyPassphrase: true,
+});
+
+if (result.success === false) throw new Error(result.payload.error);
+const secret = result.payload.secret;
+// Use only for the approved application and context. Do not log or persist it.
+```
+
+El ejemplo selecciona explícitamente la billetera estándar con `useEmptyPassphrase: true`. Para una billetera oculta, pasa el mismo `passphraseState` utilizado al confirmar la cuenta Bitcoin conectada. Se mantiene el flujo habitual de PIN, passphrase y confirmación en el dispositivo.
+
+## Respuesta [#result]
+
+Comprueba `success` antes de leer el contenido de la respuesta. Si la operación tiene éxito, `payload.secret` es una cadena hexadecimal en minúsculas de 64 caracteres (32 bytes). Las pestañas siguientes muestran tipos de respuesta, no valores secretos reales.
+
+<Tabs items={["Éxito", "Error"]} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+type SuccessResponse = {
+  success: true;
+  payload: {
+    secret: string; // 64 lowercase hexadecimal characters (32 bytes)
+  };
+};
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+type ErrorResponse = {
+  success: false;
+  payload: {
+    error: string;
+    code?: string | number;
+  };
+};
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## Errores y manejo del secreto [#errors-and-secret-handling]
+
+Un valor no válido de `path`, `appName`, `context` o `network` devuelve `CallMethodInvalidParameter` (`405`) antes de enviar el comando de derivación. Las familias de dispositivos no compatibles o Protocol V2 devuelven `DeviceNotSupportMethod` (`415`); el firmware anterior a 3.21.0 requiere una actualización.
+
+La cancelación en el dispositivo devuelve la respuesta estándar `success: false`. Detén la solicitud y procesa `payload.error` y `payload.code` antes de intentar otra llamada.
+
+El SDK devuelve el `secret` real a tu aplicación. Trátalo como un dato sensible: mantenlo fuera de los registros, la telemetría, el portapapeles y el almacenamiento persistente. La derivación se ejecuta en el dispositivo; la clave interna de la billetera no se exporta.
+
+## Siguientes pasos [#next-steps]
+
+- [Sesiones de billetera y vinculación de passphrase](/es/hardware-sdk/concepts/wallet-session)
+- [Especificación de Babylon para la derivación del hash de contexto](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md)

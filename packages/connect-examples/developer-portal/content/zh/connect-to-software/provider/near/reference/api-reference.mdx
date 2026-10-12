@@ -2,5 +2,21 @@
 title: API 参考
 ---
 
-# API 参考
+# NEAR API 参考
 
+按[安装 SDK](/zh/connect-to-software/provider/near/integrating/install-the-provider-sdk)中的说明，创建 `OneKeyNearProvider` 实例。provider 提供便捷方法和 `request({ method, params })` 接口。
+
+| 操作 | 方法 | 结果 |
+| --- | --- | --- |
+| 检测扩展 | `detectWalletInstalled()` | `Promise<boolean>` |
+| 请求账户访问权限 | `requestSignIn()` / `near_requestAccounts` | `{ accounts: NearAccountInfo[] }` |
+| 读取开放的账户 | `near_accounts` | `{ accounts: NearAccountInfo[] }` |
+| 读取所选网络 | `near_networkInfo` | `{ networkId: string, nodeUrls?: string[] }` |
+| 断开连接 | `signOut()` / `near_signOut` | 等待完成后再更新连接状态 |
+| 构建交易 | `createTransaction({ receiverId, actions, nonceOffset })` | 未签名交易 |
+| 签名并发送 | `requestSignTransactions({ transactions })` / `near_sendTransactions` | `{ transactionHashes: string[] }` |
+| 签署消息 | `near_signMessages` | `{ signatures: string[] }` |
+
+`NearAccountInfo` 包含 `accountId`、`publicKey` 和可选的 `allKeys`。没有开放账户时，结果数组可能为空。
+
+仅签名请求见[签署交易](/zh/connect-to-software/provider/near/integrating/sending-transactions/signing-transaction)，状态变化见[事件](/zh/connect-to-software/provider/near/integrating/watch-accounts-and-network-status)，错误处理见[故障排查](/zh/connect-to-software/provider/near/reference/trouble-shooting)。其他方法的可用性取决于 RPC 端点和钱包版本。

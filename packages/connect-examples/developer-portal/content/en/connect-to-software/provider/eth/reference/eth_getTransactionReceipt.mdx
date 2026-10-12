@@ -90,17 +90,19 @@ console.log('Transaction status:', receipt.status === '0x1' ? 'Success' : 'Faile
 ### Parse Contract Events
 
 ```typescript
-// After getting receipt, parse Transfer event logs
+// Set tokenAddress to the intended ERC-20 contract before parsing its Transfer logs.
 const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
 const transferLogs = receipt.logs.filter(
-  log => log.topics[0] === transferTopic
+  log => log.address.toLowerCase() === tokenAddress.toLowerCase()
+    && log.topics[0] === transferTopic
+    && log.topics.length === 3
 )
 
 transferLogs.forEach(log => {
   const from = '0x' + log.topics[1].slice(26)
   const to = '0x' + log.topics[2].slice(26)
-  const value = parseInt(log.data, 16)
+  const value = BigInt(log.data).toString()
   console.log(`Transfer: ${from} -> ${to}: ${value}`)
 })
 ```
@@ -121,3 +123,5 @@ transferLogs.forEach(log => {
 - `status` field: `0x1` = success, `0x0` = reverted
 - `contractAddress` is only present for contract creation transactions
 - Use `logs` to parse emitted events from the transaction
+
+Check the emitting contract and expected ABI when decoding logs. A matching topic alone does not identify a token, and ERC-721 uses the same Transfer event signature with a different indexed layout.

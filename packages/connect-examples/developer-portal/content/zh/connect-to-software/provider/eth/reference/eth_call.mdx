@@ -40,8 +40,8 @@ description: 执行只读合约调用
 ### 读取 ERC-20 余额
 
 ```typescript
-// balanceOf(address) 选择器: 0x70a08231
-const address = '0x你的地址...'.slice(2).padStart(64, '0')
+// balanceOf(address) selector: 0x70a08231
+const address = '0xYourAddress...'.slice(2).padStart(64, '0')
 const data = '0x70a08231' + address
 
 const balance = await window.$onekey.ethereum.request({
@@ -52,13 +52,13 @@ const balance = await window.$onekey.ethereum.request({
   }, 'latest']
 })
 
-console.log('余额:', parseInt(balance, 16))
+console.log('Balance:', BigInt(balance).toString())
 ```
 
 ### 读取合约名称
 
 ```typescript
-// name() 选择器: 0x06fdde03
+// name() selector: 0x06fdde03
 const name = await window.$onekey.ethereum.request({
   method: 'eth_call',
   params: [{
@@ -67,8 +67,9 @@ const name = await window.$onekey.ethereum.request({
   }, 'latest']
 })
 
-// 解码结果（ABI 编码的字符串）
-console.log('合约名称:', decodeString(name))
+// Decode the result (ABI encoded string)
+// Decode `name` with your ABI library's string decoder.
+console.log('ABI-encoded contract name:', name)
 ```
 
 ### 使用 ethers.js
@@ -84,8 +85,8 @@ const contract = new Contract(
   provider
 )
 
-const balance = await contract.balanceOf('0x你的地址...')
-console.log('USDC 余额:', balance.toString())
+const balance = await contract.balanceOf('0xYourAddress...')
+console.log('USDC Balance:', balance.toString())
 ```
 
 ---
@@ -101,7 +102,9 @@ console.log('USDC 余额:', balance.toString())
 
 ## 说明
 
-- 此方法不消耗 Gas，也不修改状态
-- `from` 地址是可选的，但可能影响某些合约的结果
-- 使用 `latest` 获取最新状态
-- 对于复杂的合约交互，建议使用 ethers.js 或 web3.js
+- 该方法不会产生链上 gas 费用，也不会修改状态。
+- `from` 地址可选，但可能影响某些合约的执行结果。
+- 根据用途选择区块标签；`latest` 表示该端点可见的最新区块。
+- 复杂合约交互可使用 ethers.js 或 web3.js。
+
+示例中的代币地址位于 Ethereum 主网。编码 `balanceOf` 参数前，请确认网络，并替换为完整的 20 字节账户地址。

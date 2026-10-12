@@ -1,0 +1,186 @@
+---
+title: "evmSignTypedData"
+---
+
+# evmSignTypedData
+
+### Ethereum : signer des données typées [#ethereum-sign-typed-data]
+
+Demande à l’appareil de signer un message de données typées [EIP-712](https://eips.ethereum.org/EIPS/eip-712) avec la clé privée dérivée du chemin BIP32 spécifié.
+
+L’appareil demande à l’utilisateur de confirmer la requête. Les détails affichés dépendent de l’utilisation de la signature après analyse ou de la signature de hashes.
+
+* **Prend en charge EIP-712 (v3 et v4)**
+* **Utilisez `evmSignTypedData` pour signer des données structurées typées**
+* **Ne convient pas à la signature de données typées EIP-191**
+* **Utilisez** [evmSignMessage](/fr/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) **pour signer EIP-191(**&#x70;ersonal\_sign)
+
+```typescript
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
+```
+
+### Paramètres [#params]
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+* `path` - _obligatoire_ `string | Array<number>` La longueur minimale du SDK est `3`. [en savoir plus](/fr/hardware-sdk/concepts/common-params#hd-path)
+* `data` - _obligatoire_ `Object` de type `EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>`. Une définition JSON Schema est disponible dans la spécification EIP-712.
+* `metamaskV4Compat` - _obligatoire_ `boolean` définir sur `true` pour la compatibilité avec [signTypedData\_v4 de MetaMask](https://docs.metamask.io/metamask-connect/evm/guides/sign-data/#sign-typed-data-v4).
+* `chainId` - _facultatif_ `number` Le ChainId dans ETH est un identifiant unique d’un réseau Ethereum précis, utilisé pour distinguer les différentes versions de la blockchain. [Référence](https://github.com/ethereum-lists/chains/tree/master/_data/chains).
+
+### Signature après analyse [#parsed-signing]
+
+Transmettez l’objet EIP-712 complet, y compris `types.EIP712Domain`, et définissez `metamaskV4Compat` pour correspondre à la demande d’origine. Dans le parcours avec analyse, l’appareil demande au SDK les définitions de types et les valeurs des champs. Les détails disponibles dépendent de l’appareil et du micrologiciel ; consultez le [guide Clear Signing](/fr/hardware-sdk/signers/evm#clear-signing).
+
+### Repli vers la signature de hashes [#hash-signing-fallback]
+
+Lorsque le SDK sélectionne la signature de hashes, l’appareil reçoit des hashes précalculés au lieu du message structuré. Il s’agit d’une signature à l’aveugle, pas d’une signature structurée Clear Signing. Les hashes doivent être dérivés des **données strictement identiques** avec le même mode d’encodage ; le SDK ne calcule pas les hashes fournis et ne les compare pas à `data`.
+
+- `domainHash` : facultatif pour la signature après analyse ; obligatoire pour le repli. Hash de domaine EIP-712 de 32 octets encodé en hexadécimal.
+- `messageHash` : facultatif dans le type public, mais requis par les branches actuelles de repli automatique. Hash de structure de message EIP-712 de 32 octets encodé en hexadécimal, et non l’empreinte finale de signature `0x1901`. Une demande portant uniquement sur le domaine (`primaryType: 'EIP712Domain'`) peut l’omettre lors de la signature après analyse ; la validation actuelle du repli exige toujours les deux hashes.
+
+Le SDK actuel choisit le repli dans les cas suivants :
+
+| Condition | Périmètre |
+| --- | --- |
+| Absence de capacité d’analyse EIP-712, ou dépassement d’une limite de format | Classic, Mini, Classic1s, Classic Pure ; Classic1s/Pure ne sont pas des appareils imposant systématiquement la signature à l’aveugle |
+| Tableaux imbriqués dans les données fournies | Toutes les familles d’appareils |
+| Les octets hexadécimaux dans `message.data` dépassent la limite applicable | 1,536 octets pour Classic1s/Pure et Pro2/Neo ; 1,536 octets pour Touch/Pro avec le micrologiciel 4.4.0 ou ultérieur ; 1,024 octets sinon |
+
+Le contrôle de taille ci-dessus mesure `message.data`, et non le document JSON complet. La famille Classic/Mini impose aussi des limites de format : 16 champs par structure, 63 caractères par nom de type/membre, 24 champs de type tableau, une profondeur de chemin d’accès de 6, 8 structures de dépendance personnalisées hors type principal et domaine, et 1,536 octets par valeur string/bytes. Les tableaux de valeurs primitives sont limités à 24 éléments ; les tableaux de structures ont cette limite en mode v4. Les dépendances cycliques entre types déclenchent aussi le repli.
+
+Sur Touch/Pro, la signature de hashes nécessite le micrologiciel 4.2.0 ou ultérieur. Les versions antérieures renvoient `CallMethodNeedUpgradeFirmware` lorsque ce parcours est sélectionné.
+
+Fournir des hashes ne force pas le parcours de signature de hashes lorsque la signature après analyse est disponible. Si le repli est nécessaire et que les hashes sont absents, l’appel échoue. Gérez explicitement ce cas dans la politique de signature de l’application ; ne remplacez pas silencieusement la demande initiale et n’affirmez pas qu’une signature réussie prouve que tous les champs ont été affichés.
+
+### Exemple [#example]
+
+Ce fragment utilise `ethers` v6 pour préparer des hashes de repli compatibles v4. Réutilisez un SDK initialisé et le portefeuille sélectionné. Les hashes ne permettent pas de contourner la confirmation sur l’appareil.
+
+```typescript
+import { TypedDataEncoder } from 'ethers';
+
+const eip712Data = {
+    types: {
+        EIP712Domain: [
+            {
+                name: 'name',
+                type: 'string',
+            },
+            { name: 'chainId', type: 'uint256' },
+        ],
+        Message: [
+            {
+                name: "wallet",
+                type: "string"
+            },
+            {
+                name: "number",
+                type: "uint64"
+            }
+        ]
+    },
+    primaryType: 'Message',
+    domain: {
+        name: 'example.onekey.io',
+        chainId: 1,
+    },
+    message: {
+        "wallet": "OneKey Wallet",
+        // be careful with JavaScript numbers: MAX_SAFE_INTEGER is quite low
+        "number": `${2n ** 55n}`,
+    },
+};
+
+const { EIP712Domain, ...messageTypes } = eip712Data.types;
+const domainHash = TypedDataEncoder.hashDomain(eip712Data.domain);
+const messageHash = TypedDataEncoder.from(messageTypes).hash(eip712Data.message);
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+    path: "m/44'/60'/0'/0/0",
+    data: eip712Data,
+    metamaskV4Compat: true,
+    domainHash,
+    messageHash,
+    chainId: eip712Data.domain.chainId,
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+### Safe Tx [#safe-tx]
+
+Utilisez le schéma canonique Safe v1.3.0 `SafeTx` ci-dessous sur un micrologiciel compatible. Définissez `domain.verifyingContract` sur l’adresse Safe, utilisez le réseau réel et fournissez les dix champs du message. `operation` vaut `0` pour CALL ou `1` pour DELEGATECALL. Cet exemple utilise des adresses fictives et un nonce Safe de zéro ; remplacez-les par la transaction exacte proposée par votre application. Il omet les hashes de repli : les demandes nécessitant une signature de hashes échouent donc au lieu de fournir automatiquement ces hashes.
+
+```typescript
+const safeTypedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    SafeTx: [
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+      { name: 'operation', type: 'uint8' },
+      { name: 'safeTxGas', type: 'uint256' },
+      { name: 'baseGas', type: 'uint256' },
+      { name: 'gasPrice', type: 'uint256' },
+      { name: 'gasToken', type: 'address' },
+      { name: 'refundReceiver', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+    ],
+  },
+  primaryType: 'SafeTx',
+  domain: {
+    chainId: 1,
+    verifyingContract: '0x1111111111111111111111111111111111111111',
+  },
+  message: {
+    to: '0x2222222222222222222222222222222222222222',
+    value: '0',
+    data: '0x',
+    operation: '0',
+    safeTxGas: '0',
+    baseGas: '0',
+    gasPrice: '0',
+    gasToken: '0x0000000000000000000000000000000000000000',
+    refundReceiver: '0x0000000000000000000000000000000000000000',
+    nonce: '0',
+  },
+};
+
+const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  data: safeTypedData,
+  metamaskV4Compat: true,
+  chainId: safeTypedData.domain.chainId,
+});
+if (result.success === false) throw new Error(result.payload.error);
+```
+
+Cela renvoie une signature de propriétaire, pas une transaction diffusée. Conservez les données typées inchangées lors de la vérification et de la collecte des signatures. Consultez [l’intégration Safe Tx](/fr/hardware-sdk/signers/evm#eip-712-and-safe-tx) pour la distinction avec les appels Safe sur la chaîne.
+
+#### Résultat [#result]
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string, // hexadecimal string without the "0x" prefix
+    }
+}
+```
+
+Erreur
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code?: string | number // error code
+    }
+}
+```

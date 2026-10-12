@@ -1,5 +1,6 @@
 ---
 title: EVM Signer
+description: 在同一钱包上下文确认账户并签署 EVM 交易、消息和 Typed Data。
 ---
 
 # EVM Signer
@@ -65,6 +66,7 @@ const tokenContract = '0x1111111111111111111111111111111111111111';
 const spender = '0x2222222222222222222222222222222222222222';
 const erc20 = new Interface(['function approve(address spender, uint256 amount)']);
 const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   transaction: {
     to: tokenContract,
@@ -108,20 +110,22 @@ Safe 使用标准 `SafeTx` 主类型，`domain.chainId` 和 `domain.verifyingCon
 > 本模块依赖 `@onekeyfe/hd-core` 及连接层（如 `@onekeyfe/hd-common-connect-sdk`），请先完成基础 SDK 安装。
 
 ```bash
-npm install @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
 ```
 
 ## 初始化
 
+示例统一使用**标准钱包**。隐藏钱包应在每次地址和签名调用中，以经过确认的 `passphraseState` 替代 `useEmptyPassphrase: true`。受保护调用前先注册 [UI 处理器](/zh/hardware-sdk/core-api-guide#events-ui)，使用返回数据前检查 `success`。含待提供交易参数的代码是接入片段，应用仍需实现 UI、设备选择与网络数据获取。
+
 ```ts
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-
-const initialized = await HardwareSDK.init({ env: 'webusb', debug: false, fetchConfig: true });
+const initialized = await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
 if (!initialized) throw new Error('SDK initialization failed');
-
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 if (!devices.payload.length) throw new Error('No device connected');
+// Select explicitly in the application when more than one device is available.
+if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const { connectId } = devices.payload[0];
 if (!connectId) throw new Error('Device connection unavailable');
 const state = await HardwareSDK.getDeviceState(connectId);
@@ -144,10 +148,12 @@ if (!deviceId) throw new Error('Device identity unavailable');
 
 ```ts
 const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   showOnOneKey: true,
   chainId: 1,
 });
+if (!res.success) throw new Error(res.payload.error);
 // res.payload: { address, path }
 ```
 
@@ -177,16 +183,13 @@ type GetAddressResult = {
 支持 EIP‑1559 与 Legacy 交易，需传入序列化前的字段。除 `chainId` 外，数值字段必须为 `0x` 十六进制字符串（SDK 会去掉前导 0）。
 
 ```ts
-const { success, payload } = await HardwareSDK.evmSignTransaction(
-  connectId,
-  deviceId,
-  {
-    path: "m/44'/60'/0'/0/0",
-    transaction: tx,
-    useEmptyPassphrase: true,
-  },
-);
-// payload: { v, r, s, authorizationSignatures? }
+const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: tx,
+  useEmptyPassphrase: true,
+});
+if (!success) throw new Error(payload.error);
+// payload: { v, r, s }
 ```
 
 **参数**
@@ -213,10 +216,13 @@ Promise<{ success, payload: { v, r, s } }>
 
 ```ts
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: "m/44'/60'/0'/0/0",
   messageHex,
   chainId: 1,
 });
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature
 ```
 
 **参数**
@@ -238,16 +244,15 @@ Promise<{ success, payload: { address, signature } }>
 ### 场景 4：签名 Typed Data（EIP-712）
 
 ```ts
-const res = await HardwareSDK.evmSignTypedData(
-  connectId,
-  deviceId,
-  {
-    path: "m/44'/60'/0'/0/0",
-    data: typedData,
-    metamaskV4Compat: true,
-    chainId: 1,
-  },
-);
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
+  path: "m/44'/60'/0'/0/0",
+  data: typedData,
+  metamaskV4Compat: true,
+  chainId: 1,
+});
+if (!res.success) throw new Error(res.payload.error);
+// res.payload.signature
 ```
 
 **参数**
@@ -315,7 +320,7 @@ const rawTx = serialize({ ...tx, nonce: Number(tx.nonce), type: TransactionTypes
   v: Number(sig.v),
 });
 
-// 通过 RPC 广播，例如 ethers.js provider.sendTransaction(rawTx)
+// Broadcast with your RPC provider, e.g. ethers.js provider.sendTransaction(rawTx)
 ```
 
 ### 示例：Legacy 交易
@@ -332,9 +337,11 @@ const legacyTx = {
 };
 
 const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: accountPath,
   transaction: legacyTx,
 });
+if (!sig.success) throw new Error(sig.payload.error);
 ```
 
 ### 示例：personal_sign 消息签名
@@ -346,6 +353,7 @@ const message = 'Hello OneKey';
 const messageHex = hexlify(toUtf8Bytes(message));
 
 const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: accountPath,
   messageHex,
   chainId: 1,
@@ -396,6 +404,7 @@ const typedData = {
 };
 
 const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  useEmptyPassphrase: true,
   path: accountPath,
   data: typedData,
   metamaskV4Compat: true,
@@ -413,10 +422,10 @@ if (signer.toLowerCase() !== res.payload.address.toLowerCase()) {
 ## 验签与排障
 
 - 验签：
-  - 交易：用 `ethers/viem` 重新序列化，校验签名哈希与设备显示一致。
+  - 交易：保留所有已签字段，用 `ethers/viem` 重建交易并校验签名者与已确认账户一致；按设备实际显示核对地址、金额、网络与手续费。
   - personal_sign：按上方示例为签名补齐 `0x`，使用原始消息字节调用 `verifyMessage`。
   - EIP‑712：为签名补齐 `0x`，从 `types` 中排除 `EIP712Domain` 后调用 `verifyTypedData`；SDK 请求仍需保留完整 `types`。
-- 常见限制：超大 `data` 或异常字段可能被拒；`chainId` 必须与广播网络一致。
+- 常见限制：超大 `data` 或异常字段可能被拒；`chainId` 必须与广播网络一致。向用户报告拒绝原因；任何交易改动都需重新审阅，不自动改写请求。
 - 常见错误：
   - 路径不一致：默认 `m/44'/60'/0'/0/0`，按账户/地址递增；务必与地址确认一致。
   - Gas 字段缺失：1559 必填 `maxFeePerGas + maxPriorityFeePerGas`；Legacy 仅填 `gasPrice`。

@@ -6,13 +6,13 @@ title: getBalance
 
 查询账户余额
 
-### 方法
+## 方法
 
 ```typescript
-async function getBalance(): BalanceResponse
+declare function getBalance(): Promise<BalanceResponse>;
 ```
 
-### 响应
+## 响应
 
 ```typescript
 interface BalanceResponse {
@@ -21,7 +21,7 @@ interface BalanceResponse {
 }
 ```
 
-### 示例
+## 示例
 
 ```typescript
 const provider = (window.$onekey && window.$onekey.webln) || window.webln;
@@ -30,8 +30,6 @@ await provider.enable();
 const balance = await provider.getBalance();
 ```
 
-### 演示
+## 演示
 
-
-<iframe src="https://codepen.io/OneKeyHQ/pen/GRzXmqN" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
-
+[打开示例](https://codepen.io/OneKeyHQ/pen/GRzXmqN)

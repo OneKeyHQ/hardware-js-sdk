@@ -6,7 +6,7 @@ title: tonSignMessage
 
 ### 使用要求
 
-* 固件版本要求
+* 最低固件版本
   * Touch: 4.10.0
   * Pro 2 / Neo：Protocol V2（同一公开方法，SDK 负责字段映射）
 
@@ -20,7 +20,7 @@ const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     destination: "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_",
     tonAmount: 100,
     seqno: 0,
-    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    expireAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
     walletVersion: 3,
     isBounceable: false,
     isTestnetOnly: false
@@ -29,15 +29,15 @@ const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 
 #### 参数
 
-[**可选通用参数**](/zh/hardware-sdk/concepts/common-params)
+[可选通用参数](/zh/hardware-sdk/concepts/common-params)
 
 **必需参数**
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 3
+* `path` - _必需_ `string | Array<number>` SDK 校验的最小长度为 `3`。
 * `destination` - _必需_ `string` 目标地址
-* `tonAmount` - _必需_ `number` 要转账的 TON 数量
+* `tonAmount` - _必需_ `number | string`。转账金额，单位为 nanotons。
 * `seqno` - _必需_ `number` 序列号
-* `expireAt` - _必需_ `number` 消息过期时间戳
+* `expireAt` - _必需_ `number | string`。消息到期时间，使用 Unix 秒级时间戳。
 
 **可选参数**
 
@@ -45,8 +45,8 @@ const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 * `isBounceable` - _可选_ `boolean` 消息是否可弹回（默认：false）
 * `isTestnetOnly` - _可选_ `boolean` 是否使用测试网（默认：false）
 * `jettonMasterAddress` - _可选_ `string` Jetton 主合约地址
-* `jettonAmount` - _可选_ `number` 要转账的 Jetton 数量
-* `fwdFee` - _可选_ `number` Jetton 转账的转发费用
+* `jettonAmount` - _可选_ `number | string`。Jetton 数量，以该代币的最小单位表示。
+* `fwdFee` - _可选_ `number | string`。Jetton 转账的转发费用，单位为 nanotons。
 * `comment` - _可选_ `string` 消息备注
 * `mode` - _可选_ `number` 消息模式
 * `workchain` - _可选_ `TonWorkChain` TON 工作链
@@ -55,25 +55,25 @@ const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 #### 示例
 
 ```typescript
-// 简单的 TON 转账
+// Simple TON transfer
 const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     path: "m/44'/607'/0'",
     destination: "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_",
     tonAmount: 100,
     seqno: 0,
-    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    expireAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
     walletVersion: 3,
     isBounceable: false,
     isTestnetOnly: false
 });
 
-// 多笔原生代币转账
+// Multiple native TON transfers
 const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
     path: "m/44'/607'/0'",
     destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
     tonAmount: 100,
     seqno: 0,
-    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    expireAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
     walletVersion: 3,
     isBounceable: false,
     isTestnetOnly: false,
@@ -90,10 +90,10 @@ const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 {
     success: true,
     payload: {
-        skip_validate: boolean; // 用于在 Classic 1s 中跳过验证
+        skip_validate: boolean; // Used to skip validation in classic 1s.
         signature: string;
-        signing_message?: string; // 规范字段。Pro2/Neo 返回这个；SDK 也会从 V1 的拼写错误字段拷过来
-        signning_message?: string; // 已废弃的 Protocol V1 拼写。新代码不要读它
+        signing_message?: string; // Canonical field. Pro2/Neo return this; the SDK also copies it from the legacy V1 typo.
+        signning_message?: string; // Deprecated Protocol V1 typo. Do not read this in new code.
     }
 }
 ```
@@ -104,8 +104,8 @@ const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
 {
     success: false,
     payload: {
-        error: string, // 错误信息
-        code?: string | number // 错误码
+        error: string, // error message
+        code?: string | number // error code
     }
 }
 ```

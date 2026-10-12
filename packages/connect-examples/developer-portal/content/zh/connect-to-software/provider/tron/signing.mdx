@@ -7,6 +7,8 @@ import { Callout } from 'nextra/components'
 
 # 签名
 
+先连接 provider，并使用同一钱包对应的 TronWeb 实例。将省略的地址和合约方法替换为有效值。准备交易前，检查所选网络。
+
 了解如何在 TRON 上签署消息。
 
 ---
@@ -19,7 +21,7 @@ import { Callout } from 'nextra/components'
 const message = tronWeb.toHex('Hello TRON!')
 const signature = await provider.signMessage(message)
 
-console.log('签名:', signature)
+console.log('Signature:', signature)
 ```
 
 ---
@@ -32,7 +34,7 @@ console.log('签名:', signature)
 const message = 'Hello TRON!'
 const signature = await provider.signMessageV2(message)
 
-console.log('签名:', signature)
+console.log('Signature:', signature)
 ```
 
 ---
@@ -43,9 +45,9 @@ console.log('签名:', signature)
 const message = 'Hello TRON!'
 const signature = await provider.signMessageV2(message)
 
-// 使用 TronWeb 验证
+// Verify using TronWeb
 const address = await tronWeb.trx.verifyMessageV2(message, signature)
-console.log('签名者:', address)
+console.log('Signer:', address)
 ```
 
 ---
@@ -58,15 +60,12 @@ try {
     method: 'tron_requestAccounts'
   })
 
-  if (result.code !== 200) {
-    throw new Error(result.message)
+  if (result.code === 4001) {
+    console.log('A connection request is already pending')
+  } else if (result.code !== 200) {
+    console.log('Connection was not approved:', result.message)
   }
 } catch (error) {
-  if (error.code === 4001) {
-    console.log('用户拒绝了请求')
-  } else {
-    console.error('错误:', error.message)
-  }
+  console.error('Request failed:', error)
 }
 ```
-

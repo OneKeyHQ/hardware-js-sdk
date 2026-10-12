@@ -1,0 +1,83 @@
+---
+title: "API-Referenz"
+description: "Vollständige API-Referenz für den TRON-Provider von OneKey"
+---
+
+<span id="api-reference" />
+
+# API-Referenz
+
+Referenz der Methoden und Typen des TRON-Providers von OneKey.
+
+---
+
+## Provider-Methoden [#provider-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `request({ method, params })` | Allgemeine JSON-RPC-Anfrage |
+| `sign(transaction)` | Eine Transaktion signieren |
+| `signMessage(hexMessage)` | Hex-Nachricht signieren (V1) |
+| `signMessageV2(message)` | UTF-8-Nachricht signieren (V2) |
+| `getNodeInfo(callback)` | Knoteninformationen abrufen |
+
+---
+
+## Anfragemethoden [#request-methods]
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `tron_requestAccounts` | Verbindung anfordern |
+| `tron_getProviderState` | Provider-Status abrufen |
+| `tron_signTransaction` | Transaktion signieren |
+| `signMessageV1` | Nachricht signieren V1 |
+| `signMessageV2` | Nachricht signieren V2 |
+
+---
+
+## Antwortcodes [#response-codes]
+
+| Code | Beschreibung |
+|------|-------------|
+| 200 | Erfolg |
+| 4000 | Vom Nutzer abgelehnt |
+| 4001 | Anfrage in der Warteschlange |
+
+---
+
+## Ereignisse [#events]
+
+| Ereignis | Beschreibung |
+|-------|-------------|
+| `accountsChanged` | Konto geändert |
+| `chainChanged` | Netzwerk geändert |
+| `connect` | Verbunden |
+| `disconnect` | Getrennt |
+
+---
+
+## TronWeb-Methoden [#tronweb-methods]
+
+Nach dem Verbinden verwenden Sie `window.tronWeb`:
+
+| Methode | Beschreibung |
+|--------|-------------|
+| `tronWeb.trx.getBalance(address)` | TRX-Guthaben abrufen |
+| `tronWeb.trx.sendTransaction(to, amount)` | TRX senden |
+| `tronWeb.trx.sendRawTransaction(signedTx)` | Signierte Transaktion übertragen |
+| `tronWeb.trx.verifyMessageV2(msg, sig)` | Signatur prüfen |
+| `tronWeb.contract().at(address)` | Vertragsinstanz abrufen |
+| `tronWeb.toSun(trx)` | TRX in Sun umrechnen |
+| `tronWeb.fromSun(sun)` | Sun in TRX umrechnen |
+| `tronWeb.toHex(string)` | In Hex umwandeln |
+
+---
+
+## Eigenschaften [#properties]
+
+| Eigenschaft | Typ | Beschreibung |
+|----------|------|-------------|
+| `isTronLink` | `boolean` | TronLink-kompatibel |
+| `isOneKey` | `boolean` | OneKey-Kennung |
+| `tronWeb.ready` | `boolean` | TronWeb-Bereitschaftsstatus |
+| `tronWeb.defaultAddress.base58` | `string` | Aktuelle Adresse |

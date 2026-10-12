@@ -1,0 +1,32 @@
+---
+title: "CryptoCoinInfo"
+---
+
+# CryptoCoinInfo
+
+Die Klasse `CryptoCoinInfo` steht für Kryptowährungsinformationen. Diese Seite beschreibt den älteren Export aus `@onekeyfe/onekey-air-gap`, einschließlich seines Ethereum-Enum-Werts. Andere Registry-Pakete können andere Enums bereitstellen; verwenden Sie Konstruktor und Typen aus demselben installierten Paket.
+
+## Typen [#types]
+
+```typescript
+export enum Type {
+  bitcoin = 0,
+  ethereum = 60,
+}
+
+export enum Network {
+  mainnet,
+  testnet,
+}
+```
+
+## Parameter [#parameters]
+
+| Parameter | Typ | Beschreibung |
+|-----------|------|-------------|
+| `type` | `Type` | Erstes Konstruktorargument; Währungstyp (z. B. `bitcoin = 0`, `ethereum = 60`) |
+| `network` | `Network` | Zweites Konstruktorargument; Netzwerktyp (`mainnet` oder `testnet`) |
+
+## UR-Typ [#ur-type]
+
+Der UR-Typ ist `crypto-coin-info`. Erzeugen Sie die kodierte Nutzlast mit dem Registry-Encoder.

@@ -1,0 +1,77 @@
+---
+title: "Funciones"
+description: "Asocia las solicitudes de cartera, intercambio, mercado y seguridad con las habilidades disponibles."
+---
+
+<span id="capabilities" />
+
+# Funciones
+
+Utiliza las cuatro habilidades de cartera de OneKey para dirigir las solicitudes a los comandos de cartera, intercambio, mercado y seguridad. Consulta el esquema de la CLI instalada para conocer las cadenas, los parámetros y los campos de respuesta admitidos.
+
+## Operaciones de cartera [#wallet-operations]
+
+Utiliza esta habilidad cuando el usuario solicite saldos, direcciones de recepción, historial de transacciones, tipos de dirección BTC o transferencias.
+
+| Intención del usuario | Lenguaje natural | Habilidad correspondiente |
+| --- | --- | --- |
+| Consultar la cartera activa | `What wallet am I using?` | `onekey-wallet` lee el estado de la sesión activa. |
+| Mostrar una dirección de recepción | `Show my ETH receiving address.` | `onekey-wallet` devuelve la dirección de recepción actual. |
+| Consultar saldos | `Show my wallet balance on Ethereum.` | `onekey-wallet` consulta los saldos de la cartera activa. |
+| Consultar el historial | `Show my last 5 BTC transactions.` | `onekey-wallet` recupera el historial reciente. |
+| Tipos de dirección BTC | `Show my BTC taproot address.` | `onekey-wallet` conserva el tipo de dirección BTC solicitado. |
+| Transferir fondos | `Send 50 USDC to this address.` | `onekey-wallet` valida, prepara y solicita confirmación. |
+
+Las solicitudes de transferencia deben mostrar una confirmación antes de ejecutarse. La confirmación debe incluir el activo, el importe, el destinatario, la cadena, la comisión si se conoce, el estado del saldo y el siguiente paso de seguridad.
+
+## Intercambio y puente [#swap-and-bridge]
+
+Utiliza esta habilidad cuando el usuario solicite negociar, comprar, vender, convertir, transferir mediante un puente o firmar una PSBT de BTC.
+
+| Intención del usuario | Lenguaje natural | Habilidad correspondiente |
+| --- | --- | --- |
+| Cotizar un intercambio | `Quote 1 ETH to USDC.` | `onekey-swap` obtiene una cotización sin ejecutar la operación. |
+| Construir una transacción | `Prepare the swap, but do not submit.` | `onekey-swap` prepara la orden después de revisarla. |
+| Ejecutar tras la confirmación | `Yes, execute the swap.` | `onekey-swap` ejecuta únicamente la orden confirmada. |
+| Consultar el estado | `What happened to this swap?` | `onekey-swap` realiza el seguimiento de la orden existente. |
+| Encontrar puentes | `Can I bridge USDC from Ethereum to Base?` | `onekey-swap` comprueba la compatibilidad del puente antes de obtener una cotización. |
+| Solo firma de BTC | `Swap BTC to USDC using taproot and sign only.` | `onekey-swap` conserva taproot y devuelve una PSBT firmada o de vista previa. |
+
+El flujo habitual consiste en cotizar, comprobar la seguridad, confirmar, construir y ejecutar. La cotización y la ejecución no deben combinarse en un único turno del asistente.
+
+## Mercado e investigación [#market-and-research]
+
+Utiliza esta habilidad cuando el usuario pregunte por precios, tokens en tendencia, información de tokens, datos de velas, liquidez, titulares o investigación.
+
+| Intención del usuario | Lenguaje natural | Habilidad correspondiente |
+| --- | --- | --- |
+| Precio individual | `What is the SOL price?` | `onekey-market` devuelve el precio y el contexto de las últimas 24h. |
+| Tokens en tendencia | `What tokens are trending on Solana?` | `onekey-market` devuelve una lista breve de tokens en tendencia. |
+| Buscar un token | `Search BONK on Solana.` | `onekey-market` conserva el contexto de Solana. |
+| Detalles del token | `Show token info for USDC on Ethereum.` | `onekey-market` obtiene los detalles del token. |
+| Gráfico de velas | `Show ETH 1H candles.` | `onekey-market` devuelve datos para el gráfico. |
+| Liquidez / titulares | `Show liquidity for PEPE.` | `onekey-market` resume los datos de liquidez o de titulares. |
+
+Las respuestas sobre el mercado deben ser de solo lectura de forma predeterminada. Si el usuario solicita después comprar o intercambiar, el agente debe terminar primero la investigación y preparar la operación en un flujo de confirmación independiente.
+
+## Comprobaciones de seguridad [#security-checks]
+
+Utiliza esta habilidad antes de mover fondos o interactuar con contratos, y siempre que el usuario pregunte si un token o una transacción es seguro.
+
+| Intención del usuario | Lenguaje natural | Habilidad correspondiente |
+| --- | --- | --- |
+| Auditar un token | `Is this token safe?` | `onekey-security` informa del nivel de riesgo y de sus motivos. |
+| Simular una transacción | `What happens if I sign this?` | `onekey-security` simula antes de firmar. |
+| Riesgo de autorización | `Review this unlimited USDC approval.` | `onekey-security` advierte del riesgo de las autorizaciones ilimitadas. |
+| La cadena no coincide | `Send SOL to 0x...` | Detenerse e informar de que la dirección Solana/EVM no coincide |
+| Riesgo de contrato falso | `Swap 500 USDC to WETH at 0x...` | Detenerse si el token y el contrato no coinciden |
+
+Un riesgo elevado o unos datos incompletos deben bloquear los flujos dependientes que muevan fondos hasta que el usuario acepte explícitamente el riesgo.
+
+## Control del hardware [#hardware-control]
+
+Utiliza esta habilidad cuando el usuario solicite firma mediante hardware, verificación del dispositivo, cambios de PIN/frase de contraseña o firma clara para operaciones sensibles.
+
+El usuario sigue interactuando mediante lenguaje natural: conecta un dispositivo, lo verifica, cambia a una sesión respaldada por hardware, elige cómo introducir la frase de contraseña cuando sea necesario y revisa las operaciones sensibles en el dispositivo.
+
+Iniciar sesión con hardware cambia la sesión activa. Después, los comandos de cartera, transferencia, intercambio y firma utilizan automáticamente la sesión respaldada por hardware.
