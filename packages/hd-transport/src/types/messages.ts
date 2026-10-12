@@ -4554,6 +4554,28 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+export enum Enum_CanonicalBitcoinNetwork {
+  BITCOIN_MAINNET = 0,
+  BITCOIN_TESTNET = 1,
+  BITCOIN_SIGNET = 2,
+  BITCOIN_REGTEST = 3,
+}
+export type CanonicalBitcoinNetwork = keyof typeof Enum_CanonicalBitcoinNetwork;
+
+// BabylonDeriveContextHash
+export type BabylonDeriveContextHash = {
+  address_n: number[];
+  script_type: InputScriptType;
+  app_name: string;
+  context: string;
+  network: CanonicalBitcoinNetwork;
+};
+
+// BabylonDerivedContextHash
+export type BabylonDerivedContextHash = {
+  secret: string;
+};
+
 export type TextMemo = {
   text: string;
 };
@@ -5949,6 +5971,8 @@ export type MessageType = {
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
   facotry: facotry;
+  BabylonDeriveContextHash: BabylonDeriveContextHash;
+  BabylonDerivedContextHash: BabylonDerivedContextHash;
   TextMemo: TextMemo;
   RefundMemo: RefundMemo;
   CoinPurchaseMemo: CoinPurchaseMemo;

@@ -1143,8 +1143,8 @@
       "zh": "a9645df88262fde56a8cf715702fb23800ffac562b82211c4ba45d15fe4f8f79"
     },
     "hardware-sdk/legacy-guides/from-1x.mdx": {
-      "en": "5c3daf5060a0d17b2de4de739e8d31b8e8d74212c8932aefef6f211fb16f2282",
-      "zh": "72503fc58be0ed2421a6eea17a6c657dc99bb82c8f9a0de9dc64a121f9b5a388"
+      "en": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
+      "zh": "7c0b64e2490899bf2ae3841d466d46c6486744b42198af6a9cdb58625fe2e74e"
     },
     "hardware-sdk/legacy-guides/index.mdx": {
       "en": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
@@ -1269,6 +1269,10 @@
     "troubleshooting.mdx": {
       "en": "3d387b2f42cee6fdbd560230bdeac35b9421859e15795128aa2a3c630f6f5877",
       "zh": "8570a69995364c02ebb4afe2082c275d15ad6f8741921d9116069184c03c42c4"
+    },
+    "hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcderivecontexthash.mdx": {
+      "en": "53d30b605a00e4bdb9b5feb39fa5834ffabb6891207186cff334ffb17a7c8c79",
+      "zh": "4baa0532d8d4cf7f7d4b8d26cb00eb4b8e0c06d31d9db5ddb05c6f16923614a6"
     }
   }
 }

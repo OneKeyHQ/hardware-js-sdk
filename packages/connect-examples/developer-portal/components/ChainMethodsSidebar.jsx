@@ -32,6 +32,7 @@ const CHAINS = [
     methods: [
       { id: 'btcgetaddress', name: 'btcGetAddress' },
       { id: 'btcgetpublickey', name: 'btcGetPublicKey' },
+      { id: 'btcderivecontexthash', name: 'btcDeriveContextHash' },
       { id: 'btcsignmessage', name: 'btcSignMessage' },
       { id: 'btcsigntransaction', name: 'btcSignTransaction' },
       { id: 'btcverifymessage', name: 'btcVerifyMessage' },

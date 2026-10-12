@@ -1,0 +1,107 @@
+---
+title: btcDeriveContextHash
+description: "Dérivez un hachage de contexte Babylon sur Classic 1s ou Classic 1s Pure en sélectionnant explicitement le portefeuille, l’application et le réseau."
+---
+
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / BITCOIN / BABYLON</div>
+
+# btcDeriveContextHash
+
+Dérivez sur l’appareil un hachage de contexte Babylon de 32 octets pour la clé Bitcoin, l’application, le contexte et le réseau sélectionnés. La réponse contient un `secret` sensible destiné à votre application.
+
+Disponible dans le SDK `1.2.8-alpha.6`. Nécessite **Classic 1s ou Classic 1s Pure avec un micrologiciel 3.21.0 ou ultérieur** et **Protocol V1**. Les autres familles d’appareils et Protocol V2 ne sont pas pris en charge.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, params);
+```
+
+<div className="doc-method-flow"><span>01 <strong>Préparer le contexte</strong></span><span aria-hidden="true">→</span><span>02 <strong>Confirmer sur l’appareil</strong></span><span aria-hidden="true">→</span><span>03 <strong>Utiliser le secret</strong></span></div>
+
+## Avant l’appel [#before-you-call]
+
+- [Initialisez le SDK et sélectionnez un appareil](/fr/hardware-sdk/getting-started).
+- Enregistrez les [gestionnaires d’événements d’interface](/fr/hardware-sdk/core-api-guide#events-ui) et sélectionnez explicitement la [session de portefeuille](/fr/hardware-sdk/concepts/wallet-session) souhaitée.
+- Avant l’appel, obtenez l’accord de l’utilisateur pour l’application demandeuse et son origine. `appName` est fourni par l’appelant ; votre application doit déterminer quel site ou quelle application demande l’accès.
+
+## Paramètres [#params]
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>obligatoire</b></div><p>L’identifiant de connexion renvoyé par la découverte d’appareils.</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>obligatoire</b></div><p>L’identité du portefeuille renvoyée par getDeviceState ou openWalletSession.</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>obligatoire</b></div><p>Chemin BIP32 de la clé Bitcoin connectée, avec au moins 3 composants. Le type de script est déduit du chemin. Utilisez le chemin de la clé connectée, pas le chemin interne de dérivation IKM.</p></div>
+<div className="doc-parameter"><div><code>params.appName</code><span>string</span><b>obligatoire</b></div><p>1–64 caractères ASCII correspondant à [a-z0-9-].</p></div>
+<div className="doc-parameter"><div><code>params.context</code><span>string</span><b>obligatoire</b></div><p>Chaîne hexadécimale en minuscules, de longueur paire et sans préfixe 0x, représentant 1–1024 octets. Un contexte vide est invalide. Le SDK envoie les octets décodés à l’appareil.</p></div>
+<div className="doc-parameter"><div><code>params.network</code><span>string</span><b>obligatoire</b></div><p>Exactement bitcoin-mainnet, bitcoin-testnet, bitcoin-signet ou bitcoin-regtest. Testnet3 et testnet4 utilisent tous deux bitcoin-testnet. Le réseau n’est pas déduit du chemin.</p></div>
+</div>
+
+[**Paramètres communs facultatifs**](/fr/hardware-sdk/concepts/common-params)
+
+## Exemple [#example]
+
+Ce fragment suppose que le SDK est initialisé et qu’un portefeuille standard est sélectionné. Remplacez les valeurs d’exemple `path`, `appName`, `context` et `network` par celles approuvées par l’utilisateur. Le contexte ci-dessous est un exemple de données encodées en hexadécimal.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  appName: 'babylon-example',
+  context: '48656c6c6f',
+  network: 'bitcoin-mainnet',
+  useEmptyPassphrase: true,
+});
+
+if (result.success === false) throw new Error(result.payload.error);
+const secret = result.payload.secret;
+// Use only for the approved application and context. Do not log or persist it.
+```
+
+L’exemple sélectionne explicitement le portefeuille standard avec `useEmptyPassphrase: true`. Pour un portefeuille caché, transmettez le même `passphraseState` que lors de la confirmation du compte Bitcoin connecté. Le parcours habituel de PIN, de passphrase et de confirmation sur l’appareil reste applicable.
+
+## Réponse [#result]
+
+Vérifiez `success` avant de lire le contenu de la réponse. En cas de succès, `payload.secret` est une chaîne hexadécimale en minuscules de 64 caractères (32 octets). Les onglets ci-dessous montrent les types de réponse, pas de véritables valeurs secrètes.
+
+<Tabs items={["Succès", "Erreur"]} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+type SuccessResponse = {
+  success: true;
+  payload: {
+    secret: string; // 64 lowercase hexadecimal characters (32 bytes)
+  };
+};
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+type ErrorResponse = {
+  success: false;
+  payload: {
+    error: string;
+    code?: string | number;
+  };
+};
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## Gestion des erreurs et du secret [#errors-and-secret-handling]
+
+Une valeur invalide de `path`, `appName`, `context` ou `network` renvoie `CallMethodInvalidParameter` (`405`) avant l’envoi de la commande de dérivation. Les familles d’appareils non prises en charge ou Protocol V2 renvoient `DeviceNotSupportMethod` (`415`) ; un micrologiciel antérieur à 3.21.0 nécessite une mise à jour.
+
+L’annulation sur l’appareil renvoie la réponse standard `success: false`. Arrêtez la requête et traitez `payload.error` et `payload.code` avant de tenter un nouvel appel.
+
+Le SDK renvoie le véritable `secret` à votre application. Traitez-le comme une donnée sensible : excluez-le des journaux, de la télémétrie, du presse-papiers et du stockage persistant. La dérivation s’exécute sur l’appareil ; la clé interne du portefeuille n’est pas exportée.
+
+## Étapes suivantes [#next-steps]
+
+- [Sessions de portefeuille et liaison de passphrase](/fr/hardware-sdk/concepts/wallet-session)
+- [Spécification Babylon de dérivation du hachage de contexte](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md)

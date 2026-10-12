@@ -1,5 +1,5 @@
 const SENSITIVE_LOG_KEY =
-  /mnemonic|seed|private.?key|xprv|pin|passphrase|session.?id|transaction|tx.?data|binary|package.?bytes|raw/i;
+  /mnemonic|seed|private.?key|xprv|secret|pin|passphrase|session.?id|transaction|tx.?data|binary|package.?bytes|raw/i;
 
 export const redactSensitiveLogValue = (
   value: unknown,

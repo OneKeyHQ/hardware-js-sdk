@@ -1,5 +1,5 @@
 ---
-description: "Hardware SDK 1.1.x の統合を、正規化されたデバイス状態、明示的なウォレットセッション、Protocol V2 に移行します。"
+description: "Hardware SDK 1.1.x から 1.2.x への移行：パッケージ、デバイス項目、ウォレットの紐付け、UI、制限、受け入れテストとロールバック。"
 title: "1.1.x から 1.2.x へ"
 ---
 
@@ -7,44 +7,43 @@ title: "1.1.x から 1.2.x へ"
 
 # 1.1.x から 1.2.x へ移行
 
-このページは、すでに Hardware SDK の次のバージョンを使用しているサードパーティアプリ向けです: **1.1.x**。このガイドの対象は次です: **1.2.x** 系統。
+このガイドは **1.1.x から 1.2.x** へ移行する外部アプリ向けです。SDK のエントリーポイントは一つのままで構いません。Protocol V2 のために別の SDK は不要です。新規プロジェクトは[はじめに](/ja/hardware-sdk/getting-started)から進めてください。
 
-JavaScript メソッドは同じままです。Protocol V2 (Pro 2 / Neo) は Core 内部で処理されるため、2 つ目の SDK を追加しないでください。
-
-新規プロジェクトではこのページを飛ばし、[はじめに](/ja/hardware-sdk/getting-started)を使用してください。
+**Protocol V2 で必須：**V1 専用のデバイス読み取りを置き換え、各メソッドの対応機種、ファームウェア、プロトコルを確認します。**推奨：**新しいコードでは明示的なウォレット選択を使います。**互換性：**既存の対応チェーン呼び出しは維持できます。`getPassphraseState` は両プロトコルで非推奨の互換補助 API として残ります。**必要に応じて：**Bridge から WebUSB への変更、SDK の入口変更、ファームウェア更新の実装は、それぞれ別の判断です。
 
 ## 変わらない点 [#what-stays-the-same]
 
-- 呼び出し形式: `HardwareSDK.method(connectId, deviceId?, params)` → `{ success, payload }`
-- チェーンメソッド (`evmGetAddress`, `btcSignTransaction`, …)
-- `init({ env })` が選択するのは引き続き**トランスポート** (USB / BLE / 低レベル) であり、Protocol V1 と V2 のどちらを使うかではありません
-- `UI_EVENT` はプロンプト用; `uiResponse` 入力リクエストのみに使用し、ボタン通知には使いません
+- 戻り値は引き続き `{ success, payload }` です。成功時のデータを使う前に `success` を確認します。失敗時には `payload.error` と、存在する場合は `payload.code` が返ります。
+- `evmGetAddress` や `btcSignTransaction` などのチェーンメソッドは、公開呼び出し形式 `HardwareSDK.method(connectId, deviceId?, params)` を維持します。利用可否は引き続き機種とファームウェアによって決まります。
+- `init({ env })` が選ぶのは通信手段であり、Protocol V1 / V2 ではありません。`keepSession` は通信の保持を制御し、ウォレットを選びません。
 
 ## アップグレード [#upgrade]
+
+実行環境に適した既存の入口パッケージを維持します。common-connect を使う既存の接続では、以下のコマンドで 1.2 系を選び、解決したバージョンを固定できます。再現可能なリリースには `1.2` を検証済みの完全なバージョン番号に置き換えてください。
 
 ```bash
 npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2
 ```
 
-すべての `@onekeyfe/hd-*` パッケージを同じ 1.2.x バージョンに固定してください。引き続き `@onekeyfe/hd-web-sdk` を埋め込む場合は、**`connectSrc` を省略し**、iframe をインストール済みパッケージに合わせます。
+直接インストールするすべての `@onekeyfe/hd-*` パッケージを同じ完全なバージョンに揃えます。共有型と通信パッケージも含め、ロックファイルをコミットし、解決された依存関係を確認します。プレリリースを試す場合は alpha バージョンを明示します。1.2.x のどの版でも後続パッチの全メソッドが使えるわけではありません。各 API の最低 SDK・ファームウェアバージョンを確認してください。
 
-1 つの実行環境で `@onekeyfe/hd-web-sdk` と `@onekeyfe/hd-common-connect-sdk` を併用しないでください。
+`@onekeyfe/hd-web-sdk` では `connectSrc` を省略すると、インストールしたパッケージの既定 iframe URL を使います。URL を上書きするか自前で配信する場合は、対応する互換 iframe リソースを配置し、URL の読み込み、CSP の許可、初期化成功を確認します。npm の公開成功だけでは配信 iframe の利用可能性は保証されません。パッケージと iframe はリリース時もロールバック時も一緒に扱います。
+
+同じ実行環境に `@onekeyfe/hd-web-sdk` と `@onekeyfe/hd-common-connect-sdk` を同時に読み込まないでください。ネイティブ接続では、選んだ SDK でインストール済み通信プラグインと権限も検証します。[はじめに](/ja/hardware-sdk/getting-started)を参照してください。
 
 ## 以下の API を置き換える [#replace-these-apis]
 
-| 1.1.x | 1.2.x | 注意事項 |
+| 既存の実装 | 移行先 | 変更する条件 |
 | --- | --- | --- |
-| `getFeatures()` | [`getDeviceState()`](/ja/hardware-sdk/basic-api/get-device-state) | `payload.device_id` ではなく `payload.identity.deviceId` を読み取ります |
-| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | バージョン / 識別情報のスナップショット |
-| `getPassphraseState()` | [`openWalletSession({ mode })`](/ja/hardware-sdk/basic-api/open-wallet-session) | `standard` または `select-hidden` 一度 |
-| `keepSession` | **変更なし** | トランスポートの保持のみ。削除したり、`passphraseState` / `openWalletSession` に置き換えたり**しないでください**。 |
-| ファームウェア `session_id` データベース内 | **永続化しない** | Core が内部で保持 |
-| `env: 'web'` + Bridge | `env: 'webusb'` | 参照: [Bridge → WebUSB](/ja/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
-| `firmwareUpdateV2` / `V3` Pro 2 / Neo で使用 | [`firmwareUpdateV4`](/ja/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro は引き続き V2 / V3 |
+| `getFeatures()` | [`getDeviceState()`](/ja/hardware-sdk/basic-api/get-device-state) | 両プロトコルの統一読み取りに使用。従来 API は V1 のみ |
+| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | V2 では統一された識別情報・バージョンを使用 |
+| `getPassphraseState()` | [`openWalletSession({ mode })`](/ja/hardware-sdk/basic-api/open-wallet-session) | 新規実装は明示的なウォレット選択を使用。従来の補助 API は互換用途で残る |
+| 保存しているファームウェアの `session_id` | ウォレットの紐付けを保存 | ファームウェアのセッション ID は SDK 内部で管理 |
+| `keepSession` | 既存の通信保持用途を維持 | ウォレットセッションの引数に置き換えない |
+| `env: 'web'` + Bridge | `env: 'webusb'` | 通信手段を別途移行する場合のみ。通信の節を参照 |
+| Pro 2 / Neo の更新フロー | `firmwareUpdateV4` | アプリがこれらの機種の更新を実装する場合のみ |
 
-`getFeatures` は Protocol V1 でのみ引き続き使用でき、Protocol V2 では拒否されます。 `getPassphraseState` は互換 API として残ります。新しいコードは代替メソッドを使用してください。
-
-`openWalletSession({ mode: 'resume-hidden' })` は存在しません。関連付けを取得した後は、以降のアドレス取得 / 署名で `passphraseState` を渡すと、Core 内部で再開します。
+`openWalletSession({ mode: 'resume-hidden' })` はありません。既存の隠しウォレットの紐付けは、後続メソッドに `passphraseState` を渡して再開します。
 
 ## 1. デバイススナップショット [#1-device-snapshot]
 
@@ -62,106 +61,162 @@ const deviceId = features.payload.device_id;
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
-if (!deviceId) throw new Error("Device has no wallet identity");
+if (!deviceId) throw new Error('Device has no wallet identity');
 ```
 
-`searchDevices` は引き続き `{ success, payload }` を返します。`success` を確認してから `payload` をデバイス一覧として扱ってください。
+| 従来の項目や前提 | 統一項目 / 規則 |
+| --- | --- |
+| `device_id` | `identity.deviceId`：ウォレット/シードの識別子。取得できない場合がある |
+| `onekey_serial_no` / 検出結果の `uuid` | `identity.serialNo` / 検出結果の `serialNo`：物理デバイスの識別子。`uuid` は非推奨 |
+| `label`、`onekey_ble_name` | `identity.label`、`identity.bleName` |
+| `initialized`、`unlocked`、`pin_protection`、`passphrase_protection` | `status.initialized`、`status.unlocked`、`status.pinProtection`、`status.passphraseProtection` |
+| `language` と BLE 設定 | `settings.language`、`settings.bleEnabled` |
+| ファームウェア / Bootloader / BLE のバージョン項目 | `versions.firmware`、`versions.bootloader`、`versions.ble`：文字列または `null` |
+
+既定の `scope: 'runtime'` は状態、`scope: 'settings'` は状態と設定、`scope: 'firmware'` は状態・識別情報・バージョン・検証情報を更新します。返るのは更新した部分だけでなく完全なスナップショットです。現在のモードで取得できない項目は `null` のまま扱い、`false` や `0.0.0` に変換しないでください。V2 Bootloader / Romloader モードでは設定の読み取りに対応しません。
+
+`searchDevices` の成功を確認してから一覧を読みます。`connectId` は現在の通信接続を表し、再接続で変わることがあります。欠けている `deviceId` をシリアル番号で代用したり、物理シリアル番号をウォレットの紐付けに使ったりしないでください。[識別子](/ja/hardware-sdk/concepts/identifiers)と[デバイス状態](/ja/hardware-sdk/basic-api/get-device-state)を参照してください。
 
 ## 2. ウォレットセッション [#2-wallet-session]
 
-**1.1.x** — 隠しウォレットを開き、以降もフィンガープリントを渡して呼び出す:
+**1.1.x** — 隠しウォレットを選び、後続呼び出しにフィンガープリントを渡します。
 
 ```ts
 const ps = await HardwareSDK.getPassphraseState(connectId, {
   initSession: true,
 });
 if (!ps.success) throw new Error(ps.payload.error);
-if (typeof ps.payload !== "string" || !ps.payload) throw new Error("No hidden wallet fingerprint");
-const passphraseState = ps.payload;
-
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+if (typeof ps.payload !== 'string' || !ps.payload) {
+  throw new Error('No hidden wallet fingerprint');
+}
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
-  passphraseState,
+  passphraseState: ps.payload,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-**1.2.x** — 明示的なモードで一度開き、各メソッドにフィンガープリントを渡す:
+**1.2.x** — ユーザーの選択に従い、以下の**どちらか一つ**を実行します。両方を続けて実行しないでください。
+
+**標準ウォレット**
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
-// Standard wallet
-const standard = await HardwareSDK.openWalletSession(connectId, {
+const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
-if (!standard.success) throw new Error(standard.payload.error);
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'standard') {
+  throw new Error('A standard wallet was not opened');
+}
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
+if (!address.success) throw new Error(address.payload.error);
+```
 
-// Hidden wallet — user selects on the device
+**隠しウォレット**
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
 if (!opened.success) throw new Error(opened.payload.error);
-if (opened.payload.walletType !== 'hidden') {
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
   throw new Error('A hidden wallet was not opened');
 }
-const hiddenDeviceId = opened.payload.deviceId;
-const passphraseState = opened.payload.passphraseState;
-
-await HardwareSDK.evmGetAddress(connectId, hiddenDeviceId, {
+const binding = opened.payload;
+const address = await HardwareSDK.evmGetAddress(connectId, binding.deviceId, {
   path: "m/44'/60'/0'/0/0",
-  passphraseState,
+  passphraseState: binding.passphraseState,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-**同じ**呼び出しで `openWalletSession({ mode })` と `useEmptyPassphrase` / `initSession` を併用しないでください。
+成功とウォレット種別を確認した後に、戻り値の `walletType`、`deviceId`、`passphraseState` を保存します。標準ウォレットのフィンガープリントは `null` です。V1 で passphrase 保護が無効の場合、隠しウォレットの選択でも標準ウォレットが返ることがあります。隠しウォレットとして保存しないでください。
 
-隠しウォレットで `passphraseState` を省略すると、アドレス取得 / 署名が**標準**ウォレットでエラーなく成功する場合があります。
+`openWalletSession` に従来の `useEmptyPassphrase`、`initSession`、`deviceId`、`passphraseState` を渡さないでください。継承した既定値が `false` の場合も同様です。後続のアドレス/署名呼び出しでは、標準ウォレットに `useEmptyPassphrase: true`、隠しウォレットに保存した `passphraseState` を使います。隠しウォレットのフィンガープリントを省略すると、エラーなく標準ウォレットで成功する可能性があります。
 
-仕様: [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session).
+各メソッドの前や再接続後に自動でウォレットを選び直さないでください。既存の紐付けを再利用し、識別子またはフィンガープリントの検証に失敗したら停止して明示的な選択を求めます。新しく接続したデバイスで保存済みの紐付けを上書きしないでください。[ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)を参照してください。
+
+## UI、キャンセルと再接続 [#ui-cancellation-and-reconnect]
+
+| イベント | ホストの処理 |
+| --- | --- |
+| `REQUEST_PIN` | ホスト入力の場合のみ `UI_RESPONSE.RECEIVE_PIN` で応答。デバイス側 PIN の通知には応答不要 |
+| `REQUEST_PASSPHRASE` | ホスト入力では `UI_RESPONSE.RECEIVE_PASSPHRASE` で応答。デバイス入力を選ぶ場合は `value: ""` と `passphraseOnDevice: true` を使用。デバイスのみの通知には応答不要 |
+| `REQUEST_PASSPHRASE_ON_DEVICE`、`REQUEST_BUTTON` | ユーザーに案内し、入力応答は送らない |
+| ウィンドウ終了 / 進捗通知 | UI を更新するが、メソッド成功の根拠にはしない |
+
+メソッドの Promise が最終結果です。翻訳されたエラー文ではなく `payload.code` で分類し、引数不正、未対応メソッド、ウォレット不一致、キャンセル、通信失敗を区別します。
+
+`UI_EVENT` のリスナーには型と内容を持つメッセージが届きます。`DEVICE.STATE` のリスナーには `connectId`、`state`、`revision` を含む状態イベントの内容が直接届きます。同じ形として扱わないでください。購読は一度にし、接続画面などを破棄する際にリスナーを解除します。
+
+デバイスごとの呼び出しと、デバイスをまたぐホスト PIN/passphrase 入力を直列化します。現在の公開エントリーポイントは `uiResponse` の `type` と `payload` のみを転送します。最上位の関連付けメタデータが SDK に届くと仮定しないでください。終了、キャンセル、切断時に古いモーダルのコールバックを無効化し、後続の入力要求に応答しないようにします。
+
+`HardwareSDK.cancel(connectId)` で実行中の処理をキャンセルし、ユーザーの中止を尊重します。切断後はデバイスを再検出して現在の接続を取得し、状態を読み、検証済みウォレットの紐付けを再利用します。署名、消去、更新を自動再実行しないでください。通常の切断に `dispose` は不要です。SDK を明示的に破棄した場合は、次の呼び出し前に初期化し直します。[Core API ガイド](/ja/hardware-sdk/core-api-guide)と[再接続](/ja/hardware-sdk/transport/reconnect)を参照してください。
 
 ## 3. Protocol V1 と V2 [#3-protocol-v1-and-v2]
 
-Classic / Mini / Touch / Pro は引き続き Protocol V1、Pro 2 / Neo は Protocol V2 を使用します。アプリが呼び出すメソッドは同じです。
+Classic / Mini / Touch / Pro は Protocol V1、Pro 2 / Neo は Protocol V2 を使います。SDK は実際の問い合わせで判定します。USB PID、BLE 名、筐体から推測しないでください。
 
-SDK は**実際の検査**に基づいて `connectProtocol` を設定します。USB PID、BLE 名、筐体から V1/V2 を推測しないでください。
+通常は SDK の判定に任せます。`connectProtocol` を渡す場合は厳密な指定となり、不一致は拒否されます。SDK バージョン、プロトコル対応、最低ファームウェアは別々の確認事項です。メソッドを有効にする前に API の対応表を確認してください。
 
-呼び出しに `connectProtocol` を指定すると厳密な要件として扱われ、SDK が黙ってプロトコルを切り替えることはありません。
-
-V1 専用チェーン (Stellar、Alephium、Nexa、Dynex、Nervos、SCDO、Benfen、Neo チェーン) は **未対応** Pro 2 / Neo では利用できません。参照: [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol) および [対応チェーン](/ja/hardware-sdk/concepts/chain-support).
+V1 専用チェーン（Stellar、Alephium、Nexa、Dynex、Nervos、SCDO、Benfen、Neo チェーン）は Pro 2 / Neo に対応しません。Neo デバイスという名前は Neo チェーン対応を意味しません。[プロトコル](/ja/hardware-sdk/concepts/protocol)と[チェーン対応](/ja/hardware-sdk/concepts/chain-support)を参照してください。
 
 ## 4. ファームウェア [#4-firmware]
 
-| デバイス | 1.2.x API |
+| デバイス | 更新 API |
 | --- | --- |
 | Classic / Mini / Touch | `firmwareUpdateV2` |
 | Pro | `firmwareUpdateV3` |
-| Pro 2 / Neo | `firmwareUpdateV4` |
+| Pro 2 / Neo | [`firmwareUpdateV4`](/ja/hardware-sdk/device-api/firmwareupdatev4) |
 
-トランスポート切断後に、ファームウェア更新、消去、署名を再実行しないでください。
+ファームウェア更新を管理する接続では、リリース確認結果の解析も更新します。V2 プロトコル用リリースには対象コンポーネントやリソースアーカイブが含まれる場合があります。従来の単一バイナリや、常に存在する URL/フィンガープリントを前提にしないでください。機種に合った配布物と、選択した更新 API の契約を使います。
+
+応答や進捗イベントだけではインストール完了を確認できません。再起動後に再接続し、`scope: 'firmware'` でインストール済みバージョンを確認します。必要な `keepSession` の通信保持は維持し、切断後に更新を自動再実行しないでください。[ファームウェア更新](/ja/hardware-sdk/firmware-update)を参照してください。
 
 ## 5. トランスポート [#5-transport]
 
-OneKey Bridge を引き続き使用している場合 (`env: 'web'` + `checkBridgeStatus`)、WebUSB に移行してください:
+1.1.x から 1.2.x への更新だけなら、動作している通信手段を変える必要はありません。Bridge（`env: 'web'` + `checkBridgeStatus`）から WebUSB への移行も行う場合は、専用ガイドを使います。
 
-- 推奨: [Bridge → `@onekeyfe/hd-common-connect-sdk`](/ja/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
-- iframe を維持: [Bridge → `@onekeyfe/hd-web-sdk`](/ja/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
+- [Bridge → common-connect WebUSB](/ja/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
+- [Bridge → iframe WebUSB](/ja/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
 
-WebUSB には HTTPS とユーザー操作が必要です。BLE には OS の Bluetooth 権限が必要です。
+WebUSB の権限選択にはセキュアコンテキストとユーザー操作が必要です。BLE には OS の Bluetooth 権限が必要です。実際に提供するブラウザ、Electron、ネイティブ環境で検証してください。
 
 ## チェックリスト [#checklist]
 
-1. すべての次の `@onekeyfe/hd-*` パッケージを同じ 1.2.x バージョンに更新します。
-2. `getFeatures` / `getOnekeyFeatures` を `getDeviceState` に置き換えます。
-3. `getPassphraseState` を `openWalletSession({ mode: 'standard' | 'select-hidden' })` に置き換えます。
-4. `deviceId + passphraseState` のみを永続化し、ファームウェアの `session_id` の保存はやめてください。
-5. 後続のすべてのアドレス取得 / 署名呼び出しに、`passphraseState` または `useEmptyPassphrase: true` を渡します。
-6. 維持します: `keepSession` USB の連続署名 / 確認後の更新、および Electron BLE のファームウェア処理中に維持します。ウォレットセッションのフラグではありません。
-7. デバイスごとに呼び出しを直列化します。
-8. Pro 2 / Neo をサポートしてリリースする前に、チェーンの対応範囲を確認してください。
+1. 完全なバージョンを決め、SDK 依存関係と iframe 配布物を揃え、以前のロックファイルとリリースを保存します。
+2. 状態の読み取りと null の扱いを更新し、V2 が必要な箇所の旧 API を置き換えます。
+3. ウォレット選択を更新し、検証済みの紐付けを保存します。通信接続とファームウェアのセッション ID をウォレット識別子にしません。
+4. 入力/通知、キャンセル、再接続を更新し、デバイス呼び出しとホスト入力を直列化します。
+5. プロトコル、チェーン、ファームウェアを確認します。更新フローを管理する場合のみ、その処理も移行します。
+
+公開前に対応する各実行環境で次の受け入れテストを実施してください。ハードウェアのケースは実機が必要です。文書のビルド成功はハードウェアテストではありません。
+
+| ケース | 期待する結果 |
+| --- | --- |
+| 既存 V1 と対応 V2 デバイスの初期化・検出 | 正しい通信/プロトコル。統一状態か対処可能なエラーを返し、識別情報を捏造しない |
+| 標準/隠しウォレット、V1 の passphrase 無効 | 正しい種別とアドレス。標準の指紋は null、隠しは検証済みの紐付け |
+| 隠し紐付けの再利用、デバイス/シード変更、不正な指紋 | 有効なら同じウォレット。不一致なら紐付けを上書きせず停止 |
+| ホスト/デバイスの PIN・passphrase、確認・キャンセル・終了 | 入力要求だけに応答。Promise で完了を判定し、古いコールバックを無視 |
+| 切断・再接続と二台の使用 | 現在の接続に更新、入力を直列化、検証済み紐付けを維持、副作用を再実行しない |
+| 未対応チェーン・プロトコル・古いファームウェア | ウォレット/プロトコルを無断変更せず対応エラーを処理 |
+| 独自 iframe / ネイティブ通信 | 配布物と権限が固定版に対応。初期化と対応アドレス取得が成功 |
+| 更新フローを実装している場合 | 正しい機種と配布物。再接続後にインストール済みバージョンを確認 |
+
+既知のウォレットアドレスと対応署名結果を 1.1.x の基準と比較し、失敗はエラーコードで確認します。PIN、passphrase、派生秘密、非公開の情報をログやテストデータに残さないでください。
+
+## ロールバック [#rollback]
+
+以前の固定依存関係、ロックファイル、iframe 配布物、実行設定を検証済みの一つのリリースとして保存します。戻す際はまとめて復元し、1.1.x の入口パッケージと 1.2.x の配布物や型を混在させないでください。
+
+1.1.x の基準へ戻す場合は、新たに有効にした V2 専用接続を無効にします。SDK のダウングレードはファームウェアのダウングレードではありません。保存済みの紐付けはデータとして維持しますが、復元した接続で検証し、確認できない場合はユーザーに選択を求めます。標準ウォレットへ自動的に戻したり、キャンセル済み処理を再実行したりしないでください。
 
 ## 次へ [#next]
 
@@ -169,5 +224,3 @@ WebUSB には HTTPS とユーザー操作が必要です。BLE には OS の Blu
 - [Core API ガイド](/ja/hardware-sdk/core-api-guide)
 - [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)
 - [再接続と破棄](/ja/hardware-sdk/transport/reconnect)
-
-Protocol V1 では、パスフレーズ保護が無効な場合、`select-hidden` が標準ウォレットを返すことがあります。`passphraseState` を保存または使用する前に、`walletType` を確認してください。

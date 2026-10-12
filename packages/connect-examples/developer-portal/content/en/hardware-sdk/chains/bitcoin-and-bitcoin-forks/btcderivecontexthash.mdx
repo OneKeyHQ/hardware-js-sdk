@@ -1,0 +1,107 @@
+---
+title: btcDeriveContextHash
+description: "Derive a Babylon context hash on Classic 1s or Classic 1s Pure with explicit wallet, application and network selection."
+---
+
+import { Tabs } from 'nextra/components'
+
+<div className="doc-eyebrow">HARDWARE SDK / BITCOIN / BABYLON</div>
+
+# btcDeriveContextHash
+
+Derive a 32-byte Babylon context hash on the device for the selected Bitcoin key, application, context and network. The response contains a sensitive `secret` for your application to use.
+
+Available in SDK `1.2.8-alpha.6`. Requires **Classic 1s or Classic 1s Pure firmware 3.21.0 or later** and **Protocol V1**. Other device families and Protocol V2 are not supported.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, params);
+```
+
+<div className="doc-method-flow"><span>01 <strong>Prepare context</strong></span><span aria-hidden="true">→</span><span>02 <strong>Confirm on device</strong></span><span aria-hidden="true">→</span><span>03 <strong>Use the secret</strong></span></div>
+
+## Before you call [#before-you-call]
+
+- [Initialize the SDK and select a device](/en/hardware-sdk/getting-started).
+- Register [UI event handlers](/en/hardware-sdk/core-api-guide#events-ui) and explicitly select the intended [wallet session](/en/hardware-sdk/concepts/wallet-session).
+- Obtain user approval for the requesting application and its origin before calling. `appName` is caller-supplied; your application must establish which site or application is requesting access.
+
+## Params [#params]
+
+<div className="doc-parameters">
+<div className="doc-parameter"><div><code>connectId</code><span>string</span><b>required</b></div><p>The connection identifier returned by device discovery.</p></div>
+<div className="doc-parameter"><div><code>deviceId</code><span>string</span><b>required</b></div><p>The wallet identity returned by getDeviceState or openWalletSession.</p></div>
+<div className="doc-parameter"><div><code>params.path</code><span>string | number[]</span><b>required</b></div><p>BIP32 path of the connected Bitcoin key, with at least 3 components. Script type is inferred from the path. Use the connected key’s path, not the internal IKM derivation path.</p></div>
+<div className="doc-parameter"><div><code>params.appName</code><span>string</span><b>required</b></div><p>1–64 ASCII characters matching [a-z0-9-].</p></div>
+<div className="doc-parameter"><div><code>params.context</code><span>string</span><b>required</b></div><p>Lowercase, even-length hex without a 0x prefix, representing 1–1024 bytes. Empty context is invalid. The SDK sends the decoded bytes to the device.</p></div>
+<div className="doc-parameter"><div><code>params.network</code><span>string</span><b>required</b></div><p>Exactly bitcoin-mainnet, bitcoin-testnet, bitcoin-signet or bitcoin-regtest. Testnet3 and testnet4 both use bitcoin-testnet. Network is not inferred from the path.</p></div>
+</div>
+
+[**Optional common params**](/en/hardware-sdk/concepts/common-params)
+
+## Example [#example]
+
+This fragment assumes an initialized SDK and a selected standard wallet. Replace the sample `path`, `appName`, `context` and `network` with the values approved by your user. The context below is illustrative hex-encoded data.
+
+```typescript
+const result = await HardwareSDK.btcDeriveContextHash(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  appName: 'babylon-example',
+  context: '48656c6c6f',
+  network: 'bitcoin-mainnet',
+  useEmptyPassphrase: true,
+});
+
+if (result.success === false) throw new Error(result.payload.error);
+const secret = result.payload.secret;
+// Use only for the approved application and context. Do not log or persist it.
+```
+
+The example explicitly selects the standard wallet with `useEmptyPassphrase: true`. For a hidden wallet, pass the same `passphraseState` used when confirming the connected Bitcoin account. The normal PIN, passphrase and device-confirmation flow still applies.
+
+## Response [#result]
+
+Check `success` before reading the payload. On success, `payload.secret` is a 64-character lowercase hex string (32 bytes). The tabs below show response types, not real secret values.
+
+<Tabs items={["Success", "Error"]} className="doc-example-tabs">
+
+<Tabs.Tab>
+
+```typescript
+type SuccessResponse = {
+  success: true;
+  payload: {
+    secret: string; // 64 lowercase hexadecimal characters (32 bytes)
+  };
+};
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```typescript
+type ErrorResponse = {
+  success: false;
+  payload: {
+    error: string;
+    code?: string | number;
+  };
+};
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## Errors and secret handling [#errors-and-secret-handling]
+
+Invalid `path`, `appName`, `context` or `network` returns `CallMethodInvalidParameter` (`405`) before the derivation command is sent. Unsupported device families or Protocol V2 return `DeviceNotSupportMethod` (`415`); firmware below 3.21.0 requires an upgrade.
+
+Device cancellation returns the standard `success: false` response. Stop the request and handle `payload.error` and `payload.code` before attempting another call.
+
+The SDK returns the actual `secret` to your application. Treat it as sensitive: keep it out of logs, telemetry, the clipboard and persistent storage. Derivation runs on the device; the internal wallet key is not exported.
+
+## Next steps [#next-steps]
+
+- [Wallet sessions and passphrase binding](/en/hardware-sdk/concepts/wallet-session)
+- [Babylon derive-context-hash specification](https://github.com/babylonlabs-io/babylon-toolkit/blob/main/docs/specs/derive-context-hash.md)

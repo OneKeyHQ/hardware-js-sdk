@@ -60,6 +60,7 @@ export { default as allNetworkGetAddressByLoop } from './allnetwork/AllNetworkGe
 
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
+export { default as btcDeriveContextHash } from './btc/BTCDeriveContextHash';
 export { default as btcSignMessage } from './btc/BTCSignMessage';
 export { default as btcSignPsbt } from './btc/BTCSignPsbt';
 export { default as btcSignTransaction } from './btc/BTCSignTransaction';

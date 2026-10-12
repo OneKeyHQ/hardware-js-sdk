@@ -87,7 +87,16 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
         mode,
       });
 
-      onExecute(JSON.stringify(res, null, 2));
+      // The response viewer and clipboard must never receive the derived secret.
+      onExecute(
+        JSON.stringify(
+          res,
+          method === 'btcDeriveContextHash'
+            ? (key: string, value: unknown) => (key === 'secret' ? '[Redacted]' : value)
+            : undefined,
+          2
+        )
+      );
     } catch (error: any) {
       // Adjust according to your error type
       onExecute(JSON.stringify({ error: error.message }, null, 2));

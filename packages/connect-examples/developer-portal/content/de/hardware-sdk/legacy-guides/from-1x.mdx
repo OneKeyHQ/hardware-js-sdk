@@ -1,5 +1,5 @@
 ---
-description: "Hardware-SDK-1.1.x-Integrationen auf vereinheitlichten Gerätestatus, ausdrückliche Wallet-Sitzungen und Protocol V2 migrieren."
+description: "Hardware SDK von 1.1.x auf 1.2.x aktualisieren: Paketversionen, Gerätefelder, Wallet-Bindung, UI, Grenzen, Abnahmetests und Rückkehr zur alten Version."
 title: "Von 1.1.x zu 1.2.x"
 ---
 
@@ -7,44 +7,43 @@ title: "Von 1.1.x zu 1.2.x"
 
 # Von 1.1.x zu 1.2.x migrieren
 
-Diese Seite richtet sich an Drittanbieter-Apps, die bereits Hardware SDK **1.1.x** verwenden. Sie beschreibt die Migration zu **1.2.x**.
+Dieser Leitfaden richtet sich an Integrationen, die von **1.1.x auf 1.2.x** wechseln. Behalten Sie einen SDK-Einstiegspunkt; Protocol V2 erfordert kein zweites SDK. Neue Projekte beginnen mit [Erste Schritte](/de/hardware-sdk/getting-started).
 
-Sie behalten dieselben JavaScript-Methoden. Protocol V2 (Pro 2 / Neo) wird innerhalb von Core verarbeitet. Fügen Sie kein zweites SDK hinzu.
-
-Neue Projekte sollten diese Seite überspringen und mit [Erste Schritte](/de/hardware-sdk/getting-started) beginnen.
+**Für Protocol V2 erforderlich:** Ersetzen Sie V1-exklusive Geräteabfragen und prüfen Sie Geräte-, Firmware- und Protokollunterstützung jeder Methode. **Empfohlen:** Verwenden Sie im neuen Code eine explizite Wallet-Auswahl. **Kompatibilität:** Bestehende unterstützte Chain-Aufrufe können bleiben; `getPassphraseState` bleibt eine veraltete Kompatibilitätshilfe für beide Protokolle. **Bei Bedarf:** Bridge durch WebUSB ersetzen, den SDK-Einstiegspunkt wechseln oder Firmware-Updates implementieren sind eigenständige Entscheidungen.
 
 ## Was gleich bleibt [#what-stays-the-same]
 
-- Aufrufformat: `HardwareSDK.method(connectId, deviceId?, params)` → `{ success, payload }`
-- Chain-Methoden (`evmGetAddress`, `btcSignTransaction`, …)
-- `init({ env })` wählt weiterhin **Transport** (USB / BLE / Low-Level), nicht Protocol V1 oder V2
-- `UI_EVENT` für Aufforderungen; `uiResponse` nur für Eingabeanfragen, nicht für Tastenbenachrichtigungen
+- Ergebnisse bleiben `{ success, payload }`; prüfen Sie `success`, bevor Sie ein erfolgreiches Ergebnis verwenden. Fehler enthalten `payload.error` sowie, falls vorhanden, `payload.code`.
+- Chain-Methoden wie `evmGetAddress` und `btcSignTransaction` behalten die öffentliche Aufrufform `HardwareSDK.method(connectId, deviceId?, params)`. Ihre Verfügbarkeit hängt weiterhin von Gerät und Firmware ab.
+- `init({ env })` wählt den Transport, nicht Protocol V1 oder V2. `keepSession` hält weiterhin den Transport; es wählt keine Wallet.
 
 ## Upgrade [#upgrade]
+
+Behalten Sie das zu Ihrer Laufzeit passende Einstiegspaket. Bei einer bestehenden common-connect-Integration wählt der folgende Befehl die 1.2-Linie und speichert die aufgelöste Version exakt; ersetzen Sie `1.2` für eine reproduzierbare Veröffentlichung durch die vollständig getestete Versionsnummer.
 
 ```bash
 npm i --save-exact @onekeyfe/hd-common-connect-sdk@1.2
 ```
 
-Legen Sie jedes `@onekeyfe/hd-*`-Paket auf dieselbe 1.2.x-Version fest. Wenn Sie weiterhin `@onekeyfe/hd-web-sdk` einbetten, **lassen Sie `connectSrc` weg**, damit der Iframe zum installierten Paket passt.
+Fixieren Sie alle direkt installierten `@onekeyfe/hd-*`-Pakete auf dieselbe exakte Version, einschließlich gemeinsamer Typen und Transportpakete. Committen Sie die Lockdatei und prüfen Sie den aufgelösten Abhängigkeitsbaum. Wählen Sie für Vorabtests ausdrücklich eine Alpha-Version. Eine 1.2.x-Version garantiert nicht alle Methoden späterer Patches: Prüfen Sie die minimale SDK- und Firmware-Version jeder API.
 
-Kombinieren Sie nicht `@onekeyfe/hd-web-sdk` und `@onekeyfe/hd-common-connect-sdk` in einer Laufzeit.
+Lassen Sie bei `@onekeyfe/hd-web-sdk` den Parameter `connectSrc` weg, um die standardmäßige iframe-URL des installierten Pakets zu verwenden. Bei einer eigenen URL oder eigenem Hosting müssen passende kompatible iframe-Dateien bereitstehen; prüfen Sie URL, CSP und erfolgreiche Initialisierung. Eine npm-Veröffentlichung beweist nicht, dass das gehostete iframe verfügbar ist. Veröffentlichen und restaurieren Sie Paket und iframe gemeinsam.
+
+Laden Sie `@onekeyfe/hd-web-sdk` und `@onekeyfe/hd-common-connect-sdk` nicht gemeinsam in einer Laufzeit. Native Integrationen müssen auch das installierte Transport-Plugin und Berechtigungen mit der gewählten SDK-Version prüfen; siehe [Erste Schritte](/de/hardware-sdk/getting-started).
 
 ## Diese APIs ersetzen [#replace-these-apis]
 
-| 1.1.x | 1.2.x | Hinweise |
+| Bestehende Integration | Migrationsziel | Wann ändern |
 | --- | --- | --- |
-| `getFeatures()` | [`getDeviceState()`](/de/hardware-sdk/basic-api/get-device-state) | Lesen Sie `payload.identity.deviceId`, nicht `payload.device_id` |
-| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | Versions-/Identitätsstatus |
-| `getPassphraseState()` | [`openWalletSession({ mode })`](/de/hardware-sdk/basic-api/open-wallet-session) | `standard` oder `select-hidden` einmal |
-| `keepSession` | **unverändert** | Nur zum Offenhalten des Transports. **nicht** weglassen oder ersetzen durch `passphraseState` / `openWalletSession`. |
-| Firmware `session_id` in Ihrer Datenbank | **nicht dauerhaft speichern** | Core hält es intern |
-| `env: 'web'` + Bridge | `env: 'webusb'` | Siehe [Bridge → WebUSB](/de/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb) |
-| `firmwareUpdateV2` / `V3` auf Pro 2 / Neo | [`firmwareUpdateV4`](/de/hardware-sdk/device-api/firmwareupdatev4) | Classic / Mini / Touch / Pro bleiben bei V2 / V3 |
+| `getFeatures()` | [`getDeviceState()`](/de/hardware-sdk/basic-api/get-device-state) | Für normalisierte Abfragen beider Protokolle; die alte API unterstützt nur V1 |
+| `getOnekeyFeatures()` | `getDeviceState({ scope: 'firmware' })` | Für V2 den vereinheitlichten Identitäts-/Versionsstand verwenden |
+| `getPassphraseState()` | [`openWalletSession({ mode })`](/de/hardware-sdk/basic-api/open-wallet-session) | Explizite Wallet-Auswahl für neue Integrationen; alte Hilfsmethode bleibt zur Kompatibilität |
+| Gespeicherte Firmware-`session_id` | Stattdessen Wallet-Bindung speichern | Firmware-Sitzungs-IDs werden intern verwaltet |
+| `keepSession` | Bestehende Transportnutzung beibehalten | Nicht durch Wallet-Sitzungsparameter ersetzen |
+| `env: 'web'` + Bridge | `env: 'webusb'` | Nur bei gesonderter Transportmigration; siehe Transportabschnitt |
+| Firmware-Ablauf für Pro 2 / Neo | `firmwareUpdateV4` | Nur wenn Ihre App Firmware-Updates dieser Geräte implementiert |
 
-`getFeatures` bleibt nur auf Protocol V1 verfügbar und wird auf Protocol V2 abgelehnt. `getPassphraseState` bleibt eine Kompatibilitäts-API. Neuer Code sollte die Ersatzmethoden verwenden.
-
-Es gibt keinen `openWalletSession({ mode: 'resume-hidden' })`-Aufruf. Sobald eine Bindung vorhanden ist, setzen spätere Adress-/Signieraufrufe mit `passphraseState` die Sitzung innerhalb von Core fort.
+Es gibt kein `openWalletSession({ mode: 'resume-hidden' })`. Bestehende versteckte Bindungen werden in späteren Methoden mit `passphraseState` wieder aufgenommen.
 
 ## 1. Gerätestatus [#1-device-snapshot]
 
@@ -62,112 +61,166 @@ const deviceId = features.payload.device_id;
 const state = await HardwareSDK.getDeviceState(connectId);
 if (!state.success) throw new Error(state.payload.error);
 const deviceId = state.payload.identity.deviceId;
-if (!deviceId) throw new Error("Device has no wallet identity");
+if (!deviceId) throw new Error('Device has no wallet identity');
 ```
 
-`searchDevices` ist weiterhin `{ success, payload }`. Prüfen Sie `success`, bevor Sie `payload` als Geräteliste behandeln.
+| Altes Feld oder bisherige Annahme | Normalisiertes Feld / Regel |
+| --- | --- |
+| `device_id` | `identity.deviceId`: Wallet-/Seed-Identität, kann fehlen |
+| `onekey_serial_no` / `uuid` aus der Gerätesuche | `identity.serialNo` / `serialNo` aus der Gerätesuche: physische Identität; `uuid` ist veraltet |
+| `label`, `onekey_ble_name` | `identity.label`, `identity.bleName` |
+| `initialized`, `unlocked`, `pin_protection`, `passphrase_protection` | `status.initialized`, `status.unlocked`, `status.pinProtection`, `status.passphraseProtection` |
+| `language` und BLE-Einstellungen | `settings.language`, `settings.bleEnabled` |
+| Firmware-/Bootloader-/BLE-Versionsfelder | `versions.firmware`, `versions.bootloader`, `versions.ble`: Zeichenfolgen oder `null` |
+
+Standardmäßig aktualisiert `scope: 'runtime'` den Status; `scope: 'settings'` Status und Einstellungen; `scope: 'firmware'` Status, Identität, Versionen und Verifikation. Zurückgegeben wird immer ein vollständiger Zustand, nicht nur der aktualisierte Teil. Felder können im aktuellen Modus fehlen: Behalten Sie `null` bei, statt es in `false` oder `0.0.0` umzuwandeln. Einstellungsabfragen werden im V2-Bootloader-/Romloader-Modus nicht unterstützt.
+
+Prüfen Sie den Erfolg von `searchDevices`, bevor Sie die Liste lesen. `connectId` bezeichnet die aktuelle Transportverbindung und kann sich nach Wiederverbindung ändern. Ersetzen Sie eine fehlende `deviceId` nicht durch eine Seriennummer und verwenden Sie die Hardware-Seriennummer nicht als Wallet-Bindung. Siehe [Identifikatoren](/de/hardware-sdk/concepts/identifiers) und [Gerätezustand](/de/hardware-sdk/basic-api/get-device-state).
 
 ## 2. Wallet-Sitzung [#2-wallet-session]
 
-**1.1.x** — eine versteckte Wallet öffnen, dann weiter mit dem Fingerabdruck aufrufen:
+**1.1.x** — versteckte Wallet auswählen und ihren Fingerabdruck weitergeben:
 
 ```ts
 const ps = await HardwareSDK.getPassphraseState(connectId, {
   initSession: true,
 });
 if (!ps.success) throw new Error(ps.payload.error);
-if (typeof ps.payload !== "string" || !ps.payload) throw new Error("No hidden wallet fingerprint");
-const passphraseState = ps.payload;
-
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+if (typeof ps.payload !== 'string' || !ps.payload) {
+  throw new Error('No hidden wallet fingerprint');
+}
+const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'/0/0",
-  passphraseState,
+  passphraseState: ps.payload,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-**1.2.x** — einmal mit ausdrücklichem Modus öffnen, dann den Fingerabdruck an Methoden übergeben:
+**1.2.x** — führen Sie entsprechend der Benutzerauswahl **einen** der folgenden Abläufe aus. Führen Sie nicht beide nacheinander aus.
+
+**Standard-Wallet**
 
 ```ts
 import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
 
-// Standard wallet
-const standard = await HardwareSDK.openWalletSession(connectId, {
+const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.Standard,
 });
-if (!standard.success) throw new Error(standard.payload.error);
-await HardwareSDK.evmGetAddress(connectId, deviceId, {
+if (!opened.success) throw new Error(opened.payload.error);
+if (opened.payload.walletType !== 'standard') {
+  throw new Error('A standard wallet was not opened');
+}
+const address = await HardwareSDK.evmGetAddress(connectId, opened.payload.deviceId, {
   path: "m/44'/60'/0'/0/0",
   useEmptyPassphrase: true,
 });
+if (!address.success) throw new Error(address.payload.error);
+```
 
-// Hidden wallet — user selects on the device
+**Versteckte Wallet**
+
+```ts
+import { OpenWalletSessionMode } from '@onekeyfe/hd-core';
+
 const opened = await HardwareSDK.openWalletSession(connectId, {
   mode: OpenWalletSessionMode.SelectHidden,
 });
 if (!opened.success) throw new Error(opened.payload.error);
-if (opened.payload.walletType !== 'hidden') {
+if (opened.payload.walletType !== 'hidden' || !opened.payload.passphraseState) {
   throw new Error('A hidden wallet was not opened');
 }
-const hiddenDeviceId = opened.payload.deviceId;
-const passphraseState = opened.payload.passphraseState;
-
-await HardwareSDK.evmGetAddress(connectId, hiddenDeviceId, {
+const binding = opened.payload;
+const address = await HardwareSDK.evmGetAddress(connectId, binding.deviceId, {
   path: "m/44'/60'/0'/0/0",
-  passphraseState,
+  passphraseState: binding.passphraseState,
 });
+if (!address.success) throw new Error(address.payload.error);
 ```
 
-Kombinieren Sie `openWalletSession({ mode })` nicht mit `useEmptyPassphrase` / `initSession` im **selben Aufruf**.
+Speichern Sie die zurückgegebenen `walletType`, `deviceId` und `passphraseState` erst nach Prüfung von Erfolg und Wallet-Typ. Eine Standard-Wallet hat den Fingerabdruck `null`. Bei V1 ohne Passphrase-Schutz kann die Auswahl einer versteckten Wallet eine Standard-Wallet liefern; speichern Sie diese nicht als versteckt.
 
-Wenn Sie `passphraseState` bei einer versteckten Wallet weglassen, können Adress-/Signieraufrufe auf der **Standard-Wallet** ohne Fehler erfolgreich sein.
+Übergeben Sie die alten Parameter `useEmptyPassphrase`, `initSession`, `deviceId` oder `passphraseState` nicht an `openWalletSession`, auch keine übernommenen Standardwerte mit `false`. Spätere Adress-/Signaturaufrufe verwenden `useEmptyPassphrase: true` für die Standard-Wallet oder den gespeicherten `passphraseState` für die versteckte Wallet. Ohne versteckten Fingerabdruck kann der Aufruf ohne Fehler auf der Standard-Wallet erfolgreich sein.
 
-Schnittstellenvertrag: [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session).
+Öffnen Sie die Wallet-Auswahl nicht vor jeder Methode oder automatisch nach Wiederverbindung. Verwenden Sie die Bindung erneut; stoppen Sie bei fehlgeschlagener Identitäts- oder Fingerabdruckprüfung und verlangen Sie eine ausdrückliche Auswahl. Überschreiben Sie die Bindung nicht durch ein neu verbundenes Gerät. Siehe [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session).
+
+## UI, Abbruch und Wiederverbindung [#ui-cancellation-and-reconnect]
+
+| Ereignis | Aktion des Hosts |
+| --- | --- |
+| `REQUEST_PIN` | Nur bei Host-Eingabe mit `UI_RESPONSE.RECEIVE_PIN` antworten; reine Geräte-PIN-Hinweise benötigen keine Antwort |
+| `REQUEST_PASSPHRASE` | Bei Host-Eingabe mit `UI_RESPONSE.RECEIVE_PASSPHRASE` antworten; die Wahl der Geräteeingabe verwendet `value: ""` und `passphraseOnDevice: true`. Reine Gerätebenachrichtigungen benötigen keine Antwort |
+| `REQUEST_PASSPHRASE_ON_DEVICE`, `REQUEST_BUTTON` | Benutzer informieren, keine Eingabeantwort senden |
+| Fenster schließen / Fortschritt | UI aktualisieren; diese Meldungen beweisen keinen Methodenerfolg |
+
+Die Methoden-Promise liefert das endgültige Ergebnis. Klassifizieren Sie Fehler mit `payload.code` statt durch lokalisierten Text; unterscheiden Sie ungültige Parameter, nicht unterstützte Methoden, Wallet-Abweichungen, Abbruch und Transportfehler.
+
+`UI_EVENT`-Listener erhalten eine Nachricht mit Typ und Inhalt. `DEVICE.STATE`-Listener erhalten den Zustandsevent-Inhalt direkt, einschließlich `connectId`, `state` und `revision`; behandeln Sie beide Strukturen unterschiedlich. Registrieren Sie Listener einmal und entfernen Sie sie beim Abbau der Integration.
+
+Führen Sie Aufrufe pro Gerät und Host-PIN-/Passphrase-Dialoge über Geräte hinweg seriell aus. Die aktuellen öffentlichen Einstiegspunkte leiten aus `uiResponse` nur `type` und `payload` weiter; verlassen Sie sich nicht auf die Weiterleitung von Korrelationsmetadaten auf oberster Ebene. Entwerten Sie alte Dialog-Callbacks bei Schließen, Abbruch und Verbindungsverlust, damit sie keine spätere Anfrage beantworten.
+
+Brechen Sie die aktive Operation mit `HardwareSDK.cancel(connectId)` ab und respektieren Sie den Benutzerabbruch. Nach Verbindungsverlust suchen Sie das Gerät erneut, erhalten die aktuelle Verbindung, lesen den Zustand und nutzen die geprüfte Wallet-Bindung. Signieren, Löschen und Firmware-Updates dürfen nicht automatisch wiederholt werden. Ein gewöhnlicher Verbindungsverlust erfordert kein `dispose`; nach expliziter Freigabe des SDK ist vor weiteren Aufrufen eine neue Initialisierung nötig. Siehe [Core-API-Leitfaden](/de/hardware-sdk/core-api-guide) und [Wiederverbindung](/de/hardware-sdk/transport/reconnect).
 
 ## 3. Protocol V1 und V2 [#3-protocol-v1-and-v2]
 
-Classic / Mini / Touch / Pro bleiben auf Protocol V1. Pro 2 / Neo verwenden Protocol V2. Ihre App ruft weiterhin dieselben Methoden auf.
+Classic / Mini / Touch / Pro verwenden Protocol V1; Pro 2 / Neo verwenden Protocol V2. Das SDK erkennt das Protokoll durch eine direkte Abfrage. Leiten Sie es nicht aus USB-PID, BLE-Namen oder Gehäuse ab.
 
-Das SDK setzt `connectProtocol` anhand einer **aktuellen Protokollabfrage**. Leiten Sie V1/V2 nicht aus USB-PID, BLE-Namen oder Gehäuse ab.
+Lassen Sie normalerweise die Erkennung entscheiden. Wenn Sie `connectProtocol` übergeben, ist dies eine strikte Vorgabe: Abweichungen werden abgelehnt. SDK-Version, Protokollunterstützung und minimale Gerätefirmware sind getrennte Prüfungen; prüfen Sie vor Aktivierung einer Methode die API-Unterstützungstabelle.
 
-Die Angabe von `connectProtocol` bei einem Aufruf ist eine verbindliche Erwartung — das SDK wechselt das Protokoll nicht stillschweigend.
-
-Reine V1-Chains (Stellar, Alephium, Nexa, Dynex, Nervos, SCDO, Benfen, Neo-Chain) werden **nicht unterstützt** auf Pro 2 / Neo. Siehe [Protocol V1 und V2](/de/hardware-sdk/concepts/protocol) und [Chain-Unterstützung](/de/hardware-sdk/concepts/chain-support).
+V1-exklusive Chains (Stellar, Alephium, Nexa, Dynex, Nervos, SCDO, Benfen und die Neo-Chain) werden auf Pro 2 / Neo nicht unterstützt. Der Gerätename Neo bedeutet keine Unterstützung der Neo-Chain. Siehe [Protokoll](/de/hardware-sdk/concepts/protocol) und [Chain-Unterstützung](/de/hardware-sdk/concepts/chain-support).
 
 ## 4. Firmware [#4-firmware]
 
-| Gerät | 1.2.x-API |
+| Gerät | Update-API |
 | --- | --- |
 | Classic / Mini / Touch | `firmwareUpdateV2` |
 | Pro | `firmwareUpdateV3` |
-| Pro 2 / Neo | `firmwareUpdateV4` |
+| Pro 2 / Neo | [`firmwareUpdateV4`](/de/hardware-sdk/device-api/firmwareupdatev4) |
 
-Wiederholen Sie nach einem Transportabbruch kein Firmware-Update, Löschen oder Signieren.
+Wenn Ihre Integration Firmware verwaltet, passen Sie auch die Auswertung der Release-Prüfung an: Releases für das V2-Protokoll können Zielkomponenten und ein Ressourcenarchiv enthalten. Gehen Sie nicht von einer einzigen alten Binärdatei oder immer vorhandener URL/Fingerabdruck aus. Verwenden Sie zum Modell passende Dateien und den Vertrag der gewählten Update-API.
+
+Eine Bestätigung oder Fortschrittsmeldung beweist keine Installation. Verbinden Sie sich nach dem Neustart erneut und lesen Sie `scope: 'firmware'`, um die installierten Versionen zu prüfen. Behalten Sie benötigte `keepSession`-Transporthalte bei und wiederholen Sie Updates nach Verbindungsverlust niemals automatisch. Siehe [Firmware-Update](/de/hardware-sdk/firmware-update).
 
 ## 5. Transport [#5-transport]
 
-Wenn Sie weiterhin OneKey Bridge verwenden (`env: 'web'` + `checkBridgeStatus`), migrieren Sie zu WebUSB:
+Ein Upgrade von 1.1.x auf 1.2.x verlangt keinen Wechsel eines funktionierenden Transports. Wenn Sie auch Bridge (`env: 'web'` + `checkBridgeStatus`) auf WebUSB umstellen, folgen Sie dem eigenen Leitfaden:
 
-- Empfohlen: [Bridge → `@onekeyfe/hd-common-connect-sdk`](/de/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
-- Beim Iframe bleiben: [Bridge → `@onekeyfe/hd-web-sdk`](/de/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
+- [Bridge → common-connect WebUSB](/de/hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb)
+- [Bridge → iframe WebUSB](/de/hardware-sdk/legacy-guides/migrate-bridge-to-webusb)
 
-WebUSB benötigt HTTPS und eine Nutzeraktion. BLE benötigt die Bluetooth-Berechtigung des Betriebssystems.
+WebUSB benötigt einen sicheren Kontext und eine Benutzeraktion für die Berechtigungsauswahl. BLE benötigt die Bluetooth-Berechtigungen des Betriebssystems. Testen Sie im tatsächlich ausgelieferten Browser, Electron oder nativen System.
 
 ## Checkliste [#checklist]
 
-1. Alle `@onekeyfe/hd-*`-Pakete auf dieselbe 1.2.x-Version anheben.
-2. Ersetzen Sie `getFeatures` / `getOnekeyFeatures` mit `getDeviceState`.
-3. Ersetzen Sie `getPassphraseState` mit `openWalletSession({ mode: 'standard' | 'select-hidden' })`.
-4. Speichern Sie nur `deviceId + passphraseState`. Speichern Sie keine Firmware-Informationen mehr vom Typ `session_id`.
-5. Übergeben Sie `passphraseState` oder `useEmptyPassphrase: true` bei jedem späteren Adress-/Signieraufruf.
-6. Behalten Sie `keepSession` bei aufeinanderfolgenden USB-Signierungen / Prüfen-dann-Aktualisieren und während Electron-BLE-Firmware-Vorgängen bei. Es ist kein Wallet-Sitzungsflag.
-7. Aufrufe pro Gerät serialisieren.
-8. Prüfen Sie die Chain-Abdeckung von Pro 2 / Neo, bevor Sie diese Geräte unterstützen.
+1. Wählen Sie eine exakte Version, gleichen Sie SDK-Abhängigkeiten und iframe-Dateien ab und sichern Sie die bisherige Lockdatei und Veröffentlichung.
+2. Passen Sie Zustandsabfragen und Nullwerte an; ersetzen Sie alte Abfragen, wenn V2 benötigt wird.
+3. Aktualisieren Sie die Wallet-Auswahl und speichern Sie geprüfte Bindungen; Transportverbindungen und Firmware-Sitzungs-IDs sind keine Wallet-Identität.
+4. Aktualisieren Sie Eingaben/Benachrichtigungen, Abbruch und Wiederverbindung; serialisieren Sie Geräteaufrufe und Host-Dialoge.
+5. Prüfen Sie Protokoll-, Chain- und Firmware-Unterstützung; migrieren Sie Updates nur, wenn Ihre Integration diese verwaltet.
+
+Führen Sie vor Veröffentlichung diese Fälle in jeder unterstützten Laufzeit aus. Hardwarefälle benötigen echte Geräte; ein erfolgreicher Dokumentationsbuild ist kein Hardwaretest.
+
+| Fall | Erwartetes Ergebnis |
+| --- | --- |
+| Initialisierung und Suche mit bestehenden V1- und unterstützten V2-Geräten | Richtiger Transport/Protokoll; normalisierter Zustand oder behandelbarer Fehler, keine erfundene Identität |
+| Standard- und versteckte Wallet; deaktivierte V1-Passphrase | Richtiger Typ und Adresse; null-Fingerabdruck beim Standard, geprüfte Bindung bei versteckter Wallet |
+| Versteckte Bindung erneut nutzen; Gerät/Seed wechseln oder falscher Fingerabdruck | Bei gültiger Bindung dieselbe Wallet; bei Abweichung stoppen, ohne Bindung zu überschreiben |
+| Host-/Geräte-PIN und Passphrase; bestätigen, abbrechen und schließen | Nur Eingabeanfragen erhalten Antworten; Promise bestimmt Abschluss; alte Callbacks werden ignoriert |
+| Verbindungsverlust/-aufbau und zwei Geräte | Verbindung aktualisieren, Eingaben serialisieren, geprüfte Bindung erhalten, keine Nebenwirkungen wiederholen |
+| Nicht unterstützte Chain/Protokoll oder alte Firmware | Unterstützungsfehler behandeln, ohne Wallet/Protokoll still zu wechseln |
+| Eigenes iframe / nativer Transport | Dateien und Berechtigungen passen zur fixierten Version; Initialisierung und ein unterstützter Adressaufruf gelingen |
+| Firmware-Ablauf, falls implementiert | Passendes Modell/Dateien; installierte Versionen nach Wiederverbindung prüfen |
+
+Vergleichen Sie bekannte Wallet-Adressen und unterstützte Signaturergebnisse mit Ihrer 1.1.x-Basis; prüfen Sie Fehler anhand des Codes. PINs, Passphrases, abgeleitete Geheimnisse oder private Daten gehören weder in Logs noch in Testdaten.
+
+## Zur alten Version zurückkehren [#rollback]
+
+Bewahren Sie bisherige exakte Abhängigkeiten, Lockdatei, iframe-Dateien und Laufzeitkonfiguration als eine getestete Veröffentlichung auf. Stellen Sie diese gemeinsam wieder her; mischen Sie kein 1.1.x-Einstiegspaket mit 1.2.x-Dateien oder Typen.
+
+Deaktivieren Sie neu aktivierte V2-exklusive Integrationen, wenn Sie zur 1.1.x-Basis zurückkehren. Ein SDK-Downgrade ist kein Firmware-Downgrade. Erhalten Sie gespeicherte Wallet-Bindungen als Daten, prüfen Sie sie aber mit der wiederhergestellten Integration und verlangen Sie bei fehlender Verifizierbarkeit eine Benutzerauswahl. Wechseln Sie nicht automatisch zur Standard-Wallet und wiederholen Sie keine abgebrochenen Operationen.
 
 ## Weiter [#next]
 
 - [Erste Schritte](/de/hardware-sdk/getting-started)
-- [Core-API-Anleitung](/de/hardware-sdk/core-api-guide)
+- [Core-API-Leitfaden](/de/hardware-sdk/core-api-guide)
 - [Wallet-Sitzungen](/de/hardware-sdk/concepts/wallet-session)
-- [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect)
-
-Auf Protocol V1 kann `select-hidden` eine Standard-Wallet zurückgeben, wenn der Passphrase-Schutz deaktiviert ist. Prüfen Sie `walletType` vor dem Speichern oder Verwenden von `passphraseState`.
+- [Wiederverbindung und Freigabe](/de/hardware-sdk/transport/reconnect)
