@@ -11,9 +11,9 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
-    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
-    "test": "jest",
+    "dev": "node scripts/protobuf-static.js && rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "node scripts/protobuf-static.js && rimraf dist && rollup -c ../../build/rollup.config.js",
+    "test": "node scripts/protobuf-static.js && jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "update:protobuf": "./scripts/protobuf-build.sh"
