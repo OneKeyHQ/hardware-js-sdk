@@ -97,9 +97,10 @@ describe('public device lifecycle events', () => {
       const methodRun = jest.spyOn(GetDeviceState.prototype, 'run').mockResolvedValue({} as never);
       const releaseGate = createDeferred<void>();
       const release = jest.spyOn(device, 'release').mockReturnValue(releaseGate.promise);
-      core = initCore();
+      const context = initCore();
+      core = context;
       const call = (id: number) =>
-        core!.handleMessage({
+        context.handleMessage({
           id,
           event: IFRAME.CALL,
           type: IFRAME.CALL,
