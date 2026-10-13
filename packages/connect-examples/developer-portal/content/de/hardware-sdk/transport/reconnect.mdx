@@ -1,15 +1,13 @@
 ---
 description: "Geräteverbindungen wiederherstellen, Wallet-Bindungen bewahren und das SDK beenden, ohne Nebenwirkungen erneut auszulösen."
-title: "Wiederverbinden und freigeben"
+title: "Verbindungsabbrüche und Wiederverbindung"
 ---
 
 <span id="reconnect-and-dispose" />
 
-# Wiederverbinden und freigeben
+# Verbindungsabbrüche und Wiederverbindung [#wiederverbinden-und-freigeben]
 
-Transportabbrüche sind normal: USB-Abziehen, BLE-Reichweite, Bluetooth-Zurücksetzen im Betriebssystem, Firmware-Neustart. Hardware SDK 1.2.0 stellt die **Verbindung** wieder her. Ihre App muss weiterhin den **Aufruf** wiederherstellen.
-
-Diese Seite beschreibt den Integrationsvertrag. Sie beschreibt keine Protocol-V2-Sequenznummern oder Transport-Generation.
+Das Abziehen des USB-Kabels, ein BLE-Signalverlust, ein Bluetooth-Reset oder ein Firmware-Neustart können die Verbindung unterbrechen. Beenden Sie den unterbrochenen Vorgang, verbinden Sie das Gerät erneut und verwenden Sie die ausgewählte Wallet sicher weiter.
 
 ## Was das SDK bereits übernimmt [#what-the-sdk-already-does]
 

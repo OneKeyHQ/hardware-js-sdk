@@ -1,13 +1,13 @@
 ---
-description: "Actualizar Hardware SDK de 1.1.x a 1.2.x: versiones, campos, vinculación de wallets, UI, límites, pruebas de aceptación y reversión."
-title: "De 1.1.x a 1.2.x"
+description: "Actualiza una integración existente de Hardware SDK 1.1.x a 1.2.x. Revisa los cambios de API obligatorios, la gestión de carteras y los pasos de validación."
+title: "Actualizar a Hardware SDK 1.2"
 ---
 
 <span id="migrate-from-11x-to-12x" />
 
-# Migrar de 1.1.x a 1.2.x
+# Actualizar a Hardware SDK 1.2 [#migrar-de-11x-a-12x]
 
-Esta guía se dirige a integraciones de terceros que pasan de **1.1.x a 1.2.x**. Mantén un solo punto de entrada del SDK; Protocol V2 no exige otro SDK. Los proyectos nuevos pueden empezar por [Primeros pasos](/es/hardware-sdk/getting-started).
+Actualiza una integración existente de Hardware SDK **1.1.x** a **1.2.x**. Mantén un solo punto de entrada del SDK; Protocol V2 no exige otro SDK. Para proyectos nuevos, empieza por [Primeros pasos](/es/hardware-sdk/getting-started).
 
 **Obligatorio para Protocol V2:** sustituye las lecturas exclusivas de V1 y comprueba dispositivos, firmware y protocolos compatibles con cada método. **Recomendado:** usa selección explícita de wallet en código nuevo. **Compatibilidad:** puedes conservar las llamadas de cadena existentes compatibles; `getPassphraseState` sigue como utilidad obsoleta de compatibilidad en ambos protocolos. **Según el caso:** cambiar Bridge por WebUSB, cambiar el punto de entrada o implementar actualizaciones de firmware son decisiones independientes.
 

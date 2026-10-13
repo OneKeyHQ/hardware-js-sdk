@@ -94,7 +94,7 @@ if (!result.success) throw new Error(result.payload.error);
 
 ## 4. Después de la llamada [#4-after-the-call]
 
-1. El dispositivo puede reiniciarse. Espera a `DEVICE.CONNECT` (o vuelve a buscar). Una reconexión normal conserva el protocolo confirmado. Consulta [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect).
+1. El dispositivo puede reiniciarse. Espera a `DEVICE.CONNECT` (o vuelve a buscar). Una reconexión normal conserva el protocolo confirmado. Consulta [Desconexiones y reconexión](/es/hardware-sdk/transport/reconnect).
 2. Vuelve a leer [`getDeviceState`](/es/hardware-sdk/basic-api/get-device-state) (`scope: 'firmware'` si necesitas las versiones) antes de confiar en la nueva compilación.
 3. Si la llamada falla por un tiempo de espera del transporte agotado **después de** enviar la solicitud de instalación, **no repitas** la misma actualización. Reconecta, lee el estado y luego decide.
 

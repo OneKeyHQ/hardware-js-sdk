@@ -92,7 +92,7 @@ if (!result.success) throw new Error(result.payload.error);
 
 ## 4. After the call
 
-1. The device may reboot. Wait for `DEVICE.CONNECT` (or search again). Ordinary reconnect keeps the confirmed protocol. See [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+1. The device may reboot. Wait for `DEVICE.CONNECT` (or search again). Ordinary reconnect keeps the confirmed protocol. See [Disconnects and reconnection](/en/hardware-sdk/transport/reconnect).
 2. Re-read [`getDeviceState`](/en/hardware-sdk/basic-api/get-device-state) (`scope: 'firmware'` if you need versions) before trusting the new build.
 3. If the call failed with a transport timeout **after** the install request was sent, **do not replay** the same update. Reconnect, read status, then decide.
 

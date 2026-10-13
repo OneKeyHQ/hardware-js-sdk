@@ -125,7 +125,7 @@ Always check `success` before reading `payload`. `useEmptyPassphrase: true` keep
 
 WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 
-## What 1.2.0 does for you
+## Device and wallet support [#what-120-does-for-you]
 
 - The SDK detects Protocol V1 vs V2 from the live device. Do not branch on USB PID, BLE name, or product string. See [Protocol V1 and V2](/en/hardware-sdk/concepts/protocol).
 - Pro 2 and Neo use the same methods as Classic / Pro. Device differences are listed in [Devices](/en/hardware-sdk/concepts/devices).
@@ -135,10 +135,10 @@ WebUSB requires HTTPS and a user gesture. BLE requires OS Bluetooth permission.
 
 <Link className="doc-next" href="/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM &amp; EVM</small><strong>Sign your first transaction</strong><span>Parameters, fee types, and the signature response.</span></span><span aria-hidden="true">↗</span></Link>
 
-1. Already on 1.1.x: [From 1.1.x to 1.2.x](/en/hardware-sdk/legacy-guides/from-1x)
+1. Already on 1.1.x: [Upgrade to Hardware SDK 1.2](/en/hardware-sdk/legacy-guides/from-1x)
 2. Wire PIN / passphrase UI events: [Core API Guide](/en/hardware-sdk/core-api-guide)
 3. Connect for real on your platform: [Transport](/en/hardware-sdk/transport)
-4. Handle drops: [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
+4. Handle drops: [Disconnects and reconnection](/en/hardware-sdk/transport/reconnect)
 5. Which chains on which device: [Chain Support](/en/hardware-sdk/concepts/chain-support)
 6. Sign a transaction: [Signer Guides](/en/hardware-sdk/signers)
 7. Firmware: [Firmware Update](/en/hardware-sdk/firmware-update)

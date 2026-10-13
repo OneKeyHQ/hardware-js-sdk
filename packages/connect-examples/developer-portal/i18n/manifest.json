@@ -993,9 +993,9 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/basic-api/cancel-request.mdx": {
-        "sourceHash": "4fbb9e545acf3251f3df235cd07097450b1b1fd135e462821a038db103abeb5e",
-        "outputHash": "d661e973ca4676dd40f5da28ddc45d1e1901ff133795982f2425118582feb344",
-        "mode": "reviewed-baseline"
+        "sourceHash": "6204c2e3c3fbf14b92c23f24f4bc431696e749db784ffe692cd0d96d187f6c34",
+        "outputHash": "fd4a3bba442972b209e7bd77c8c33ceff374a7ef0b3d2dd8820bb3ad227ca228",
+        "mode": "translated"
       },
       "hardware-sdk/basic-api/get-device-state.mdx": {
         "sourceHash": "db7298b828dde74ee05a3b660d6a98c58a93ffa2edc04bd48965c663aeb7b0e8",
@@ -1448,9 +1448,9 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/concepts/common-params.mdx": {
-        "sourceHash": "7c1dcfa290a9347fe6c99a4600fa39c9d44e637eabe9a7001f268bfba3478bcc",
-        "outputHash": "80698c0e6cfa4a4c6906249c0c7008730191691a8a73ed34f304e3bc92110f76",
-        "mode": "reviewed-baseline"
+        "sourceHash": "fe78ba5ab5771ec789ac11018a9871c131446f54c692b03cfdf0659186395240",
+        "outputHash": "eb54cbf1496088aa3f7cda6cced74a5b33c94f84749b6cb783f0a7bd51838807",
+        "mode": "translated"
       },
       "hardware-sdk/concepts/devices.mdx": {
         "sourceHash": "cfe6806e45dbdceb54dab119eca91ffb47770198a40f4c3af65bf85408dfc39c",
@@ -1458,9 +1458,9 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/concepts/identifiers.mdx": {
-        "sourceHash": "b9b08b67c4943458081af5548a6e1992d09f029d4f9f7f9dbb0d54335f09b25c",
-        "outputHash": "f8e3b0c61be33afbf43f2fcb51b01f1ec89e107f6f725f2c0c602b160f033f12",
-        "mode": "reviewed-baseline"
+        "sourceHash": "0f92bc04125c658ad3acab042d85765ced1669ea5aba66600b6dd13bb6a0cf70",
+        "outputHash": "a4582bb2d2d1342c2bfba8ca73327288cd66526488d98d47a8ed6e650a718f1b",
+        "mode": "translated"
       },
       "hardware-sdk/concepts/low-level-plugin.mdx": {
         "sourceHash": "2a218f16729b64af88b88d4024188be9b5f904f0dec8b11234ec4c5bf8bd86f8",
@@ -1488,9 +1488,9 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/core-api-guide.mdx": {
-        "sourceHash": "99b40bc4a3c8478a381850f83e0adabe92e7a056915d7db978e79cc7d5ffc5df",
-        "outputHash": "bae28efae89983e95d1bb7cd61e9b9f7c7b320114159c11fbfbff50f83fd007b",
-        "mode": "reviewed-baseline"
+        "sourceHash": "1639f8ad2b1022f445b1c320ca97f3830afa281f900b6aa70c450864485b89c8",
+        "outputHash": "16bd918e5483c14c3fc232ec4ad0e7f745d535536966ab7985546777c875ff61",
+        "mode": "translated"
       },
       "hardware-sdk/device-api/checkblefirmwarerelease.mdx": {
         "sourceHash": "36f5c34e837b3c1a5b64ddb0141fd54f2d8605ac16ca014331536442f228fdc5",
@@ -1548,14 +1548,14 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/firmware-update.mdx": {
-        "sourceHash": "35edd11b422007e0cb95d208cde3b47bf72364f7a69f50c68ca1294543b084ce",
-        "outputHash": "2ded59eead5bddfc902d925451fc452232d4ea42c3e053a0428d5214907df4b5",
-        "mode": "reviewed-baseline"
+        "sourceHash": "cbe9011ca8f646b91b08ad87392409b92997bceca126903e58148d5c63f1d613",
+        "outputHash": "282c37bf7f4e8a3e783d7dbe7563fb3ce71d894963cad97dede06ac51e47f3d6",
+        "mode": "translated"
       },
       "hardware-sdk/getting-started.mdx": {
-        "sourceHash": "5016e5069384183a9c35aae2929ee2e1c53737dcbf0d429c709be5322d7962cc",
-        "outputHash": "433cfaa37a816fd9972952504412ba674a468d29d06427a0ddb28b7e1ca5fb0a",
-        "mode": "reviewed-baseline"
+        "sourceHash": "7421647b8372bb918757990d54e47277326bcb5decc064556295f63a3230cdc3",
+        "outputHash": "3410bcf701a1c80cb5c4e834346ff71dbdb58f6ed55b13da759ef1d776f10816",
+        "mode": "translated"
       },
       "hardware-sdk/index.mdx": {
         "sourceHash": "eb2f9c74271a5ee00d82c4b1c1206370ccb4394785c4646fa4aeb273aa59f9bd",
@@ -1563,19 +1563,19 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/legacy-guides/_meta.js": {
-        "sourceHash": "8ea0233ee57b4348d5b617398efaae6a1fa7d41e7f835b76f4d81787715630b9",
-        "outputHash": "2012db71b6185af346feb3cd188726901195139dc5a775793f9279acc8e50063",
-        "mode": "reviewed-baseline"
+        "sourceHash": "4aea35c5a943b092759dbe9f5af7a5b7cc2b1b4b3bc412e26586a02ff64094eb",
+        "outputHash": "b658c3f1fd46096c871a2a62c0b3d2467b8455445ff2208c4888c5fb23c95d1e",
+        "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
-        "outputHash": "7c0b64e2490899bf2ae3841d466d46c6486744b42198af6a9cdb58625fe2e74e",
-        "mode": "reviewed-baseline"
+        "sourceHash": "e65efa058e32274e194d74d33d6e0ae20be15cf6140f9208d11b18a08749d922",
+        "outputHash": "02e0489a80360a318248e7bf5a599a0a2e0552c879a7456ca7cc67c474c89b9b",
+        "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
-        "sourceHash": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
-        "outputHash": "db9c3fc387650c294b347b8f16ebc3c5cd1d17f6aa7c7fc19d261cf6632cfbaf",
-        "mode": "reviewed-baseline"
+        "sourceHash": "a93ebd3b10c7da1abca7af3edc4e7fa2a9ad1fd79ab85f7995045f4708dd126b",
+        "outputHash": "3d1bc8101d6b9cf34ab0a14693f2c6928dfdc26e8b8c3a1b1e495a2b6f6a0ea2",
+        "mode": "translated"
       },
       "hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb.mdx": {
         "sourceHash": "6ad6d3dc7acc54c041351b7a421a1088b86e04d60e2b1d443e713c99921b94d4",
@@ -1618,14 +1618,14 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/transport/_meta.js": {
-        "sourceHash": "474e913155f31c0a80c096c019257d4b42fa589dbb4e0d7a076c3462ae21c0b8",
-        "outputHash": "1e565f7363f25810e9df154daca3eb2156fef310f7bf552162702ba52d71776c",
-        "mode": "reviewed-baseline"
+        "sourceHash": "4dc4d4d8f1c7fef09274dfc361661dc68dbac4f7f285d1738cb84d487dc4c7d5",
+        "outputHash": "10c9010096f0aba78c45bb902f08d441e71848a11c7b8f1b6b8cb8874e505c1d",
+        "mode": "translated"
       },
       "hardware-sdk/transport/android.mdx": {
-        "sourceHash": "f62b039bc5eaa2f8c278db015af6828b2cab6ac242bf3327b173d4329ef52e99",
-        "outputHash": "335938d4732ab77da2d40bb3ea014d53b7b9456f9206b27e3e3d32b57ed42df5",
-        "mode": "reviewed-baseline"
+        "sourceHash": "40c0042d8130765e7293b425e364806dacfafaf7435f6e9842977520b082d98a",
+        "outputHash": "476c72969eca73eb4242e2b0e8de3b2f0ee73283f5f4730d442348d73ec57512",
+        "mode": "translated"
       },
       "hardware-sdk/transport/flutter.mdx": {
         "sourceHash": "8b1caa9fc6e297660ef025410a6ed3355b08b35e61e9a737c8d7b764b0869a54",
@@ -1633,14 +1633,14 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/index.mdx": {
-        "sourceHash": "ae36e4e7db142d921f7c64918645014f8a94f2dcd8638a588ed09df5ea7a995e",
-        "outputHash": "11b2af0afaf6e1a87e445b356049d05aa313ff7ee3b567c86e6417e8369c46e2",
-        "mode": "reviewed-baseline"
+        "sourceHash": "bca34e029955b7c2811ff2cd26c5be29639b62de1cf5c73698cc20d2c9923c86",
+        "outputHash": "b70ccc8e8ca3009dc4b4970433d45301f6a70608f669c7f207f8102118a309aa",
+        "mode": "translated"
       },
       "hardware-sdk/transport/ios.mdx": {
-        "sourceHash": "801df558af74e7fe590b4c9dd3720346a0da25c271ec0310ac32208070494dab",
-        "outputHash": "28a5046a2ce555a4084bacd8dc8a04642b111aea42780040dbcfd1dfd762b184",
-        "mode": "reviewed-baseline"
+        "sourceHash": "205e7ed47f7d601eb38c0f830df8d608d8bd5146dacc62a627008fdc64e0e4c3",
+        "outputHash": "22781931b7ae486b8b3937cafbaa9c71b10b5970803cc508627e21e35f4c7ac2",
+        "mode": "translated"
       },
       "hardware-sdk/transport/native-ble.mdx": {
         "sourceHash": "2f5e9b5b826109af4e5317d134b36226f199814e48d1858112343fc70a8559ea",
@@ -1653,14 +1653,14 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/transport/reconnect.mdx": {
-        "sourceHash": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",
-        "outputHash": "5587296287856e993783bb5a63535056ddb73455f6b88dc4aecd269c6cb1e4de",
-        "mode": "reviewed-baseline"
+        "sourceHash": "cce3582f45b2f892a6f7de941601e4992009c1e8b0e8a0344ccea3e85ab86c20",
+        "outputHash": "5995d83228c3f4fdccc3d1abbddac1cbed3603b8793137434054e0ec18c3c4a6",
+        "mode": "translated"
       },
       "hardware-sdk/transport/web-usb.mdx": {
-        "sourceHash": "159a580d23e71b3a470ff2254b537aeb76f3cb19f37e34c25b975b803614cc2d",
-        "outputHash": "bbef048a6866447a2e96346a5c26d6b72153789b29d4676ec3d10d1a67d99642",
-        "mode": "reviewed-baseline"
+        "sourceHash": "d209af922d1812a56a791d1e6fb0a2c74d9c103a16263da4294d5ad63ec033c7",
+        "outputHash": "7906898256c4c906bd6ac0fbcb6169c6da9795e54b99c3207bde002343e95369",
+        "mode": "translated"
       },
       "index.mdx": {
         "sourceHash": "270e55cbd575ed293cf9c184f9a600215abbd46a34b176749f16bf397dacf089",
@@ -2765,8 +2765,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/cancel-request.mdx": {
-        "sourceHash": "4fbb9e545acf3251f3df235cd07097450b1b1fd135e462821a038db103abeb5e",
-        "outputHash": "76cd406e47b1684948a3d187a84516722136ba74d5999ea7a87b2af66a661872",
+        "sourceHash": "6204c2e3c3fbf14b92c23f24f4bc431696e749db784ffe692cd0d96d187f6c34",
+        "outputHash": "018b80558b7c5bac3b6cf5862861de8125733f7f3f1b3a5d65b1fe24588f6152",
         "mode": "translated"
       },
       "hardware-sdk/basic-api/get-device-state.mdx": {
@@ -3220,8 +3220,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/common-params.mdx": {
-        "sourceHash": "7c1dcfa290a9347fe6c99a4600fa39c9d44e637eabe9a7001f268bfba3478bcc",
-        "outputHash": "8cbb745aff4cf4ada8098194a1750684b79a4c34630cbac490df46f671fd94ae",
+        "sourceHash": "fe78ba5ab5771ec789ac11018a9871c131446f54c692b03cfdf0659186395240",
+        "outputHash": "aee56545676d17469537d9d4d72c2c7a9e0c390a791aee93dc46531b1e8f6620",
         "mode": "translated"
       },
       "hardware-sdk/concepts/devices.mdx": {
@@ -3230,8 +3230,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/identifiers.mdx": {
-        "sourceHash": "b9b08b67c4943458081af5548a6e1992d09f029d4f9f7f9dbb0d54335f09b25c",
-        "outputHash": "08913b4858e436b7cec78a97a67e54d96dd895cae5c8fdd047495ee79172cd93",
+        "sourceHash": "0f92bc04125c658ad3acab042d85765ced1669ea5aba66600b6dd13bb6a0cf70",
+        "outputHash": "53698c618f578e1957c0524ee7d2e471b95e2b25ff8f10a2829e01cc628d531a",
         "mode": "translated"
       },
       "hardware-sdk/concepts/low-level-plugin.mdx": {
@@ -3260,8 +3260,8 @@
         "mode": "translated"
       },
       "hardware-sdk/core-api-guide.mdx": {
-        "sourceHash": "99b40bc4a3c8478a381850f83e0adabe92e7a056915d7db978e79cc7d5ffc5df",
-        "outputHash": "0419320c4538bc2fcd02aa342cd7966cfc95ca33640fef919ed860b0d13b464b",
+        "sourceHash": "1639f8ad2b1022f445b1c320ca97f3830afa281f900b6aa70c450864485b89c8",
+        "outputHash": "e21494c16672fbbd7245fb7dcb099b6f461267e709734c60b7caa559d216cca9",
         "mode": "translated"
       },
       "hardware-sdk/device-api/checkblefirmwarerelease.mdx": {
@@ -3320,13 +3320,13 @@
         "mode": "translated"
       },
       "hardware-sdk/firmware-update.mdx": {
-        "sourceHash": "35edd11b422007e0cb95d208cde3b47bf72364f7a69f50c68ca1294543b084ce",
-        "outputHash": "265598add1fd6a6075b7139377c0768dcec290f367b262e91204b81741d85181",
+        "sourceHash": "cbe9011ca8f646b91b08ad87392409b92997bceca126903e58148d5c63f1d613",
+        "outputHash": "bed62a50f0a2a5e75626321eb9c2442d207a8023b5b3d7c763927f18ea3eb892",
         "mode": "translated"
       },
       "hardware-sdk/getting-started.mdx": {
-        "sourceHash": "5016e5069384183a9c35aae2929ee2e1c53737dcbf0d429c709be5322d7962cc",
-        "outputHash": "8873dc317d5cd038d7fe2b70a6b6b8289b067ccd69cbeb86a9dd33b3666ac0e7",
+        "sourceHash": "7421647b8372bb918757990d54e47277326bcb5decc064556295f63a3230cdc3",
+        "outputHash": "cd0846f94d16988ed64db56397f2c3847e7c4da4c13f1c19c05bc0c9e2bfb593",
         "mode": "translated"
       },
       "hardware-sdk/index.mdx": {
@@ -3335,18 +3335,18 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/_meta.js": {
-        "sourceHash": "8ea0233ee57b4348d5b617398efaae6a1fa7d41e7f835b76f4d81787715630b9",
-        "outputHash": "ff292f28b316bcc6a52e07a58ec91af426e2104ea9566e256f5b144470fa795f",
+        "sourceHash": "4aea35c5a943b092759dbe9f5af7a5b7cc2b1b4b3bc412e26586a02ff64094eb",
+        "outputHash": "42e3894b4de843c9e4c7fe7307bef79340b09b01b0999fb74d3e65a7ecd701d7",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
-        "outputHash": "924834499528dbab8e61425617fa5564243124eb291175e8271cb7648d6dd95f",
+        "sourceHash": "e65efa058e32274e194d74d33d6e0ae20be15cf6140f9208d11b18a08749d922",
+        "outputHash": "99ba906fcfc125547141076719a32c48c41d2808e5bd3eefe1ccc7aebcf85843",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
-        "sourceHash": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
-        "outputHash": "cd9f06935f07cab112dc229f302ad472c59c970267297800338b4ca514068b30",
+        "sourceHash": "a93ebd3b10c7da1abca7af3edc4e7fa2a9ad1fd79ab85f7995045f4708dd126b",
+        "outputHash": "d0b8576e1ce5a2a0316e2acf0aeb8fc415d35aa7ac30a4a2ddd2d67d8f774681",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb.mdx": {
@@ -3390,13 +3390,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/_meta.js": {
-        "sourceHash": "474e913155f31c0a80c096c019257d4b42fa589dbb4e0d7a076c3462ae21c0b8",
-        "outputHash": "6a49b7b5fcabf5e7ffe04c3f2ce8265d40427ec39212be9c8422e21e6f985a64",
+        "sourceHash": "4dc4d4d8f1c7fef09274dfc361661dc68dbac4f7f285d1738cb84d487dc4c7d5",
+        "outputHash": "042f6098ae1b0789c1614bf6269e4e6cbe822fa94924b33de2e84cc6715d38f7",
         "mode": "translated"
       },
       "hardware-sdk/transport/android.mdx": {
-        "sourceHash": "f62b039bc5eaa2f8c278db015af6828b2cab6ac242bf3327b173d4329ef52e99",
-        "outputHash": "2e98e586061cf6cd39a52e7103bd3ffb049c35c38c199dc3f0b5ed7a3b7294d4",
+        "sourceHash": "40c0042d8130765e7293b425e364806dacfafaf7435f6e9842977520b082d98a",
+        "outputHash": "f855a7c8766150f90df53cd58335a2e4a6c6cf5c9ab25302c2fbf825b146ff77",
         "mode": "translated"
       },
       "hardware-sdk/transport/flutter.mdx": {
@@ -3405,13 +3405,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/index.mdx": {
-        "sourceHash": "ae36e4e7db142d921f7c64918645014f8a94f2dcd8638a588ed09df5ea7a995e",
-        "outputHash": "bf2b71f367f2142130912c90b8a1bdc60f24cff731205741c909c71f3fd9e9d0",
+        "sourceHash": "bca34e029955b7c2811ff2cd26c5be29639b62de1cf5c73698cc20d2c9923c86",
+        "outputHash": "980f07bbeb4cd957d2639ffa442c251be1679ee3b826560603e01bde26d886ba",
         "mode": "translated"
       },
       "hardware-sdk/transport/ios.mdx": {
-        "sourceHash": "801df558af74e7fe590b4c9dd3720346a0da25c271ec0310ac32208070494dab",
-        "outputHash": "8718ca014a5628af8658fcaa64711af77929f4d16b587a5247bbd2c60a90d6fc",
+        "sourceHash": "205e7ed47f7d601eb38c0f830df8d608d8bd5146dacc62a627008fdc64e0e4c3",
+        "outputHash": "15969ec3c04434e2b10bfa720693cc691e43ced40239d91af1704da6fe0b8280",
         "mode": "translated"
       },
       "hardware-sdk/transport/native-ble.mdx": {
@@ -3425,13 +3425,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
-        "sourceHash": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",
-        "outputHash": "b08bb75c67e48c0d529c572e621926eeb1c24bc3ab8fe311768fa70644743e35",
+        "sourceHash": "cce3582f45b2f892a6f7de941601e4992009c1e8b0e8a0344ccea3e85ab86c20",
+        "outputHash": "94d0b7d2ebea545f2a2cd4f4ab9e673e8a0ed1b4617af5a91ccbe2f94d078a16",
         "mode": "translated"
       },
       "hardware-sdk/transport/web-usb.mdx": {
-        "sourceHash": "159a580d23e71b3a470ff2254b537aeb76f3cb19f37e34c25b975b803614cc2d",
-        "outputHash": "77b375807bcce2732e04e917cb6befd88f498649ad73d7e15e6ae1acd1ad8592",
+        "sourceHash": "d209af922d1812a56a791d1e6fb0a2c74d9c103a16263da4294d5ad63ec033c7",
+        "outputHash": "a7ae1c57fc5897f6636d9ba9f973b5a478ad1db9bac14c05c0546cdb3c59becb",
         "mode": "translated"
       },
       "index.mdx": {
@@ -4532,8 +4532,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/cancel-request.mdx": {
-        "sourceHash": "4fbb9e545acf3251f3df235cd07097450b1b1fd135e462821a038db103abeb5e",
-        "outputHash": "8a3fdffada4d1bbbdcfe29492e9b1782304f67e3de91a2d3f6e12dff62843fb9",
+        "sourceHash": "6204c2e3c3fbf14b92c23f24f4bc431696e749db784ffe692cd0d96d187f6c34",
+        "outputHash": "bff2b35def8eba7ddbc30e505a33edeb79899a416011465e9c07774a3c8952fc",
         "mode": "translated"
       },
       "hardware-sdk/basic-api/get-device-state.mdx": {
@@ -4987,8 +4987,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/common-params.mdx": {
-        "sourceHash": "7c1dcfa290a9347fe6c99a4600fa39c9d44e637eabe9a7001f268bfba3478bcc",
-        "outputHash": "0d9abe909d4a97ff270df2142a13af1fd44c54b782a38d1665163e83aee6647c",
+        "sourceHash": "fe78ba5ab5771ec789ac11018a9871c131446f54c692b03cfdf0659186395240",
+        "outputHash": "6b6d592a3a31bd9e4379b89dfb514f3b11ff2b0129bd0502d526aba845dc1afb",
         "mode": "translated"
       },
       "hardware-sdk/concepts/devices.mdx": {
@@ -4997,8 +4997,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/identifiers.mdx": {
-        "sourceHash": "b9b08b67c4943458081af5548a6e1992d09f029d4f9f7f9dbb0d54335f09b25c",
-        "outputHash": "01f5d5031c7b4dc32ebd46b25cb4361366e3730a336a12508781a3fdd945ce4e",
+        "sourceHash": "0f92bc04125c658ad3acab042d85765ced1669ea5aba66600b6dd13bb6a0cf70",
+        "outputHash": "56caa0a99c0319b3b57093a348f1824e0dc7cfd682e6ce6de8e8202934e1d5fc",
         "mode": "translated"
       },
       "hardware-sdk/concepts/low-level-plugin.mdx": {
@@ -5027,8 +5027,8 @@
         "mode": "translated"
       },
       "hardware-sdk/core-api-guide.mdx": {
-        "sourceHash": "99b40bc4a3c8478a381850f83e0adabe92e7a056915d7db978e79cc7d5ffc5df",
-        "outputHash": "fffec6ad16901ead0dd9cd20b199d02b4d8a1d62d864e4eaa682081f2878c7e1",
+        "sourceHash": "1639f8ad2b1022f445b1c320ca97f3830afa281f900b6aa70c450864485b89c8",
+        "outputHash": "f815b778e6f1282880e88d61404ded00dbd3824ea397514d0ee250ed739440f3",
         "mode": "translated"
       },
       "hardware-sdk/device-api/checkblefirmwarerelease.mdx": {
@@ -5087,13 +5087,13 @@
         "mode": "translated"
       },
       "hardware-sdk/firmware-update.mdx": {
-        "sourceHash": "35edd11b422007e0cb95d208cde3b47bf72364f7a69f50c68ca1294543b084ce",
-        "outputHash": "696f5f811636e180b25a5d8c284c6633247d667fd163c4fdeb0edf413e3afa5a",
+        "sourceHash": "cbe9011ca8f646b91b08ad87392409b92997bceca126903e58148d5c63f1d613",
+        "outputHash": "9372111d9fdd964f62485f29dbda1a8d1f8199499ea8e7a6093706a765ba950c",
         "mode": "translated"
       },
       "hardware-sdk/getting-started.mdx": {
-        "sourceHash": "5016e5069384183a9c35aae2929ee2e1c53737dcbf0d429c709be5322d7962cc",
-        "outputHash": "b09b248e59bf47d628f6862bfd7350d30bcf3606024cd01099d373b9bddddcd2",
+        "sourceHash": "7421647b8372bb918757990d54e47277326bcb5decc064556295f63a3230cdc3",
+        "outputHash": "e267b4c9432f392c3d3e4a6c833442ec6f63068411d631151d453980914cee41",
         "mode": "translated"
       },
       "hardware-sdk/index.mdx": {
@@ -5102,18 +5102,18 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/_meta.js": {
-        "sourceHash": "8ea0233ee57b4348d5b617398efaae6a1fa7d41e7f835b76f4d81787715630b9",
-        "outputHash": "23f1b07e16081d742fca6daf5e365c3f0e1ce55ec14de5b8fdbf6d22d77cafb0",
+        "sourceHash": "4aea35c5a943b092759dbe9f5af7a5b7cc2b1b4b3bc412e26586a02ff64094eb",
+        "outputHash": "130ca2b48f43eb804c7cab96a74247ceadd36d74a6ce5698f370a050ab6d2a63",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
-        "outputHash": "e8487b3af0ffe2c392c0cd81ae5a1ca01299d40b8b8fd83dc9d065990dc25c1e",
+        "sourceHash": "e65efa058e32274e194d74d33d6e0ae20be15cf6140f9208d11b18a08749d922",
+        "outputHash": "2db0fe3d0384fb4b7fa67fb2174a6090cf240e34b8022c46441fb0ba0a035966",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
-        "sourceHash": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
-        "outputHash": "575f45abbd8105f2eb2452f9996ab768a5c03a785ca722c020cae78ac918722d",
+        "sourceHash": "a93ebd3b10c7da1abca7af3edc4e7fa2a9ad1fd79ab85f7995045f4708dd126b",
+        "outputHash": "f6d85e7c26c5e38b09dd6be04307bc615a82b337c9cb739d6ec16923fb9b3daa",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb.mdx": {
@@ -5157,13 +5157,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/_meta.js": {
-        "sourceHash": "474e913155f31c0a80c096c019257d4b42fa589dbb4e0d7a076c3462ae21c0b8",
-        "outputHash": "23fe99d799a297cc2ab8cc6cc9066bf33645df8a0d2fa078697ae35c5ae50998",
+        "sourceHash": "4dc4d4d8f1c7fef09274dfc361661dc68dbac4f7f285d1738cb84d487dc4c7d5",
+        "outputHash": "5d4fec2b262f614e3ee313e95b8ce170a7c979b200bdac45f793f1315b252318",
         "mode": "translated"
       },
       "hardware-sdk/transport/android.mdx": {
-        "sourceHash": "f62b039bc5eaa2f8c278db015af6828b2cab6ac242bf3327b173d4329ef52e99",
-        "outputHash": "ac4635010abf0918945d247a8ca87d5faf005c3a70cd319eb9f051de5fa3b2da",
+        "sourceHash": "40c0042d8130765e7293b425e364806dacfafaf7435f6e9842977520b082d98a",
+        "outputHash": "a19e3b625163168cd9ba252f385b2f1669a9ebd885c97fc146c0afe2d824aa4e",
         "mode": "translated"
       },
       "hardware-sdk/transport/flutter.mdx": {
@@ -5172,13 +5172,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/index.mdx": {
-        "sourceHash": "ae36e4e7db142d921f7c64918645014f8a94f2dcd8638a588ed09df5ea7a995e",
-        "outputHash": "2835ab64a3b1e258c400ee7fe2b50870f7631c0f970aabb4d7eac8c39dd48bb8",
+        "sourceHash": "bca34e029955b7c2811ff2cd26c5be29639b62de1cf5c73698cc20d2c9923c86",
+        "outputHash": "299d3e9c72fc0e7f42468cbaeff8fb211fdf825706249ee647230fcc146faf34",
         "mode": "translated"
       },
       "hardware-sdk/transport/ios.mdx": {
-        "sourceHash": "801df558af74e7fe590b4c9dd3720346a0da25c271ec0310ac32208070494dab",
-        "outputHash": "ed9cfc47bc93a3d2a6ac66e9ea577a891afd14ef21ab271307621a37da954263",
+        "sourceHash": "205e7ed47f7d601eb38c0f830df8d608d8bd5146dacc62a627008fdc64e0e4c3",
+        "outputHash": "aec963fc25231a775cc0e23d37c1c291aafdeb497878aee4112bd700775906fa",
         "mode": "translated"
       },
       "hardware-sdk/transport/native-ble.mdx": {
@@ -5192,13 +5192,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
-        "sourceHash": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",
-        "outputHash": "b4e8734dd18fef8e01b6c3d38feb36b6be8e9579bc80a72eebba62348e141ecf",
+        "sourceHash": "cce3582f45b2f892a6f7de941601e4992009c1e8b0e8a0344ccea3e85ab86c20",
+        "outputHash": "07c9300cbbe44cf3f6d4af0546e11e18682a792ae34176c70f795eae545bafd0",
         "mode": "translated"
       },
       "hardware-sdk/transport/web-usb.mdx": {
-        "sourceHash": "159a580d23e71b3a470ff2254b537aeb76f3cb19f37e34c25b975b803614cc2d",
-        "outputHash": "f00aae6a3aab262db52d62a07c5d350f57894cf6e712a1a97087bc959f63eada",
+        "sourceHash": "d209af922d1812a56a791d1e6fb0a2c74d9c103a16263da4294d5ad63ec033c7",
+        "outputHash": "1f9bca4f486cf3213362e190488e6b10cac56f8d739bc5dbe8f13e350c66dc54",
         "mode": "translated"
       },
       "index.mdx": {
@@ -6299,8 +6299,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/cancel-request.mdx": {
-        "sourceHash": "4fbb9e545acf3251f3df235cd07097450b1b1fd135e462821a038db103abeb5e",
-        "outputHash": "393b32a586fee70f29dbebdfc9e3b8e23c7bb0a86621ada63af099b72bfdba05",
+        "sourceHash": "6204c2e3c3fbf14b92c23f24f4bc431696e749db784ffe692cd0d96d187f6c34",
+        "outputHash": "2c9b7d25121ecb59fc0d31c0430c5d90068e691eb719b4f19147673e84976af2",
         "mode": "translated"
       },
       "hardware-sdk/basic-api/get-device-state.mdx": {
@@ -6754,8 +6754,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/common-params.mdx": {
-        "sourceHash": "7c1dcfa290a9347fe6c99a4600fa39c9d44e637eabe9a7001f268bfba3478bcc",
-        "outputHash": "8cdc1e3f039c7b0dc8124d801112f27cfa1cb8ea3a546b80c60485eddbfc5c8f",
+        "sourceHash": "fe78ba5ab5771ec789ac11018a9871c131446f54c692b03cfdf0659186395240",
+        "outputHash": "08293755564a22b2665df8c2cf07616687d461121f0fda62968c52f2bfe7d343",
         "mode": "translated"
       },
       "hardware-sdk/concepts/devices.mdx": {
@@ -6764,8 +6764,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/identifiers.mdx": {
-        "sourceHash": "b9b08b67c4943458081af5548a6e1992d09f029d4f9f7f9dbb0d54335f09b25c",
-        "outputHash": "a369e2608d0418f401cd636ae3b2bd7a5ef6c21eb84308176d483b3f7f349014",
+        "sourceHash": "0f92bc04125c658ad3acab042d85765ced1669ea5aba66600b6dd13bb6a0cf70",
+        "outputHash": "5ab04f93a1ae0c8921c20f888427c067a86d330ba2da35668ea4493ccc914aa8",
         "mode": "translated"
       },
       "hardware-sdk/concepts/low-level-plugin.mdx": {
@@ -6794,8 +6794,8 @@
         "mode": "translated"
       },
       "hardware-sdk/core-api-guide.mdx": {
-        "sourceHash": "99b40bc4a3c8478a381850f83e0adabe92e7a056915d7db978e79cc7d5ffc5df",
-        "outputHash": "138872877f51157a49bb03c0c33a080816a9837b504778db92272914b084a7cc",
+        "sourceHash": "1639f8ad2b1022f445b1c320ca97f3830afa281f900b6aa70c450864485b89c8",
+        "outputHash": "7dcaebd78a41135d972b29b0611bbf57d346d600d8558b4012271a62040bb17c",
         "mode": "translated"
       },
       "hardware-sdk/device-api/checkblefirmwarerelease.mdx": {
@@ -6854,13 +6854,13 @@
         "mode": "translated"
       },
       "hardware-sdk/firmware-update.mdx": {
-        "sourceHash": "35edd11b422007e0cb95d208cde3b47bf72364f7a69f50c68ca1294543b084ce",
-        "outputHash": "e3fd19db89425258a06bf948a71988352b356bb95808abf1f372ef0e1cdd4a55",
+        "sourceHash": "cbe9011ca8f646b91b08ad87392409b92997bceca126903e58148d5c63f1d613",
+        "outputHash": "ae5d53f71e4f258aebce0081d94ece58cd9cedaed472b88ba86c61fa1fd4f316",
         "mode": "translated"
       },
       "hardware-sdk/getting-started.mdx": {
-        "sourceHash": "5016e5069384183a9c35aae2929ee2e1c53737dcbf0d429c709be5322d7962cc",
-        "outputHash": "fb2c9b025f203bc9cfb953a00b7d4cd870b2276604c54aa3fd30ef14f008dfe6",
+        "sourceHash": "7421647b8372bb918757990d54e47277326bcb5decc064556295f63a3230cdc3",
+        "outputHash": "048d0f9eeed6216da27d801f197a52c64d57037b6496f5c96b28237efdd88388",
         "mode": "translated"
       },
       "hardware-sdk/index.mdx": {
@@ -6869,18 +6869,18 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/_meta.js": {
-        "sourceHash": "8ea0233ee57b4348d5b617398efaae6a1fa7d41e7f835b76f4d81787715630b9",
-        "outputHash": "85308fe996e3fa7568d10069b20540235f343f26cad167389af301b7259becf6",
+        "sourceHash": "4aea35c5a943b092759dbe9f5af7a5b7cc2b1b4b3bc412e26586a02ff64094eb",
+        "outputHash": "04d6ef5904a12f635db2ac2addb85833baa598c52fd95ba4ad216907d4b40a69",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
-        "outputHash": "2b279dc4e4f8c56199ba9e90969862c5d1234aa9a329ae3f0470c55bdc9040eb",
+        "sourceHash": "e65efa058e32274e194d74d33d6e0ae20be15cf6140f9208d11b18a08749d922",
+        "outputHash": "2c053557ad103c806b22c3d2045fab5dcfc8020e9089fbf16fa3aabda396f09b",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
-        "sourceHash": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
-        "outputHash": "20bd1f6165bed890b6f9d7f9f6b05d7d24dbcccdf4da361ad6368e2ee65f67c9",
+        "sourceHash": "a93ebd3b10c7da1abca7af3edc4e7fa2a9ad1fd79ab85f7995045f4708dd126b",
+        "outputHash": "a532e96cec5fa7dc5060c0d726acead2faae49c66b0484dc20617a7aa10a365a",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb.mdx": {
@@ -6924,13 +6924,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/_meta.js": {
-        "sourceHash": "474e913155f31c0a80c096c019257d4b42fa589dbb4e0d7a076c3462ae21c0b8",
-        "outputHash": "605daada8a3a7bffd51e48ddf7b0f89ad1835f3200d5ddf8c7011d000c2d4880",
+        "sourceHash": "4dc4d4d8f1c7fef09274dfc361661dc68dbac4f7f285d1738cb84d487dc4c7d5",
+        "outputHash": "bfad6a6aa70f56934c52d5ea750a005bbdae1d729e68da4666b93debfcd285cb",
         "mode": "translated"
       },
       "hardware-sdk/transport/android.mdx": {
-        "sourceHash": "f62b039bc5eaa2f8c278db015af6828b2cab6ac242bf3327b173d4329ef52e99",
-        "outputHash": "d2d579684ee16d60fd871d1ab2e9bee3089a0aff96cb5e19452d554c5add3447",
+        "sourceHash": "40c0042d8130765e7293b425e364806dacfafaf7435f6e9842977520b082d98a",
+        "outputHash": "c3efe5c65323090ce20fa9fe31621a5fe88f7db4ed9d5220b47394d60d90bb2d",
         "mode": "translated"
       },
       "hardware-sdk/transport/flutter.mdx": {
@@ -6939,13 +6939,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/index.mdx": {
-        "sourceHash": "ae36e4e7db142d921f7c64918645014f8a94f2dcd8638a588ed09df5ea7a995e",
-        "outputHash": "262c9e3e4a460cce1909da5643d184ffb737254def47e9ab8f3b4f57c5c8d712",
+        "sourceHash": "bca34e029955b7c2811ff2cd26c5be29639b62de1cf5c73698cc20d2c9923c86",
+        "outputHash": "1a86f7d098cd442ffcc5c8017ee4eeea90f2513778e22097eb5991c435182081",
         "mode": "translated"
       },
       "hardware-sdk/transport/ios.mdx": {
-        "sourceHash": "801df558af74e7fe590b4c9dd3720346a0da25c271ec0310ac32208070494dab",
-        "outputHash": "f4de1cd222ecfa7342c036f02db4cd5b794d14e790fbb32493cd136dec2d4099",
+        "sourceHash": "205e7ed47f7d601eb38c0f830df8d608d8bd5146dacc62a627008fdc64e0e4c3",
+        "outputHash": "7dbf1c6aa16ad8dced7a6261bde362ce43206e23690b26845137d7ad3db25099",
         "mode": "translated"
       },
       "hardware-sdk/transport/native-ble.mdx": {
@@ -6959,13 +6959,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
-        "sourceHash": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",
-        "outputHash": "887fdd45e16fb9bb9fee7fac8cb9273fbb479cb4a36d921979506e7e62e6aad3",
+        "sourceHash": "cce3582f45b2f892a6f7de941601e4992009c1e8b0e8a0344ccea3e85ab86c20",
+        "outputHash": "216312ae41274636776e0537861fdfdcb2e57ab7d22604d995d448550e9f6804",
         "mode": "translated"
       },
       "hardware-sdk/transport/web-usb.mdx": {
-        "sourceHash": "159a580d23e71b3a470ff2254b537aeb76f3cb19f37e34c25b975b803614cc2d",
-        "outputHash": "742b486187f6562b0bca979ea86429bce1bc986b59ac141fa005c96e1f9fb173",
+        "sourceHash": "d209af922d1812a56a791d1e6fb0a2c74d9c103a16263da4294d5ad63ec033c7",
+        "outputHash": "5ada1131140f91a0ca971c76e4474a6d4af6857932984c6db1e61ee036c7a1d0",
         "mode": "translated"
       },
       "index.mdx": {
@@ -8066,8 +8066,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/cancel-request.mdx": {
-        "sourceHash": "4fbb9e545acf3251f3df235cd07097450b1b1fd135e462821a038db103abeb5e",
-        "outputHash": "c944b49e424b38c62f6b61a7681f03532dccf2209da8d512012c0a0b02077cb9",
+        "sourceHash": "6204c2e3c3fbf14b92c23f24f4bc431696e749db784ffe692cd0d96d187f6c34",
+        "outputHash": "63d6021ee26bea837e8c9980a9d286535d115a707e9bc76ff69e286ff6f19284",
         "mode": "translated"
       },
       "hardware-sdk/basic-api/get-device-state.mdx": {
@@ -8521,8 +8521,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/common-params.mdx": {
-        "sourceHash": "7c1dcfa290a9347fe6c99a4600fa39c9d44e637eabe9a7001f268bfba3478bcc",
-        "outputHash": "14ac160514cc0e21f4cd0f334dabce014f0d784e045f5ecb59da179496b41619",
+        "sourceHash": "fe78ba5ab5771ec789ac11018a9871c131446f54c692b03cfdf0659186395240",
+        "outputHash": "e9fc3546a62fe797fe100adabca2e80e595802ba85decacd5b2957ff6109d2aa",
         "mode": "translated"
       },
       "hardware-sdk/concepts/devices.mdx": {
@@ -8531,8 +8531,8 @@
         "mode": "translated"
       },
       "hardware-sdk/concepts/identifiers.mdx": {
-        "sourceHash": "b9b08b67c4943458081af5548a6e1992d09f029d4f9f7f9dbb0d54335f09b25c",
-        "outputHash": "3ffab0197cca7bb24624f398d685900a0a7a5f8855e89f015a2126b4a661a81d",
+        "sourceHash": "0f92bc04125c658ad3acab042d85765ced1669ea5aba66600b6dd13bb6a0cf70",
+        "outputHash": "dbaba6302f9ec9fbd4d711eab89af44238e4edb8da1fdef88e792bfd686f7489",
         "mode": "translated"
       },
       "hardware-sdk/concepts/low-level-plugin.mdx": {
@@ -8561,8 +8561,8 @@
         "mode": "translated"
       },
       "hardware-sdk/core-api-guide.mdx": {
-        "sourceHash": "99b40bc4a3c8478a381850f83e0adabe92e7a056915d7db978e79cc7d5ffc5df",
-        "outputHash": "2be6c9c139f61d7dc35e8fcac0893b112ec69b0be27e45731ef1a8b32bbcbe26",
+        "sourceHash": "1639f8ad2b1022f445b1c320ca97f3830afa281f900b6aa70c450864485b89c8",
+        "outputHash": "28338b60de0a9e6c6e89e2913b84fe385c3d2d58ff55cdf2425f0dda2d2ed395",
         "mode": "translated"
       },
       "hardware-sdk/device-api/checkblefirmwarerelease.mdx": {
@@ -8621,13 +8621,13 @@
         "mode": "translated"
       },
       "hardware-sdk/firmware-update.mdx": {
-        "sourceHash": "35edd11b422007e0cb95d208cde3b47bf72364f7a69f50c68ca1294543b084ce",
-        "outputHash": "ac19ee081662772d0add7fa6b7cc536c2857a8e3a98e0e3bde0fd59bf2f704d8",
+        "sourceHash": "cbe9011ca8f646b91b08ad87392409b92997bceca126903e58148d5c63f1d613",
+        "outputHash": "10aee896ea2d7db461cecf9d49e9fb0878b22d3f5e66d23c125d4188cb75345c",
         "mode": "translated"
       },
       "hardware-sdk/getting-started.mdx": {
-        "sourceHash": "5016e5069384183a9c35aae2929ee2e1c53737dcbf0d429c709be5322d7962cc",
-        "outputHash": "7e0cb3ce8975d1b5708665bcc46a1131dad61251920c17c02e62ff32fa60ba20",
+        "sourceHash": "7421647b8372bb918757990d54e47277326bcb5decc064556295f63a3230cdc3",
+        "outputHash": "41c6c0739c8acf8b067d0056e63974ca4da5c2c7043468565fde9ad3ccd6fb1e",
         "mode": "translated"
       },
       "hardware-sdk/index.mdx": {
@@ -8636,18 +8636,18 @@
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/_meta.js": {
-        "sourceHash": "8ea0233ee57b4348d5b617398efaae6a1fa7d41e7f835b76f4d81787715630b9",
-        "outputHash": "c2ad2e93ba7644469a3b636b891c62967a521dd705c84bf36539d5383c6bf836",
+        "sourceHash": "4aea35c5a943b092759dbe9f5af7a5b7cc2b1b4b3bc412e26586a02ff64094eb",
+        "outputHash": "4c98ac3adb3de8fd078d9e6b0b4cdd57a7b655c48610c7bce3070f8dcd5e9d6d",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/from-1x.mdx": {
-        "sourceHash": "862dd121113949e0e56cacf03757758e389aa7e07401d445f8bab69bcafbd351",
-        "outputHash": "4da7b8baa643def02b8d86ebb6db44f39ed1c88db64b8694698a79b88bf3d19e",
+        "sourceHash": "e65efa058e32274e194d74d33d6e0ae20be15cf6140f9208d11b18a08749d922",
+        "outputHash": "cda52230edcde3911a6fa5eccb8811a78494e3d32d3009db5ceefd54a52bee21",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/index.mdx": {
-        "sourceHash": "4476e6481f3b8bbd06e9977e04f89c49d39009f2b65ffbd5bf3efbb8a49cef40",
-        "outputHash": "0007083b92286c3d8ead930c8b951432fbb99220a5cb59b3cc4c26e69c371549",
+        "sourceHash": "a93ebd3b10c7da1abca7af3edc4e7fa2a9ad1fd79ab85f7995045f4708dd126b",
+        "outputHash": "0735a3d5ad46aa69d8d354338911ea28072113d56774ae758a8390042b3d757f",
         "mode": "translated"
       },
       "hardware-sdk/legacy-guides/migrate-bridge-to-common-connect-webusb.mdx": {
@@ -8691,13 +8691,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/_meta.js": {
-        "sourceHash": "474e913155f31c0a80c096c019257d4b42fa589dbb4e0d7a076c3462ae21c0b8",
-        "outputHash": "3943f46a6b4592f09dd911e9f2fd6c0604c70fb0c2f386f73672bb4f41a4404f",
+        "sourceHash": "4dc4d4d8f1c7fef09274dfc361661dc68dbac4f7f285d1738cb84d487dc4c7d5",
+        "outputHash": "e97b3bcf82d0518e7b782af11451d6c02f82cc26bdb3cbadde24b91b351087d3",
         "mode": "translated"
       },
       "hardware-sdk/transport/android.mdx": {
-        "sourceHash": "f62b039bc5eaa2f8c278db015af6828b2cab6ac242bf3327b173d4329ef52e99",
-        "outputHash": "fef795f8215ef011cb8ab3fdc3ed0ec58f8c87811293242eb74f3ccaf81a4c3a",
+        "sourceHash": "40c0042d8130765e7293b425e364806dacfafaf7435f6e9842977520b082d98a",
+        "outputHash": "bafb53a997577643c1c9e5c24ee85d5f01b6633705da241c80f5a7c91e56fa69",
         "mode": "translated"
       },
       "hardware-sdk/transport/flutter.mdx": {
@@ -8706,13 +8706,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/index.mdx": {
-        "sourceHash": "ae36e4e7db142d921f7c64918645014f8a94f2dcd8638a588ed09df5ea7a995e",
-        "outputHash": "207b1157e50ff55dd652a9d06bea0db826df0b72c4ff2feb9d3163138a639691",
+        "sourceHash": "bca34e029955b7c2811ff2cd26c5be29639b62de1cf5c73698cc20d2c9923c86",
+        "outputHash": "1e6ed501c99b13a0babc3b6e432a9ba0c9308682ebb5fe61d3ae4e2cf55bf246",
         "mode": "translated"
       },
       "hardware-sdk/transport/ios.mdx": {
-        "sourceHash": "801df558af74e7fe590b4c9dd3720346a0da25c271ec0310ac32208070494dab",
-        "outputHash": "704ece565ee3a990350f134c3b002571b30f53a4011e72b47ea46e6541620cff",
+        "sourceHash": "205e7ed47f7d601eb38c0f830df8d608d8bd5146dacc62a627008fdc64e0e4c3",
+        "outputHash": "b6c437cc1c1e5ad13f2f25ac1c08bd33cf36d02f3d3c3b2ed0bc9bcaa3bfd680",
         "mode": "translated"
       },
       "hardware-sdk/transport/native-ble.mdx": {
@@ -8726,13 +8726,13 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
-        "sourceHash": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",
-        "outputHash": "8466cd8e5b90506fbf4c5ab52de1196107c6280054f388001582beec7c475d9f",
+        "sourceHash": "cce3582f45b2f892a6f7de941601e4992009c1e8b0e8a0344ccea3e85ab86c20",
+        "outputHash": "f71802accce804c77d1eb4a79e7cf81089936fb38ac0cbd1338513b85d28fcd2",
         "mode": "translated"
       },
       "hardware-sdk/transport/web-usb.mdx": {
-        "sourceHash": "159a580d23e71b3a470ff2254b537aeb76f3cb19f37e34c25b975b803614cc2d",
-        "outputHash": "cd95e77b823917b71604b72cea896968953984da777ba1a6acb6e6d6fe0087e1",
+        "sourceHash": "d209af922d1812a56a791d1e6fb0a2c74d9c103a16263da4294d5ad63ec033c7",
+        "outputHash": "5673d697179dffeddc03a44094282ba9ddf03a533b439a598821339db954fed3",
         "mode": "translated"
       },
       "index.mdx": {

@@ -6,5 +6,5 @@ export default {
   android: 'Android (原生)',
   ios: 'iOS (原生)',
   flutter: 'Flutter (原生)',
-  reconnect: '重连与释放',
+  reconnect: '断线与重连',
 };
