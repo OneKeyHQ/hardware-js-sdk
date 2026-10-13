@@ -662,9 +662,10 @@ export class TrezorDeviceSession {
       throw error;
     }
 
-    if (this.connectionType === 'ble') {
+    if (this.connectionType === 'ble' && this.currentFeatures?.bootloader_mode !== true) {
       // Trezor firmware serves Bluetooth over THP only, so a peer answering plain v1 here is not
-      // a Trezor; staying would send PINs and passphrases unencrypted to it.
+      // a Trezor; staying would send PINs and passphrases unencrypted to it. The bootloader
+      // speaks v1 over Bluetooth, but it holds no keys and asks for no PIN or passphrase.
       this.core = undefined;
       this.currentFeatures = undefined;
       throw thpPairingRefused('Trezor Bluetooth requires the encrypted THP protocol');

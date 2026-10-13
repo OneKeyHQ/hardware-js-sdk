@@ -290,6 +290,19 @@ describe('TrezorDeviceSession', () => {
       expect(session.features).toBeUndefined();
     });
 
+    test('but still reaches a Trezor bootloader, which speaks v1 over Bluetooth', async () => {
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'ble',
+        coreFactory: createFactory(calls, [
+          { type: 'Features', message: { ...features, bootloader_mode: true } },
+        ]),
+      });
+
+      await expect(session.initialize()).resolves.toMatchObject({ bootloader_mode: true });
+    });
+
     test('a peer claiming a pairing when no stored credential was sent', async () => {
       const { session, calls } = thpBleSession({
         pairingMethods: ['CodeEntry'],
