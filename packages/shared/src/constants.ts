@@ -43,6 +43,7 @@ export const isKnownTrezorWebUsbDevice = (descriptor: WebUsbIdentityDescriptor):
  * These errors indicate the device is in an invalid state and needs to be released
  */
 export const ERROR_CODES_REQUIRE_RELEASE = [
+  HardwareErrorCode.WebUsbDeviceAccessError,
   HardwareErrorCode.DeviceInitializeFailed,
   HardwareErrorCode.DeviceInterruptedFromOutside,
   HardwareErrorCode.DeviceInterruptedFromUser,
@@ -58,6 +59,7 @@ export const ERROR_CODES_REQUIRE_RELEASE = [
  * These errors indicate a communication failure that requires full reconnection
  */
 export const ERROR_CODES_REQUIRE_DISCONNECT = [
+  HardwareErrorCode.WebUsbDeviceAccessError,
   HardwareErrorCode.DeviceInitializeFailed,
   HardwareErrorCode.ResponseUnexpectTypeError,
 ] as const;

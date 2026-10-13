@@ -18,7 +18,6 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   createDeferred,
-  isBleStaleBondHardwareError,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
@@ -203,11 +202,14 @@ export default class ElectronBleTransport {
         if (error.code === HardwareErrorCode.BlePermissionError) {
           return ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
         }
+        if (error.code === HardwareErrorCode.BleLocationError) {
+          return ERRORS.TypedError(HardwareErrorCode.BleLocationError);
+        }
       }
       const errorMessage = error.message || String(error);
       const poweredOffMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePoweredOff];
       const unsupportedMessage = HardwareErrorCodeMessage[HardwareErrorCode.BleUnsupported];
-      const permissionMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePermissionError];
+      const permissionMessage = HardwareErrorCodeMessage[HardwareErrorCode.BleLocationError];
 
       if (errorMessage.includes(poweredOffMessage) || errorMessage.includes('poweredOff')) {
         return ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
@@ -216,7 +218,7 @@ export default class ElectronBleTransport {
         return ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
       }
       if (errorMessage.includes(permissionMessage) || errorMessage.includes('unauthorized')) {
-        return ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        return ERRORS.TypedError(HardwareErrorCode.BleLocationError);
       }
     }
     return error;
@@ -676,10 +678,7 @@ export default class ElectronBleTransport {
         this.resetProtocolV2Frames(uuid);
       },
       // A declared V2 protocol needs no fallback; preserve the actual link failure.
-      shouldRethrow: error =>
-        expectedProtocol === 'V2' ||
-        isBleStaleBondHardwareError(error) ||
-        isProtocolV2LinkDisabledError(error),
+      shouldRethrow: error => expectedProtocol === 'V2' || isProtocolV2LinkDisabledError(error),
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
