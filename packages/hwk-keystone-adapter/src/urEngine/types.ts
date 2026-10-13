@@ -59,7 +59,7 @@ export interface KeystoneBtcSignRequestAccount {
   address?: string;
 }
 
-/** Script types for purposes 44'/49'/84'/86'; `p2tr` address derivation is not supported yet. */
+/** Script types for purposes 44'/49'/84'/86'. */
 export type BtcScriptType = 'p2pkh' | 'p2sh-p2wpkh' | 'p2wpkh' | 'p2tr';
 
 export interface KeystoneSolSignRequestInput {

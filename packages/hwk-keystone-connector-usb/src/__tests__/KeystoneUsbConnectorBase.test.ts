@@ -572,9 +572,10 @@ describe('KeystoneUsbConnectorBase', () => {
           urData: 'de',
         });
 
-        expect(result.success).toBe(false);
-        if (result.success) return;
-        expect(result.error.params).toMatchObject({ origin: 'device', replyUnreadable: true });
+        expect(result).toMatchObject({
+          success: false,
+          error: { params: { origin: 'device', replyUnreadable: true } },
+        });
         expect(receivePart).not.toHaveBeenCalled();
       } finally {
         receivePart.mockRestore();
@@ -598,27 +599,42 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(result).toMatchObject({ success: true, payload: { urData: message } });
     });
 
-    it('reports a reply that does not decode as unreadable and keeps the session', async () => {
-      const connector = versionConnector({
-        [Actions.CMD_RESOLVE_UR]: () => 'UR:ETH-SIGNATURE/NOT-A-VALID-PART',
-      });
-      const session = await connector.connect();
+    it.each([
+      ['does not decode', () => 'UR:ETH-SIGNATURE/NOT-A-VALID-PART', /./],
+      [
+        'does not contain enough BC-UR parts',
+        () => {
+          const encoder = new UREncoder(new UR(Buffer.alloc(220, 0x5a), 'bytes'), 40);
+          const firstPart = encoder.nextPart().toUpperCase();
+          expect(firstPart).toMatch(/^UR:BYTES\/1-/);
+          return { payload: firstPart };
+        },
+        /incomplete BC-UR response/,
+      ],
+    ])(
+      'reports a reply that %s as unreadable at once and keeps the session',
+      async (_case, reply, message) => {
+        const connector = versionConnector({ [Actions.CMD_RESOLVE_UR]: reply });
+        const session = await connector.connect();
 
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'de',
-      });
+        const result = await connector.call(session.sessionId, 'resolveUr', {
+          urType: 'eth-sign-request',
+          urData: 'deadbeef',
+        });
 
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error).toMatchObject({
-        code: HardwareErrorCode.PayloadTooLarge,
-        params: expect.objectContaining({ origin: 'device', replyUnreadable: true }),
-      });
-      // The device answered, so the same session still serves the next request.
-      const again = await connector.call(session.sessionId, 'getAppConfig', {});
-      expect(again.success).toBe(true);
-    });
+        expect(result).toMatchObject({
+          success: false,
+          error: {
+            code: HardwareErrorCode.PayloadTooLarge,
+            message: expect.stringMatching(message),
+            params: expect.objectContaining({ origin: 'device', replyUnreadable: true }),
+          },
+        });
+        // The device answered, so the same session still serves the next request.
+        const again = await connector.call(session.sessionId, 'getAppConfig', {});
+        expect(again.success).toBe(true);
+      }
+    );
 
     it('encodes the outgoing UR as a bech32 string and decodes the response back to {urType, urData}', async () => {
       const request = EthSignRequest.constructETHRequest(
@@ -652,9 +668,7 @@ describe('KeystoneUsbConnectorBase', () => {
       const result = await connector.call(session.sessionId, 'resolveUr', requestUr);
 
       expect(sentEncodedUr).toMatch(/^UR:ETH-SIGN-REQUEST\//);
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect((result.payload as { urType: string }).urType).toBe('eth-signature');
+      expect(result).toMatchObject({ success: true, payload: { urType: 'eth-signature' } });
     });
   });
 
@@ -793,29 +807,6 @@ describe('KeystoneUsbConnectorBase', () => {
     });
   });
 
-  describe('multi-part UR responses', () => {
-    it('fails immediately when the transport response does not contain enough BC-UR parts', async () => {
-      const encoder = new UREncoder(new UR(Buffer.alloc(220, 0x5a), 'bytes'), 40);
-      const firstPart = encoder.nextPart().toUpperCase();
-      expect(firstPart).toMatch(/^UR:BYTES\/1-/);
-
-      const connector = versionConnector({
-        [Actions.CMD_RESOLVE_UR]: () => ({ payload: firstPart }),
-      });
-      const session = await connector.connect();
-
-      const result = await connector.call(session.sessionId, 'resolveUr', {
-        urType: 'eth-sign-request',
-        urData: 'deadbeef',
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.code).toBe(HardwareErrorCode.PayloadTooLarge);
-      expect(result.error.message).toContain('incomplete BC-UR response');
-    });
-  });
-
   describe('call("checkLockStatus", ...)', () => {
     it('passes through the device-reported lock status', async () => {
       const connector = versionConnector({
@@ -824,9 +815,7 @@ describe('KeystoneUsbConnectorBase', () => {
       const session = await connector.connect();
 
       const result = await connector.call(session.sessionId, 'checkLockStatus', undefined);
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.payload).toEqual({ locked: true });
+      expect(result).toEqual({ success: true, payload: { locked: true } });
     });
 
     it('reads anything but a boolean true as not locked', async () => {
@@ -914,20 +903,23 @@ describe('KeystoneUsbConnectorBase', () => {
       expect(error.message).toContain(text);
     });
 
-    it('names a firmware status the device sent no text for', async () => {
-      // What hw-transport-webusb throws when the response frame carries no
-      // payload text: `TransportError('unknown error', status)`.
-      const error = await resolveUrError(
-        new TransportError('unknown error', Status.PRS_PARSING_VERIFY_PASSWORD_ERROR)
-      );
-      expect(error.message).toContain('password verification failed');
-    });
-
-    it('keeps a device-supplied message instead of the table wording', async () => {
-      const error = await resolveUrError(
-        new TransportError('wallet is exporting another address', Status.PRS_EXPORT_ADDRESS_BUSY)
-      );
-      expect(error.message).toContain('wallet is exporting another address');
+    // 'unknown error' is what hw-transport-webusb throws when the response frame carries no text.
+    it.each([
+      [
+        'names a firmware status the device sent no text for',
+        'unknown error',
+        'password verification failed',
+        Status.PRS_PARSING_VERIFY_PASSWORD_ERROR,
+      ],
+      [
+        'keeps a device-supplied message instead of the table wording',
+        'wallet is exporting another address',
+        'wallet is exporting another address',
+        Status.PRS_EXPORT_ADDRESS_BUSY,
+      ],
+    ])('%s', async (_name, thrownText, expected, status) => {
+      const error = await resolveUrError(new TransportError(thrownText, status));
+      expect(error.message).toContain(expected);
     });
 
     it('maps ERR_DATA_TOO_LARGE to PayloadTooLarge', async () => {
@@ -952,9 +944,10 @@ describe('KeystoneUsbConnectorBase', () => {
     it('returns DeviceNotFound as data for an unknown sessionId, never throwing', async () => {
       const connector = newConnector(fakeTransportClass(fakeTransport({})));
       const result = await connector.call('nonexistent-session', 'resolveUr', {});
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.code).toBe(HardwareErrorCode.DeviceNotFound);
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: HardwareErrorCode.DeviceNotFound },
+      });
     });
   });
 

@@ -214,10 +214,7 @@ export class KeystoneUrEngine {
 
   // --- BTC (PSBT transaction signing + plain message signing) ---
 
-  /**
-   * `CryptoHDKey` always emits mainnet xpub version bytes (`0488B21E`), so `hdkey` parses it as is.
-   * `p2tr` needs an ECC lib for BIP-341 tweaking, not wired here.
-   */
+  /** `CryptoHDKey` always emits mainnet xpub version bytes (`0488B21E`), so `hdkey` parses it as is. */
   deriveBtcAddressFromXpub(
     xpub: string,
     relativeDerivePath: string,

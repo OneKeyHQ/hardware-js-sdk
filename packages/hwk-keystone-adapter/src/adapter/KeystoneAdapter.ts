@@ -63,7 +63,14 @@ import {
   keystoneQueueKey,
 } from '../utils/queueKey';
 
-import type { KeystoneKeySchema, KeystoneParsedMultiAccounts, KeystoneUr } from '../urEngine/types';
+import type {
+  KeystoneEthSignRequestInput,
+  KeystoneEthSignatureResult,
+  KeystoneKeySchema,
+  KeystoneParsedMultiAccounts,
+  KeystoneSolSignRequestInput,
+  KeystoneUr,
+} from '../urEngine/types';
 import type { KeystoneAccountEntry, KeystoneDeviceRecord } from './deviceTable';
 import type {
   AllNetworkAddressParams,
@@ -148,7 +155,6 @@ function keystoneBtcParamsFailure(params: {
   return undefined;
 }
 
-/** Key material for one operation, keyed by `accountKey()`; never retained. */
 /**
  * How an all-network item reads its key. QR: from the bundle's one scan, never the device again.
  * USB: straight from the device, on the session the bundle started with.
@@ -160,6 +166,8 @@ type BundleAccess =
 type OperationRoute = { operationId: string; connectionType: 'usb' | 'qr' };
 
 type ExpectedWallet = { expectedMasterFingerprint?: string };
+
+type CallTarget = { connectId: string | undefined; deviceId: string | undefined };
 
 // Keystone briefly leaves the USB bus when entering external-wallet mode, so a persisted-wallet
 // call must wait out re-enumeration instead of falling back to QR on one empty snapshot.
@@ -217,6 +225,24 @@ function coinTypeFailure(chain: ChainCapability, path: string): Response<never> 
     HardwareErrorCode.InvalidParams,
     `Keystone ${chain} needs a path with its own BIP44 coin type, not ${path}`
   );
+}
+
+function btcAccountFailure(accountPath: string): Response<never> | undefined {
+  if (isKeystoneSignableBtcAccountPath(accountPath)) return undefined;
+  return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
+}
+
+function missingParamFailure(method: string, param: string): Response<never> {
+  return failure(HardwareErrorCode.InvalidParams, `${method} requires ${param}`);
+}
+
+/** Hex input must be exact hex; anything else is signed as its UTF-8 bytes. */
+function messageToHex(message: string, hex: boolean | undefined): string | undefined {
+  return hex ? exactHex(message) : Buffer.from(message, 'utf8').toString('hex');
+}
+
+function evmMessageSignature(sig: KeystoneEthSignatureResult): EvmSignature {
+  return { signature: ensure0x(sig.r + sig.s + sig.v) };
 }
 
 export interface ImportFromQrOptions {
@@ -338,10 +364,6 @@ export class KeystoneAdapter implements IHardwareWallet {
     this._usbConnector?.on('ui-event', this._handleUsbUiEvent);
   }
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle / transport
-  // ---------------------------------------------------------------------------
-
   get activeTransport(): TransportType | null {
     if (this._devices.size === 0) return null;
     const hasUsbSession = Array.from(this._devices.values()).some(r => r.usbSessionId);
@@ -375,10 +397,6 @@ export class KeystoneAdapter implements IHardwareWallet {
     this._devices.clear();
     this.emitter.removeAllListeners();
   }
-
-  // ---------------------------------------------------------------------------
-  // Device table
-  // ---------------------------------------------------------------------------
 
   /**
    * Returns known wallets plus USB scan results; USB entries have no mfp until `connectDevice()`
@@ -463,12 +481,10 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   /** Best-effort disconnect; the session is retired either way so it cannot be selected again. */
   private async _retireUsbSession(sessionId: string): Promise<void> {
-    if (this._usbConnector) {
-      try {
-        await this._usbConnector.disconnect(sessionId);
-      } catch {
-        // Local routing state is cleared below regardless.
-      }
+    try {
+      await this._usbConnector?.disconnect(sessionId);
+    } catch {
+      // Local routing state is cleared below regardless.
     }
     this._handleUsbDisconnect({ connectId: sessionId });
   }
@@ -518,7 +534,7 @@ export class KeystoneAdapter implements IHardwareWallet {
             'No USB connector configured for this Keystone adapter'
           );
         }
-        connected = await this._connectUsb({}, searchTargetId, scope.signal);
+        connected = await this._connectUsb(this._usbConnector, {}, searchTargetId, scope.signal);
       } else if (hasHardwareRuntimeIdPrefix(searchTargetId)) {
         return failure(
           HardwareErrorCode.DeviceNotFound,
@@ -539,7 +555,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           );
         } else {
           selectedConnectionType = 'usb';
-          connected = await this._connectUsb(target, undefined, scope.signal);
+          connected = await this._connectUsb(this._usbConnector, target, undefined, scope.signal);
         }
       }
       KeystoneAdapter._throwIfAborted(scope.signal);
@@ -728,13 +744,13 @@ export class KeystoneAdapter implements IHardwareWallet {
         let responseUr: KeystoneUr;
 
         if (options.mode === 'scan') {
-          responseUr = await this._requestQrScanAndAwaitResponse(displayDevice, signal);
+          responseUr = await this._requestQrAndAwaitResponse(displayDevice, undefined, signal);
         } else {
           const requestUr = this.urEngine.buildKeyDerivationRequest({
             schemas: [keySchema('evm', KEYSTONE_COLD_START_PATH)],
             origin: this._origin,
           });
-          responseUr = await this._requestQrDisplayAndAwaitResponse(
+          responseUr = await this._requestQrAndAwaitResponse(
             displayDevice,
             { ...requestUr, animated: false },
             signal
@@ -829,11 +845,7 @@ export class KeystoneAdapter implements IHardwareWallet {
               return this.solGetAddress(effectiveConnectId, itemDeviceId, commonArgs, access);
             case 'tronGetAddress':
               return this.tronGetAddress(effectiveConnectId, itemDeviceId, commonArgs, access);
-            default:
-              return failure(
-                HardwareErrorCode.MethodNotSupported,
-                `Unsupported method: ${String(method)}`
-              );
+            // no default
           }
         },
         attachIdentity: context => {
@@ -878,69 +890,39 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // EVM
-  // ---------------------------------------------------------------------------
-
   async evmGetAddress(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<EvmGetAddressParams>>,
+    paramsArg?: NullableCallArg<IHardwareCallParams<EvmGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<EvmAddress>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'evmGetAddress requires params');
-    if (!params.path)
-      return failure(HardwareErrorCode.InvalidParams, 'evmGetAddress requires params.path');
+    const call = this._beginCall('evmGetAddress', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('evmGetAddress', 'params.path');
     const evmCoinTypeFailure = coinTypeFailure('evm', params.path);
     if (evmCoinTypeFailure) return evmCoinTypeFailure;
 
-    const { accountPath, relativeDerivePath } = splitAccountPath(params.path);
-    if (!relativeDerivePath) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        "evmGetAddress requires a full leaf path, e.g. m/44'/60'/0'/0/0"
-      );
-    }
-
-    return this._runJob(connectId, deviceId, async signal => {
-      const xpub = await this._fetchAccountXpub(
-        connectId,
-        deviceId,
-        'evm',
-        accountPath,
-        signal,
-        bundle
-      );
-      // showOnDevice is accepted but not wired: Keystone firmware cannot show an address on
-      // request yet, so the address is derived offline from an unsigned export. Wire it here once
-      // the device supports it.
-      const address = this.urEngine.deriveEvmAddressFromXpub(xpub, relativeDerivePath);
-      return success<EvmAddress>({
-        address,
-        path: normalizePath(params.path),
-        accountKey: this._exportedAccountKey(accountPath, xpub),
-      });
-    });
+    return this._addressFromAccountXpub(
+      'evmGetAddress',
+      'evm',
+      call.payload,
+      params.path,
+      "m/44'/60'/0'/0/0",
+      bundle,
+      (xpub, relativeDerivePath) => this.urEngine.deriveEvmAddressFromXpub(xpub, relativeDerivePath)
+    );
   }
 
   async evmSignTransaction(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<EvmSignTxParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<EvmSignTxParams>>
   ): Promise<Response<EvmSignedTx>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params)
-      return failure(HardwareErrorCode.InvalidParams, 'evmSignTransaction requires params');
-    if (!params.path) {
-      return failure(HardwareErrorCode.InvalidParams, 'evmSignTransaction requires params.path');
-    }
+    const call = this._beginCall('evmSignTransaction', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('evmSignTransaction', 'params.path');
     if (
       !('serializedTx' in params) ||
       typeof params.serializedTx !== 'string' ||
@@ -953,92 +935,54 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
     const rawTxHex = exactHex(params.serializedTx);
     if (rawTxHex === undefined) return invalidHexFailure('serializedTx');
-    const path = normalizePath(params.path);
     // EIP-2718 typed txs start with a type byte < 0x80; legacy RLP lists start at >= 0xc0.
     const dataType = parseInt(rawTxHex.slice(0, 2), 16) < 0xc0 ? 'typedTransaction' : 'transaction';
 
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'evm',
-      operationName: 'evmSignTransaction',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildEthSignRequest({
-          requestId,
-          unsignedTxHex: rawTxHex,
-          dataType,
-          path,
-          xfp,
-          chainId: params.chainId,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseEthSignature(ur),
-      toPayload: (sig): EvmSignedTx => ({
-        v: ensure0x(sig.v),
-        r: ensure0x(sig.r),
-        s: ensure0x(sig.s),
-      }),
-    });
+    return this._evmSign(
+      'evmSignTransaction',
+      call.payload,
+      params.path,
+      params.chainId,
+      rawTxHex,
+      dataType,
+      (sig): EvmSignedTx => ({ v: ensure0x(sig.v), r: ensure0x(sig.r), s: ensure0x(sig.s) })
+    );
   }
 
   async evmSignMessage(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<EvmSignMsgParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<EvmSignMsgParams>>
   ): Promise<Response<EvmSignature>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'evmSignMessage requires params');
+    const call = this._beginCall('evmSignMessage', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
     if (!params.path || params.message === undefined) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        'evmSignMessage requires params.path and params.message'
-      );
+      return missingParamFailure('evmSignMessage', 'params.path and params.message');
     }
-    const messageHex = params.hex
-      ? exactHex(params.message)
-      : Buffer.from(params.message, 'utf8').toString('hex');
+    const messageHex = messageToHex(params.message, params.hex);
     if (messageHex === undefined) return invalidHexFailure('message');
-    const path = normalizePath(params.path);
 
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'evm',
-      operationName: 'evmSignMessage',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildEthSignRequest({
-          requestId,
-          unsignedTxHex: messageHex,
-          dataType: 'personalMessage',
-          path,
-          xfp,
-          chainId: params.chainId,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseEthSignature(ur),
-      toPayload: (sig): EvmSignature => ({ signature: ensure0x(sig.r + sig.s + sig.v) }),
-    });
+    return this._evmSign(
+      'evmSignMessage',
+      call.payload,
+      params.path,
+      params.chainId,
+      messageHex,
+      'personalMessage',
+      evmMessageSignature
+    );
   }
 
   async evmSignTypedData(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<EvmSignTypedDataParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<EvmSignTypedDataParams>>
   ): Promise<Response<EvmSignature>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params)
-      return failure(HardwareErrorCode.InvalidParams, 'evmSignTypedData requires params');
-    if (!params.path) {
-      return failure(HardwareErrorCode.InvalidParams, 'evmSignTypedData requires params.path');
-    }
+    const call = this._beginCall('evmSignTypedData', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('evmSignTypedData', 'params.path');
     if (params.mode === 'hash') {
       return failure(
         HardwareErrorCode.MethodNotSupported,
@@ -1054,27 +998,16 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
     }
     const signDataHex = Buffer.from(params.dataJson, 'utf8').toString('hex');
-    const path = normalizePath(params.path);
 
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'evm',
-      operationName: 'evmSignTypedData',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildEthSignRequest({
-          requestId,
-          unsignedTxHex: signDataHex,
-          dataType: 'typedData',
-          path,
-          xfp,
-          chainId: params.chainId,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseEthSignature(ur),
-      toPayload: (sig): EvmSignature => ({ signature: ensure0x(sig.r + sig.s + sig.v) }),
-    });
+    return this._evmSign(
+      'evmSignTypedData',
+      call.payload,
+      params.path,
+      params.chainId,
+      signDataHex,
+      'typedData',
+      evmMessageSignature
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1085,16 +1018,13 @@ export class KeystoneAdapter implements IHardwareWallet {
   async btcGetAddress(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<BtcGetAddressParams>>,
+    paramsArg?: NullableCallArg<IHardwareCallParams<BtcGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<BtcAddress>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcGetAddress requires params');
-    if (!params.path)
-      return failure(HardwareErrorCode.InvalidParams, 'btcGetAddress requires params.path');
+    const call = this._beginCall('btcGetAddress', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('btcGetAddress', 'params.path');
     const btcParamsFailure = keystoneBtcParamsFailure(params);
     if (btcParamsFailure) return btcParamsFailure;
 
@@ -1112,34 +1042,16 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
     }
 
-    const normalizedPath = normalizePath(params.path);
-    const { accountPath, relativeDerivePath } = splitAccountPath(normalizedPath);
-    if (!relativeDerivePath) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        "btcGetAddress requires a full leaf path, e.g. m/84'/0'/0'/0/0"
-      );
-    }
-    if (!isKeystoneSignableBtcAccountPath(accountPath)) {
-      return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
-    }
-
-    return this._runJob(connectId, deviceId, async signal => {
-      const xpub = await this._fetchAccountXpub(
-        connectId,
-        deviceId,
-        'btc',
-        accountPath,
-        signal,
-        bundle
-      );
-      const address = this.urEngine.deriveBtcAddressFromXpub(xpub, relativeDerivePath, scriptType);
-      return success<BtcAddress>({
-        address,
-        path: normalizedPath,
-        accountKey: this._exportedAccountKey(accountPath, xpub),
-      });
-    });
+    return this._addressFromAccountXpub(
+      'btcGetAddress',
+      'btc',
+      call.payload,
+      params.path,
+      "m/84'/0'/0'/0/0",
+      bundle,
+      (xpub, relativeDerivePath) =>
+        this.urEngine.deriveBtcAddressFromXpub(xpub, relativeDerivePath, scriptType)
+    );
   }
 
   /**
@@ -1149,16 +1061,13 @@ export class KeystoneAdapter implements IHardwareWallet {
   async btcGetPublicKey(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<BtcGetPublicKeyParams>>,
+    paramsArg?: NullableCallArg<IHardwareCallParams<BtcGetPublicKeyParams>>,
     bundle?: BundleAccess
   ): Promise<Response<BtcPublicKey>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcGetPublicKey requires params');
-    if (!params.path)
-      return failure(HardwareErrorCode.InvalidParams, 'btcGetPublicKey requires params.path');
+    const call = this._beginCall('btcGetPublicKey', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { connectId, deviceId, params } = call.payload;
+    if (!params.path) return missingParamFailure('btcGetPublicKey', 'params.path');
     const btcParamsFailure = keystoneBtcParamsFailure(params);
     if (btcParamsFailure) return btcParamsFailure;
 
@@ -1169,9 +1078,8 @@ export class KeystoneAdapter implements IHardwareWallet {
         "btcGetPublicKey requires an account path, e.g. m/84'/0'/0' (not a leaf path)"
       );
     }
-    if (!isKeystoneSignableBtcAccountPath(accountPath)) {
-      return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
-    }
+    const accountFailure = btcAccountFailure(accountPath);
+    if (accountFailure) return accountFailure;
 
     return this._runJob(connectId, deviceId, async signal => {
       const xpub = await this._fetchAccountXpub(
@@ -1209,21 +1117,16 @@ export class KeystoneAdapter implements IHardwareWallet {
   async btcSignPsbt(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<BtcSignPsbtParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<BtcSignPsbtParams>>
   ): Promise<Response<BtcSignedPsbt>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcSignPsbt requires params');
-    if (!params.psbt)
-      return failure(HardwareErrorCode.InvalidParams, 'btcSignPsbt requires params.psbt');
+    const call = this._beginCall('btcSignPsbt', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { connectId, deviceId, params } = call.payload;
+    if (!params.psbt) return missingParamFailure('btcSignPsbt', 'params.psbt');
     // `path` is optional in the shared type, but the account-0 gate needs it.
-    if (!params.path)
-      return failure(HardwareErrorCode.InvalidParams, 'btcSignPsbt requires params.path');
-    if (!isKeystoneSignableBtcAccountPath(splitAccountPath(params.path).accountPath)) {
-      return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
-    }
+    if (!params.path) return missingParamFailure('btcSignPsbt', 'params.path');
+    const accountFailure = btcAccountFailure(splitAccountPath(params.path).accountPath);
+    if (accountFailure) return accountFailure;
 
     const requestPsbtHex = exactHex(params.psbt);
     if (requestPsbtHex === undefined) return invalidHexFailure('psbt');
@@ -1251,27 +1154,19 @@ export class KeystoneAdapter implements IHardwareWallet {
   async btcSignMessage(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<BtcSignMsgParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<BtcSignMsgParams>>
   ): Promise<Response<BtcSignature>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'btcSignMessage requires params');
+    const call = this._beginCall('btcSignMessage', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { connectId, deviceId, params } = call.payload;
     if (!params.path || params.message === undefined) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        'btcSignMessage requires params.path and params.message'
-      );
+      return missingParamFailure('btcSignMessage', 'params.path and params.message');
     }
-    const messageHex = params.hex
-      ? exactHex(params.message)
-      : Buffer.from(params.message, 'utf8').toString('hex');
+    const messageHex = messageToHex(params.message, params.hex);
     if (messageHex === undefined) return invalidHexFailure('message');
     const path = normalizePath(params.path);
-    if (!isKeystoneSignableBtcAccountPath(splitAccountPath(path).accountPath)) {
-      return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
-    }
+    const accountFailure = btcAccountFailure(splitAccountPath(path).accountPath);
+    if (accountFailure) return accountFailure;
 
     return this._signWithWallet({
       connectId,
@@ -1311,23 +1206,16 @@ export class KeystoneAdapter implements IHardwareWallet {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // SOL
-  // ---------------------------------------------------------------------------
-
   async solGetAddress(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<SolGetAddressParams>>,
+    paramsArg?: NullableCallArg<IHardwareCallParams<SolGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<SolAddress>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'solGetAddress requires params');
-    if (!params.path)
-      return failure(HardwareErrorCode.InvalidParams, 'solGetAddress requires params.path');
+    const call = this._beginCall('solGetAddress', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { connectId, deviceId, params } = call.payload;
+    if (!params.path) return missingParamFailure('solGetAddress', 'params.path');
     const solCoinTypeFailure = coinTypeFailure('sol', params.path);
     if (solCoinTypeFailure) return solCoinTypeFailure;
     const path = normalizePath(params.path);
@@ -1368,59 +1256,35 @@ export class KeystoneAdapter implements IHardwareWallet {
   async solSignTransaction(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<SolSignTxParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<SolSignTxParams>>
   ): Promise<Response<SolSignedTx>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params)
-      return failure(HardwareErrorCode.InvalidParams, 'solSignTransaction requires params');
+    const call = this._beginCall('solSignTransaction', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
     if (!params.path || !params.serializedTx) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        'solSignTransaction requires params.path and params.serializedTx'
-      );
+      return missingParamFailure('solSignTransaction', 'params.path and params.serializedTx');
     }
-    const path = normalizePath(params.path);
-
     const unsignedPayloadHex = exactHex(params.serializedTx);
     if (unsignedPayloadHex === undefined) return invalidHexFailure('serializedTx');
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'sol',
-      operationName: 'solSignTransaction',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildSolSignRequest({
-          requestId,
-          unsignedPayloadHex,
-          dataType: 'transaction',
-          path,
-          xfp,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseSolSignature(ur),
-      toPayload: (sig): SolSignedTx => ({ signature: sig.signature }),
-    });
+    return this._solSign(
+      'solSignTransaction',
+      call.payload,
+      params.path,
+      unsignedPayloadHex,
+      'transaction'
+    );
   }
 
   async solSignMessage(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<SolSignMsgParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<SolSignMsgParams>>
   ): Promise<Response<SolSignature>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'solSignMessage requires params');
+    const call = this._beginCall('solSignMessage', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
     if (!params.path || !params.message) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        'solSignMessage requires params.path and params.message'
-      );
+      return missingParamFailure('solSignMessage', 'params.path and params.message');
     }
     // The request carries only the message bytes; the off-chain message envelope and its signer
     // set never reach the device, so the signature would not verify as one.
@@ -1430,28 +1294,15 @@ export class KeystoneAdapter implements IHardwareWallet {
         'Keystone signs Solana messages as raw bytes only; off-chain message format is not supported'
       );
     }
-    const path = normalizePath(params.path);
-
     const unsignedPayloadHex = exactHex(params.message);
     if (unsignedPayloadHex === undefined) return invalidHexFailure('message');
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'sol',
-      operationName: 'solSignMessage',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildSolSignRequest({
-          requestId,
-          unsignedPayloadHex,
-          dataType: 'message',
-          path,
-          xfp,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseSolSignature(ur),
-      toPayload: (sig): SolSignature => ({ signature: sig.signature }),
-    });
+    return this._solSign(
+      'solSignMessage',
+      call.payload,
+      params.path,
+      unsignedPayloadHex,
+      'message'
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1462,59 +1313,37 @@ export class KeystoneAdapter implements IHardwareWallet {
   async tronGetAddress(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<TronGetAddressParams>>,
+    paramsArg?: NullableCallArg<IHardwareCallParams<TronGetAddressParams>>,
     bundle?: BundleAccess
   ): Promise<Response<TronAddress>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'tronGetAddress requires params');
-    if (!params.path)
-      return failure(HardwareErrorCode.InvalidParams, 'tronGetAddress requires params.path');
+    const call = this._beginCall('tronGetAddress', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('tronGetAddress', 'params.path');
     const tronCoinTypeFailure = coinTypeFailure('tron', params.path);
     if (tronCoinTypeFailure) return tronCoinTypeFailure;
 
-    const { accountPath, relativeDerivePath } = splitAccountPath(params.path);
-    if (!relativeDerivePath) {
-      return failure(
-        HardwareErrorCode.InvalidParams,
-        "tronGetAddress requires a full leaf path, e.g. m/44'/195'/0'/0/0"
-      );
-    }
-
-    return this._runJob(connectId, deviceId, async signal => {
-      const xpub = await this._fetchAccountXpub(
-        connectId,
-        deviceId,
-        'tron',
-        accountPath,
-        signal,
-        bundle
-      );
-      const address = this.urEngine.deriveTronAddressFromXpub(xpub, relativeDerivePath);
-      return success<TronAddress>({
-        address,
-        path: normalizePath(params.path),
-        accountKey: this._exportedAccountKey(accountPath, xpub),
-      });
-    });
+    return this._addressFromAccountXpub(
+      'tronGetAddress',
+      'tron',
+      call.payload,
+      params.path,
+      "m/44'/195'/0'/0/0",
+      bundle,
+      (xpub, relativeDerivePath) =>
+        this.urEngine.deriveTronAddressFromXpub(xpub, relativeDerivePath)
+    );
   }
 
   async tronSignTransaction(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<TronSignTxParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<TronSignTxParams>>
   ): Promise<Response<TronSignedTx>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params)
-      return failure(HardwareErrorCode.InvalidParams, 'tronSignTransaction requires params');
-    if (!params.path) {
-      return failure(HardwareErrorCode.InvalidParams, 'tronSignTransaction requires params.path');
-    }
+    const call = this._beginCall('tronSignTransaction', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('tronSignTransaction', 'params.path');
     if (!params.rawTxHex) {
       return failure(
         HardwareErrorCode.InvalidParams,
@@ -1523,44 +1352,21 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
     const rawTxHex = exactHex(params.rawTxHex);
     if (rawTxHex === undefined) return invalidHexFailure('rawTxHex');
-    const path = normalizePath(params.path);
 
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'tron',
-      operationName: 'tronSignTransaction',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildTronSignRequest({
-          requestId,
-          rawTxHex,
-          path,
-          xfp,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseTronSignature(ur),
-      // Keystone signs rawTxHex as given and returns only the signature, so no serializedTx.
-      toPayload: (sig): TronSignedTx => ({ signature: sig.signature }),
-    });
+    // Keystone signs rawTxHex as given and returns only the signature, so no serializedTx.
+    return this._tronSign('tronSignTransaction', call.payload, params.path, rawTxHex);
   }
 
   async tronSignMessage(
     connectIdArg?: NullableCallArg<string>,
     deviceIdArg?: NullableCallArg<string>,
-    params?: NullableCallArg<IHardwareCallParams<TronSignMsgParams>>
+    paramsArg?: NullableCallArg<IHardwareCallParams<TronSignMsgParams>>
   ): Promise<Response<TronSignature>> {
-    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
-    if (!operationTarget.success) return operationTarget;
-    const connectId = operationTarget.payload.targetId;
-    const deviceId = deviceIdArg ?? undefined;
-    if (!params) return failure(HardwareErrorCode.InvalidParams, 'tronSignMessage requires params');
-    if (!params.path) {
-      return failure(HardwareErrorCode.InvalidParams, 'tronSignMessage requires params.path');
-    }
-    if (!params.messageHex) {
-      return failure(HardwareErrorCode.InvalidParams, 'tronSignMessage requires params.messageHex');
-    }
+    const call = this._beginCall('tronSignMessage', connectIdArg, deviceIdArg, paramsArg);
+    if (!call.success) return call;
+    const { params } = call.payload;
+    if (!params.path) return missingParamFailure('tronSignMessage', 'params.path');
+    if (!params.messageHex) return missingParamFailure('tronSignMessage', 'params.messageHex');
     // Firmware implements TIP-191 signMessageV2 only.
     if (params.messageType !== 'V2') {
       return failure(
@@ -1570,31 +1376,160 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
     const messageHex = exactHex(params.messageHex);
     if (messageHex === undefined) return invalidHexFailure('messageHex');
-    const path = normalizePath(params.path);
 
-    return this._signWithWallet({
-      connectId,
-      deviceId,
-      path,
-      chain: 'tron',
-      operationName: 'tronSignMessage',
-      buildRequest: (requestId, xfp) =>
-        this.urEngine.buildTronSignRequest({
-          requestId,
-          rawTxHex: messageHex,
-          path,
-          xfp,
-          signType: TronSignType.PersonalMessage,
-          origin: this._origin,
-        }),
-      parseResponse: ur => this.urEngine.parseTronSignature(ur),
-      toPayload: (sig): TronSignature => ({ signature: sig.signature }),
+    return this._tronSign(
+      'tronSignMessage',
+      call.payload,
+      params.path,
+      messageHex,
+      TronSignType.PersonalMessage
+    );
+  }
+
+  /** Resolves the call's target and requires params, before any method-specific check. */
+  private _beginCall<P extends IHardwareCommonCallParams>(
+    method: string,
+    connectIdArg: NullableCallArg<string>,
+    deviceIdArg: NullableCallArg<string>,
+    params: NullableCallArg<P>
+  ): Response<CallTarget & { params: P }> {
+    const operationTarget = this._resolveOperationTarget(connectIdArg, params?.operationId);
+    if (!operationTarget.success) return operationTarget;
+    if (!params) return missingParamFailure(method, 'params');
+    return success({
+      connectId: operationTarget.payload.targetId,
+      deviceId: deviceIdArg ?? undefined,
+      params,
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Internals
-  // ---------------------------------------------------------------------------
+  /** Derives a leaf address offline from its account xpub. */
+  private async _addressFromAccountXpub(
+    method: string,
+    chain: 'evm' | 'btc' | 'tron',
+    { connectId, deviceId }: CallTarget,
+    path: string,
+    leafExample: string,
+    bundle: BundleAccess | undefined,
+    derive: (xpub: string, relativeDerivePath: string) => string
+  ): Promise<Response<{ address: string; path: string; accountKey: ExportedAccountKey }>> {
+    const normalizedPath = normalizePath(path);
+    const { accountPath, relativeDerivePath } = splitAccountPath(normalizedPath);
+    if (!relativeDerivePath) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        `${method} requires a full leaf path, e.g. ${leafExample}`
+      );
+    }
+    const accountFailure = chain === 'btc' ? btcAccountFailure(accountPath) : undefined;
+    if (accountFailure) return accountFailure;
+
+    return this._runJob(connectId, deviceId, async signal => {
+      const xpub = await this._fetchAccountXpub(
+        connectId,
+        deviceId,
+        chain,
+        accountPath,
+        signal,
+        bundle
+      );
+      // showOnDevice is accepted but not wired: Keystone firmware cannot show an address on
+      // request yet, so the address is derived offline from an unsigned export. Wire it here once
+      // the device supports it.
+      return success({
+        address: derive(xpub, relativeDerivePath),
+        path: normalizedPath,
+        accountKey: this._exportedAccountKey(accountPath, xpub),
+      });
+    });
+  }
+
+  private _evmSign<T>(
+    method: string,
+    target: CallTarget,
+    rawPath: string,
+    chainId: number | undefined,
+    signDataHex: string,
+    dataType: KeystoneEthSignRequestInput['dataType'],
+    toPayload: (signature: KeystoneEthSignatureResult) => T
+  ): Promise<Response<T>> {
+    const path = normalizePath(rawPath);
+    return this._signWithWallet({
+      connectId: target.connectId,
+      deviceId: target.deviceId,
+      path,
+      chain: 'evm',
+      operationName: method,
+      buildRequest: (requestId, xfp) =>
+        this.urEngine.buildEthSignRequest({
+          requestId,
+          unsignedTxHex: signDataHex,
+          dataType,
+          path,
+          xfp,
+          chainId,
+          origin: this._origin,
+        }),
+      parseResponse: ur => this.urEngine.parseEthSignature(ur),
+      toPayload,
+    });
+  }
+
+  private _solSign(
+    method: string,
+    target: CallTarget,
+    rawPath: string,
+    unsignedPayloadHex: string,
+    dataType: KeystoneSolSignRequestInput['dataType']
+  ): Promise<Response<{ signature: string }>> {
+    const path = normalizePath(rawPath);
+    return this._signWithWallet({
+      connectId: target.connectId,
+      deviceId: target.deviceId,
+      path,
+      chain: 'sol',
+      operationName: method,
+      buildRequest: (requestId, xfp) =>
+        this.urEngine.buildSolSignRequest({
+          requestId,
+          unsignedPayloadHex,
+          dataType,
+          path,
+          xfp,
+          origin: this._origin,
+        }),
+      parseResponse: ur => this.urEngine.parseSolSignature(ur),
+      toPayload: sig => ({ signature: sig.signature }),
+    });
+  }
+
+  private _tronSign(
+    method: string,
+    target: CallTarget,
+    rawPath: string,
+    signDataHex: string,
+    signType?: TronSignType
+  ): Promise<Response<{ signature: string }>> {
+    const path = normalizePath(rawPath);
+    return this._signWithWallet({
+      connectId: target.connectId,
+      deviceId: target.deviceId,
+      path,
+      chain: 'tron',
+      operationName: method,
+      buildRequest: (requestId, xfp) =>
+        this.urEngine.buildTronSignRequest({
+          requestId,
+          rawTxHex: signDataHex,
+          path,
+          xfp,
+          signType,
+          origin: this._origin,
+        }),
+      parseResponse: ur => this.urEngine.parseTronSignature(ur),
+      toPayload: sig => ({ signature: sig.signature }),
+    });
+  }
 
   private async _runJob<T>(
     connectId: string | undefined,
@@ -1719,8 +1654,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       case 'btcGetPublicKey':
       case 'solGetAddress':
         return { hwkChain, path };
-      default:
-        return undefined;
+      // no default
     }
   }
 
@@ -1788,7 +1722,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         schemas: schemas.map(schema => keySchema(schema.hwkChain, schema.path)),
         origin: this._origin,
       });
-      const responseUr = await this._requestQrDisplayAndAwaitResponse(
+      const responseUr = await this._requestQrAndAwaitResponse(
         record ? toDeviceInfo(record) : placeholderDeviceInfo(),
         { ...requestUr, animated: false },
         signal
@@ -1810,7 +1744,6 @@ export class KeystoneAdapter implements IHardwareWallet {
     });
   }
 
-  /** Resolve the wallet's master fingerprint from the connectId and/or deviceId the caller passed. */
   /**
    * A positional wallet id and an operation id must name the same wallet: otherwise the call
    * would run on the operation's wallet while the caller files the result under the other one.
@@ -1925,9 +1858,10 @@ export class KeystoneAdapter implements IHardwareWallet {
    * USB in place (`device-changed`); an unseen one becomes USB-only.
    */
   private async _connectUsb(
+    connector: IConnector,
     expected: ExpectedWallet,
-    searchTargetId?: string,
-    signal?: AbortSignal
+    searchTargetId: string | undefined,
+    signal: AbortSignal
   ): Promise<Response<DeviceInfo>> {
     if (this._pendingUsbTeardowns > 0 || this._abandonedUsbConnects > 0) {
       return failure(
@@ -1941,35 +1875,30 @@ export class KeystoneAdapter implements IHardwareWallet {
       abandoned = true;
       this._abandonedUsbConnects += 1;
     };
-    signal?.addEventListener('abort', onAbort, { once: true });
+    signal.addEventListener('abort', onAbort, { once: true });
     // Cancellation releases the caller, not the physical USB transfer. Keep
     // the tail until the late result has been rejected and disconnected.
     const pending = this._usbConnectTail.then(async () => {
       KeystoneAdapter._throwIfAborted(signal);
-      return this._connectUsbExclusive(expected, searchTargetId, signal);
+      return this._connectUsbExclusive(connector, expected, searchTargetId, signal);
     });
     const settled = pending.finally(() => {
-      signal?.removeEventListener('abort', onAbort);
+      signal.removeEventListener('abort', onAbort);
       if (abandoned) this._abandonedUsbConnects -= 1;
     });
     this._usbConnectTail = settled.then(
       () => undefined,
       () => undefined
     );
-    return signal ? KeystoneAdapter._abortable(signal, settled) : settled;
+    return KeystoneAdapter._abortable(signal, settled);
   }
 
   private async _connectUsbExclusive(
+    connector: IConnector,
     expected: ExpectedWallet,
-    searchTargetId?: string,
-    signal?: AbortSignal
+    searchTargetId: string | undefined,
+    signal: AbortSignal
   ): Promise<Response<DeviceInfo>> {
-    if (!this._usbConnector) {
-      return failure(
-        HardwareErrorCode.TransportNotAvailable,
-        'No USB connector configured for this Keystone adapter'
-      );
-    }
     let sessionId: string | undefined;
     try {
       let connectTarget: ConnectorConnectTarget = { type: 'default' };
@@ -1981,7 +1910,6 @@ export class KeystoneAdapter implements IHardwareWallet {
           deviceIdentity: expected.expectedMasterFingerprint,
         };
       }
-      const connector = this._usbConnector;
       const session = await (connector.connectTarget
         ? connector.connectTarget(connectTarget)
         : connector.connect(searchTargetId ?? expected.expectedMasterFingerprint));
@@ -2000,20 +1928,12 @@ export class KeystoneAdapter implements IHardwareWallet {
         });
       }
       const masterFingerprint = mfpValue.toLowerCase();
-      if (
-        expected.expectedMasterFingerprint &&
-        masterFingerprint !== expected.expectedMasterFingerprint
-      ) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceMismatch,
-          message: `Connected Keystone wallet (mfp ${masterFingerprint}) does not match the requested wallet fingerprint (${expected.expectedMasterFingerprint})`,
-        });
-      }
+      this._assertParsedIdentity({ masterFingerprint, accounts: [] }, expected);
 
       const previousUsbSessionId = this._devices.get(masterFingerprint)?.usbSessionId;
       if (previousUsbSessionId && previousUsbSessionId !== session.sessionId) {
         try {
-          await this._usbConnector.disconnect(previousUsbSessionId);
+          await connector.disconnect(previousUsbSessionId);
         } catch {
           // The replacement session is authoritative even if stale teardown fails.
         }
@@ -2034,7 +1954,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     } catch (err) {
       if (sessionId) {
         try {
-          await this._usbConnector.disconnect(sessionId);
+          await connector.disconnect(sessionId);
         } catch {
           // Preserve the identity/export failure; teardown is best-effort.
         }
@@ -2097,7 +2017,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
 
     // Enumeration retries are silent; the connect runs once, targeted at the expected mfp.
-    const attached = await this._connectUsb({ expectedMasterFingerprint }, undefined, signal);
+    const attached = await this._connectUsb(
+      this._usbConnector,
+      { expectedMasterFingerprint },
+      undefined,
+      signal
+    );
     KeystoneAdapter._throwIfAborted(signal);
     // A cancelled transfer still draining is busy, not absent; don't fall back to QR. Two devices
     // claiming this wallet are not a missing device either: the user must see it and unplug one.
@@ -2196,9 +2121,9 @@ export class KeystoneAdapter implements IHardwareWallet {
           message: 'USB channel is not connected for this Keystone wallet',
         });
       }
-      const result = await this._callUsbConnector(
+      const result = await this._callUsbResolveUr(
+        this._usbConnector,
         record.usbSessionId,
-        'resolveUr',
         requestUr,
         signal
       );
@@ -2212,11 +2137,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       if (usbErrorCode === HardwareErrorCode.PayloadTooLarge && usbErrorOrigin !== 'device') {
         if (!interactionRoute && !this._forcedTransport) {
           const displayDevice = toDeviceInfo(record);
-          return this._requestQrDisplayAndAwaitResponse(
-            displayDevice,
-            { ...requestUr, animated },
-            signal
-          );
+          return this._requestQrAndAwaitResponse(displayDevice, { ...requestUr, animated }, signal);
         }
         // Rejected by the host before sending: keep the pinned session and report
         // the limit without implying the operation ran.
@@ -2276,7 +2197,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
     const displayDevice = record ? toDeviceInfo(record) : placeholderDeviceInfo();
     try {
-      return await this._requestQrDisplayAndAwaitResponse(
+      return await this._requestQrAndAwaitResponse(
         displayDevice,
         { ...requestUr, animated },
         signal
@@ -2450,9 +2371,8 @@ export class KeystoneAdapter implements IHardwareWallet {
   private async _awaitQrResponse<T>(
     requestType: string,
     pending: Promise<T>,
-    signal?: AbortSignal
+    signal: AbortSignal
   ): Promise<T> {
-    if (!signal) return pending;
     let settled = false;
     const onAbort = () => {
       if (!settled) this._uiRegistry.cancel(requestType);
@@ -2472,78 +2392,54 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
   }
 
-  private async _requestQrDisplayAndAwaitResponse(
+  /** Shows `data` for the device to scan, or with no `data` asks the host to scan the device. */
+  private async _requestQrAndAwaitResponse(
     device: DeviceInfo,
-    data: QrDisplayData,
-    signal?: AbortSignal
+    data: QrDisplayData | undefined,
+    signal: AbortSignal
   ): Promise<KeystoneUr> {
+    const requestType = data ? UI_REQUEST.REQUEST_QR_DISPLAY : UI_REQUEST.REQUEST_QR_SCAN;
     const operationId = this._activeOperationId();
     // An open prompt keeps its operation alive, so the operation's TTL cannot end a pending scan.
     const release = operationId ? this._operations.retain(operationId) : undefined;
     try {
-      const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
-        UI_REQUEST.REQUEST_QR_DISPLAY,
-        { timeoutMs: this._qrTimeoutMs, operationId }
-      );
-      this.emitter.emit(UI_REQUEST.REQUEST_QR_DISPLAY, {
-        type: UI_REQUEST.REQUEST_QR_DISPLAY,
-        payload: { device, data, operationId },
+      const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(requestType, {
+        timeoutMs: this._qrTimeoutMs,
+        operationId,
       });
-      const response = await this._awaitQrResponse(
-        UI_REQUEST.REQUEST_QR_DISPLAY,
-        waitPromise,
-        signal
-      );
+      if (data) {
+        this.emitter.emit(UI_REQUEST.REQUEST_QR_DISPLAY, {
+          type: UI_REQUEST.REQUEST_QR_DISPLAY,
+          payload: { device, data, operationId },
+        });
+      } else {
+        this.emitter.emit(UI_REQUEST.REQUEST_QR_SCAN, {
+          type: UI_REQUEST.REQUEST_QR_SCAN,
+          payload: { device, operationId },
+        });
+      }
+      const response = await this._awaitQrResponse(requestType, waitPromise, signal);
       return { urType: response.urType, urData: response.urData };
     } finally {
       release?.();
     }
   }
 
-  private async _requestQrScanAndAwaitResponse(
-    device: DeviceInfo,
-    signal?: AbortSignal
-  ): Promise<KeystoneUr> {
-    const operationId = this._activeOperationId();
-    // An open prompt keeps its operation alive, so the operation's TTL cannot end a pending scan.
-    const release = operationId ? this._operations.retain(operationId) : undefined;
-    try {
-      const waitPromise = this._uiRegistry.wait<{ urType: string; urData: string }>(
-        UI_REQUEST.REQUEST_QR_SCAN,
-        { timeoutMs: this._qrTimeoutMs, operationId }
-      );
-      this.emitter.emit(UI_REQUEST.REQUEST_QR_SCAN, {
-        type: UI_REQUEST.REQUEST_QR_SCAN,
-        payload: { device, operationId },
-      });
-      const response = await this._awaitQrResponse(UI_REQUEST.REQUEST_QR_SCAN, waitPromise, signal);
-      return { urType: response.urType, urData: response.urData };
-    } finally {
-      release?.();
-    }
-  }
-
-  private async _callUsbConnector(
+  private async _callUsbResolveUr(
+    connector: IConnector,
     sessionId: string,
-    method: string,
-    params: unknown,
-    signal?: AbortSignal
+    requestUr: KeystoneUr,
+    signal: AbortSignal
   ): Promise<ConnectorCallResult> {
-    if (!this._usbConnector) {
-      throw createHwkError({
-        code: HardwareErrorCode.TransportNotAvailable,
-        message: 'No USB connector configured for this Keystone adapter',
-      });
-    }
     if (this._pendingUsbTeardowns > 0 || this._unsettledUsbOperations.size > 0) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceBusyInternal,
-        message: `Keystone USB is busy while calling ${method}`,
+        message: 'Keystone USB is busy while calling resolveUr',
       });
     }
     // Checked before the connector call: racing an aborted signal would still put
     // the command on the wire.
-    if (signal?.aborted) {
+    if (signal.aborted) {
       throw signal.reason instanceof Error
         ? signal.reason
         : createHwkError({
@@ -2554,12 +2450,12 @@ export class KeystoneAdapter implements IHardwareWallet {
     const releaseOperation = this._retainUsbOperation(`call:${sessionId}`);
     let rawCall: Promise<ConnectorCallResult>;
     try {
-      rawCall = this._usbConnector.call(sessionId, method, params).finally(releaseOperation);
+      rawCall = connector.call(sessionId, 'resolveUr', requestUr).finally(releaseOperation);
     } catch (error) {
       releaseOperation();
       throw error;
     }
-    return signal ? KeystoneAdapter._abortable(signal, rawCall) : rawCall;
+    return KeystoneAdapter._abortable(signal, rawCall);
   }
 
   private _runUsbTeardown(task: () => Promise<void>): Promise<void> {

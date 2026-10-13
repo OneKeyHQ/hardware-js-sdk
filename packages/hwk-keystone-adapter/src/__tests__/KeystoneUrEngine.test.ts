@@ -16,13 +16,13 @@ import {
   EthSignRequest,
 } from '@keystonehq/bc-ur-registry-eth';
 import { SolSignRequest, SolSignature } from '@keystonehq/bc-ur-registry-sol';
-import * as bitcoin from 'bitcoinjs-lib';
 import HDKey from 'hdkey';
 import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest } from '../urEngine/TronSignRequest';
 import { TronSignature as TronUrSignature } from '../urEngine/TronSignature';
+import { psbtFixtureHex, urJson } from './fixtures';
 
 import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type { KeystoneUr } from '../urEngine/types';
@@ -31,10 +31,6 @@ import type { KeystoneUr } from '../urEngine/types';
 // exercise CBOR/UR framing, none of it is derived from or resembles real key
 // material. The 4-byte MFP is protocol metadata, not a wallet identity key.
 const FAKE_MFP_HEX = '52a5d0d1';
-
-function urFromSdk(ur: { type: string; cbor: Buffer }): KeystoneUr {
-  return { urType: ur.type, urData: ur.cbor.toString('hex') };
-}
 
 function buildMultiAccountsUr(): KeystoneUr {
   const hdKey = new CryptoHDKey({
@@ -59,29 +55,7 @@ function buildMultiAccountsUr(): KeystoneUr {
     undefined, // deviceId omitted, matching the firmware's generic KeyDerivation response
     '1.7.0'
   );
-  return urFromSdk(multiAccounts.toUR());
-}
-
-/** A real PSBT paying `outputValue`; `signed` adds a partial signature, which signing may do. */
-function psbtFixtureHex(outputValue = 9000n, signed = false): string {
-  const psbt = new bitcoin.Psbt();
-  psbt.addInput({
-    hash: '11'.repeat(32),
-    index: 0,
-    witnessUtxo: { script: Buffer.from(`0014${'22'.repeat(20)}`, 'hex'), value: 10000n },
-  });
-  psbt.addOutput({ script: Buffer.from(`0014${'33'.repeat(20)}`, 'hex'), value: outputValue });
-  if (signed) {
-    psbt.updateInput(0, {
-      partialSig: [
-        {
-          pubkey: Buffer.from(`02${'44'.repeat(32)}`, 'hex'),
-          signature: Buffer.from('300602010102010101', 'hex'),
-        },
-      ],
-    });
-  }
-  return psbt.toHex();
+  return urJson(multiAccounts.toUR());
 }
 
 describe('KeystoneUrEngine', () => {
@@ -101,7 +75,7 @@ describe('KeystoneUrEngine', () => {
 
     it('lowercases the master fingerprint for consistent protocol comparisons', () => {
       const upper = new CryptoMultiAccounts(Buffer.from('AABBCCDD', 'hex'), []);
-      const parsedUpper = engine.parseMultiAccounts(urFromSdk(upper.toUR()));
+      const parsedUpper = engine.parseMultiAccounts(urJson(upper.toUR()));
       expect(parsedUpper.masterFingerprint).toBe('aabbccdd');
     });
   });
@@ -123,7 +97,7 @@ describe('KeystoneUrEngine', () => {
         ),
         name: 'SOL',
       });
-      const parsed = engine.parseAccountResponse(urFromSdk(hdKey.toUR()));
+      const parsed = engine.parseAccountResponse(urJson(hdKey.toUR()));
 
       expect(parsed.masterFingerprint).toBe(FAKE_MFP_HEX);
       expect(parsed.accounts).toHaveLength(1);
@@ -169,7 +143,7 @@ describe('KeystoneUrEngine', () => {
       const v = '1c';
       const signature = new ETHSignature(Buffer.from(r + s + v, 'hex'), requestId);
 
-      const parsed = engine.parseEthSignature(urFromSdk(signature.toUR()));
+      const parsed = engine.parseEthSignature(urJson(signature.toUR()));
 
       expect(parsed.r).toBe(r);
       expect(parsed.s).toBe(s);
@@ -185,7 +159,7 @@ describe('KeystoneUrEngine', () => {
         Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex')
       );
 
-      expect(() => engine.parseEthSignature(urFromSdk(short.toUR()))).toThrow(
+      expect(() => engine.parseEthSignature(urJson(short.toUR()))).toThrow(
         /expected at least 65 bytes/
       );
     });
@@ -199,7 +173,7 @@ describe('KeystoneUrEngine', () => {
         Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex')
       );
 
-      expect(engine.parseEthSignature(urFromSdk(signature.toUR()))).toMatchObject({
+      expect(engine.parseEthSignature(urJson(signature.toUR()))).toMatchObject({
         r,
         s,
         v: '0136',
@@ -269,7 +243,7 @@ describe('KeystoneUrEngine', () => {
       expect(built.urType).toBe('crypto-psbt');
 
       const signedHex = psbtFixtureHex(9000n, true);
-      const responseUr = urFromSdk(new CryptoPSBT(Buffer.from(signedHex, 'hex')).toUR());
+      const responseUr = urJson(new CryptoPSBT(Buffer.from(signedHex, 'hex')).toUR());
       expect(engine.parseBtcPsbt(responseUr, requestHex)).toBe(signedHex);
     });
 
@@ -277,7 +251,7 @@ describe('KeystoneUrEngine', () => {
       ['another transaction', psbtFixtureHex(8000n, true)],
       ['bytes that are not a PSBT', Buffer.from('signed-psbt-bytes-fixture').toString('hex')],
     ])('refuses a reply carrying %s', (_name, replyHex) => {
-      const responseUr = urFromSdk(new CryptoPSBT(Buffer.from(replyHex, 'hex')).toUR());
+      const responseUr = urJson(new CryptoPSBT(Buffer.from(replyHex, 'hex')).toUR());
       expect(() => engine.parseBtcPsbt(responseUr, psbtFixtureHex())).toThrow(
         expect.objectContaining({ code: HardwareErrorCode.DeviceMismatch })
       );
@@ -321,7 +295,7 @@ describe('KeystoneUrEngine', () => {
 
       const requestId = Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex');
       const signature = new SolSignature(Buffer.alloc(64, 0x07), requestId);
-      const parsed = engine.parseSolSignature(urFromSdk(signature.toUR()));
+      const parsed = engine.parseSolSignature(urJson(signature.toUR()));
 
       expect(parsed.signature).toBe('07'.repeat(64));
       expect(parsed.requestId).toBe('2b5893f2-52e2-4ba8-9d5e-6c2b6f5f1c11');
@@ -348,7 +322,7 @@ describe('KeystoneUrEngine', () => {
 
       const requestId = Buffer.from('2b5893f252e24ba89d5e6c2b6f5f1c11', 'hex');
       const signature = new TronUrSignature(Buffer.alloc(65, 0x09), requestId);
-      const parsed = engine.parseTronSignature(urFromSdk(signature.toUR()));
+      const parsed = engine.parseTronSignature(urJson(signature.toUR()));
 
       expect(parsed.signature).toBe('09'.repeat(65));
       expect(parsed.requestId).toBe('2b5893f2-52e2-4ba8-9d5e-6c2b6f5f1c11');
