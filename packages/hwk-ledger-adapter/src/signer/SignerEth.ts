@@ -7,8 +7,6 @@ import type { CancelReason } from './deviceActionToPromise';
 import type { SignerEth as ISdkSignerEth, TypedData } from '@ledgerhq/device-signer-kit-ethereum';
 import type { SignerEvmAddress, SignerEvmSignature } from '../types';
 
-/** Timeout for user-interactive operations (verify address, sign). */
-
 /**
  * Wraps Ledger's SDK signer (Observable-based DeviceActions) into
  * a simple async interface returning plain serializable data.

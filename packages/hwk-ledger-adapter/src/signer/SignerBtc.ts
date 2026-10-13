@@ -18,8 +18,6 @@ function hexToUtf8(hex: string): string {
   return new TextDecoder().decode(hexToBytes(hex));
 }
 
-/** Timeout for user-interactive operations (sign, verify). */
-
 /**
  * Wraps Ledger's BTC SDK signer (Observable-based DeviceActions) into
  * a simple async interface returning plain serializable data.

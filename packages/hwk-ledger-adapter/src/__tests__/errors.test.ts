@@ -638,13 +638,6 @@ describe('installApp DMK error classification', () => {
     expect(mapLedgerError(err).message).toContain('Not enough memory for those applications');
   });
 
-  it('maps SecureChannelError to LedgerSecureChannelError with a transport origin', () => {
-    const err = dmkSecureChannelError('Connection closed unexpectedly');
-    const result = mapLedgerError(err);
-    expect(result.code).toBe(HardwareErrorCode.LedgerSecureChannelError);
-    expect(result.origin).toBe('transport');
-  });
-
   it.each([
     [ERROR_TAG.AppAlreadyInstalledDA, 'Unknown error.', HardwareErrorCode.AppAlreadyInstalled],
     [
@@ -687,9 +680,10 @@ describe('installApp DMK error classification', () => {
     expect(failure.payload._tag).toBe('UnknownDAError');
   });
 
-  it('carries _tag and the new code through the Failure payload', () => {
+  it('maps SecureChannelError to a transport-origin code and carries _tag through the Failure payload', () => {
     const err = dmkSecureChannelError('Connection closed unexpectedly');
     const mapped = mapLedgerError(err);
+    expect(mapped.origin).toBe('transport');
     const failure = ledgerFailure(mapped.code, mapped.message, undefined, ERROR_TAG.SecureChannel);
     expect(failure.payload).toMatchObject({
       code: HardwareErrorCode.LedgerSecureChannelError,

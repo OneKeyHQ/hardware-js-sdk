@@ -241,12 +241,7 @@ export class LedgerAdapter implements IHardwareWallet {
   // the Ledger app's safety boundary, not ours to bypass.
   private _btcHighIndexConfirmedThisSession = false;
 
-  // Pure FIFO queue. New jobs chain onto the tail and run in order. The
-  // queue is intentionally passive: it does not arbitrate, does not ask
-  // the user. Callers wanting "interrupt current?" semantics must do so
-  // explicitly via `getActiveJob()` + `cancelActive()` from the UI
-  // layer. USB transports can't read multiple devices in parallel, and
-  // BLE-only parallelism isn't worth the coordination cost.
+  // One device job at a time; every enqueue passes rejectIfBusy, so a second job fails as busy.
   private readonly _jobQueue: DeviceJobQueue;
 
   // Runtime relay configuration mutates connector-wide DMK state. Serialize
@@ -1744,13 +1739,6 @@ export class LedgerAdapter implements IHardwareWallet {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Ensure at least one device is connected and return a valid connectId.
-   *
-   * - If a session already exists for the given connectId, reuse it.
-   * - If ANY session exists (Ledger IDs are ephemeral), reuse it.
-   * - Otherwise: search → one USB device auto-connects; multiple asks the host to choose.
-   */
   // Mutex for ensureConnected — prevents concurrent calls from establishing duplicate connections
   private _connectingPromise: Promise<string> | null = null;
 
@@ -2364,14 +2352,6 @@ export class LedgerAdapter implements IHardwareWallet {
     return result.payload;
   }
 
-  /**
-   * Call the connector with automatic session resolution and disconnect retry.
-   *
-   * 1. Resolves a valid connectId via ensureConnected()
-   * 2. Looks up sessionId from _sessions
-   * 3. Calls connector.call()
-   * 4. On disconnect error: clears stale session, re-connects, retries once
-   */
   /**
    * Unwrap a `ConnectorCallResult` back into the throw-based control flow this
    * class relies on. On failure, rehydrate a FLAT Error (lifting `params.*`

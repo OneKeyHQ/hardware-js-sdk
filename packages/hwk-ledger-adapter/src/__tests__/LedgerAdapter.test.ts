@@ -124,6 +124,8 @@ function ledgerSession(
   } as ConnectorSession;
 }
 
+const EVM_ADDR = '0x1111111111111111111111111111111111111111';
+
 async function waitForCondition(condition: () => boolean): Promise<void> {
   for (let i = 0; i < 10; i += 1) {
     if (condition()) return;
@@ -160,21 +162,11 @@ describe('LedgerAdapter', () => {
     'rejects a late explicit connection after cancellation (%s, %s)',
     async (transport, target) => {
       Object.defineProperty(connector, 'connectionType', { value: transport });
-      let finishConnect!: (session: ConnectorSession) => void;
-      let connectStarted!: () => void;
-      const started = new Promise<void>(resolve => {
-        connectStarted = resolve;
-      });
-      (connector.connect as jest.Mock).mockImplementationOnce(() => {
-        connectStarted();
-        return new Promise<ConnectorSession>(resolve => {
-          finishConnect = resolve;
-        });
-      });
+      const connect = holdConnect();
       const pending = adapter.connectDevice('dev-1');
-      await started;
+      await connect.started;
       adapter.cancel(target);
-      finishConnect(ledgerSession('late-session', { connectionType: transport }));
+      connect.finish(ledgerSession('late-session', { connectionType: transport }));
       const result = await pending;
       try {
         expect(result).toMatchObject({
@@ -223,16 +215,62 @@ describe('LedgerAdapter', () => {
   );
 
   /** Hosts must acknowledge every binding; return the payloads the SDK asked to save. */
-  function acknowledgeBindings(): jest.Mock {
+  function acknowledgeBindings(saved = true): jest.Mock {
     const save = jest.fn();
     adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
       save(event.payload);
       adapter.uiResponse({
         type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
-        payload: { requestId: event.payload.requestId, saved: true },
+        payload: { requestId: event.payload.requestId, saved },
       });
     });
     return save;
+  }
+
+  /** Answer every device picker with dev-1; the mock records each request payload. */
+  function pickDevice(): jest.Mock {
+    const select = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      select(event.payload);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+        payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
+      });
+    });
+    return select;
+  }
+
+  async function connectOperation(): Promise<string> {
+    const connected = await adapter.connectDevice('dev-1');
+    if (!connected.success) throw new Error('Fixture connect failed');
+    return connected.payload;
+  }
+
+  /** Hold the next connector.connect open until the test finishes it. */
+  function holdConnect() {
+    let finish!: (session: ConnectorSession) => void;
+    let markStarted!: () => void;
+    const started = new Promise<void>(resolve => {
+      markStarted = resolve;
+    });
+    (connector.connect as jest.Mock).mockImplementationOnce(() => {
+      markStarted();
+      return new Promise<ConnectorSession>(resolve => {
+        finish = resolve;
+      });
+    });
+    return { started, finish: (session: ConnectorSession) => finish(session) };
+  }
+
+  /** Start a BTC account-100 read and wait for its high-index prompt. */
+  async function openHighIndexPrompt() {
+    const prompts: { payload: { operationId?: string } }[] = [];
+    adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
+      prompts.push(event);
+    });
+    const pending = adapter.btcGetPublicKey('dev-1', '', { path: "m/84'/0'/100'", coin: 'btc' });
+    await waitForCondition(() => prompts.length === 1);
+    return { prompts, pending };
   }
 
   /** Pick dev-1 once the BLE picker has candidates; an empty first offer waits for the scan. */
@@ -441,14 +479,7 @@ describe('LedgerAdapter', () => {
             ]
       );
       connector.callImpl.mockResolvedValue({ address: 'original-wallet' });
-      const save = jest.fn();
-      adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
-        save();
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
-          payload: { requestId: event.payload.requestId, saved: false },
-        });
-      });
+      const save = acknowledgeBindings(false);
       selectDevOneWhenOffered();
       let target = targetKind === 'legacy' ? 'previous-usb-id' : '';
       if (targetKind === 'operation') {
@@ -486,11 +517,10 @@ describe('LedgerAdapter', () => {
       connector.connect.mockResolvedValue(
         ledgerSession('session-abc', { connectionType: usbPresent ? 'usb' : 'ble' })
       );
-      const address = '0x1111111111111111111111111111111111111111';
-      connector.callImpl.mockResolvedValue({ address });
+      connector.callImpl.mockResolvedValue({ address: EVM_ADDR });
       const picker = jest.fn();
       adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, picker);
-      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(address), {
+      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(EVM_ADDR), {
         path: "m/44'/60'/0'/0/0",
         knownConnections: [{ transport: 'ble', connectId: 'dev-1' }],
       });
@@ -621,14 +651,7 @@ describe('LedgerAdapter', () => {
           finishNewScan = resolve;
         })
       );
-    const select = jest.fn();
-    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-      select(event.payload.extra);
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-        payload: { sdkConnectId: 'dev-1', requestId: event.payload.requestId },
-      });
-    });
+    const select = pickDevice();
     const oldOperation = adapter.acquireOperation('', { extra: { dbDeviceId: 'old' } });
     await waitForCondition(() => connector.searchDevices.mock.calls.length === 1);
     adapter.cancel();
@@ -648,7 +671,7 @@ describe('LedgerAdapter', () => {
     finishNewScan(devices);
     const result = await newOperation;
     expect(result.success).toBe(true);
-    expect(select.mock.calls).toEqual([[{ dbDeviceId: 'new' }]]);
+    expect(select.mock.calls.map(([payload]) => payload.extra)).toEqual([{ dbDeviceId: 'new' }]);
     expect(connector.connect).toHaveBeenCalledTimes(1);
     expect(connector.callImpl).not.toHaveBeenCalled();
     if (result.success) await adapter.releaseOperation(result.payload);
@@ -676,14 +699,7 @@ describe('LedgerAdapter', () => {
           })
         );
       }
-      const select = jest.fn();
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        select();
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { sdkConnectId: 'dev-1', requestId: event.payload.requestId },
-        });
-      });
+      const select = pickDevice();
       const acquired = await adapter.acquireOperation('', {
         knownConnections:
           scenario === 'unbound-ble'
@@ -705,11 +721,10 @@ describe('LedgerAdapter', () => {
       expect(connector.callImpl).not.toHaveBeenCalled();
       if (scenario === 'known-ble') expect(connector.searchDevices).not.toHaveBeenCalled();
       if (acquired.success) {
-        const address = '0x1111111111111111111111111111111111111111';
-        connector.callImpl.mockResolvedValue({ address });
+        connector.callImpl.mockResolvedValue({ address: EVM_ADDR });
         const result = await adapter.evmGetAddress(
           acquired.payload,
-          deriveDeviceFingerprint(address),
+          deriveDeviceFingerprint(EVM_ADDR),
           { path: "m/44'/60'/0'/0/0" }
         );
         expect(result.success).toBe(true);
@@ -722,12 +737,7 @@ describe('LedgerAdapter', () => {
   describe('operation BLE binding', () => {
     async function acquireBinding() {
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { sdkConnectId: 'dev-1', requestId: event.payload.requestId },
-        });
-      });
+      pickDevice();
       return adapter.acquireOperation('', {
         knownConnections: [],
         extra: { dbDeviceId: 'binding-record' },
@@ -737,20 +747,12 @@ describe('LedgerAdapter', () => {
     it.each([true, false])(
       'saves the pick once its first call passes the wallet check (saved=%s)',
       async saved => {
-        const save = jest.fn();
-        adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, event => {
-          save(event.payload);
-          adapter.uiResponse({
-            type: UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING,
-            payload: { requestId: event.payload.requestId, saved },
-          });
-        });
+        const save = acknowledgeBindings(saved);
         const acquired = await acquireBinding();
         if (!acquired.success) throw new Error('Expected acquisition to succeed');
         expect(save).not.toHaveBeenCalled();
-        const address = '0x1111111111111111111111111111111111111111';
-        connector.callImpl.mockResolvedValue({ address });
-        const fingerprint = deriveDeviceFingerprint(address);
+        connector.callImpl.mockResolvedValue({ address: EVM_ADDR });
+        const fingerprint = deriveDeviceFingerprint(EVM_ADDR);
         const params = { path: "m/44'/60'/0'/0/0" };
         expect((await adapter.evmGetAddress(acquired.payload, fingerprint, params)).success).toBe(
           true
@@ -796,7 +798,7 @@ describe('LedgerAdapter', () => {
       connector.callImpl.mockResolvedValue({ address: 'other-wallet' });
       const result = await adapter.evmGetAddress(
         acquired.payload,
-        deriveDeviceFingerprint('0x1111111111111111111111111111111111111111'),
+        deriveDeviceFingerprint(EVM_ADDR),
         { path: "m/44'/60'/0'/0/0" }
       );
       expect(result).toMatchObject({
@@ -1030,15 +1032,13 @@ describe('LedgerAdapter', () => {
     });
 
     it('fails an ended operation without searching or reconnecting', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
-      await adapter.releaseOperation(connected.payload);
+      const operationId = await connectOperation();
+      await adapter.releaseOperation(operationId);
       jest.clearAllMocks();
 
-      const result = await adapter.evmGetAddress(connected.payload, '', {
+      const result = await adapter.evmGetAddress(operationId, '', {
         path: "m/44'/60'/0'/0/0",
-        operationId: connected.payload,
+        operationId,
       });
 
       expect(result.success).toBe(false);
@@ -1073,26 +1073,21 @@ describe('LedgerAdapter', () => {
       const operations = (bleAdapter as unknown as { _operations: OperationRegistry })._operations;
       expect(operations.resolve(connected.payload).connectionType).toBe('ble');
 
-      const usbConnected = await adapter.connectDevice('dev-1');
-      expect(usbConnected.success).toBe(true);
-      if (!usbConnected.success) return;
+      const usbConnected = await connectOperation();
       const usbOperations = (adapter as unknown as { _operations: OperationRegistry })._operations;
-      expect(usbOperations.resolve(usbConnected.payload).connectionType).toBe('usb');
+      expect(usbOperations.resolve(usbConnected).connectionType).toBe('usb');
     });
 
     it('retires an older operation before replacing its USB session', async () => {
-      const first = await adapter.connectDevice('dev-1');
-      const second = await adapter.connectDevice('dev-1');
-      expect(first.success).toBe(true);
-      expect(second.success).toBe(true);
-      if (!first.success || !second.success) return;
+      const first = await connectOperation();
+      const second = await connectOperation();
 
-      const oldInfo = await adapter.getDeviceInfo(first.payload, '');
+      const oldInfo = await adapter.getDeviceInfo(first, '');
       expect(oldInfo.success).toBe(false);
       if (!oldInfo.success) {
         expect(oldInfo.payload.code).toBe(HardwareErrorCode.OperationEnded);
       }
-      await expect(adapter.getDeviceInfo(second.payload, '')).resolves.toEqual({
+      await expect(adapter.getDeviceInfo(second, '')).resolves.toEqual({
         success: true,
         payload: expect.objectContaining({ connectId: 'dev-1' }),
       });
@@ -1104,18 +1099,15 @@ describe('LedgerAdapter', () => {
         .mockResolvedValueOnce(ledgerSession('session-A'))
         .mockResolvedValueOnce(ledgerSession('session-B'));
 
-      const first = await adapter.connectDevice('dev-1');
-      const second = await adapter.connectDevice('dev-1');
-      expect(first.success).toBe(true);
-      expect(second.success).toBe(true);
-      if (!first.success || !second.success) return;
+      const first = await connectOperation();
+      const second = await connectOperation();
       connector.callImpl.mockResolvedValueOnce({ address: '0xB', publicKey: '0xpk' });
       jest.clearAllMocks();
 
-      await adapter.releaseOperation(first.payload);
-      const result = await adapter.evmGetAddress(second.payload, '', {
+      await adapter.releaseOperation(first);
+      const result = await adapter.evmGetAddress(second, '', {
         path: "m/44'/60'/0'/0/0",
-        operationId: second.payload,
+        operationId: second,
       });
 
       expect(result.success).toBe(true);
@@ -1126,13 +1118,10 @@ describe('LedgerAdapter', () => {
     it.each([true, false])(
       'does not replay a pinned signing request or probe a replacement after a disconnect (event=%s)',
       async emitDisconnectEvent => {
-        const expectedAddress = '0x1111111111111111111111111111111111111111';
-        const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
-        const connected = await adapter.connectDevice('dev-1');
-        expect(connected.success).toBe(true);
-        if (!connected.success) return;
+        const expectedFingerprint = deriveDeviceFingerprint(EVM_ADDR);
+        const operationId = await connectOperation();
         connector.callImpl
-          .mockResolvedValueOnce({ address: expectedAddress })
+          .mockResolvedValueOnce({ address: EVM_ADDR })
           .mockImplementationOnce(() => {
             if (emitDisconnectEvent) connector._emit('device-disconnect', { connectId: 'dev-1' });
             return Promise.reject(
@@ -1142,7 +1131,7 @@ describe('LedgerAdapter', () => {
               })
             );
           })
-          .mockResolvedValueOnce({ address: expectedAddress })
+          .mockResolvedValueOnce({ address: EVM_ADDR })
           .mockResolvedValueOnce({ signature: '0xSIGNED' });
         connector.searchDevices.mockResolvedValueOnce([
           { connectId: 'dev-new', deviceId: 'dev-new', name: 'Nano X', model: 'nanoX' },
@@ -1152,10 +1141,10 @@ describe('LedgerAdapter', () => {
         );
         jest.clearAllMocks();
 
-        const result = await adapter.evmSignMessage(connected.payload, expectedFingerprint, {
+        const result = await adapter.evmSignMessage(operationId, expectedFingerprint, {
           path: "m/44'/60'/0'/0/0",
           message: 'Hello',
-          operationId: connected.payload,
+          operationId,
         });
 
         expect(result).toMatchObject({
@@ -1172,22 +1161,20 @@ describe('LedgerAdapter', () => {
           'evmSignMessage',
           expect.anything()
         );
-        expect((await adapter.getDeviceInfo(connected.payload, '')).success).toBe(false);
+        expect((await adapter.getDeviceInfo(operationId, '')).success).toBe(false);
       }
     );
 
     it('ends a pinned operation after an APDU timeout without reconnecting', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
       );
       jest.clearAllMocks();
 
-      const result = await adapter.evmGetAddress(connected.payload, '', {
+      const result = await adapter.evmGetAddress(operationId, '', {
         path: "m/44'/60'/0'/0/0",
-        operationId: connected.payload,
+        operationId,
       });
 
       expect(result).toMatchObject({
@@ -1197,10 +1184,10 @@ describe('LedgerAdapter', () => {
       expect(connector.searchDevices).not.toHaveBeenCalled();
       expect(connector.connect).not.toHaveBeenCalled();
       expect(connector.callImpl).toHaveBeenCalledTimes(1);
-      expect((await adapter.getDeviceInfo(connected.payload, '')).success).toBe(false);
+      expect((await adapter.getDeviceInfo(operationId, '')).success).toBe(false);
       expect(connector.disconnect).toHaveBeenCalledTimes(1);
       expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
-      await adapter.releaseOperation(connected.payload);
+      await adapter.releaseOperation(operationId);
       expect(connector.disconnect).toHaveBeenCalledTimes(1);
     });
   });
@@ -1224,24 +1211,22 @@ describe('LedgerAdapter', () => {
     });
 
     it('ignores a cancel aimed at an operation that already ended', async () => {
-      const stale = await adapter.connectDevice('dev-1');
-      if (!stale.success) throw new Error('Fixture connect failed');
-      await adapter.releaseOperation(stale.payload);
+      const stale = await connectOperation();
+      await adapter.releaseOperation(stale);
 
-      const live = await adapter.connectDevice('dev-1');
-      if (!live.success) throw new Error('Fixture reconnect failed');
+      const live = await connectOperation();
       connector.cancel.mockClear();
 
       // "Cancel this one" must not decay into "cancel everything" when the one
       // it names is already gone: the operation running now is unrelated.
-      adapter.cancel(stale.payload);
+      adapter.cancel(stale);
       expect(connector.cancel).not.toHaveBeenCalled();
 
-      const address = await adapter.evmGetAddress(live.payload, '', {
+      const address = await adapter.evmGetAddress(live, '', {
         path: "m/44'/60'/0'/0/0",
       });
       expect(address.success).toBe(true);
-      await adapter.releaseOperation(live.payload);
+      await adapter.releaseOperation(live);
     });
 
     it('should connect and return an operation id', async () => {
@@ -1317,17 +1302,13 @@ describe('LedgerAdapter', () => {
     });
 
     it('should disconnect without error', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
-      await expect(adapter.releaseOperation(connected.payload)).resolves.toBeUndefined();
+      const operationId = await connectOperation();
+      await expect(adapter.releaseOperation(operationId)).resolves.toBeUndefined();
       expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
     });
 
     it('releases a timed-out operation and keeps releaseOperation idempotent', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
 
       const operations = (
         adapter as unknown as {
@@ -1336,24 +1317,22 @@ describe('LedgerAdapter', () => {
           };
         }
       )._operations;
-      operations.end(connected.payload, 'timeout');
+      operations.end(operationId, 'timeout');
       await new Promise(resolve => setImmediate(resolve));
 
       expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
-      await expect(adapter.releaseOperation(connected.payload)).resolves.toBeUndefined();
+      await expect(adapter.releaseOperation(operationId)).resolves.toBeUndefined();
     });
 
     it('cancels the active job without terminating its operation', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
 
-      adapter.cancel(connected.payload);
+      adapter.cancel(operationId);
 
       expect(connector.cancel).toHaveBeenCalledWith('session-abc');
-      const info = await adapter.getDeviceInfo(connected.payload, '');
+      const info = await adapter.getDeviceInfo(operationId, '');
       expect(info.success).toBe(true);
-      await adapter.releaseOperation(connected.payload);
+      await adapter.releaseOperation(operationId);
     });
   });
 
@@ -1511,27 +1490,28 @@ describe('LedgerAdapter', () => {
       });
     }
 
-    it('retries once and succeeds when DeviceAppStuck clears on the second attempt', async () => {
-      connector.callImpl
-        .mockRejectedValueOnce(makeStuckErr())
-        .mockResolvedValueOnce({ address: '0xABCD', publicKey: '0xpk' });
+    it.each([false, true])(
+      'retries APDU 0x6901 once on the original session without reconnecting (pinned=%s)',
+      async pinned => {
+        connector.callImpl
+          .mockRejectedValueOnce(makeStuckErr())
+          .mockResolvedValueOnce({ address: '0xABCD', publicKey: '0xpk' });
+        const operationId = await connectOperation();
+        jest.clearAllMocks();
 
-      await adapter.connectDevice('dev-1');
+        const result = await adapter.evmGetAddress(pinned ? operationId : 'dev-1', '', {
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+          ...(pinned ? { operationId } : {}),
+        });
 
-      const result = await adapter.evmGetAddress('dev-1', '', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.payload.address).toBe('0xABCD');
+        expect(result).toMatchObject({ success: true, payload: { address: '0xABCD' } });
+        expect(connector.call).toHaveBeenCalledTimes(2);
+        expect(connector.reset).not.toHaveBeenCalled();
+        expect(connector.searchDevices).not.toHaveBeenCalled();
+        expect(connector.connect).not.toHaveBeenCalled();
       }
-      // Retry the rejected APDU on the original session only.
-      expect(connector.call).toHaveBeenCalledTimes(2);
-      expect(connector.reset).not.toHaveBeenCalled();
-      expect(connector.connect).toHaveBeenCalledTimes(1);
-    });
+    );
 
     it('surfaces the original DeviceAppStuck error after a second 0x6901', async () => {
       connector.callImpl
@@ -1552,43 +1532,19 @@ describe('LedgerAdapter', () => {
       expect(connector.call).toHaveBeenCalledTimes(2);
     });
 
-    it('retries APDU 0x6901 once on the pinned session without reconnecting', async () => {
-      connector.callImpl
-        .mockRejectedValueOnce(makeStuckErr())
-        .mockResolvedValueOnce({ address: '0xABCD', publicKey: '0xpk' });
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
-      jest.clearAllMocks();
-
-      const result = await adapter.evmGetAddress(connected.payload, '', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-        operationId: connected.payload,
-      });
-
-      expect(result.success).toBe(true);
-      expect(connector.call).toHaveBeenCalledTimes(2);
-      expect(connector.reset).not.toHaveBeenCalled();
-      expect(connector.searchDevices).not.toHaveBeenCalled();
-      expect(connector.connect).not.toHaveBeenCalled();
-    });
-
     it('disconnects and ends a pinned operation when the 0x6901 retry times out', async () => {
       connector.callImpl
         .mockRejectedValueOnce(makeStuckErr())
         .mockRejectedValueOnce(
           Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
         );
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       jest.clearAllMocks();
 
-      const result = await adapter.evmGetAddress(connected.payload, '', {
+      const result = await adapter.evmGetAddress(operationId, '', {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
-        operationId: connected.payload,
+        operationId,
       });
 
       expect(result.success).toBe(false);
@@ -1597,30 +1553,27 @@ describe('LedgerAdapter', () => {
       }
       expect(connector.call).toHaveBeenCalledTimes(2);
       expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
-      expect((await adapter.getDeviceInfo(connected.payload, '')).success).toBe(false);
+      expect((await adapter.getDeviceInfo(operationId, '')).success).toBe(false);
       expect(connector.searchDevices).not.toHaveBeenCalled();
       expect(connector.connect).not.toHaveBeenCalled();
       expect(connector.reset).not.toHaveBeenCalled();
     });
 
     it('marks an unsafe pinned operation ambiguous when its 0x6901 retry disconnects', async () => {
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
-      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+      const expectedFingerprint = deriveDeviceFingerprint(EVM_ADDR);
       connector.callImpl
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockRejectedValueOnce(makeStuckErr())
         .mockRejectedValueOnce(
           Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
         );
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       jest.clearAllMocks();
 
-      const result = await adapter.evmSignMessage(connected.payload, expectedFingerprint, {
+      const result = await adapter.evmSignMessage(operationId, expectedFingerprint, {
         path: "m/44'/60'/0'/0/0",
         message: 'Hello',
-        operationId: connected.payload,
+        operationId,
       });
 
       expect(result).toMatchObject({
@@ -1651,9 +1604,7 @@ describe('LedgerAdapter', () => {
         } else {
           connector.callImpl.mockRejectedValue(locked);
         }
-        const connected = await adapter.connectDevice('dev-1');
-        expect(connected.success).toBe(true);
-        if (!connected.success) return;
+        const operationId = await connectOperation();
         const unlockRequests = jest.fn();
         adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, () => {
           unlockRequests();
@@ -1664,10 +1615,10 @@ describe('LedgerAdapter', () => {
         });
         jest.clearAllMocks();
 
-        const result = await adapter.evmGetAddress(connected.payload, '', {
+        const result = await adapter.evmGetAddress(operationId, '', {
           path: "m/44'/60'/0'/0/0",
           showOnDevice: false,
-          operationId: connected.payload,
+          operationId,
         });
 
         expect(result.success).toBe(unlocks);
@@ -1679,7 +1630,7 @@ describe('LedgerAdapter', () => {
         expect(connector.call.mock.calls.every(([sessionId]) => sessionId === 'session-abc')).toBe(
           true
         );
-        expect((await adapter.getDeviceInfo(connected.payload, '')).success).toBe(true);
+        expect((await adapter.getDeviceInfo(operationId, '')).success).toBe(true);
         expect(connector.searchDevices).not.toHaveBeenCalled();
         expect(connector.connect).not.toHaveBeenCalled();
         expect(connector.reset).not.toHaveBeenCalled();
@@ -1777,59 +1728,37 @@ describe('LedgerAdapter', () => {
     });
 
     it('names the connection live operation on a prompt from an unpinned call', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       connector.callImpl.mockImplementation(
         () =>
           new Promise(() => {
             // Never settles: the prompt has to stay open.
           })
       );
-
-      const prompts: { payload: { operationId?: string } }[] = [];
-      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
-        prompts.push(event);
-      });
-
-      const pending = adapter.btcGetPublicKey('dev-1', '', {
-        path: "m/84'/0'/100'",
-        coin: 'btc',
-      });
-      await waitForCondition(() => prompts.length === 1);
+      const { prompts, pending } = await openHighIndexPrompt();
 
       // The call carries no operationId, so it queues under the connectId; the
       // live operation on that connection still owns the prompt.
-      expect(prompts[0].payload.operationId).toBe(connected.payload);
+      expect(prompts[0].payload.operationId).toBe(operationId);
 
       // Which is what lets a cancel naming that operation reach the prompt.
-      adapter.cancel(connected.payload);
+      adapter.cancel(operationId);
       expect((await pending).success).toBe(false);
     });
 
     it('reaches nothing when the named connectId resolves to no operation', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       connector.callImpl.mockImplementation(
         () =>
           new Promise(() => {
             // Never settles: the prompt has to stay open.
           })
       );
-
-      const prompts: unknown[] = [];
-      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
-        prompts.push(event);
-      });
+      const { pending } = await openHighIndexPrompt();
       let settled = false;
-      const pending = adapter
-        .btcGetPublicKey('dev-1', '', { path: "m/84'/0'/100'", coin: 'btc' })
-        .then(result => {
-          settled = true;
-          return result;
-        });
-      await waitForCondition(() => prompts.length === 1);
+      void pending.then(() => {
+        settled = true;
+      });
 
       // Named but unresolvable: no job of that key, and no UI request it owns.
       // It must not decay into the untargeted form.
@@ -1839,20 +1768,12 @@ describe('LedgerAdapter', () => {
       });
       expect(settled).toBe(false);
 
-      adapter.cancel(connected.payload);
+      adapter.cancel(operationId);
       expect((await pending).success).toBe(false);
     });
 
     it('ends the prompt of a call cancelled by its connectId when no operation exists', async () => {
-      const prompts: unknown[] = [];
-      adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
-        prompts.push(event);
-      });
-      const pending = adapter.btcGetPublicKey('dev-1', '', {
-        path: "m/84'/0'/100'",
-        coin: 'btc',
-      });
-      await waitForCondition(() => prompts.length === 1);
+      const { pending } = await openHighIndexPrompt();
 
       adapter.cancel('dev-1');
 
@@ -2235,22 +2156,12 @@ describe('LedgerAdapter', () => {
     });
 
     it('forwards the connect id to the connector while a connect is still in flight', async () => {
-      let finishConnect!: (session: ConnectorSession) => void;
-      let connectStarted!: () => void;
-      const started = new Promise<void>(resolve => {
-        connectStarted = resolve;
-      });
-      (connector.connect as jest.Mock).mockImplementationOnce(() => {
-        connectStarted();
-        return new Promise<ConnectorSession>(resolve => {
-          finishConnect = resolve;
-        });
-      });
+      const connect = holdConnect();
       const pending = adapter.connectDevice('dev-1');
-      await started;
+      await connect.started;
       adapter.cancel();
       expect(connector.cancel).toHaveBeenCalledWith('dev-1');
-      finishConnect(ledgerSession('late-session'));
+      connect.finish(ledgerSession('late-session'));
       await pending;
     });
   });
@@ -2262,9 +2173,7 @@ describe('LedgerAdapter', () => {
     });
 
     it('waits for a cancelled raw connector call before disconnecting and resetting', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       let resolveRawCall: (value: { address: string; publicKey: string }) => void = () => undefined;
       connector.callImpl.mockImplementationOnce(
         () =>
@@ -2274,12 +2183,12 @@ describe('LedgerAdapter', () => {
       );
       jest.clearAllMocks();
 
-      const pending = adapter.evmGetAddress(connected.payload, '', {
+      const pending = adapter.evmGetAddress(operationId, '', {
         path: "m/44'/60'/0'/0/0",
-        operationId: connected.payload,
+        operationId,
       });
       await new Promise(resolve => setImmediate(resolve));
-      adapter.cancel(connected.payload);
+      adapter.cancel(operationId);
       await expect(pending).resolves.toMatchObject({
         success: false,
         payload: { code: HardwareErrorCode.UserAborted },
@@ -2592,19 +2501,18 @@ describe('LedgerAdapter', () => {
     });
 
     it('does not replay an acquired USB operation even with a verified fingerprint', async () => {
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
-      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+      const expectedFingerprint = deriveDeviceFingerprint(EVM_ADDR);
 
       // First: establish a session
       await adapter.connectDevice('dev-1');
 
       // Simulate disconnect error on first call, success on retry
       connector.callImpl
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockRejectedValueOnce(
           Object.assign(new Error('session not found'), { _tag: 'DeviceSessionNotFound' })
         )
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockResolvedValueOnce({ address: '0xRETRY' });
 
       // After disconnect, searchDevices returns a new device ID (DMK regenerates UUIDs)
@@ -2659,17 +2567,16 @@ describe('LedgerAdapter', () => {
     });
 
     it('should not replay a signing request after an APDU timeout', async () => {
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
-      const expectedFingerprint = deriveDeviceFingerprint(expectedAddress);
+      const expectedFingerprint = deriveDeviceFingerprint(EVM_ADDR);
 
       await adapter.connectDevice('dev-1');
 
       connector.callImpl
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockRejectedValueOnce(
           Object.assign(new Error('apdu timeout'), { _tag: 'SendApduTimeoutError' })
         )
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockResolvedValueOnce({ signature: '0xSIGNED' });
 
       connector.searchDevices.mockResolvedValueOnce([
@@ -2715,29 +2622,17 @@ describe('LedgerAdapter', () => {
     it('releases a timed-out session and permits a separate new operation', async () => {
       await adapter.connectDevice('dev-1');
 
-      connector.connect
-        .mockResolvedValueOnce({
-          sessionId: 'session-retry',
-          deviceInfo: {
-            vendor: 'ledger',
-            model: 'nanoX',
-            firmwareVersion: 'unknown',
-            deviceId: 'dev-1',
-            connectId: 'dev-1',
-            connectionType: 'usb',
-          },
-        } as ConnectorSession)
-        .mockResolvedValueOnce({
-          sessionId: 'session-final',
-          deviceInfo: {
-            vendor: 'ledger',
-            model: 'nanoX',
-            firmwareVersion: 'unknown',
-            deviceId: 'dev-1',
-            connectId: 'dev-1',
-            connectionType: 'usb',
-          },
-        } as ConnectorSession);
+      connector.connect.mockResolvedValueOnce({
+        sessionId: 'session-retry',
+        deviceInfo: {
+          vendor: 'ledger',
+          model: 'nanoX',
+          firmwareVersion: 'unknown',
+          deviceId: 'dev-1',
+          connectId: 'dev-1',
+          connectionType: 'usb',
+        },
+      } as ConnectorSession);
 
       connector.callImpl
         .mockRejectedValueOnce(
@@ -2805,9 +2700,8 @@ describe('LedgerAdapter', () => {
     it('selects an unbound BLE device, then checks its wallet before the call', async () => {
       const save = acknowledgeBindings();
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
       connector.callImpl
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockResolvedValueOnce({ address: 'business-address' });
       const select = jest.fn();
       adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
@@ -2822,7 +2716,7 @@ describe('LedgerAdapter', () => {
         });
       });
 
-      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(expectedAddress), {
+      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(EVM_ADDR), {
         path: "m/44'/60'/0'/0/0",
         showOnDevice: false,
       });
@@ -2837,19 +2731,8 @@ describe('LedgerAdapter', () => {
       const save = acknowledgeBindings();
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
       connector.callImpl.mockResolvedValueOnce({ address: 'different-wallet' });
-      const select = jest.fn();
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        select();
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: {
-            sdkConnectId: event.payload.devices[0].connectId,
-            requestId: event.payload.requestId,
-          },
-        });
-      });
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
-      const fingerprint = deriveDeviceFingerprint(expectedAddress);
+      const select = pickDevice();
+      const fingerprint = deriveDeviceFingerprint(EVM_ADDR);
       const params = { path: "m/44'/60'/0'/0/1", showOnDevice: false };
 
       const result = await adapter.evmGetAddress('', fingerprint, params);
@@ -2864,7 +2747,7 @@ describe('LedgerAdapter', () => {
 
       // The next call asks again instead of reusing the wrong device.
       connector.callImpl
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockResolvedValueOnce({ address: 'business-address' });
       expect((await adapter.evmGetAddress('', fingerprint, params)).success).toBe(true);
       expect(select).toHaveBeenCalledTimes(2);
@@ -2918,11 +2801,10 @@ describe('LedgerAdapter', () => {
 
     it('binds a new BLE address and pins unlock retries to the selected target', async () => {
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
-      const address = '0x1111111111111111111111111111111111111111';
-      const fingerprint = deriveDeviceFingerprint(address);
-      connector.callImpl.mockResolvedValue({ address });
+      const fingerprint = deriveDeviceFingerprint(EVM_ADDR);
+      connector.callImpl.mockResolvedValue({ address: EVM_ADDR });
       connector.callImpl
-        .mockResolvedValueOnce({ address })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockRejectedValueOnce(
           Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked })
         );
@@ -2933,18 +2815,8 @@ describe('LedgerAdapter', () => {
         });
       });
       adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, unlock);
-      const select = jest.fn();
+      const select = pickDevice();
       const verified = acknowledgeBindings();
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        select();
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: {
-            sdkConnectId: event.payload.devices[0].connectId,
-            requestId: event.payload.requestId,
-          },
-        });
-      });
       const params = { path: "m/44'/60'/0'/0/0", showOnDevice: false };
 
       expect((await adapter.evmGetAddress('', fingerprint, params)).success).toBe(true);
@@ -2967,19 +2839,11 @@ describe('LedgerAdapter', () => {
     it('drops an unchecked BLE pick on a wrong app and saves the next checked pick', async () => {
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
       const save = acknowledgeBindings();
-      const select = jest.fn();
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        select();
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
-        });
-      });
+      const select = pickDevice();
       connector.callImpl.mockRejectedValueOnce(
         Object.assign(new Error('Wrong app opened'), { _tag: ERROR_TAG.WrongAppOpened })
       );
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
-      const fingerprint = deriveDeviceFingerprint(expectedAddress);
+      const fingerprint = deriveDeviceFingerprint(EVM_ADDR);
       const params = { path: "m/44'/60'/0'/0/1", extra: { dbDeviceId: 'ledger-db' } };
 
       const result = await adapter.evmGetAddress('', fingerprint, params);
@@ -2993,7 +2857,7 @@ describe('LedgerAdapter', () => {
       expect(connector.disconnect).toHaveBeenCalledTimes(1);
 
       connector.callImpl
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockResolvedValueOnce({ address: 'business-address' });
       expect((await adapter.evmGetAddress('', fingerprint, params)).success).toBe(true);
       expect(select).toHaveBeenCalledTimes(2);
@@ -3003,29 +2867,21 @@ describe('LedgerAdapter', () => {
     it('saves a BLE pick checked after an unlock retry', async () => {
       Object.defineProperty(connector, 'connectionType', { value: 'ble' });
       const save = acknowledgeBindings();
-      const select = jest.fn();
-      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-        select();
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
-        });
-      });
+      const select = pickDevice();
       adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, () => {
         adapter.uiResponse({
           type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
           payload: { confirmed: true },
         });
       });
-      const expectedAddress = '0x1111111111111111111111111111111111111111';
       connector.callImpl
         .mockRejectedValueOnce(
           Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked })
         )
-        .mockResolvedValueOnce({ address: expectedAddress })
+        .mockResolvedValueOnce({ address: EVM_ADDR })
         .mockResolvedValueOnce({ address: 'business-address' });
 
-      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(expectedAddress), {
+      const result = await adapter.evmGetAddress('', deriveDeviceFingerprint(EVM_ADDR), {
         path: "m/44'/60'/0'/0/1",
       });
 
@@ -3035,7 +2891,6 @@ describe('LedgerAdapter', () => {
     });
 
     describe('all-network bundle on an unchecked BLE pick', () => {
-      const evmAddress = '0x1111111111111111111111111111111111111111';
       const solAddress = 'SoLExpectedFingerprintAddress';
       const bundle = [
         {
@@ -3043,7 +2898,7 @@ describe('LedgerAdapter', () => {
           methodName: 'evmGetAddress' as const,
           path: "m/44'/60'/0'/0/0",
           chainId: 1,
-          deviceId: deriveDeviceFingerprint(evmAddress),
+          deviceId: deriveDeviceFingerprint(EVM_ADDR),
         },
         {
           network: 'sol',
@@ -3060,22 +2915,10 @@ describe('LedgerAdapter', () => {
           appName: 'Ethereum',
         });
 
-      function pickDevOne(): jest.Mock {
-        const select = jest.fn();
-        adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
-          select();
-          adapter.uiResponse({
-            type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-            payload: { requestId: event.payload.requestId, sdkConnectId: 'dev-1' },
-          });
-        });
-        return select;
-      }
-
       it('keeps the shared pick when the first item fails before its wallet check', async () => {
         Object.defineProperty(connector, 'connectionType', { value: 'ble' });
         const save = acknowledgeBindings();
-        const select = pickDevOne();
+        const select = pickDevice();
         connector.callImpl
           .mockRejectedValueOnce(appNotInstalled())
           .mockResolvedValueOnce({ address: solAddress })
@@ -3105,7 +2948,7 @@ describe('LedgerAdapter', () => {
       it('drops the shared pick when no item passes its wallet check', async () => {
         Object.defineProperty(connector, 'connectionType', { value: 'ble' });
         const save = acknowledgeBindings();
-        const select = pickDevOne();
+        const select = pickDevice();
         connector.callImpl.mockRejectedValueOnce(appNotInstalled());
 
         const result = await adapter.allNetworkGetAddress('', '', {
@@ -3118,7 +2961,7 @@ describe('LedgerAdapter', () => {
         expect(connector.disconnect).toHaveBeenCalledTimes(1);
 
         connector.callImpl
-          .mockResolvedValueOnce({ address: evmAddress })
+          .mockResolvedValueOnce({ address: EVM_ADDR })
           .mockResolvedValueOnce({ address: 'business-address' });
         expect((await adapter.evmGetAddress('', bundle[0].deviceId, bundle[0])).success).toBe(true);
         expect(select).toHaveBeenCalledTimes(2);
@@ -3403,6 +3246,13 @@ describe('LedgerAdapter', () => {
     const solFingerprintAddress = 'SoLExpectedFingerprintAddress';
     const solFingerprint = deriveDeviceFingerprint(solFingerprintAddress);
     const btcFingerprint = 'deadbeef';
+    const evmItem = {
+      network: 'evm',
+      methodName: 'evmGetAddress' as const,
+      path: "m/44'/60'/0'/0/0",
+      chainId: 1,
+      deviceId: evmFingerprint,
+    };
 
     function makeAppNotInstalledErr(appName = 'Cardano'): Error {
       return Object.assign(new Error(`Failed to open "${appName}"`), {
@@ -3509,13 +3359,6 @@ describe('LedgerAdapter', () => {
     });
 
     describe('all-network wallet check', () => {
-      const evmItem = {
-        network: 'evm',
-        methodName: 'evmGetAddress' as const,
-        path: "m/44'/60'/0'/0/0",
-        chainId: 1,
-        deviceId: evmFingerprint,
-      };
       const uncheckedSolItem = {
         network: 'sol',
         methodName: 'solGetAddress' as const,
@@ -3533,14 +3376,12 @@ describe('LedgerAdapter', () => {
 
       it('ends an operation whose wallet check fails, so later calls cannot run unchecked on it', async () => {
         connector.callImpl.mockResolvedValueOnce({ address: '0xANOTHERWALLET' });
-        const connected = await adapter.connectDevice('dev-1');
-        expect(connected.success).toBe(true);
-        if (!connected.success) return;
+        const operationId = await connectOperation();
 
-        const mismatch = await adapter.evmGetAddress(connected.payload, evmFingerprint, {
+        const mismatch = await adapter.evmGetAddress(operationId, evmFingerprint, {
           path: evmItem.path,
         });
-        const next = await adapter.evmGetAddress(connected.payload, '', { path: evmItem.path });
+        const next = await adapter.evmGetAddress(operationId, '', { path: evmItem.path });
 
         expect(mismatch).toMatchObject({
           success: false,
@@ -3718,13 +3559,7 @@ describe('LedgerAdapter', () => {
       const result = await adapter.allNetworkGetAddress('dev-1', '', {
         autoInstallApp: true,
         bundle: [
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            chainId: 1,
-            deviceId: evmFingerprint,
-          },
+          evmItem,
           {
             network: 'sol',
             methodName: 'solGetAddress',
@@ -3778,13 +3613,7 @@ describe('LedgerAdapter', () => {
             path: "m/49'/0'/0'/0/0",
             deviceId: btcFingerprint,
           },
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            chainId: 1,
-            deviceId: evmFingerprint,
-          },
+          evmItem,
         ],
       });
 
@@ -3841,13 +3670,7 @@ describe('LedgerAdapter', () => {
             path: "m/86'/0'/0'/0/0",
             deviceId: btcFingerprint,
           },
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            chainId: 1,
-            deviceId: evmFingerprint,
-          },
+          evmItem,
         ],
       });
 
@@ -3894,13 +3717,7 @@ describe('LedgerAdapter', () => {
             path: "m/44'/0'/0'/0/0",
             deviceId: btcFingerprint,
           },
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            chainId: 1,
-            deviceId: evmFingerprint,
-          },
+          evmItem,
         ],
       });
 
@@ -4058,79 +3875,33 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('allNetworkGetAddress over BLE stops when an item fingerprint mismatches', async () => {
-      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
-      const wrongFingerprint = deriveDeviceFingerprint(
-        '0x0000000000000000000000000000000000000001'
-      );
-      connector.callImpl
-        .mockResolvedValueOnce({ address: '0xabcd000000000000000000000000000000000000' })
-        .mockResolvedValueOnce({ address: '0xSHOULD_NOT_RUN' });
+    it.each(['usb', 'ble'])(
+      'allNetworkGetAddress over %s stops at top level when an item fingerprint mismatches',
+      async transport => {
+        Object.defineProperty(connector, 'connectionType', { value: transport });
+        const wrongFingerprint = deriveDeviceFingerprint(
+          '0x0000000000000000000000000000000000000001'
+        );
+        connector.callImpl
+          .mockResolvedValueOnce({ address: evmFingerprintAddress })
+          .mockResolvedValueOnce({ address: '0xSHOULD_NOT_RUN' });
 
-      await adapter.connectDevice('dev-1');
+        await adapter.connectDevice('dev-1');
 
-      const result = await adapter.allNetworkGetAddress('dev-1', '', {
-        bundle: [
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            chainId: 1,
-            deviceId: wrongFingerprint,
-          },
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/1",
-            chainId: 1,
-            deviceId: wrongFingerprint,
-          },
-        ],
-      });
+        const result = await adapter.allNetworkGetAddress('dev-1', '', {
+          bundle: [
+            { ...evmItem, deviceId: wrongFingerprint },
+            { ...evmItem, path: "m/44'/60'/0'/0/1", deviceId: wrongFingerprint },
+          ],
+        });
 
-      expect(result).toMatchObject({
-        success: false,
-        payload: { code: HardwareErrorCode.DeviceMismatch },
-      });
-      expect(methodsCalled()).toEqual(['evmGetAddress']);
-    });
-
-    it('allNetworkGetAddress stops at top level when any item fingerprint mismatches', async () => {
-      const liveAddress = '0xabcd000000000000000000000000000000000000';
-      const wrongFingerprint = deriveDeviceFingerprint(
-        '0x0000000000000000000000000000000000000001'
-      );
-      connector.callImpl
-        .mockResolvedValueOnce({ address: liveAddress })
-        .mockResolvedValueOnce({ address: '0xSHOULD_NOT_RUN' });
-
-      await adapter.connectDevice('dev-1');
-
-      const result = await adapter.allNetworkGetAddress('dev-1', '', {
-        bundle: [
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            chainId: 1,
-            deviceId: wrongFingerprint,
-          },
-          {
-            network: 'evm',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/1",
-            chainId: 1,
-            deviceId: wrongFingerprint,
-          },
-        ],
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.payload.code).toBe(HardwareErrorCode.DeviceMismatch);
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceMismatch },
+        });
+        expect(methodsCalled()).toEqual(['evmGetAddress']);
       }
-      expect(methodsCalled()).toEqual(['evmGetAddress']);
-    });
+    );
 
     it('allNetworkGetAddress bootstraps and returns a chain fingerprint when an item has none', async () => {
       const expectedAddress = '0xabcd000000000000000000000000000000000000';
@@ -4207,12 +3978,10 @@ describe('LedgerAdapter', () => {
       connector.callImpl
         .mockResolvedValueOnce({ address: '0xBUNDLE', path: "m/44'/60'/0'/0/0" })
         .mockResolvedValueOnce({ address: expectedAddress });
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
 
       const result = await adapter.allNetworkGetAddress('stale-or-unrelated-connect-id', '', {
-        operationId: connected.payload,
+        operationId,
         bundle: [
           {
             network: 'evm',
@@ -4229,12 +3998,10 @@ describe('LedgerAdapter', () => {
     });
 
     it('rejects conflicting positional and common operation ids before device I/O', async () => {
-      const connected = await adapter.connectDevice('dev-1');
-      expect(connected.success).toBe(true);
-      if (!connected.success) return;
+      const operationId = await connectOperation();
       jest.clearAllMocks();
 
-      const result = await adapter.allNetworkGetAddress(connected.payload, '', {
+      const result = await adapter.allNetworkGetAddress(operationId, '', {
         operationId: createHardwareOperationId('ledger'),
         bundle: [
           {

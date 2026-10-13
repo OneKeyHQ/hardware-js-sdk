@@ -1119,16 +1119,10 @@ export class LedgerConnectorBase implements IConnector {
     return this._deviceAppsManager!;
   }
 
-  // DeviceAppsManager is a per-call factory with no cached session state, so
-  // there is nothing to invalidate for it here.
   private _invalidateSession(sessionId: string): void {
     this._signerManager?.invalidate(sessionId);
   }
 
-  /**
-   * Fire the canceller so DMK closes the secure-channel WebSocket. The DMK device
-   * session is kept: unlock/retry recovery reuses it.
-   */
   private _teardownSecureChannelSession(sessionId: string): void {
     const cancel = this._cancellers.get(sessionId);
     this._cancellers.delete(sessionId);

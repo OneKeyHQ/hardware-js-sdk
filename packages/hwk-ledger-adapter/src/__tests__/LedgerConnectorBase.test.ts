@@ -1,7 +1,18 @@
-import { HardwareErrorCode, ORPHAN_ELIGIBLE_ERROR_CODES } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  ORPHAN_ELIGIBLE_ERROR_CODES,
+  rehydrateConnectorError,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerConnectorBase } from '../connector/LedgerConnectorBase';
-import { ERROR_TAG, mapLedgerError } from '../errors';
+import {
+  ERROR_TAG,
+  isConnectionLevelError,
+  isDeviceDisconnectedError,
+  isDeviceNotAdvertisingError,
+  isTimeoutError,
+  mapLedgerError,
+} from '../errors';
 
 import type { ConnectionType, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 
@@ -366,7 +377,6 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
   function connectorWithFailingInstall(error: unknown) {
     const connector = new LedgerConnectorBase(async () => ({}));
     const cancel = jest.fn();
-    const invalidateDeviceApps = jest.fn();
     const invalidateSigners = jest.fn();
 
     (connector as any)._deviceAppsManager = {
@@ -377,11 +387,7 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
         set onRegisterCanceller(fn: (c: () => void) => void) {
           fn(cancel);
         },
-        set onInteraction(_fn: unknown) {
-          /* not exercised here */
-        },
       }),
-      invalidate: invalidateDeviceApps,
       clearAll: jest.fn(),
     };
     (connector as any)._signerManager = {
@@ -389,7 +395,7 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
       clearAll: jest.fn(),
     };
 
-    return { connector, cancel, invalidateDeviceApps, invalidateSigners };
+    return { connector, cancel, invalidateSigners };
   }
 
   it('maps SecureChannelError, cancels the action and drops the session signers', async () => {
@@ -426,6 +432,16 @@ describe('LedgerConnectorBase installApp failure teardown', () => {
     if (result.success) throw new Error('expected failure');
     expect(result.error.code).toBe(HardwareErrorCode.LedgerFirmwareMetadataError);
     expect(result.error.params?._tag).toBe(ERROR_TAG.InvalidFirmwareMetadataResponse);
+    // The adapter drops the link only for these lost-connection classes.
+    const rehydrated = rehydrateConnectorError(result.error);
+    expect(
+      [
+        isDeviceDisconnectedError,
+        isDeviceNotAdvertisingError,
+        isTimeoutError,
+        isConnectionLevelError,
+      ].some(isLost => isLost(rehydrated))
+    ).toBe(false);
   });
 });
 
@@ -463,8 +479,11 @@ describe('LedgerConnectorBase connect() opening-tag classification', () => {
     return { connector, connect };
   }
 
-  it('keeps a BLE opening failure in the bluetooth family and orphan-eligible', async () => {
-    const { connector, connect } = connectorWithFailingDmConnect('ble');
+  it.each([
+    ['ble', HardwareErrorCode.BlePairingTimeout],
+    ['usb', HardwareErrorCode.DeviceBusy],
+  ] as const)('classifies a %s opening failure as code %s', async (connectionType, code) => {
+    const { connector, connect } = connectorWithFailingDmConnect(connectionType);
 
     const err = await connector.connect(DEVICE_PATH).then(
       () => null,
@@ -475,21 +494,8 @@ describe('LedgerConnectorBase connect() opening-tag classification', () => {
     // half-built stub.
     expect(connect).toHaveBeenCalledTimes(1);
     expect(err).not.toBeNull();
-    const mapped = mapLedgerError(err);
-    expect(mapped.code).toBe(HardwareErrorCode.BlePairingTimeout);
-    expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(mapped.code);
-  });
-
-  it('still reads a HID opening failure as DeviceBusy', async () => {
-    const { connector, connect } = connectorWithFailingDmConnect('usb');
-
-    const err = await connector.connect(DEVICE_PATH).then(
-      () => null,
-      (e: unknown) => e
-    );
-
-    expect(connect).toHaveBeenCalledTimes(1);
-    expect(err).not.toBeNull();
-    expect(mapLedgerError(err).code).toBe(HardwareErrorCode.DeviceBusy);
+    expect(mapLedgerError(err).code).toBe(code);
+    // BLE stays in the bluetooth family, so the host may treat it as orphan-eligible.
+    if (connectionType === 'ble') expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(code);
   });
 });

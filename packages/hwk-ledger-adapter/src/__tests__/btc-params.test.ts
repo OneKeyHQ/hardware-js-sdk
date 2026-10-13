@@ -9,19 +9,28 @@ const ctx = {} as ConnectorContext;
 
 describe('Ledger BTC request checks', () => {
   it.each([
-    ['a full address path', { path: "m/84'/0'/0'/0/0" }, HardwareErrorCode.InvalidParams],
     [
+      'btcGetAddress',
+      'a full address path',
+      btcGetAddress,
+      { path: "m/84'/0'/0'/0/0" },
+      HardwareErrorCode.InvalidParams,
+    ],
+    [
+      'btcGetAddress',
       'a non-mainnet coin',
+      btcGetAddress,
       { path: "m/84'/0'/0'", coin: 'Litecoin' },
       HardwareErrorCode.ChainNotSupported,
     ],
-  ])('btcGetAddress refuses %s', async (_name, params, code) => {
-    await expect(btcGetAddress(ctx, 'session-1', params)).rejects.toMatchObject({ code });
-  });
-
-  it('btcGetPublicKey refuses a non-mainnet coin', async () => {
-    await expect(
-      btcGetPublicKey(ctx, 'session-1', { path: "m/84'/1'/0'", coin: 'Testnet' })
-    ).rejects.toMatchObject({ code: HardwareErrorCode.ChainNotSupported });
+    [
+      'btcGetPublicKey',
+      'a non-mainnet coin',
+      btcGetPublicKey,
+      { path: "m/84'/1'/0'", coin: 'Testnet' },
+      HardwareErrorCode.ChainNotSupported,
+    ],
+  ] as const)('%s refuses %s', async (_method, _name, call, params, code) => {
+    await expect(call(ctx, 'session-1', params)).rejects.toMatchObject({ code });
   });
 });
