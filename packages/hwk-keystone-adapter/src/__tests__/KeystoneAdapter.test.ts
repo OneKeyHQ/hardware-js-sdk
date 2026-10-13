@@ -922,6 +922,27 @@ describe('KeystoneAdapter', () => {
       });
     }
 
+    it.each([
+      ['an indefinite-length header', '9f'],
+      ['a byte string declared longer than the reply', '5affffffff'],
+    ])('refuses a scanned reply holding %s', async (_case, urData) => {
+      const adapter = newTestAdapter();
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+          payload: { urType: 'crypto-multi-accounts', urData },
+        });
+      });
+
+      const result = await adapter.evmGetAddress(null, null, { path: "m/44'/60'/0'/0/0" });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      await adapter.dispose();
+    });
+
     it('records no wallet from an export that lacks the requested path', async () => {
       const adapter = newTestAdapter();
       answerKeyRequestsWith(adapter, () => [fixtureHdKey("m/44'/60'/7'", FIXTURE_MFP)]);

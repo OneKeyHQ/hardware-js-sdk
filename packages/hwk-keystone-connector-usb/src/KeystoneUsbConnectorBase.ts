@@ -1,10 +1,13 @@
 import { UR, URDecoder, UREncoder } from '@ngraveio/bc-ur';
+// Not re-exported by the package root; pinned with the package version.
+import bytewords from '@ngraveio/bc-ur/dist/bytewords';
 import { Actions } from '@keystonehq/hw-transport-usb';
 import {
   EConnectorInteraction,
   HardwareErrorCode,
   MISSING_BIP32_MASTER_FINGERPRINT,
   TypedEventEmitter,
+  assertBoundedCbor,
   createHardwareLinkId,
   createHardwareSearchTargetId,
   createHwkError,
@@ -106,6 +109,25 @@ function toUrEncoded(ur: KeystoneUr): string {
     .toUpperCase();
 }
 
+/**
+ * Animated replies stay far below this; the fountain decoder allocates per declared part, so an
+ * unbounded count from the device would exhaust memory before any check could run.
+ */
+const MAX_UR_SEQ_LENGTH = 4096;
+
+/** Checks one UR part from the device before the vendor decoder parses its CBOR. */
+function assertBoundedUrPart(part: string): void {
+  const match = /^ur:[a-z0-9-]+\/(?:(\d{1,9})-(\d{1,9})\/)?([a-z]+)$/i.exec(part);
+  if (!match) throw new Error('Keystone USB reply part is not a UR');
+  const seqLength = match[2] === undefined ? undefined : Number(match[2]);
+  if (seqLength !== undefined && (seqLength < 1 || seqLength > MAX_UR_SEQ_LENGTH)) {
+    throw new Error('Keystone USB reply declares an unsupported number of parts');
+  }
+  // Minimal bytewords carry their own CRC32; decode throws on a mismatch.
+  const payloadHex = bytewords.decode(match[3].toLowerCase(), bytewords.STYLES.MINIMAL);
+  assertBoundedCbor(Buffer.from(payloadHex, 'hex'));
+}
+
 function fromUrEncoded(encoded: unknown): KeystoneUr {
   // One complete UR or whitespace-separated parts; EAPDU framing is the transport's job.
   const text = typeof encoded === 'string' ? encoded.trim() : '';
@@ -113,6 +135,7 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
   const decoder = new URDecoder();
   try {
     for (const part of parts) {
+      assertBoundedUrPart(part);
       decoder.receivePart(part);
       if (decoder.isComplete()) break;
     }

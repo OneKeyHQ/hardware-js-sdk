@@ -1,5 +1,5 @@
 import { UI_REQUEST, UI_RESPONSE } from '../events/ui-request';
-import { createHwkError, HardwareErrorCode } from '../types/errors';
+import { HardwareErrorCode, createHwkError } from '../types/errors';
 
 /** 10 min — every UI request is human-in-the-loop; bias toward "wait long". */
 export const UI_REQUEST_DEFAULT_TIMEOUT_MS = 600_000;

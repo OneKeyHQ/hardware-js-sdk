@@ -243,6 +243,7 @@ export {
 } from './utils/UiRequestRegistry';
 export { compareSemver } from './utils/semver';
 export { ensure0x, stripHex, padHex64, hexToBytes, bytesToHex } from './utils/hex';
+export { assertBoundedCbor, boundedCborFromHex } from './utils/boundedCbor';
 export { prepareSolanaOffchainMessageV1 } from './utils/solanaOffchainMessage';
 export type {
   PreparedSolanaOffchainMessageV1,

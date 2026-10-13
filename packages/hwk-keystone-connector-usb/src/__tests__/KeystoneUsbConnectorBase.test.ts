@@ -498,6 +498,30 @@ describe('KeystoneUsbConnectorBase', () => {
   });
 
   describe('call("resolveUr", ...)', () => {
+    it.each([
+      ['a payload that is not bounded CBOR', () => encodeUrString('bytes', '9f')],
+      ['more parts than any reply has', () => 'UR:BYTES/1-5000/LPADAXCSENCYLOBEMOHSGM'],
+    ])('reports a reply with %s as unreadable before decoding it', async (_case, reply) => {
+      const receivePart = jest.spyOn(URDecoder.prototype, 'receivePart');
+      const connector = versionConnector({
+        [Actions.CMD_RESOLVE_UR]: () => ({ payload: reply() }),
+      });
+      const session = await connector.connect();
+      try {
+        const result = await connector.call(session.sessionId, 'resolveUr', {
+          urType: 'eth-sign-request',
+          urData: 'de',
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.params).toMatchObject({ origin: 'device', replyUnreadable: true });
+        expect(receivePart).not.toHaveBeenCalled();
+      } finally {
+        receivePart.mockRestore();
+      }
+    });
+
     it('reports a reply that does not decode as unreadable and keeps the session', async () => {
       const connector = versionConnector({
         [Actions.CMD_RESOLVE_UR]: () => 'UR:ETH-SIGNATURE/NOT-A-VALID-PART',
@@ -560,7 +584,8 @@ describe('KeystoneUsbConnectorBase', () => {
 
   describe('on-device operation events', () => {
     const answerBytes = {
-      [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', 'deadbeef') }),
+      // A well-formed CBOR byte string, as every real reply is.
+      [Actions.CMD_RESOLVE_UR]: () => ({ payload: encodeUrString('bytes', '44deadbeef') }),
     };
 
     it('brackets signing resolveUr calls with ConfirmOnDevice / InteractionComplete', async () => {

@@ -1,7 +1,7 @@
 import {
   HardwareErrorCode,
-  OperationRegistry,
   ORPHAN_ELIGIBLE_ERROR_CODES,
+  OperationRegistry,
   createHardwareLinkId,
   createHardwareSearchTargetId,
   isHardwareOperationId,

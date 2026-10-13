@@ -6,6 +6,7 @@ import HDKey from 'hdkey';
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid';
 import {
   HardwareErrorCode,
+  boundedCborFromHex,
   createHwkError,
   parseWalletMasterFingerprint,
 } from '@onekeyfe/hwk-adapter-core';
@@ -48,8 +49,9 @@ const DERIVATION_CURVE = {
   ed25519: Curve.ed25519,
 } as const;
 
+// Every reply is untrusted: the vendor decoders behind UR parsing do not bound CBOR lengths.
 function toSdkUr(ur: KeystoneUr): UR {
-  return new UR(Buffer.from(ur.urData, 'hex'), ur.urType);
+  return new UR(boundedCborFromHex(ur.urData), ur.urType);
 }
 
 function fromSdkUr(ur: UR): KeystoneUr {
@@ -363,7 +365,7 @@ export class KeystoneUrEngine {
     if (ur.urType !== 'tron-signature') {
       throw new Error(`Expected a tron-signature UR, got ${ur.urType}`);
     }
-    const signature = TronSignature.fromCBOR(Buffer.from(ur.urData, 'hex'));
+    const signature = TronSignature.fromCBOR(boundedCborFromHex(ur.urData));
     const requestId = signature.getRequestId();
     return {
       requestId: requestId ? uuidStringify(requestId) : undefined,
