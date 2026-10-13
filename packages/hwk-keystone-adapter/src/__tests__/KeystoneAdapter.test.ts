@@ -12,6 +12,7 @@ import {
 import { ETHSignature, EthSignRequest } from '@keystonehq/bc-ur-registry-eth';
 import { SolSignRequest, SolSignature } from '@keystonehq/bc-ur-registry-sol';
 import {
+  DEVICE,
   EConnectorInteraction,
   HardwareErrorCode,
   UI_REQUEST,
@@ -194,9 +195,14 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
     switch (data.urType) {
       case 'qr-hardware-call': {
         const call = QRHardwareCall.fromCBOR(cbor);
-        const requestedPaths = (call.getParams() as KeyDerivation)
-          .getSchemas()
-          .map(schema => `m/${schema.getKeypath().getPath()}`);
+        const requestedSchemas = (call.getParams() as KeyDerivation).getSchemas();
+        const requestedPaths = requestedSchemas.map(schema => `m/${schema.getKeypath().getPath()}`);
+        // Like the device, answer each schema on the curve it asked for.
+        const ed25519Paths = new Set(
+          requestedSchemas
+            .filter(schema => schema.getCurve() === Curve.ed25519)
+            .map(schema => `m/${schema.getKeypath().getPath()}`)
+        );
         const bundledPaths = [...requestedPaths];
         if (options.bundleExtraBtcVariants) {
           for (const requestedPath of requestedPaths) {
@@ -209,7 +215,9 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
             }
           }
         }
-        const keys = bundledPaths.map(path => fixtureHdKey(path, mfpHex, options.root));
+        const keys = bundledPaths.map(path =>
+          fixtureHdKey(path, mfpHex, options.root, ed25519Paths.has(path))
+        );
         const response = new CryptoMultiAccounts(
           Buffer.from(mfpHex, 'hex'),
           keys,
@@ -894,6 +902,149 @@ describe('KeystoneAdapter', () => {
       const { address, accountKey } = result.payload;
       expect(accountKey?.path).toBe(path);
       expect(bs58.encode(Buffer.from(accountKey?.publicKey ?? '', 'hex'))).toBe(address);
+    });
+  });
+
+  describe('untrusted input hardening', () => {
+    /** Answer every displayed key request with keys built for the given paths. */
+    function answerKeyRequestsWith(adapter: KeystoneAdapter, keysFor: () => CryptoHDKey[]) {
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, event => {
+        if (event.payload.data.urType !== 'qr-hardware-call') return;
+        const response = new CryptoMultiAccounts(
+          Buffer.from(FIXTURE_MFP, 'hex'),
+          keysFor(),
+          'Keystone 3 Pro (fixture)'
+        );
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+          payload: urJson(response.toUR()),
+        });
+      });
+    }
+
+    it('records no wallet from an export that lacks the requested path', async () => {
+      const adapter = newTestAdapter();
+      answerKeyRequestsWith(adapter, () => [fixtureHdKey("m/44'/60'/7'", FIXTURE_MFP)]);
+
+      const result = await adapter.evmGetAddress(null, null, { path: "m/44'/60'/0'/0/0" });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      await expect(adapter.searchDevices()).resolves.toEqual([]);
+      await adapter.dispose();
+    });
+
+    it('refuses an account export that carries a private key', async () => {
+      const adapter = newTestAdapter();
+      const path = "m/44'/60'/0'";
+      answerKeyRequestsWith(adapter, () => {
+        const node = FIXTURE_ROOT.derive(path);
+        const parentFingerprint = Buffer.alloc(4);
+        parentFingerprint.writeUInt32BE(node.parentFingerprint, 0);
+        return [
+          new CryptoHDKey({
+            isMaster: false,
+            isPrivateKey: true,
+            key: Buffer.concat([Buffer.alloc(1), Buffer.from(node.privateKey ?? [])]),
+            chainCode: node.chainCode ?? undefined,
+            parentFingerprint,
+            useInfo: new CryptoCoinInfo(),
+            origin: new CryptoKeypath(pathComponents(path), Buffer.from(FIXTURE_MFP, 'hex')),
+          }),
+        ];
+      });
+
+      const result = await adapter.evmGetAddress(null, null, { path: `${path}/0/0` });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      await adapter.dispose();
+    });
+
+    it('refuses a Solana export whose key is not a 32-byte Ed25519 key', async () => {
+      const adapter = newTestAdapter();
+      const path = "m/44'/501'/0'/0'";
+      // A 33-byte secp256k1 key where an Ed25519 key belongs.
+      answerKeyRequestsWith(adapter, () => [fixtureHdKey(path, FIXTURE_MFP)]);
+
+      const result = await adapter.solGetAddress(null, null, { path });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      await adapter.dispose();
+    });
+
+    it.each([
+      ['a non-hex character', { serializedTx: `02${'ab'.repeat(10)}zz` }],
+      ['an odd length', { serializedTx: `02${'ab'.repeat(10)}a` }],
+    ])('refuses a transaction with %s before asking the device', async (_case, tx) => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        ...tx,
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(fake.requests).toHaveLength(0);
+      await adapter.dispose();
+    });
+
+    it('accepts an uppercase 0X prefix as the same hex', async () => {
+      const adapter = newTestAdapter();
+      attachFakeDevice(adapter);
+
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `0X02${'ab'.repeat(30)}`,
+      });
+
+      expect(result.success).toBe(true);
+      await adapter.dispose();
+    });
+
+    it('refuses to sign with a key path of another chain', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, {
+        path: "m/44'/195'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(fake.requests).toHaveLength(0);
+      await adapter.dispose();
+    });
+
+    it('requires the original typed-data JSON text', async () => {
+      const adapter = newTestAdapter();
+      const fake = attachFakeDevice(adapter);
+
+      const result = await adapter.evmSignTypedData(null, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        data: { types: {}, primaryType: 'Mail', domain: {}, message: {} },
+      } as unknown as Parameters<KeystoneAdapter['evmSignTypedData']>[2]);
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(fake.requests).toHaveLength(0);
+      await adapter.dispose();
     });
   });
 
@@ -2608,6 +2759,67 @@ describe('KeystoneAdapter', () => {
         callSpy.mockRestore();
         await adapter.dispose();
       }
+    });
+
+    it('reports two USB devices claiming the wallet instead of falling back to QR', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const imported = await connectQrDevice(adapter);
+      expect(imported.success).toBe(true);
+      if (!imported.success) return;
+      await adapter.releaseOperation(imported.payload);
+      const qrRequestsAfterImport = qrFake.requests.length;
+      jest.spyOn(usb.connector, 'connect').mockRejectedValue(
+        Object.assign(new Error('More than one connected Keystone reports this wallet'), {
+          code: HardwareErrorCode.DeviceOneDeviceOnly,
+        })
+      );
+
+      const result = await adapter.evmGetAddress(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path: "m/44'/60'/1'/0/0",
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceOneDeviceOnly },
+      });
+      expect(qrFake.requests).toHaveLength(qrRequestsAfterImport);
+      await adapter.dispose();
+    });
+
+    it('announces the switch to QR when a failed USB session is dropped', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter);
+      const connected = await connectUsbDevice(adapter);
+      expect(connected.success).toBe(true);
+      if (!connected.success) return;
+      await adapter.releaseOperation(connected.payload);
+      const changes: string[] = [];
+      adapter.on(DEVICE.CHANGED, event => changes.push(event.payload.connectionType));
+      const callUsb = usb.connector.call.bind(usb.connector);
+      jest.spyOn(usb.connector, 'call').mockImplementation((sessionId, method, params) => {
+        if ((params as { urType?: string })?.urType === 'eth-sign-request') {
+          return Promise.resolve({
+            success: false,
+            error: {
+              code: HardwareErrorCode.TransportError,
+              message: 'USB transfer failed',
+              params: { origin: 'transport' },
+            },
+          });
+        }
+        return callUsb(sessionId, method, params);
+      });
+
+      await adapter.evmSignTransaction(`keystone-wallet:${FIXTURE_MFP}`, FIXTURE_MFP, {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: `02${'ab'.repeat(30)}`,
+      });
+
+      expect(changes).toContain('qr');
+      await adapter.dispose();
     });
 
     it('probes USB before each fetch and attaches when USB returns', async () => {

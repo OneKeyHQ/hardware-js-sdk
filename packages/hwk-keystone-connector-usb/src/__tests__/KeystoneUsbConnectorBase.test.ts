@@ -727,6 +727,38 @@ describe('KeystoneUsbConnectorBase', () => {
       if (!result.success) return;
       expect(result.payload).toEqual({ locked: true });
     });
+
+    it('reads anything but a boolean true as not locked', async () => {
+      const connector = versionConnector({
+        [Actions.CMD_CHECK_LOCK_STATUS]: () => ({ payload: 'true' }),
+      });
+      const session = await connector.connect();
+
+      const result = await connector.call(session.sessionId, 'checkLockStatus', undefined);
+      expect(result).toMatchObject({ success: true, payload: { locked: false } });
+    });
+  });
+
+  describe('firmware version from the device', () => {
+    it.each([
+      ['2.0.4-BTC', '2.0.4-BTC'],
+      ['<img src=x onerror=alert(1)>', '0.0.0'],
+      ['1.7.0 please update', '0.0.0'],
+    ])('reports %s as %s', async (reported, expected) => {
+      const connector = newConnector(
+        fakeTransportClass(
+          fakeTransport({
+            [Actions.CMD_GET_DEVICE_VERSION]: () => ({
+              firmwareVersion: reported,
+              walletMFP: FAKE_MFP,
+            }),
+          })
+        )
+      );
+
+      const session = await connector.connect();
+      expect(session.deviceInfo.firmwareVersion).toBe(expected);
+    });
   });
 
   describe('error mapping', () => {

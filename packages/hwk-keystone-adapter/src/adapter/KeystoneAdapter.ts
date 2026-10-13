@@ -34,7 +34,6 @@ import {
   rehydrateConnectorError,
   resolveHardwareOperationTarget as resolveGenericHardwareOperationTarget,
   runAllNetworkGetAddress,
-  stripHex,
   success,
 } from '@onekeyfe/hwk-adapter-core';
 
@@ -199,6 +198,28 @@ const BIP44_COIN_TYPE_TO_CHAIN: Record<number, ChainCapability> = {
 function hasChainCoinType(chain: ChainCapability, path: string): boolean {
   const match = normalizePath(path).match(/^m\/\d+'\/(\d+)'/);
   return Boolean(match) && BIP44_COIN_TYPE_TO_CHAIN[Number(match?.[1])] === chain;
+}
+
+/** Signing input must be exact hex: a lenient decode would silently sign a truncated payload. */
+function exactHex(value: string): string | undefined {
+  const hex = value.replace(/^0x/i, '');
+  return /^(?:[0-9a-f]{2})*$/i.test(hex) ? hex : undefined;
+}
+
+function invalidHexFailure(field: string): Response<never> {
+  return failure(HardwareErrorCode.InvalidParams, `${field} must be an even-length hex string`);
+}
+
+/** An export must contain the path that was asked for; anything else is not this request's answer. */
+function requireExportedPath(parsed: KeystoneParsedMultiAccounts, path: string) {
+  const account = parsed.accounts.find(returned => normalizePath(returned.path) === path);
+  if (!account) {
+    throw createHwkError({
+      code: HardwareErrorCode.DeviceMismatch,
+      message: `Keystone did not return the requested derivation path (${path})`,
+    });
+  }
+  return account;
 }
 
 function coinTypeFailure(chain: ChainCapability, path: string): Response<never> | undefined {
@@ -741,6 +762,9 @@ export class KeystoneAdapter implements IHardwareWallet {
         KeystoneAdapter._throwIfAborted(signal);
 
         const parsed = this.urEngine.parseAccountResponse(responseUr);
+        // A device-initiated scan carries whatever the device chose to sync; a displayed request
+        // must be answered with the path it asked for.
+        if (options.mode !== 'scan') requireExportedPath(parsed, KEYSTONE_COLD_START_PATH);
         const record = this._upsertDeviceRecord(parsed);
         return success(toDeviceInfo(record));
       });
@@ -946,7 +970,8 @@ export class KeystoneAdapter implements IHardwareWallet {
         'Keystone only signs a fully RLP-serialized transaction (params.serializedTx) — structured-field signing is not supported'
       );
     }
-    const rawTxHex = stripHex(params.serializedTx);
+    const rawTxHex = exactHex(params.serializedTx);
+    if (rawTxHex === undefined) return invalidHexFailure('serializedTx');
     const path = normalizePath(params.path);
     // EIP-2718 typed txs start with a type byte < 0x80; legacy RLP lists start at >= 0xc0.
     const dataType = parseInt(rawTxHex.slice(0, 2), 16) < 0xc0 ? 'typedTransaction' : 'transaction';
@@ -993,8 +1018,9 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
     }
     const messageHex = params.hex
-      ? stripHex(params.message)
+      ? exactHex(params.message)
       : Buffer.from(params.message, 'utf8').toString('hex');
+    if (messageHex === undefined) return invalidHexFailure('message');
     const path = normalizePath(params.path);
 
     return this._signWithWallet({
@@ -1038,12 +1064,15 @@ export class KeystoneAdapter implements IHardwareWallet {
         'Keystone always displays the full EIP-712 payload for on-device review — pre-hashed signing is not supported'
       );
     }
-    // Typed-data JSON as UTF-8, the Keystone USB SDK convention. Prefer `dataJson`:
-    // re-stringifying can rewrite integers above 2^53.
-    const signDataHex = Buffer.from(
-      params.dataJson ?? JSON.stringify(params.data),
-      'utf8'
-    ).toString('hex');
+    // The device parses and hashes the JSON itself, so it must be the caller's exact text:
+    // re-stringifying `data` can rewrite integers above 2^53 into different values.
+    if (typeof params.dataJson !== 'string' || !params.dataJson) {
+      return failure(
+        HardwareErrorCode.InvalidParams,
+        'Keystone evmSignTypedData requires params.dataJson, the original typed-data JSON text'
+      );
+    }
+    const signDataHex = Buffer.from(params.dataJson, 'utf8').toString('hex');
     const path = normalizePath(params.path);
 
     return this._signWithWallet({
@@ -1215,12 +1244,13 @@ export class KeystoneAdapter implements IHardwareWallet {
       return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
     }
 
+    const requestPsbtHex = exactHex(params.psbt);
+    if (requestPsbtHex === undefined) return invalidHexFailure('psbt');
     return this._runJob(connectId, deviceId, async signal => {
       // A PSBT may span several paths; only the wallet's mfp is needed.
       const { record } = await this._ensureWalletKnown(connectId, deviceId, 'btc', signal);
       KeystoneAdapter._throwIfAborted(signal);
 
-      const requestPsbtHex = stripHex(params.psbt);
       const requestUr = this.urEngine.buildBtcPsbtRequest(requestPsbtHex);
       const responseUr = await this._resolveUr(
         record,
@@ -1254,8 +1284,9 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
     }
     const messageHex = params.hex
-      ? stripHex(params.message)
+      ? exactHex(params.message)
       : Buffer.from(params.message, 'utf8').toString('hex');
+    if (messageHex === undefined) return invalidHexFailure('message');
     const path = normalizePath(params.path);
     if (!isKeystoneSignableBtcAccountPath(splitAccountPath(path).accountPath)) {
       return failure(HardwareErrorCode.DevicePathForbidden, KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE);
@@ -1337,6 +1368,12 @@ export class KeystoneAdapter implements IHardwareWallet {
         bundle
       );
       KeystoneAdapter._throwIfAborted(signal);
+      if (!/^[0-9a-f]{64}$/i.test(account.publicKey)) {
+        throw createHwkError({
+          code: HardwareErrorCode.DeviceMismatch,
+          message: 'Keystone returned a Solana key that is not a 32-byte Ed25519 public key',
+        });
+      }
       // The Ed25519 public key is the Solana address (base58).
       const address = bs58.encode(Buffer.from(account.publicKey, 'hex'));
       return success<SolAddress>({
@@ -1366,6 +1403,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
     const path = normalizePath(params.path);
 
+    const unsignedPayloadHex = exactHex(params.serializedTx);
+    if (unsignedPayloadHex === undefined) return invalidHexFailure('serializedTx');
     return this._signWithWallet({
       connectId,
       deviceId,
@@ -1375,7 +1414,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       buildRequest: (requestId, xfp) =>
         this.urEngine.buildSolSignRequest({
           requestId,
-          unsignedPayloadHex: stripHex(params.serializedTx),
+          unsignedPayloadHex,
           dataType: 'transaction',
           path,
           xfp,
@@ -1412,6 +1451,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     }
     const path = normalizePath(params.path);
 
+    const unsignedPayloadHex = exactHex(params.message);
+    if (unsignedPayloadHex === undefined) return invalidHexFailure('message');
     return this._signWithWallet({
       connectId,
       deviceId,
@@ -1421,7 +1462,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       buildRequest: (requestId, xfp) =>
         this.urEngine.buildSolSignRequest({
           requestId,
-          unsignedPayloadHex: stripHex(params.message),
+          unsignedPayloadHex,
           dataType: 'message',
           path,
           xfp,
@@ -1499,7 +1540,8 @@ export class KeystoneAdapter implements IHardwareWallet {
         'Keystone only signs a fully protobuf-serialized TRON transaction (params.rawTxHex) — the Trezor-style structured contract fields have no equivalent here'
       );
     }
-    const rawTxHex = stripHex(params.rawTxHex);
+    const rawTxHex = exactHex(params.rawTxHex);
+    if (rawTxHex === undefined) return invalidHexFailure('rawTxHex');
     const path = normalizePath(params.path);
 
     return this._signWithWallet({
@@ -1545,7 +1587,8 @@ export class KeystoneAdapter implements IHardwareWallet {
         'Keystone signs TRON messages as TIP-191 signMessageV2 only (messageType: "V2")'
       );
     }
-    const messageHex = stripHex(params.messageHex);
+    const messageHex = exactHex(params.messageHex);
+    if (messageHex === undefined) return invalidHexFailure('messageHex');
     const path = normalizePath(params.path);
 
     return this._signWithWallet({
@@ -1607,6 +1650,15 @@ export class KeystoneAdapter implements IHardwareWallet {
         message: 'Keystone did not return an extended public key for this account path',
       });
     }
+    // BIP-32 serializes a public key as 02/03||x and a private key as 00||k; only the former is
+    // an account export.
+    const { publicKey } = this.urEngine.parseXpubMeta(account.extendedPublicKey);
+    if (!/^0[23]/.test(publicKey)) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message: 'Keystone returned an account key that is not a public key',
+      });
+    }
     return account.extendedPublicKey;
   }
 
@@ -1636,6 +1688,9 @@ export class KeystoneAdapter implements IHardwareWallet {
         failure(HardwareErrorCode.InvalidParams, `Invalid derivation path (${args.path})`)
       );
     }
+    // Signing keys follow the same chain/coin-type pairing as the address methods.
+    const chainCoinTypeFailure = coinTypeFailure(args.chain, args.path);
+    if (chainCoinTypeFailure) return Promise.resolve(chainCoinTypeFailure);
     return this._runJob(connectId, deviceId, async signal => {
       const { record } = await this._ensureWalletKnown(connectId, deviceId, args.chain, signal);
       KeystoneAdapter._throwIfAborted(signal);
@@ -1761,23 +1816,15 @@ export class KeystoneAdapter implements IHardwareWallet {
 
       const parsed = this.urEngine.parseAccountResponse(responseUr);
       this._assertParsedIdentity(parsed, target);
-      record = this._upsertDeviceRecord(parsed);
-      // Only requested paths are taken from the scan, each under the chain that asked for it.
+      // Only requested paths are taken from the scan, each under the chain that asked for it,
+      // and the wallet is recorded only once every one of them is present.
       for (const schema of schemas) {
-        const account = parsed.accounts.find(
-          returned => normalizePath(returned.path) === schema.path
-        );
-        if (!account) {
-          throw createHwkError({
-            code: HardwareErrorCode.DeviceMismatch,
-            message: `Keystone did not return the requested derivation path (${schema.path})`,
-          });
-        }
         scanned.set(accountKey(schema.hwkChain, schema.path), {
-          ...account,
+          ...requireExportedPath(parsed, schema.path),
           hwkChain: schema.hwkChain,
         });
       }
+      record = this._upsertDeviceRecord(parsed);
       return { access: { channel: 'qr', scanned }, masterFingerprint: record.masterFingerprint };
     });
   }
@@ -2071,8 +2118,13 @@ export class KeystoneAdapter implements IHardwareWallet {
     // Enumeration retries are silent; the connect runs once, targeted at the expected mfp.
     const attached = await this._connectUsb({ expectedMasterFingerprint }, undefined, signal);
     KeystoneAdapter._throwIfAborted(signal);
-    // A cancelled transfer still draining is busy, not absent; don't fall back to QR.
-    if (!attached.success && attached.payload.code === HardwareErrorCode.DeviceBusyInternal) {
+    // A cancelled transfer still draining is busy, not absent; don't fall back to QR. Two devices
+    // claiming this wallet are not a missing device either: the user must see it and unplug one.
+    if (
+      !attached.success &&
+      (attached.payload.code === HardwareErrorCode.DeviceBusyInternal ||
+        attached.payload.code === HardwareErrorCode.DeviceOneDeviceOnly)
+    ) {
       throw createHwkError({
         ...attached.payload,
         message: attached.payload.error,
@@ -2205,6 +2257,9 @@ export class KeystoneAdapter implements IHardwareWallet {
           this._usbConnector?.disconnect(lostSessionId).catch(() => undefined);
         }
         record.usbSessionId = undefined;
+        // Later calls for this wallet fall back to QR; announce it as an unplug would, so the host
+        // can tell the user the channel changed instead of switching silently.
+        this.emitter.emit(DEVICE.CHANGED, { type: DEVICE.CHANGED, payload: toDeviceInfo(record) });
         if (interactionRoute) {
           throw this._endDisconnectedOperation(
             interactionRoute.operationId,
@@ -2328,6 +2383,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     KeystoneAdapter._throwIfAborted(signal);
 
     const parsed = this.urEngine.parseAccountResponse(responseUr);
+    const account = requireExportedPath(parsed, syncPath);
     let record: KeystoneDeviceRecord;
     if (useSinglePathUsbExport && existingRecord) {
       if (parsed.masterFingerprint !== existingRecord.masterFingerprint) {
@@ -2341,13 +2397,6 @@ export class KeystoneAdapter implements IHardwareWallet {
       this._assertParsedIdentity(parsed, target);
       record = this._upsertDeviceRecord(parsed, {
         viaUsb: operationConnectionType !== 'qr' && Boolean(existingRecord?.usbSessionId),
-      });
-    }
-    const account = parsed.accounts.find(a => normalizePath(a.path) === syncPath);
-    if (!account) {
-      throw createHwkError({
-        code: HardwareErrorCode.DeviceMismatch,
-        message: `Keystone did not return the requested derivation path (${syncPath})`,
       });
     }
     return { record, account: { ...account, hwkChain } };
@@ -2385,7 +2434,9 @@ export class KeystoneAdapter implements IHardwareWallet {
     const responseUr = await this._resolveUr(undefined, requestUr, false, connectId, signal);
     KeystoneAdapter._throwIfAborted(signal);
 
-    return { record: this._upsertDeviceRecord(this.urEngine.parseAccountResponse(responseUr)) };
+    const parsed = this.urEngine.parseAccountResponse(responseUr);
+    requireExportedPath(parsed, normalizePath(accountPath));
+    return { record: this._upsertDeviceRecord(parsed) };
   }
 
   /**

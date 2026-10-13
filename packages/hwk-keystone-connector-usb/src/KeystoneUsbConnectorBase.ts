@@ -567,7 +567,8 @@ export class KeystoneUsbConnectorBase implements IConnector {
             ''
           );
           // `true` = locked is inferred from the SDK method name only; unverified on hardware.
-          return success({ locked: response.payload });
+          // Only a real boolean true counts, so a malformed reply never reads as a lock state.
+          return success({ locked: response.payload === true });
         }
         case 'getAppConfig':
           return success(await this._readAppConfig(session.transport));
@@ -635,7 +636,12 @@ export class KeystoneUsbConnectorBase implements IConnector {
       });
     }
     return {
-      version: typeof response.firmwareVersion === 'string' ? response.firmwareVersion : undefined,
+      // Device-supplied text reaches the host UI and version gates; accept only a version number.
+      version:
+        typeof response.firmwareVersion === 'string' &&
+        /^\d{1,4}(\.\d{1,4}){1,3}(-[0-9A-Za-z.]{1,20})?$/.test(response.firmwareVersion)
+          ? response.firmwareVersion
+          : undefined,
       mfp: masterFingerprint,
     };
   }
