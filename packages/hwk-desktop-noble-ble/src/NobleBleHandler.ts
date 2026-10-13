@@ -17,7 +17,7 @@ import type {
 
 /**
  * Subset of @stoprocent/noble we touch. We type as `any` to keep the package
- * installable without the native module — it's loaded lazily inside main().
+ * installable without the native module — the default factory loads it on first use.
  */
 export interface NobleLike {
   state: string;

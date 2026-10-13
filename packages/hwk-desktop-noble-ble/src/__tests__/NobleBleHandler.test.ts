@@ -4,7 +4,7 @@ import { NobleBleHandler } from '../NobleBleHandler';
 import { initThirdPartyBleSupport } from '../main';
 import { THIRD_PARTY_BLE_CHANNELS, THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS } from '../constants';
 
-import type { NoblePeripheralLike } from '../NobleBleHandler';
+import type { NobleBleHandlerOptions, NoblePeripheralLike } from '../NobleBleHandler';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -123,6 +123,18 @@ const flush = () =>
     setImmediate(resolve);
   });
 
+// Fake timers only: lets a pending connect get through its 300ms radio-settle delay.
+async function settle() {
+  await flush();
+  jest.advanceTimersByTime(300);
+  await flush();
+}
+
+const makeHandler = (
+  noble: FakeNoble,
+  options: Omit<NobleBleHandlerOptions, 'nobleFactory'> = {}
+) => new NobleBleHandler({ nobleFactory: () => noble, ...options });
+
 async function connectedHandler() {
   const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
   const handler = new NobleBleHandler({ nobleFactory: () => new FakeNoble([peripheral]) });
@@ -143,8 +155,7 @@ describe('NobleBleHandler', () => {
     ledger.writeChar = new FakeCharacteristic(writeUuid);
     ledger.notifyChar = new FakeCharacteristic(notifyUuid);
     const trezor = new FakePeripheral('trezor-fixture', { localName: 'Trezor Safe 7' });
-    const noble = new FakeNoble([ledger, trezor]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(new FakeNoble([ledger, trezor]));
     expect((await handler.scan(PADDED_VENDOR)).map(device => device.id)).toEqual([
       'trezor-fixture',
     ]);
@@ -182,7 +193,7 @@ describe('NobleBleHandler', () => {
   test('scan starts a continuous scan and returns the current snapshot', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
 
     const devices = await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     expect(devices).toEqual([
@@ -201,8 +212,7 @@ describe('NobleBleHandler', () => {
   test('scan is unfiltered, so non-Trezor devices are filtered out here', async () => {
     const trezor = new FakePeripheral('id-trezor', { localName: 'Trezor Safe 7 (8S9)' });
     const other = new FakePeripheral('id-other', { localName: 'Some Headphones' });
-    const noble = new FakeNoble([trezor, other]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(new FakeNoble([trezor, other]));
 
     const devices = await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     expect(devices.map(d => d.id)).toEqual(['id-trezor']);
@@ -214,7 +224,7 @@ describe('NobleBleHandler', () => {
     // A Safe 7 stops advertising while it holds a link.
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
 
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     await handler.connect('id-1', PADDED_PROFILE);
@@ -240,8 +250,7 @@ describe('NobleBleHandler', () => {
       localName: 'anything',
       serviceUuids: [TREZOR_BLE_UUIDS.service],
     });
-    const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(new FakeNoble([peripheral]));
 
     const devices = await handler.scan({
       serviceUuids: [TREZOR_BLE_UUIDS.service],
@@ -261,7 +270,7 @@ describe('NobleBleHandler', () => {
       expect(id).toBe('id-1');
       return peripheral;
     });
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
 
     const result = await handler.connect('id-1', PADDED_PROFILE);
 
@@ -274,7 +283,7 @@ describe('NobleBleHandler', () => {
 
   test('scoped scan release leaves another vendor discovery running', async () => {
     const noble = new FakeNoble([]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     await handler.scan({ vendor: 'first' });
     await handler.scan({ vendor: 'second' });
     await handler.stopScan('first');
@@ -287,8 +296,7 @@ describe('NobleBleHandler', () => {
     const first = new FakePeripheral('first', { localName: 'Trezor Safe 7' });
     const second = new FakePeripheral('second', { localName: 'Trezor Safe 7' });
     const ledger = new FakePeripheral('ledger', { localName: 'Ledger' });
-    const noble = new FakeNoble([first, second, ledger]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(new FakeNoble([first, second, ledger]));
     await handler.scan({ ...PADDED_VENDOR });
     await handler.connect('first', PADDED_PROFILE);
     await handler.connect('second', PADDED_PROFILE);
@@ -312,11 +320,7 @@ describe('NobleBleHandler', () => {
           // Never settles: the OS pairing dialog is still open.
         })
     );
-    const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({
-      nobleFactory: () => noble,
-      connectTimeoutMs: 60_000,
-    });
+    const handler = makeHandler(new FakeNoble([peripheral]), { connectTimeoutMs: 60_000 });
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
 
     const pending = handler.connect('id-1', PADDED_PROFILE);
@@ -349,8 +353,7 @@ describe('NobleBleHandler', () => {
       peripheral.state = 'connected';
     });
     const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({
-      nobleFactory: () => noble,
+    const handler = makeHandler(noble, {
       // Fires while connectAsync is in flight: _connectInner spends 300ms in
       // the settle delay first, and connectAsync itself takes 400ms more.
       connectTimeoutMs: 400,
@@ -375,8 +378,7 @@ describe('NobleBleHandler', () => {
 
   test('connect discovers chars and write splits into chunks', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
-    const noble = new FakeNoble([peripheral]);
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(new FakeNoble([peripheral]));
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
 
     // chunkSize travels with the connect profile, not the handler.
@@ -541,13 +543,11 @@ describe('Trezor BLE process shutdown', () => {
         })
     );
     const native = Object.assign(new FakeNoble([peripheral]), { stop: jest.fn() });
-    const handler = new NobleBleHandler({ nobleFactory: () => native });
+    const handler = makeHandler(native);
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     const connecting = handler.connect(peripheral.id, PADDED_PROFILE);
     const rejected = expect(connecting).rejects.toThrow('shutting down');
-    await flush();
-    jest.advanceTimersByTime(300);
-    await flush();
+    await settle();
     expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
     const disposing = handler.disposeForAppQuit();
     await flush();
@@ -587,13 +587,11 @@ describe('Trezor BLE process shutdown', () => {
         cancelConnect: jest.fn(),
         connectAsync,
       });
-      const handler = new NobleBleHandler({ nobleFactory: () => native });
+      const handler = makeHandler(native);
       await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
       const connecting = handler.connect(peripheral.id, PADDED_PROFILE);
       const rejected = expect(connecting).rejects.toThrow('shutting down');
-      await flush();
-      jest.advanceTimersByTime(300);
-      await flush();
+      await settle();
       if (route === 'direct') {
         jest.advanceTimersByTime(5000);
         await flush();
@@ -651,7 +649,7 @@ describe('Trezor BLE process shutdown', () => {
   test('cancels power-on waits without leaving a timer or listener', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
     const native = Object.assign(new FakeNoble(), { state: 'unknown', stop: jest.fn() });
-    const handler = new NobleBleHandler({ nobleFactory: () => native });
+    const handler = makeHandler(native);
     const initializing = handler.init();
     const rejected = expect(initializing).rejects.toThrow('shutting down');
     await handler.disposeForAppQuit();
@@ -718,12 +716,10 @@ describe('reconnect scan ownership', () => {
   test('a reconnect finishing leaves another vendor discovery running', async () => {
     const peripheral = new FakePeripheral('reconnecting', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble();
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     try {
       const connection = handler.connect(peripheral.id, PADDED_PROFILE);
-      await flush();
-      jest.advanceTimersByTime(300);
-      await flush();
+      await settle();
       await handler.scan({ vendor: 'ledger' });
       noble.emit('discover', peripheral);
       await connection;
@@ -740,21 +736,17 @@ describe('reconnect scan ownership', () => {
     const picked = new FakePeripheral('picked', { localName: 'Trezor Safe 7' });
     const later = new FakePeripheral('later', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble();
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     try {
       await handler.scan(PADDED_VENDOR);
       noble.emit('discover', picked);
       // The picker connects its pick without releasing its scan.
       const first = handler.connect(picked.id, PADDED_PROFILE);
-      await flush();
-      jest.advanceTimersByTime(300);
-      await flush();
+      await settle();
       await first;
       // A later connect to an uncached id scans for it; another owner keeps the radio on.
       const second = handler.connect(later.id, PADDED_PROFILE);
-      await flush();
-      jest.advanceTimersByTime(300);
-      await flush();
+      await settle();
       noble.emit('discover', later);
       await second;
       jest.advanceTimersByTime(THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS);
@@ -767,13 +759,11 @@ describe('reconnect scan ownership', () => {
 
   test('cancel then reopen discovery cannot be stopped by the old scan timeout', async () => {
     const noble = Object.assign(new FakeNoble(), { connectAsync: jest.fn() });
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     try {
       const connection = handler.connect('offline', PADDED_PROFILE);
       const rejected = expect(connection).rejects.toThrow('connect cancelled');
-      await flush();
-      jest.advanceTimersByTime(300);
-      await flush();
+      await settle();
       await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'offline' });
       await rejected;
       await handler.scan(PADDED_VENDOR);
@@ -790,7 +780,7 @@ describe('reconnect scan ownership', () => {
 
   test('a cancelled reconnect cannot start discovery after its settle delay', async () => {
     const noble = Object.assign(new FakeNoble(), { connectAsync: jest.fn() });
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     try {
       const connection = handler.connect('offline', PADDED_PROFILE);
       const rejected = expect(connection).rejects.toThrow('connect cancelled');
@@ -809,14 +799,12 @@ describe('reconnect scan ownership', () => {
   test('targeted cancellation leaves another reconnect scan active', async () => {
     const second = new FakePeripheral('second', { localName: 'Trezor Safe 7' });
     const noble = new FakeNoble();
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     try {
       const firstConnection = handler.connect('first', PADDED_PROFILE);
       const rejected = expect(firstConnection).rejects.toThrow('connect cancelled');
       const secondConnection = handler.connect(second.id, PADDED_PROFILE);
-      await flush();
-      jest.advanceTimersByTime(300);
-      await flush();
+      await settle();
       await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'first' });
       await rejected;
       expect(noble.scanning).toBe(true);
@@ -841,7 +829,7 @@ describe('reconnect scan ownership', () => {
           };
         })
     );
-    const handler = new NobleBleHandler({ nobleFactory: () => noble });
+    const handler = makeHandler(noble);
     try {
       await handler.scan(PADDED_VENDOR);
       const stopped = handler.stopScan(PADDED_VENDOR.vendor);

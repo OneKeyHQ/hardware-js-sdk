@@ -39,7 +39,19 @@ const invalidParams = { success: false, payload: { code: HardwareErrorCode.Inval
 
 const waitPastTtl = () => new Promise(resolve => setTimeout(resolve, 20));
 
+const registries: OperationRegistry[] = [];
+
+const newRegistry = (options: ConstructorParameters<typeof OperationRegistry>[0]) => {
+  const registry = new OperationRegistry(options);
+  registries.push(registry);
+  return registry;
+};
+
 describe('OperationRegistry', () => {
+  afterEach(() => {
+    for (const registry of registries.splice(0)) registry.endAll('runtime-reset');
+  });
+
   it('treats operation loss as an onboarding-wide failure', () => {
     expect(ORPHAN_ELIGIBLE_ERROR_CODES).toEqual(
       expect.arrayContaining([
@@ -49,10 +61,16 @@ describe('OperationRegistry', () => {
     );
   });
 
-  it('creates an opaque runtime id and resolves the same bound search target', () => {
-    const registry = new OperationRegistry({ vendor: 'ledger' });
+  it('creates an opaque random runtime id and resolves the same bound search target', () => {
+    const registry = newRegistry({ vendor: 'ledger' });
     const operation = createOperation(registry, { connectionKeys: ['session-1'] });
+    // Random, not a process-local sequence.
+    const other = createOperation(registry);
 
+    expect(operation.operationId).not.toBe(other.operationId);
+    for (const { operationId } of [operation, other]) {
+      expect(operationId).toMatch(/^hwk:runtime:operation:ledger:[0-9a-f]{32}$/);
+    }
     expect(isHardwareOperationId(operation.operationId)).toBe(true);
     expect(parseHardwareRuntimeId(operation.operationId)).toMatchObject({
       kind: 'operation',
@@ -62,12 +80,10 @@ describe('OperationRegistry', () => {
       connectId: 'usb-target',
       connectionKeys: ['usb-target', 'session-1'],
     });
-
-    registry.endAll('runtime-reset');
   });
 
   it('records the channel the adapter states, not the one on the device snapshot', () => {
-    const registry = new OperationRegistry({ vendor: 'ledger' });
+    const registry = newRegistry({ vendor: 'ledger' });
     const operation = createOperation(registry, {
       searchTargetId: 'ble-target',
       connectId: 'ble-target',
@@ -78,12 +94,10 @@ describe('OperationRegistry', () => {
 
     expect(operation.connectionType).toBe('ble');
     expect(registry.resolve(operation.operationId).connectionType).toBe('ble');
-
-    registry.endAll('runtime-reset');
   });
 
   it('will not create an operation without a stated channel', () => {
-    const registry = new OperationRegistry({ vendor: 'ledger' });
+    const registry = newRegistry({ vendor: 'ledger' });
     registry.create({
       searchTargetId: 'usb-target',
       connectId: 'usb-target',
@@ -91,19 +105,6 @@ describe('OperationRegistry', () => {
       // @ts-expect-error the channel is required and must not be inferred from `device`.
       connectionType: undefined,
     });
-    registry.endAll('runtime-reset');
-  });
-
-  it('uses random runtime ids instead of a process-local sequence', () => {
-    const registry = new OperationRegistry({ vendor: 'ledger' });
-    const first = createOperation(registry);
-    const second = createOperation(registry);
-
-    expect(first.operationId).not.toBe(second.operationId);
-    for (const { operationId } of [first, second]) {
-      expect(operationId).toMatch(/^hwk:runtime:operation:ledger:[0-9a-f]{32}$/);
-    }
-    registry.endAll('runtime-reset');
   });
 
   it('creates typed search targets without exposing physical descriptor data', () => {
@@ -117,7 +118,7 @@ describe('OperationRegistry', () => {
   });
 
   it('normalizes positional compatibility and rejects conflicting operation ids', () => {
-    const registry = new OperationRegistry({ vendor: 'trezor' });
+    const registry = newRegistry({ vendor: 'trezor' });
     const trezorDevice = { ...device, vendor: 'trezor' as const };
     const first = createOperation(registry, { device: trezorDevice });
     const second = createOperation(registry, {
@@ -135,7 +136,6 @@ describe('OperationRegistry', () => {
     expect(resolveHardwareOperationTarget(first.operationId, second.operationId)).toMatchObject(
       invalidParams
     );
-    registry.endAll('runtime-reset');
   });
 
   it('rejects malformed, cross-vendor, and link runtime targets', () => {
@@ -157,7 +157,7 @@ describe('OperationRegistry', () => {
   });
 
   it('keeps an ended id as a tombstone so it cannot silently fall back', () => {
-    const registry = new OperationRegistry({ vendor: 'trezor' });
+    const registry = newRegistry({ vendor: 'trezor' });
     const operation = createOperation(registry, trezorSafe7);
 
     registry.end(operation.operationId, 'disconnect');
@@ -171,19 +171,18 @@ describe('OperationRegistry', () => {
   });
 
   it('keeps the excepted operation when ending by connection key or ending all', () => {
-    const registry = new OperationRegistry({ vendor: 'ledger' });
+    const registry = newRegistry({ vendor: 'ledger' });
     const operation = createOperation(registry, { connectionKeys: ['session-1'] });
 
     registry.endByConnectionKey('session-1', 'disconnect', operation.operationId);
     registry.endAll('explicit', operation.operationId);
 
     expect(registry.resolve(operation.operationId)).toMatchObject({ connectId: 'usb-target' });
-    registry.end(operation.operationId, 'disconnect');
   });
 
   it('ends a binding when its physical session disconnects', () => {
     const onEnded = jest.fn();
-    const registry = new OperationRegistry({ vendor: 'ledger', onEnded });
+    const registry = newRegistry({ vendor: 'ledger', onEnded });
     const operation = createOperation(registry, {
       searchTargetId: '',
       connectId: '',
@@ -204,7 +203,7 @@ describe('OperationRegistry', () => {
 
   it('expires an idle binding', async () => {
     const onEnded = jest.fn();
-    const registry = new OperationRegistry({ vendor: 'keystone', ttlMs: 5, onEnded });
+    const registry = newRegistry({ vendor: 'keystone', ttlMs: 5, onEnded });
     const operation = createOperation(registry, {
       searchTargetId: 'keystone-qr:connect',
       connectId: 'keystone-wallet:abc',
@@ -221,7 +220,7 @@ describe('OperationRegistry', () => {
 
   it('does not expire while retained by an active device job', async () => {
     const onEnded = jest.fn();
-    const registry = new OperationRegistry({ vendor: 'ledger', ttlMs: 5, onEnded });
+    const registry = newRegistry({ vendor: 'ledger', ttlMs: 5, onEnded });
     const operation = createOperation(registry);
     const release = registry.retain(operation.operationId);
 
@@ -230,13 +229,11 @@ describe('OperationRegistry', () => {
       operationId: operation.operationId,
     });
     expect(onEnded).not.toHaveBeenCalled();
-
     release();
-    registry.end(operation.operationId, 'explicit');
   });
 
   it('keeps binding data after timeout so adapters can release the session', async () => {
-    const registry = new OperationRegistry({ vendor: 'trezor', ttlMs: 5 });
+    const registry = newRegistry({ vendor: 'trezor', ttlMs: 5 });
     const operation = createOperation(registry, {
       ...trezorSafe7,
       connectionKeys: ['session-7'],
