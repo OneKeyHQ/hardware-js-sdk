@@ -94,7 +94,7 @@ if (!result.success) throw new Error(result.payload.error);
 
 ## 4. Nach dem Aufruf [#4-after-the-call]
 
-1. Das Gerät kann neu starten. Warten Sie auf `DEVICE.CONNECT` (oder suchen Sie erneut). Bei normaler Wiederverbindung bleibt das bestätigte Protokoll erhalten. Siehe [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect).
+1. Das Gerät kann neu starten. Warten Sie auf `DEVICE.CONNECT` (oder suchen Sie erneut). Bei normaler Wiederverbindung bleibt das bestätigte Protokoll erhalten. Siehe [Verbindungsabbrüche und Wiederverbindung](/de/hardware-sdk/transport/reconnect).
 2. Erneut lesen: [`getDeviceState`](/de/hardware-sdk/basic-api/get-device-state) (`scope: 'firmware'`, wenn Sie Versionen benötigen), bevor Sie dem neuen Build vertrauen.
 3. Wenn der Aufruf mit einer Transportzeitüberschreitung fehlschlägt, **nachdem** die Installationsanfrage gesendet wurde, **wiederholen Sie nicht** dasselbe Update. Stellen Sie die Verbindung wieder her, lesen Sie den Status und entscheiden Sie dann.
 

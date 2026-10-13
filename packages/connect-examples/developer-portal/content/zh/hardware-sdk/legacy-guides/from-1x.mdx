@@ -1,13 +1,13 @@
 ---
-description: "Hardware SDK 从 1.1.x 升级到 1.2.x：包版本、设备字段、钱包绑定、UI、协议限制、验收用例与回退。"
-title: 从 1.1.x 迁到 1.2.x
+description: "将现有 Hardware SDK 1.1.x 接入升级到 1.2.x，了解必需的 API 调整、钱包处理和验证步骤。"
+title: "升级到 Hardware SDK 1.2"
 ---
 
 <span id="migrate-from-11x-to-12x" />
 
-# 从 1.1.x 迁到 1.2.x
+# 升级到 Hardware SDK 1.2 [#从-11x-迁到-12x]
 
-本指南面向从 **1.1.x 升级到 1.2.x** 的第三方接入。保留一个 SDK 入口即可，Protocol V2 支持不需要再接一套 SDK。新项目请从[快速开始](/zh/hardware-sdk/getting-started)入手。
+将现有 Hardware SDK **1.1.x** 接入升级到 **1.2.x**。保留一个 SDK 入口即可，Protocol V2 支持不需要再接一套 SDK。新项目请从[快速开始](/zh/hardware-sdk/getting-started)入手。
 
 **接入 Protocol V2 必改：**替换仅支持 V1 的设备读取接口，并核对每个方法的机型、固件和协议支持。**推荐：**新代码使用明确的钱包选择。**兼容项：**可保留已有且受支持的链调用；`getPassphraseState` 在两种协议上仍作为已废弃的兼容辅助接口保留。**按需处理：**Bridge 转 WebUSB、更换 SDK 入口和实现固件升级，都属于独立的接入选择。
 
@@ -243,4 +243,4 @@ WebUSB 需要安全上下文及用户手势来选择授权。BLE 需要系统蓝
 - [快速开始](/zh/hardware-sdk/getting-started)
 - [核心接口指南](/zh/hardware-sdk/core-api-guide)
 - [钱包会话](/zh/hardware-sdk/concepts/wallet-session)
-- [重连与释放](/zh/hardware-sdk/transport/reconnect)
+- [断线与重连](/zh/hardware-sdk/transport/reconnect)

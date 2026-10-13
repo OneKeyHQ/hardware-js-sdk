@@ -6,5 +6,5 @@ export default {
   android: "Android (nativ)",
   ios: "iOS (nativ)",
   flutter: "Flutter (nativ)",
-  reconnect: "Wiederverbinden und freigeben",
+  reconnect: "Verbindungsabbrüche und Wiederverbindung",
 };

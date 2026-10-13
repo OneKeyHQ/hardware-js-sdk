@@ -16,7 +16,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import MarkdownMessage, { sanitizeDocAIMessageText } from './DocAIMarkdownMessage';
-import { OneKeyIcon } from './ChainIcons';
+import { OneKeyLogo } from './OneKeyLogo';
 import { DOCS_AI_OPEN_EVENT, DOCS_AI_TAB } from './docAIAssistEvents';
 import styles from './DocAIChatWidget.module.css';
 import { getSearchSuggestions, searchDocumentation } from './docsSearch.mjs';
@@ -902,7 +902,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 onClick={handleOpenAskFromSearch}
               >
                 <span className={styles.askAiBridgeIconWrap}>
-                  <OneKeyIcon size={16} className={styles.askAiBridgeIconSvg} />
+                  <OneKeyLogo size={16} className={styles.askAiBridgeIconSvg} />
                 </span>
                 <span className={styles.askAiBridgeText}>{copy.askAiBridgeLabel}</span>
                 {activeSearchIndex === -1 ? <kbd className={styles.askAiBridgeKbd}>↵</kbd> : null}
@@ -957,7 +957,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 <div className={styles.empty} data-docs-ai="empty">
                   <div className={styles.assistantHead}>
                     <span className={styles.emptyStateIcon}>
-                      <OneKeyIcon size={22} className={styles.avatarLogo} />
+                      <OneKeyLogo size={22} className={styles.avatarLogo} />
                     </span>
                     <span className={styles.assistantLabelText}>{copy.assistantLabel}</span>
                   </div>
@@ -1025,7 +1025,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                     {isAssistant ? (
                       <div className={styles.assistantMeta}>
                         <span className={styles.avatar}>
-                          <OneKeyIcon size={16} className={styles.avatarLogo} />
+                          <OneKeyLogo size={16} className={styles.avatarLogo} />
                         </span>
                         <span className={styles.assistantName}>{copy.assistantLabel}</span>
                       </div>

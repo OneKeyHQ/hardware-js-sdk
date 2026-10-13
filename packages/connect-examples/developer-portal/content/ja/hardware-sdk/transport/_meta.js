@@ -6,5 +6,5 @@ export default {
   android: "Android (ネイティブ)",
   ios: "iOS (ネイティブ)",
   flutter: "Flutter (ネイティブ)",
-  reconnect: "再接続と破棄",
+  reconnect: "切断と再接続",
 };
