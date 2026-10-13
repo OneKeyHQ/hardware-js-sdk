@@ -83,7 +83,7 @@ export type Params<T> = CommonParams & T & { bundle?: undefined };
 
 export interface Unsuccessful {
   success: false;
-  payload: { error: string; code?: string | number };
+  payload: { error: string; code?: string | number; params?: Record<string, unknown> };
 }
 
 export interface Success<T> {

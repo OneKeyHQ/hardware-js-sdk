@@ -54,9 +54,9 @@ export const parseMessage = (messageData: any): CoreMessage => {
 };
 
 export const createErrorMessage = (error: Error & { code?: string | number }): Unsuccessful => {
-  let payload = { error: error.message, code: error.code };
+  let payload: Unsuccessful['payload'] = { error: error.message, code: error.code };
   if (error instanceof HardwareError) {
-    payload = { error: error.message, code: error.errorCode };
+    payload = { error: error.message, code: error.errorCode, params: error.params };
   }
   return {
     success: false,
