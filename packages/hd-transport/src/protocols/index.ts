@@ -1,17 +1,12 @@
 import ByteBuffer from 'bytebuffer';
-import { Reader } from 'protobufjs/light';
+import { Reader, Type } from 'protobufjs/light';
 
 import { encodeEnvelopeMessage, encodeMessageChunks, encodeTransportPackets } from './v1/packets';
 import { decodeFirstChunk } from './v1/decode';
 import { decodeMessage as decodeV1Message } from './v1/receive';
-import {
-  createMessageFromName,
-  createMessageFromType,
-  parseConfigure,
-} from '../serialization/protobuf/messages';
+import { createMessageFromName, createMessageFromType } from '../serialization/protobuf/messages';
 import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
 import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
-import { legacyProtocolInfoSchema } from '../../lib/protobuf-static';
 import {
   decodeFrame as decodeV2Frame,
   encodeProtobufFrame,
@@ -35,8 +30,27 @@ type ProtocolV2FrameOptions = {
   seq?: number;
 };
 
-const LEGACY_PROTOCOL_V2_PROTOCOL_INFO =
-  parseConfigure(legacyProtocolInfoSchema).lookupType('LegacyProtocolInfo');
+const LEGACY_PROTOCOL_V2_PROTOCOL_INFO = Type.fromJSON('LegacyProtocolInfo', {
+  fields: {
+    version: {
+      rule: 'required',
+      type: 'uint32',
+      id: 1,
+    },
+    supported_messages: {
+      rule: 'repeated',
+      type: 'uint32',
+      id: 2,
+      options: {
+        packed: false,
+      },
+    },
+    protobuf_definition: {
+      type: 'string',
+      id: 3,
+    },
+  },
+});
 
 const decodeLegacyProtocolV2ProtocolInfo = (pbPayload: Uint8Array) => {
   const byteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
