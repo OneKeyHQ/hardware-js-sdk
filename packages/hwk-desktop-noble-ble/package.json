@@ -58,8 +58,7 @@
     "connector"
   ],
   "dependencies": {
-    "@onekeyfe/hwk-adapter-core": "1.2.8-alpha.13",
-    "buffer": "^6.0.3"
+    "@onekeyfe/hwk-adapter-core": "1.2.8-alpha.13"
   },
   "peerDependencies": {
     "@stoprocent/noble": "*",

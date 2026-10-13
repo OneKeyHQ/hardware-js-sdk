@@ -17,8 +17,8 @@ This package vendors MIT-licensed source from `trezor/trezor-suite`.
   2. `fromBinary(schema, Uint8Array.from(patchedPayload), ...)` —
      `@bufbuild/protobuf` 的 `fromBinary` 在我们的 `@types/node` 18 环境下对 `Buffer`
      类型不买账，转成纯 `Uint8Array` 规避。
-     另外删掉了一处 `// @ts-expect-error noUncheckedIndexedAccess` 注释（我们
-     tsconfig 没开这个选项，属于"无错可压"，见下条统一说明）。
+  另外删掉了一处 `// @ts-expect-error noUncheckedIndexedAccess` 注释（我们
+  tsconfig 没开这个选项，属于"无错可压"，见下条统一说明）。
 - 全包范围：删掉了所有 `// @ts-expect-error: ...noUncheckedIndexedAccess...` 注释
   （分布在多个 `messages-*.ts` / `manager.ts` 里）。这是 upstream 给自己开了
   `noUncheckedIndexedAccess` 编译选项后加的压制注释，我们 `tsconfig.json` 没开这个

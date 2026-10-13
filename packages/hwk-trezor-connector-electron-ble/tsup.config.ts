@@ -11,7 +11,5 @@ export default defineConfig({
     '@onekeyfe/hwk-desktop-noble-ble',
     '@onekeyfe/hwk-trezor-adapter',
     '@onekeyfe/hwk-trezor-connector',
-    'electron',
-    '@stoprocent/noble',
   ],
 });

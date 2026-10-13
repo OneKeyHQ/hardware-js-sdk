@@ -6,20 +6,6 @@ import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyf
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export { NobleBleHandler } from './NobleBleHandler';
-export type {
-  NobleBleHandlerOptions,
-  NobleLike,
-  NoblePeripheralLike,
-  NobleCharacteristicLike,
-} from './NobleBleHandler';
-export { THIRD_PARTY_BLE_CHANNELS } from './constants';
-export type {
-  ThirdPartyBleApi,
-  ThirdPartyBleAvailability,
-  ThirdPartyBleDeviceInfo,
-} from './types/desktop-api';
-
 /** Minimal slice of Electron's `WebContents` we use (kept duck-typed so we
  * don't take a hard dep on `electron`). */
 export interface WebContentsLike {
