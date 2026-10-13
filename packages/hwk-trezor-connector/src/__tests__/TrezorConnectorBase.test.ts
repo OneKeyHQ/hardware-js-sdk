@@ -125,6 +125,33 @@ class SessionBackedTestTrezorConnector extends TrezorConnectorBase {
   }
 }
 
+/** Fake-session connector that keeps the THP options it hands to the device session. */
+class ThpCapturingConnector extends TrezorConnectorBase {
+  capturedThp?: TrezorThpSessionOptions;
+
+  constructor(thp?: TrezorThpSessionOptions) {
+    super({
+      connectionType: 'ble',
+      thp,
+      deviceSessionFactory: ({ thp: sessionThp }) => {
+        this.capturedThp = sessionThp;
+        return new FakeDeviceSession(new MemoryByteTransport([]), {
+          device_id: 'device-1',
+          model: 'T3W1',
+        }) as unknown as TrezorDeviceSession;
+      },
+    });
+  }
+
+  protected async enumerateDevices() {
+    return [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor Safe 7', model: 'T3W1' }];
+  }
+
+  protected async createByteTransport() {
+    return new MemoryByteTransport([]);
+  }
+}
+
 const trezorFeatures = (overrides: Record<string, unknown> = {}) => ({
   vendor: 'trezor.io',
   device_id: 'device-1',
@@ -3613,45 +3640,37 @@ describe('TrezorConnectorBase', () => {
     });
   });
 
-  test('btcGetAddress: derives scriptType from the purpose segment only', async () => {
+  test.each([
+    [
+      'scriptType from the purpose segment only',
+      "m/44'/0'/86'/0/0",
+      [2147483692, 2147483648, 2147483734, 0, 0],
+      'SPENDADDRESS',
+    ],
+    [
+      'the taproot script type from a path with surrounding spaces',
+      " m/86'/0'/0'/0/0",
+      [2147483734, 2147483648, 2147483648, 0, 0],
+      'SPENDTAPROOT',
+    ],
+  ])('btcGetAddress: derives %s', async (_name, path, addressN, scriptType) => {
     const connector = new SessionBackedTestTrezorConnector(
       [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
       { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
-      [{ type: 'Address', message: { address: 'legacy-address' } }]
+      [{ type: 'Address', message: { address: 'derived-address' } }]
     );
 
     const session = await connector.connect('device-1');
-    await callConnector(connector, session.sessionId, 'btcGetAddress', {
-      path: "m/44'/0'/86'/0/0",
-      coin: 'btc',
-    });
+    await callConnector(connector, session.sessionId, 'btcGetAddress', { path, coin: 'btc' });
 
     expect(connector.fakeSessions[0].calls[0]).toEqual({
       name: 'GetAddress',
       data: {
-        address_n: [2147483692, 2147483648, 2147483734, 0, 0],
+        address_n: addressN,
         coin_name: 'Bitcoin',
         show_display: false,
-        script_type: 'SPENDADDRESS',
+        script_type: scriptType,
       },
-    });
-  });
-
-  test('btcGetAddress: derives the taproot script type from a path with surrounding spaces', async () => {
-    const connector = new SessionBackedTestTrezorConnector(
-      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor', model: 'T3W1' }],
-      { vendor: 'trezor.io', device_id: 'device-1', model: 'T3W1' },
-      [{ type: 'Address', message: { address: 'bc1ptaproot' } }]
-    );
-
-    const session = await connector.connect('device-1');
-    await callConnector(connector, session.sessionId, 'btcGetAddress', {
-      path: " m/86'/0'/0'/0/0",
-      coin: 'btc',
-    });
-
-    expect(connector.fakeSessions[0].calls[0].data).toMatchObject({
-      script_type: 'SPENDTAPROOT',
     });
   });
 
@@ -3830,40 +3849,12 @@ describe('TrezorConnectorBase', () => {
   });
 
   test('bridges THP pairing request through uiResponse', async () => {
-    let capturedThp: NonNullable<
-      import('@onekeyfe/hwk-trezor-core').TrezorThpSessionOptions['onPairingRequest']
-    >;
-    class PairingConnector extends TrezorConnectorBase {
-      constructor() {
-        super({
-          connectionType: 'ble',
-          deviceSessionFactory: ({ thp }) => {
-            capturedThp = thp!.onPairingRequest!;
-            return new FakeDeviceSession(new MemoryByteTransport([]), {
-              device_id: 'device-1',
-              model: 'T3W1',
-            }) as unknown as TrezorDeviceSession;
-          },
-        });
-      }
-
-      protected async enumerateDevices() {
-        return [
-          { connectId: 'device-1', deviceId: 'device-1', name: 'Trezor Safe 7', model: 'T3W1' },
-        ];
-      }
-
-      protected async createByteTransport() {
-        return new MemoryByteTransport([]);
-      }
-    }
-
-    const connector = new PairingConnector();
+    const connector = new ThpCapturingConnector();
     const onUiRequest = jest.fn();
     connector.on('ui-request', onUiRequest);
     await connector.connect('device-1');
 
-    const pairingPromise = capturedThp!({
+    const pairingPromise = connector.capturedThp!.onPairingRequest!({
       availableMethods: [2],
       selectedMethod: 2,
     });
@@ -3889,40 +3880,13 @@ describe('TrezorConnectorBase', () => {
     const staleCredential = { credential: 'stale' };
     const freshCredential = { credential: 'fresh' };
     const otherDeviceCredential = { credential: 'other-device' };
-    let capturedThp: TrezorThpSessionOptions | undefined;
     const onPairingCredentialsChanged = jest.fn();
-
-    class CredentialConnector extends TrezorConnectorBase {
-      constructor() {
-        super({
-          connectionType: 'ble',
-          thp: {
-            knownCredentials: [staleCredential, otherDeviceCredential],
-            onPairingCredentialsChanged,
-          },
-          deviceSessionFactory: ({ thp }) => {
-            capturedThp = thp;
-            return new FakeDeviceSession(new MemoryByteTransport([]), {
-              device_id: 'device-1',
-              model: 'T3W1',
-            }) as unknown as TrezorDeviceSession;
-          },
-        });
-      }
-
-      protected async enumerateDevices() {
-        return [
-          { connectId: 'device-1', deviceId: 'device-1', name: 'Trezor Safe 7', model: 'T3W1' },
-        ];
-      }
-
-      protected async createByteTransport() {
-        return new MemoryByteTransport([]);
-      }
-    }
-
-    const connector = new CredentialConnector();
+    const connector = new ThpCapturingConnector({
+      knownCredentials: [staleCredential, otherDeviceCredential],
+      onPairingCredentialsChanged,
+    });
     await connector.connect('device-1');
+    const { capturedThp } = connector;
 
     expect(capturedThp?.knownCredentials).toEqual([staleCredential, otherDeviceCredential]);
     // Handshake: the device rejected its stored credential.
@@ -3941,38 +3905,12 @@ describe('TrezorConnectorBase', () => {
   });
 
   test('bridges Trezor PIN matrix request through uiResponse', async () => {
-    let capturedThp: NonNullable<import('@onekeyfe/hwk-trezor-core').TrezorThpSessionOptions>;
-    class PinConnector extends TrezorConnectorBase {
-      constructor() {
-        super({
-          connectionType: 'ble',
-          deviceSessionFactory: ({ thp }) => {
-            capturedThp = thp!;
-            return new FakeDeviceSession(new MemoryByteTransport([]), {
-              device_id: 'device-1',
-              model: 'T3W1',
-            }) as unknown as TrezorDeviceSession;
-          },
-        });
-      }
-
-      protected async enumerateDevices() {
-        return [
-          { connectId: 'device-1', deviceId: 'device-1', name: 'Trezor Safe 7', model: 'T3W1' },
-        ];
-      }
-
-      protected async createByteTransport() {
-        return new MemoryByteTransport([]);
-      }
-    }
-
-    const connector = new PinConnector();
+    const connector = new ThpCapturingConnector();
     const onUiRequest = jest.fn();
     connector.on('ui-request', onUiRequest);
     await connector.connect('device-1');
 
-    const pinPromise = (capturedThp! as any).onPinMatrixRequest({
+    const pinPromise = connector.capturedThp!.onPinMatrixRequest!({
       type: 'PinMatrixRequestType_Current',
     });
     expect(onUiRequest).toHaveBeenCalledWith({
@@ -3992,33 +3930,7 @@ describe('TrezorConnectorBase', () => {
   });
 
   test('does not drop a synchronous Trezor PIN matrix uiResponse', async () => {
-    let capturedThp: NonNullable<import('@onekeyfe/hwk-trezor-core').TrezorThpSessionOptions>;
-    class PinConnector extends TrezorConnectorBase {
-      constructor() {
-        super({
-          connectionType: 'ble',
-          deviceSessionFactory: ({ thp }) => {
-            capturedThp = thp!;
-            return new FakeDeviceSession(new MemoryByteTransport([]), {
-              device_id: 'device-1',
-              model: 'T3W1',
-            }) as unknown as TrezorDeviceSession;
-          },
-        });
-      }
-
-      protected async enumerateDevices() {
-        return [
-          { connectId: 'device-1', deviceId: 'device-1', name: 'Trezor Safe 7', model: 'T3W1' },
-        ];
-      }
-
-      protected async createByteTransport() {
-        return new MemoryByteTransport([]);
-      }
-    }
-
-    const connector = new PinConnector();
+    const connector = new ThpCapturingConnector();
     connector.on('ui-request', event => {
       if (event.type === UI_REQUEST.REQUEST_PIN) {
         connector.uiResponse({
@@ -4029,7 +3941,7 @@ describe('TrezorConnectorBase', () => {
     });
     await connector.connect('device-1');
 
-    const pinPromise = (capturedThp! as any).onPinMatrixRequest({
+    const pinPromise = connector.capturedThp!.onPinMatrixRequest!({
       type: 'PinMatrixRequestType_Current',
     });
 

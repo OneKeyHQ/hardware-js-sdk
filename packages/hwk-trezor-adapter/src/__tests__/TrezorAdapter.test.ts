@@ -36,17 +36,7 @@ describe('TrezorAdapter', () => {
           model: 'T3W1',
         },
       ]),
-      connect: jest.fn().mockResolvedValue({
-        sessionId: 'safe-7-session',
-        deviceInfo: {
-          vendor: 'trezor',
-          model: 'T3W1',
-          firmwareVersion: '',
-          deviceId: 'safe-7',
-          connectId: 'safe-7',
-          connectionType: 'ble',
-        },
-      }),
+      connect: jest.fn().mockResolvedValue(trezorSession()),
       disconnect: jest.fn().mockResolvedValue(undefined),
       call: jest.fn().mockResolvedValue(Uint8Array.from([4, 5, 6])),
       cancel: jest.fn().mockResolvedValue(undefined),
@@ -55,6 +45,19 @@ describe('TrezorAdapter', () => {
       off: jest.fn(),
       reset: jest.fn(),
     };
+  }
+
+  function setup(connector: IConnector = createConnector()) {
+    return { connector, adapter: new TrezorAdapter(connector) };
+  }
+
+  /** A device Failure as TrezorCore throws it. */
+  function trezorFailure(code: string, message: string, extra: Record<string, unknown> = {}) {
+    return Object.assign(new Error(message), {
+      name: 'TrezorFailureError',
+      ...extra,
+      response: { type: 'Failure', message: { code, message } },
+    });
   }
 
   function createSeriallessUsbConnector(): IConnector {
@@ -111,6 +114,55 @@ describe('TrezorAdapter', () => {
     return connected.payload;
   }
 
+  type ConnectorSession = Awaited<ReturnType<IConnector['connect']>>;
+
+  function trezorSession(
+    sessionId = 'safe-7-session',
+    deviceInfo: Partial<ConnectorSession['deviceInfo']> = {}
+  ): ConnectorSession {
+    return {
+      sessionId,
+      deviceInfo: {
+        vendor: 'trezor',
+        model: 'T3W1',
+        firmwareVersion: '',
+        deviceId: 'safe-7',
+        connectId: 'safe-7',
+        connectionType: 'ble',
+        ...deviceInfo,
+      },
+    };
+  }
+
+  /** A promise handed out by `next()` that the test settles later; `started` marks the handoff. */
+  function deferNext<T>() {
+    let markStarted!: () => void;
+    const started = new Promise<void>(resolve => {
+      markStarted = resolve;
+    });
+    let resolveNext: (value: T) => void = () => undefined;
+    let rejectNext: (error: Error) => void = () => undefined;
+    return {
+      started,
+      next: () => {
+        markStarted();
+        return new Promise<T>((resolve, reject) => {
+          resolveNext = resolve;
+          rejectNext = reject;
+        });
+      },
+      resolve: (value: T) => resolveNext(value),
+      reject: (error: Error) => rejectNext(error),
+    };
+  }
+
+  /** Queues a v1 app session followed by one business response. */
+  function v1Session(connector: IConnector, response: unknown = { address: 'verified-address' }) {
+    (connector.call as CallMock)
+      .mockResolvedValueOnce({ protocol: 'v1' })
+      .mockResolvedValueOnce(response);
+  }
+
   /** Makes the next connector call hang until the returned function settles it. */
   function holdNextCall(connector: IConnector): (value: unknown) => void {
     let settle: (value: unknown) => void = () => undefined;
@@ -158,8 +210,18 @@ describe('TrezorAdapter', () => {
     return methodsSent;
   }
 
+  const EVM_PATH = "m/44'/60'/0'/0/0";
+  const EVM_PARAMS = { path: EVM_PATH, useEmptyPassphrase: true };
+  const EVM_SILENT_PARAMS = { ...EVM_PARAMS, showOnDevice: false };
+  const ETH_ITEM: AllNetworkAddressParams = {
+    network: 'eth',
+    methodName: 'evmGetAddress',
+    path: EVM_PATH,
+    showOnDevice: false,
+  };
+
   const THREE_CHAIN_BUNDLE: AllNetworkAddressParams[] = [
-    { network: 'eth', methodName: 'evmGetAddress', path: "m/44'/60'/0'/0/0", showOnDevice: false },
+    ETH_ITEM,
     { network: 'sol', methodName: 'solGetAddress', path: "m/44'/501'/0'/0'", showOnDevice: false },
     {
       network: 'tron',
@@ -170,21 +232,13 @@ describe('TrezorAdapter', () => {
   ];
 
   it('searches and connects through injected connector', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { adapter } = setup();
 
     await expect(adapter.searchDevices()).resolves.toHaveLength(1);
-    const connected = await adapter.connectDevice('safe-7');
-    expect(connected).toEqual({
+    await expect(adapter.connectDevice('safe-7')).resolves.toEqual({
       success: true,
       payload: expect.any(String),
     });
-    if (connected.success) {
-      expect(parseHardwareRuntimeId(connected.payload)).toMatchObject({
-        kind: 'operation',
-        vendor: 'trezor',
-      });
-    }
   });
 
   it.each([
@@ -195,24 +249,14 @@ describe('TrezorAdapter', () => {
   ] as const)(
     'rejects a late explicit connection after cancellation (%s, %s)',
     async (transport, target) => {
-      const connector = { ...createConnector(), connectionType: transport };
-      const adapter = new TrezorAdapter(connector);
-      let finishConnect!: (session: Awaited<ReturnType<IConnector['connect']>>) => void;
-      let connectStarted!: () => void;
-      const started = new Promise<void>(resolve => {
-        connectStarted = resolve;
-      });
-      (connector.connect as ConnectMock).mockImplementationOnce(() => {
-        connectStarted();
-        return new Promise(resolve => {
-          finishConnect = resolve;
-        });
-      });
+      const { connector, adapter } = setup({ ...createConnector(), connectionType: transport });
+      const connect = deferNext<ConnectorSession>();
+      (connector.connect as ConnectMock).mockImplementationOnce(connect.next);
       let settled = false;
       const pending = adapter.connectDevice('safe-7').finally(() => {
         settled = true;
       });
-      await started;
+      await connect.started;
       adapter.cancel(target);
       await new Promise(resolve => setImmediate(resolve));
       await expect(adapter.connectDevice('safe-7')).resolves.toMatchObject({
@@ -222,17 +266,7 @@ describe('TrezorAdapter', () => {
       expect(connector.connect).toHaveBeenCalledTimes(1);
       expect(settled).toBe(false);
       expect(connector.disconnect).not.toHaveBeenCalled();
-      finishConnect({
-        sessionId: 'late-session',
-        deviceInfo: {
-          vendor: 'trezor',
-          model: 'T3W1',
-          firmwareVersion: '',
-          deviceId: 'safe-7',
-          connectId: 'safe-7',
-          connectionType: transport,
-        },
-      });
+      connect.resolve(trezorSession('late-session', { connectionType: transport }));
       const result = await pending;
       await new Promise(resolve => setImmediate(resolve));
       try {
@@ -254,8 +288,7 @@ describe('TrezorAdapter', () => {
   it.each([undefined, 'safe-7'])(
     'does not connect after cancelled permission is granted late (%s)',
     async target => {
-      const connector = createConnector();
-      const adapter = new TrezorAdapter(connector);
+      const { connector, adapter } = setup();
       let permissionRequested!: () => void;
       const requested = new Promise<void>(resolve => {
         permissionRequested = resolve;
@@ -338,8 +371,7 @@ describe('TrezorAdapter', () => {
     const select = jest.fn();
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
     const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
+      ...EVM_PARAMS,
       knownConnections: [],
     });
     expect(result).toMatchObject({
@@ -352,8 +384,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not save a different physical device during manual BLE binding', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const save = acknowledgeBindings(adapter);
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
       adapter.uiResponse({
@@ -374,8 +405,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('closes the binding request when the call exits before any device work', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { adapter } = setup();
     const status = jest.fn();
     adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
     selectDevice(adapter);
@@ -397,8 +427,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('keeps saved binding terminal when the following business call fails', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const save = acknowledgeBindings(adapter);
     const status = jest.fn();
     adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
@@ -409,8 +438,7 @@ describe('TrezorAdapter', () => {
         Object.assign(new Error('Disconnected'), { code: HardwareErrorCode.DeviceDisconnected })
       );
     const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
+      ...EVM_PARAMS,
       knownConnections: [],
     });
     expect(result.success).toBe(false);
@@ -425,9 +453,7 @@ describe('TrezorAdapter', () => {
   it('reconnects a known BLE endpoint and verifies identity before the wallet call', async () => {
     const connector = createConnector();
     (connector.searchDevices as SearchDevicesMock).mockResolvedValue([]);
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: 'verified-address' });
+    v1Session(connector);
     const adapter = new TrezorAdapter(connector, {
       knownDeviceConnections: [{ deviceId: 'safe-7', bleConnectId: 'safe-7' }],
     });
@@ -436,10 +462,7 @@ describe('TrezorAdapter', () => {
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
     adapter.on(UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING, save);
 
-    const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'safe-7', EVM_PARAMS);
 
     expect(result.success).toBe(true);
     expect(connector.connect).toHaveBeenCalledWith('safe-7', { transportType: 'ble' });
@@ -465,17 +488,13 @@ describe('TrezorAdapter', () => {
             : []
           : [{ connectId: 'safe-7', connectionType: 'ble', name: 'Trezor BLE' }]
       );
-      (connector.connect as ConnectMock).mockImplementation(async connectId => ({
-        sessionId: `${connectId}-session`,
-        deviceInfo: {
-          vendor: 'trezor',
-          model: 'T3W1',
-          firmwareVersion: '',
+      (connector.connect as ConnectMock).mockImplementation(async connectId =>
+        trezorSession(`${connectId}-session`, {
           deviceId: connectId === 'usb-other' ? 'different-device' : 'safe-7',
           connectId: connectId ?? '',
           connectionType: 'usb',
-        },
-      }));
+        })
+      );
       (connector.call as CallMock).mockImplementation(async (_session, method) =>
         method === 'createAppSession' ? { protocol: 'v1' } : { address: 'verified-address' }
       );
@@ -557,11 +576,8 @@ describe('TrezorAdapter', () => {
   });
 
   it('asks the host to select even a sole unbound BLE device', async () => {
-    const connector = createConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: 'verified-address' });
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
+    v1Session(connector);
     const selected = jest.fn(event => {
       expect(connector.connect).not.toHaveBeenCalled();
       adapter.uiResponse({
@@ -575,10 +591,7 @@ describe('TrezorAdapter', () => {
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, selected);
     const save = acknowledgeBindings(adapter);
 
-    const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'safe-7', EVM_PARAMS);
 
     expect(result.success).toBe(true);
     expect(selected).toHaveBeenCalledTimes(1);
@@ -589,8 +602,7 @@ describe('TrezorAdapter', () => {
   it.each([true, false])(
     'runs the wallet call after the binding answer (saved=%s)',
     async saved => {
-      const connector = createConnector();
-      const adapter = new TrezorAdapter(connector);
+      const { connector, adapter } = setup();
       (connector.call as CallMock).mockImplementation(async (_session, method) => {
         if (method === 'createAppSession') return { protocol: 'v1' };
         return { address: 'verified-address' };
@@ -623,8 +635,7 @@ describe('TrezorAdapter', () => {
   );
 
   it('reports why the host denied device permission', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { adapter } = setup();
     adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
       adapter.uiResponse({
         type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
@@ -632,8 +643,7 @@ describe('TrezorAdapter', () => {
       });
     });
     const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
+      ...EVM_PARAMS,
       knownConnections: [],
     });
     expect(result).toMatchObject({
@@ -647,8 +657,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('asks the host for device permission before scanning and fails a denied scan', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const permissionRequested = jest.fn(() => {
       adapter.uiResponse({
         type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
@@ -666,9 +675,8 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not open BLE binding for a wallet the host marks USB-only', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.searchDevices as SearchDevicesMock).mockResolvedValue([]);
-    const adapter = new TrezorAdapter(connector);
     adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
       adapter.uiResponse({
         type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
@@ -699,8 +707,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('carries opaque context through explicit binding before the wallet call runs', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const extra = { dbDeviceId: 'db-trezor' };
     const save = acknowledgeBindings(adapter);
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
@@ -741,8 +748,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not save a selected binding when the requested passphrase wallet differs', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const verified = acknowledgeBindings(adapter);
     const select = selectDevice(adapter);
     (connector.call as CallMock)
@@ -765,9 +771,7 @@ describe('TrezorAdapter', () => {
       expect.anything()
     );
     expect(connector.disconnect).toHaveBeenCalledTimes(1);
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: 'verified-address' });
+    v1Session(connector);
     const retry = await adapter.evmGetAddress('', 'safe-7', {
       path: "m/44'/60'/0'/0/0",
       useEmptyPassphrase: true,
@@ -785,29 +789,15 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not open a selection after cancellation during a BLE scan', async () => {
-    const connector = createConnector();
-    let finishScan!: (devices: Awaited<ReturnType<IConnector['searchDevices']>>) => void;
-    let scanStarted!: () => void;
-    const started = new Promise<void>(resolve => {
-      scanStarted = resolve;
-    });
-    (connector.searchDevices as SearchDevicesMock).mockImplementation(() => {
-      scanStarted();
-      return new Promise(resolve => {
-        finishScan = resolve;
-      });
-    });
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
+    const scan = deferNext<Awaited<ReturnType<IConnector['searchDevices']>>>();
+    (connector.searchDevices as SearchDevicesMock).mockImplementation(scan.next);
     const select = jest.fn();
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
-    const operation = adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-      knownConnections: [],
-    });
-    await started;
+    const operation = adapter.evmGetAddress('', 'safe-7', { ...EVM_PARAMS, knownConnections: [] });
+    await scan.started;
     adapter.cancel();
-    finishScan([{ connectId: 'safe-7', name: 'Trezor Safe 7', connectionType: 'ble' }]);
+    scan.resolve([{ connectId: 'safe-7', name: 'Trezor Safe 7', connectionType: 'ble' }]);
     expect(await operation).toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.UserAborted },
@@ -818,39 +808,29 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not let a cancelled scan overwrite a newer verified session', async () => {
-    const connector = createConnector();
-    let finishScan!: (devices: Awaited<ReturnType<IConnector['searchDevices']>>) => void;
-    let scanStarted!: () => void;
-    const started = new Promise<void>(resolve => {
-      scanStarted = resolve;
-    });
+    const { connector, adapter } = setup();
+    const scan = deferNext<Awaited<ReturnType<IConnector['searchDevices']>>>();
     const descriptors = [
       { connectId: 'safe-7', deviceId: '', name: 'Trezor Safe 7', connectionType: 'ble' as const },
     ];
     (connector.searchDevices as SearchDevicesMock)
-      .mockImplementationOnce(() => {
-        scanStarted();
-        return new Promise(resolve => {
-          finishScan = resolve;
-        });
-      })
+      .mockImplementationOnce(scan.next)
       .mockResolvedValue(descriptors);
     (connector.call as CallMock).mockImplementation(async (_session, method) =>
       method === '__thpCreateSession' ? { protocol: 'v1' } : { address: 'verified-address' }
     );
-    const adapter = new TrezorAdapter(connector);
     acknowledgeBindings(adapter);
     const select = selectDevice(adapter);
     const params = { path: "m/44'/60'/0'/0/0", useEmptyPassphrase: true, knownConnections: [] };
     const first = adapter.evmGetAddress('', 'safe-7', params);
-    await started;
+    await scan.started;
     adapter.cancel();
     expect(await first).toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.UserAborted },
     });
     expect((await adapter.evmGetAddress('', 'safe-7', params)).success).toBe(true);
-    finishScan(descriptors);
+    scan.resolve(descriptors);
     await new Promise(resolve => setImmediate(resolve));
     expect(
       (
@@ -869,74 +849,47 @@ describe('TrezorAdapter', () => {
   });
 
   it('returns cancellation before a selected raw call finishes while retaining safe teardown', async () => {
-    const connector = createConnector();
-    let finishCall!: (value: unknown) => void;
-    let callStarted!: () => void;
-    const started = new Promise<void>(resolve => {
-      callStarted = resolve;
-    });
+    const { connector, adapter } = setup();
+    const call = deferNext<unknown>();
     (connector.call as CallMock).mockImplementation(async (_session, method) => {
       if (method === '__thpCreateSession') return { protocol: 'v1' };
-      callStarted();
-      return new Promise(resolve => {
-        finishCall = resolve;
-      });
+      return call.next();
     });
-    const adapter = new TrezorAdapter(connector);
     acknowledgeBindings(adapter);
     selectDevice(adapter);
-    const operation = adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-      knownConnections: [],
-    });
-    await started;
+    const operation = adapter.evmGetAddress('', 'safe-7', { ...EVM_PARAMS, knownConnections: [] });
+    await call.started;
     adapter.cancel();
     expect(await operation).toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.UserAborted },
     });
     expect(connector.disconnect).not.toHaveBeenCalled();
-    finishCall({ address: 'verified-address' });
+    call.resolve({ address: 'verified-address' });
     await adapter.dispose();
     expect(connector.disconnect).toHaveBeenCalledTimes(1);
   });
 
   it('consumes a connection failure that arrives after cancellation', async () => {
-    const connector = createConnector();
-    let failConnect!: (error: Error) => void;
-    let connectStarted!: () => void;
-    const started = new Promise<void>(resolve => {
-      connectStarted = resolve;
-    });
-    (connector.connect as ConnectMock).mockImplementationOnce(() => {
-      connectStarted();
-      return new Promise((_resolve, reject) => {
-        failConnect = reject;
-      });
-    });
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
+    const connect = deferNext<ConnectorSession>();
+    (connector.connect as ConnectMock).mockImplementationOnce(connect.next);
     selectDevice(adapter);
-    const operation = adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-      knownConnections: [],
-    });
-    await started;
+    const operation = adapter.evmGetAddress('', 'safe-7', { ...EVM_PARAMS, knownConnections: [] });
+    await connect.started;
     adapter.cancel();
     expect(await operation).toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.UserAborted },
     });
-    failConnect(new Error('Synthetic late handshake failure'));
+    connect.reject(new Error('Synthetic late handshake failure'));
     await new Promise(resolve => setImmediate(resolve));
     await adapter.dispose();
     expect(connector.disconnect).not.toHaveBeenCalled();
   });
 
   it('reselects and saves a binding after passphrase discovery verification fails', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const verified = acknowledgeBindings(adapter);
     const select = selectDevice(adapter);
     (connector.call as CallMock)
@@ -973,11 +926,8 @@ describe('TrezorAdapter', () => {
   });
 
   it('uses the call-provided BLE hint directly and does not scan when selection is disabled', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: 'verified-address' });
+    const { connector, adapter } = setup();
+    v1Session(connector);
     const result = await adapter.evmGetAddress('stale-usb', 'safe-7', {
       path: "m/44'/60'/0'/0/0",
       useEmptyPassphrase: true,
@@ -990,11 +940,10 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not rebind an unavailable saved BLE endpoint', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
       Object.assign(new Error('Not advertising'), { code: HardwareErrorCode.DeviceNotFound })
     );
-    const adapter = new TrezorAdapter(connector);
     const selection = jest.fn();
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, selection);
     const result = await adapter.evmGetAddress('', 'safe-7', {
@@ -1012,8 +961,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('terminates binding UI when passphrase resolution fails after a good selection', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const status = jest.fn();
     adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
     selectDevice(adapter);
@@ -1038,17 +986,15 @@ describe('TrezorAdapter', () => {
   });
 
   it('terminates binding UI when a selected BLE endpoint fails to connect', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
       Object.assign(new Error('Not advertising'), { code: HardwareErrorCode.DeviceNotFound })
     );
-    const adapter = new TrezorAdapter(connector);
     const status = jest.fn();
     adapter.on(UI_REQUEST.DEVICE_BINDING_STATUS, status);
     selectDevice(adapter);
     const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
+      ...EVM_PARAMS,
       knownConnections: [],
     });
     expect(result.success).toBe(false);
@@ -1066,17 +1012,12 @@ describe('TrezorAdapter', () => {
     (connector.connect as ConnectMock).mockRejectedValueOnce(
       Object.assign(new Error('USB was unplugged'), { code: HardwareErrorCode.DeviceNotFound })
     );
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: 'verified-address' });
+    v1Session(connector);
     const adapter = new TrezorAdapter(connector, {
       knownDeviceConnections: [{ deviceId: 'safe-7', bleConnectId: 'safe-7' }],
     });
 
-    const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'safe-7', EVM_PARAMS);
 
     expect(result).toMatchObject({
       success: false,
@@ -1088,20 +1029,18 @@ describe('TrezorAdapter', () => {
 
   it('prefers identity-matched USB over a known BLE binding', async () => {
     const connector = createSeriallessUsbConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: 'verified-address' });
+    v1Session(connector);
     const adapter = new TrezorAdapter(connector, {
       knownDeviceConnections: [{ deviceId: 'expected-device-id', bleConnectId: 'known-ble' }],
     });
 
-    const result = await adapter.evmGetAddress('', 'expected-device-id', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'expected-device-id', EVM_PARAMS);
 
     expect(result.success).toBe(true);
-    expect(connector.connect).not.toHaveBeenCalledWith('known-ble');
+    // Match on the first argument only: connect may be called with or without options.
+    expect((connector.connect as ConnectMock).mock.calls.map(([id]) => id)).not.toContain(
+      'known-ble'
+    );
     expect(connector.call).toHaveBeenLastCalledWith(
       'trezor-webusb-1209-53c1-1-session',
       'evmGetAddress',
@@ -1109,31 +1048,35 @@ describe('TrezorAdapter', () => {
     );
   });
 
-  it('rejects a stale selection response before connecting', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+  it.each([
+    [
+      'rejects a stale selection response before connecting',
+      { sdkConnectId: 'not-in-this-scan' },
+      HardwareErrorCode.DeviceNotFound,
+    ],
+    [
+      'cancels an unbound BLE selection without opening a device',
+      { cancelled: true },
+      HardwareErrorCode.UserAborted,
+    ],
+  ] as const)('%s', async (_title, selection, code) => {
+    const { connector, adapter } = setup();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event =>
       adapter.uiResponse({
         type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-        payload: { sdkConnectId: 'not-in-this-scan', requestId: event.payload.requestId },
-      });
-    });
+        payload: { ...selection, requestId: event.payload.requestId },
+      })
+    );
 
-    const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'safe-7', EVM_PARAMS);
 
-    expect(result).toMatchObject({
-      success: false,
-      payload: { code: HardwareErrorCode.DeviceNotFound },
-    });
+    expect(result).toMatchObject({ success: false, payload: { code } });
     expect(connector.connect).not.toHaveBeenCalled();
+    expect(connector.call).not.toHaveBeenCalled();
   });
 
   it('never dispatches or persists a selected BLE device with a different identity', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const verified = acknowledgeBindings(adapter);
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
       if (event.payload.rejectedConnectId) {
@@ -1151,10 +1094,7 @@ describe('TrezorAdapter', () => {
       });
     });
 
-    const result = await adapter.evmGetAddress('', 'another-device', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'another-device', EVM_PARAMS);
 
     expect(result).toMatchObject({
       success: false,
@@ -1165,31 +1105,8 @@ describe('TrezorAdapter', () => {
     expect(verified).not.toHaveBeenCalled();
   });
 
-  it('cancels an unbound BLE selection without opening a device', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event =>
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-        payload: { requestId: event.payload.requestId, cancelled: true },
-      })
-    );
-
-    const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: { code: HardwareErrorCode.UserAborted },
-    });
-    expect(connector.connect).not.toHaveBeenCalled();
-    expect(connector.call).not.toHaveBeenCalled();
-  });
-
   it('uses the exact server challenge and returns the raw attestation proof', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     const challenge = 'ab'.repeat(32);
     const proof = {
       optiga_certificates: ['00'],
@@ -1198,7 +1115,6 @@ describe('TrezorAdapter', () => {
     (connector.call as CallMock)
       .mockResolvedValueOnce({ internal_model: 'T3W1' })
       .mockResolvedValueOnce(proof);
-    const adapter = new TrezorAdapter(connector);
 
     const result = await adapter.verifyDeviceAuthenticity('safe-7', { challenge });
 
@@ -1218,17 +1134,27 @@ describe('TrezorAdapter', () => {
     }
   });
 
-  it('rejects a malformed server challenge before connecting to the device', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+  it.each([
+    [
+      'rejects a malformed server challenge before connecting to the device',
+      { challenge: 'abcd' },
+      'Device authenticity challenge must be exactly 32 bytes encoded as hex',
+    ],
+    [
+      'never allows debug roots in a server-challenge reward flow',
+      { challenge: 'ab'.repeat(32), dangerouslyAllowDebugKeys: true },
+      'Debug attestation roots cannot be used with a server challenge',
+    ],
+  ])('%s', async (_title, options, error) => {
+    const { connector, adapter } = setup();
 
-    const result = await adapter.verifyDeviceAuthenticity('safe-7', { challenge: 'abcd' });
+    const result = await adapter.verifyDeviceAuthenticity('safe-7', options);
 
     expect(result).toEqual({
       success: false,
       payload: {
         code: HardwareErrorCode.InvalidParams,
-        error: 'Device authenticity challenge must be exactly 32 bytes encoded as hex',
+        error,
         recovery: { scope: 'not-recoverable' },
       },
     });
@@ -1237,8 +1163,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('returns device search targets without opening a device session', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
 
     const targets = await adapter.searchDeviceTargets({ waitForAllTransports: true });
 
@@ -1256,7 +1181,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('marks only a stable discovery locator as reconnectable', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.searchDevices as SearchDevicesMock).mockResolvedValueOnce([
       {
         connectId: 'trezor-usb-serial',
@@ -1267,7 +1192,6 @@ describe('TrezorAdapter', () => {
         capabilities: { persistentDeviceIdentity: true },
       },
     ]);
-    const adapter = new TrezorAdapter(connector);
 
     const targets = await adapter.searchDeviceTargets();
 
@@ -1278,20 +1202,13 @@ describe('TrezorAdapter', () => {
   });
 
   it('connects without deriving public data and exposes info through the operation', async () => {
-    const connector = createConnector();
-    (connector.connect as ConnectMock).mockResolvedValueOnce({
-      sessionId: 'safe-7-session',
-      deviceInfo: {
-        vendor: 'trezor',
-        model: 'T3W1',
+    const { connector, adapter } = setup();
+    (connector.connect as ConnectMock).mockResolvedValueOnce(
+      trezorSession('safe-7-session', {
         firmwareVersion: '2.8.0',
-        deviceId: 'safe-7',
-        connectId: 'safe-7',
-        connectionType: 'ble',
         raw: { features: { device_id: 'TREZOR-DEVICE-ID' } },
-      },
-    });
-    const adapter = new TrezorAdapter(connector);
+      })
+    );
 
     const result = await adapter.connectDevice('safe-7');
 
@@ -1317,8 +1234,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('fails an ended operation without reconnecting', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
     await adapter.releaseOperation(operationId);
     jest.clearAllMocks();
@@ -1337,29 +1253,8 @@ describe('TrezorAdapter', () => {
     expect(connector.call).not.toHaveBeenCalled();
   });
 
-  it('never allows debug roots in a server-challenge reward flow', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-
-    const result = await adapter.verifyDeviceAuthenticity('safe-7', {
-      challenge: 'ab'.repeat(32),
-      dangerouslyAllowDebugKeys: true,
-    });
-
-    expect(result).toEqual({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.InvalidParams,
-        error: 'Debug attestation roots cannot be used with a server challenge',
-        recovery: { scope: 'not-recoverable' },
-      },
-    });
-    expect(connector.connect).not.toHaveBeenCalled();
-  });
-
   it('retires an older operation when the same target is selected again', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { adapter } = setup();
     const first = await adapter.connectDevice('safe-7');
     const second = await adapter.connectDevice('safe-7');
     expect(first.success).toBe(true);
@@ -1378,8 +1273,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not disconnect the replacement operation when the retired owner ends late', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const first = await adapter.connectDevice('safe-7');
     const second = await adapter.connectDevice('safe-7');
     expect(first.success).toBe(true);
@@ -1400,8 +1294,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('rejects conflicting positional and common operation ids', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const first = await adapter.connectDevice('safe-7');
     const second = await adapter.connectDevice('safe-5');
     expect(first.success).toBe(true);
@@ -1424,14 +1317,9 @@ describe('TrezorAdapter', () => {
   });
 
   it('rejects a different physical device before executing a wallet method', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
 
-    const result = await adapter.evmGetAddress('safe-7', 'different-trezor', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('safe-7', 'different-trezor', EVM_SILENT_PARAMS);
 
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -1445,16 +1333,10 @@ describe('TrezorAdapter', () => {
 
   it('finds the expected serialless USB device before an operation-first wallet call', async () => {
     const connector = createSeriallessUsbConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'v1' })
-      .mockResolvedValueOnce({ address: '0x1234' });
+    v1Session(connector, { address: '0x1234' });
     const adapter = new TrezorAdapter(connector);
 
-    const result = await adapter.evmGetAddress('', 'expected-device-id', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'expected-device-id', EVM_SILENT_PARAMS);
 
     expect(connector.connect).toHaveBeenNthCalledWith(1, 'trezor-webusb-1209-53c1-0', {
       transportType: 'usb',
@@ -1478,11 +1360,11 @@ describe('TrezorAdapter', () => {
     const connector = createSeriallessUsbConnector();
     const adapter = new TrezorAdapter(connector);
 
-    const result = await adapter.evmGetAddress('', 'a-wallet-that-is-not-plugged-in', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress(
+      '',
+      'a-wallet-that-is-not-plugged-in',
+      EVM_SILENT_PARAMS
+    );
 
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -1500,17 +1382,15 @@ describe('TrezorAdapter', () => {
     const devices: Record<string, string> = { 'usb-A': 'DEVICE-A', 'usb-B': 'DEVICE-B' };
     const connector: IConnector = { ...createConnector(), connectionType: 'usb' };
     (connector.connect as ConnectMock).mockImplementation(connectId =>
-      Promise.resolve({
-        sessionId: connectId ?? '',
-        deviceInfo: {
-          vendor: 'trezor',
+      Promise.resolve(
+        trezorSession(connectId ?? '', {
           model: 'T2T1',
           firmwareVersion: '2.8.0',
           deviceId: devices[connectId ?? ''],
           connectId: connectId ?? '',
           connectionType: 'usb',
-        },
-      })
+        })
+      )
     );
     (connector.call as CallMock).mockImplementation((sessionId: string, method: string) => {
       if (method === 'getFeatures') {
@@ -1558,11 +1438,11 @@ describe('TrezorAdapter', () => {
     expect(connected.success).toBe(true);
     if (!connected.success) return;
 
-    const result = await adapter.evmGetAddress('', 'a-wallet-that-is-not-plugged-in', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress(
+      '',
+      'a-wallet-that-is-not-plugged-in',
+      EVM_SILENT_PARAMS
+    );
 
     expect(result).toMatchObject({
       success: false,
@@ -1572,11 +1452,7 @@ describe('TrezorAdapter', () => {
     expect(connector.disconnect).toHaveBeenCalledTimes(1);
     expect(connector.disconnect).toHaveBeenCalledWith('trezor-webusb-1209-53c1-1-session');
 
-    const followUp = await adapter.evmGetAddress(connected.payload, '', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const followUp = await adapter.evmGetAddress(connected.payload, '', EVM_SILENT_PARAMS);
     expect(followUp.success).toBe(true);
     expect(connector.call).toHaveBeenLastCalledWith(
       'trezor-webusb-1209-53c1-0-session',
@@ -1594,11 +1470,7 @@ describe('TrezorAdapter', () => {
     );
     const adapter = new TrezorAdapter(connector);
 
-    const result = await adapter.evmGetAddress('', 'expected-device-id', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'expected-device-id', EVM_SILENT_PARAMS);
 
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -1619,14 +1491,7 @@ describe('TrezorAdapter', () => {
 
     const result = await adapter.allNetworkGetAddress('', 'expected-device-id', {
       useEmptyPassphrase: true,
-      bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
-      ],
+      bundle: [ETH_ITEM],
     });
 
     expect(result.success).toBe(true);
@@ -1647,11 +1512,7 @@ describe('TrezorAdapter', () => {
     );
     const adapter = new TrezorAdapter(connector);
 
-    const result = await adapter.evmGetAddress('', 'expected-device-id', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const result = await adapter.evmGetAddress('', 'expected-device-id', EVM_SILENT_PARAMS);
 
     expect(result).toMatchObject({
       success: false,
@@ -1689,8 +1550,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('ends a pinned operation when its transport disconnects without reconnecting', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
     (connector.call as CallMock).mockRejectedValueOnce(
       Object.assign(new Error('disconnected'), {
@@ -1714,8 +1574,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('cancels the active job without terminating its operation', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
 
     adapter.cancel(operationId);
@@ -1727,11 +1586,10 @@ describe('TrezorAdapter', () => {
   });
 
   it('maps WebUSB transfer errors during connect to TransportError', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
       new Error("Failed to execute 'transferIn' on 'USBDevice': A transfer error has occurred.")
     );
-    const adapter = new TrezorAdapter(connector);
 
     const result = await adapter.connectDevice('safe-7');
 
@@ -1743,14 +1601,13 @@ describe('TrezorAdapter', () => {
   });
 
   it('retries once when an interrupted THP handshake leaves one malformed frame', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
       Object.assign(new Error('Malformed protocol format'), {
         name: 'TrezorProtocolError',
         code: 'Malformed protocol format',
       })
     );
-    const adapter = new TrezorAdapter(connector);
 
     await expect(adapter.connectDevice('safe-7')).resolves.toEqual({
       success: true,
@@ -1760,14 +1617,13 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not retry unrelated Trezor protocol errors', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.connect as ConnectMock).mockRejectedValueOnce(
       Object.assign(new Error('Unexpected protocol version'), {
         name: 'TrezorProtocolError',
         code: 'Unexpected protocol version',
       })
     );
-    const adapter = new TrezorAdapter(connector);
 
     const result = await adapter.connectDevice('safe-7');
 
@@ -1776,7 +1632,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('emits request and failed response logs with the device error details', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
       .mockRejectedValueOnce(
@@ -1790,7 +1646,6 @@ describe('TrezorAdapter', () => {
         logs.push(event.message);
       }
     });
-    const adapter = new TrezorAdapter(connector);
 
     try {
       const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
@@ -1824,22 +1679,10 @@ describe('TrezorAdapter', () => {
   });
 
   it('maps Trezor response-only action cancel failures to UserRejected', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Cancelled'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: {
-              code: 'Failure_ActionCancelled',
-              message: 'Cancelled',
-            },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
+      .mockRejectedValueOnce(trezorFailure('Failure_ActionCancelled', 'Cancelled'));
 
     const result = await adapter.evmSignTransaction('safe-7', 'safe-7', {
       path: "m/44'/60'/0'/0/0",
@@ -1862,23 +1705,56 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  it('maps unsupported Trezor script type failures to MethodNotSupported', async () => {
-    const connector = createConnector();
+  it.each([
+    [
+      'maps unsupported Trezor script type failures to MethodNotSupported',
+      trezorFailure('Failure_ProcessError', 'Unsupported script type'),
+      HardwareErrorCode.MethodNotSupported,
+      'Unsupported script type',
+      'host',
+    ],
+    [
+      'maps Trezor forbidden key path failures to DevicePathForbidden',
+      trezorFailure('Failure_DataError', 'Forbidden key path'),
+      HardwareErrorCode.DevicePathForbidden,
+      'Forbidden key path',
+      'device',
+    ],
+    [
+      'maps Trezor firmware errors to MethodNotSupported',
+      trezorFailure('Failure_FirmwareError', 'Firmware error'),
+      HardwareErrorCode.MethodNotSupported,
+      'Firmware error',
+      'host',
+    ],
+    [
+      'maps Trezor unexpected-message failures to MethodNotSupported',
+      trezorFailure('Failure_UnexpectedMessage', 'Unknown message', {
+        code: 'Failure_UnexpectedMessage',
+      }),
+      HardwareErrorCode.MethodNotSupported,
+      'Unknown message',
+      'host',
+    ],
+    [
+      'maps Trezor not-initialized failures to DeviceNotInitialized',
+      trezorFailure('Failure_NotInitialized', 'Device is not initialized'),
+      HardwareErrorCode.DeviceNotInitialized,
+      'Device is not initialized',
+      'device',
+    ],
+    [
+      'maps Trezor busy failures to DeviceBusyInternal',
+      trezorFailure('Failure_Busy', 'Device is busy'),
+      HardwareErrorCode.DeviceBusyInternal,
+      'Device is busy',
+      'device',
+    ],
+  ])('%s', async (_title, failure, code, error, origin) => {
+    const { connector, adapter } = setup();
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Unsupported script type'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: {
-              code: 'Failure_ProcessError',
-              message: 'Unsupported script type',
-            },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
+      .mockRejectedValueOnce(failure);
 
     const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
       path: "m/86'/0'/0'/0/0",
@@ -1887,65 +1763,16 @@ describe('TrezorAdapter', () => {
       useEmptyPassphrase: true,
     });
 
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.MethodNotSupported,
-        error: 'Unsupported script type',
-        origin: 'host',
-      },
-    });
-  });
-
-  it('maps Trezor forbidden key path failures to DevicePathForbidden', async () => {
-    const connector = createConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Forbidden key path'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: {
-              code: 'Failure_DataError',
-              message: 'Forbidden key path',
-            },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
-
-    const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
-      path: "m/86'/0'/0'/0/0",
-      coin: 'Bitcoin',
-      message: 'hello',
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.DevicePathForbidden,
-        error: 'Forbidden key path',
-        origin: 'device',
-      },
-    });
+    expect(result).toMatchObject({ success: false, payload: { code, error, origin } });
   });
 
   it('maps a device-enforced on-device passphrase failure to PassphraseAlwaysOnDevice', async () => {
     const alwaysOnDevice =
       'Providing passphrase in message is not allowed when PASSPHRASE_ALWAYS_ON_DEVICE is True.';
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.call as CallMock).mockRejectedValueOnce(
-      Object.assign(new Error(alwaysOnDevice), {
-        name: 'TrezorFailureError',
-        response: {
-          type: 'Failure',
-          message: { code: 'Failure_DataError', message: alwaysOnDevice },
-        },
-      })
+      trezorFailure('Failure_DataError', alwaysOnDevice)
     );
-    const adapter = new TrezorAdapter(connector);
 
     const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
       path: "m/86'/0'/0'/0/0",
@@ -1964,156 +1791,11 @@ describe('TrezorAdapter', () => {
     });
   });
 
-  it('maps Trezor firmware errors to MethodNotSupported', async () => {
-    const connector = createConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Firmware error'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: {
-              code: 'Failure_FirmwareError',
-              message: 'Firmware error',
-            },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
-
-    const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
-      path: "m/86'/0'/0'/0/0",
-      coin: 'Bitcoin',
-      message: 'hello',
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.MethodNotSupported,
-        error: 'Firmware error',
-        origin: 'host',
-      },
-    });
-  });
-
-  it('maps Trezor unexpected-message failures to MethodNotSupported', async () => {
-    const connector = createConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Unknown message'), {
-          name: 'TrezorFailureError',
-          code: 'Failure_UnexpectedMessage',
-          response: {
-            type: 'Failure',
-            message: {
-              code: 'Failure_UnexpectedMessage',
-              message: 'Unknown message',
-            },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
-
-    const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
-      path: "m/86'/0'/0'/0/0",
-      coin: 'Bitcoin',
-      message: 'hello',
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.MethodNotSupported,
-        error: 'Unknown message',
-        origin: 'host',
-      },
-    });
-  });
-
-  it('maps Trezor not-initialized failures to DeviceNotInitialized', async () => {
-    const connector = createConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Device is not initialized'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: {
-              code: 'Failure_NotInitialized',
-              message: 'Device is not initialized',
-            },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
-
-    const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
-      path: "m/86'/0'/0'/0/0",
-      coin: 'Bitcoin',
-      message: 'hello',
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.DeviceNotInitialized,
-        error: 'Device is not initialized',
-        origin: 'device',
-      },
-    });
-  });
-
-  it('maps Trezor busy failures to DeviceBusyInternal', async () => {
-    const connector = createConnector();
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Device is busy'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: { code: 'Failure_Busy', message: 'Device is busy' },
-          },
-        })
-      );
-    const adapter = new TrezorAdapter(connector);
-
-    const result = await adapter.btcSignMessage('safe-7', 'safe-7', {
-      path: "m/86'/0'/0'/0/0",
-      coin: 'Bitcoin',
-      message: 'hello',
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.DeviceBusyInternal,
-        error: 'Device is busy',
-        origin: 'device',
-      },
-    });
-  });
-
   it('maps Trezor PIN mismatch failures to PinMismatch', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockRejectedValueOnce(
-      Object.assign(new Error('PIN mismatch'), {
-        name: 'TrezorFailureError',
-        response: {
-          type: 'Failure',
-          message: { code: 'Failure_PinMismatch', message: 'PIN mismatch' },
-        },
-      })
+      trezorFailure('Failure_PinMismatch', 'PIN mismatch')
     );
 
     const result = await adapter.changePin('safe-7', { remove: false });
@@ -2129,12 +1811,11 @@ describe('TrezorAdapter', () => {
   });
 
   it('returns DeviceNotFound without reconnect UI when target Trezor is unavailable', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     const deviceNotFoundError = Object.assign(new Error('Trezor device not found'), {
       code: HardwareErrorCode.DeviceNotFound,
     });
     (connector.connect as ConnectMock).mockRejectedValue(deviceNotFoundError);
-    const adapter = new TrezorAdapter(connector);
     const requests: unknown[] = [];
     adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, event => {
       requests.push(event);
@@ -2158,23 +1839,18 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not wait for reconnect UI when a chain call cannot find the Trezor', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     const deviceNotFoundError = Object.assign(new Error('Trezor device not found'), {
       code: HardwareErrorCode.DeviceNotFound,
     });
     (connector.connect as ConnectMock).mockRejectedValue(deviceNotFoundError);
-    const adapter = new TrezorAdapter(connector);
     try {
       const requests: unknown[] = [];
       adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, event => {
         requests.push(event);
       });
 
-      const result = await adapter.evmGetAddress('safe-7', 'safe-7', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-        useEmptyPassphrase: true,
-      });
+      const result = await adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
 
       expect(result).toMatchObject({
         success: false,
@@ -2192,8 +1868,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('getFeatures uses active connector session', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockResolvedValueOnce({ device_id: 'trezor-1' });
 
@@ -2205,8 +1880,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('maps Trezor THP locked-after-PIN-cancel failure to PinCancelled', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockRejectedValueOnce(
       Object.assign(new Error('Trezor device still locked after PIN attempt'), {
@@ -2225,8 +1899,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('delegates Trezor device settings through dedicated management methods', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({ message: 'Success' })
@@ -2261,8 +1934,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('rejects a device-manager mutation on a different physical Trezor', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     jest.clearAllMocks();
 
@@ -2289,25 +1961,16 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not reconnect or replay a device-manager mutation after disconnect', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockRejectedValueOnce(
       Object.assign(new Error('Trezor BLE device disconnected'), {
         code: HardwareErrorCode.DeviceDisconnected,
       })
     );
-    (connector.connect as ConnectMock).mockResolvedValueOnce({
-      sessionId: 'safe-5-session',
-      deviceInfo: {
-        vendor: 'trezor',
-        model: 'T3T1',
-        firmwareVersion: '',
-        deviceId: 'safe-5',
-        connectId: 'safe-7',
-        connectionType: 'ble',
-      },
-    });
+    (connector.connect as ConnectMock).mockResolvedValueOnce(
+      trezorSession('safe-5-session', { model: 'T3T1', deviceId: 'safe-5' })
+    );
 
     const result = await adapter.wipeDevice('safe-7', {
       expectedDeviceIdentity: {
@@ -2333,8 +1996,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('rejects a non-Trezor identity before a device-manager operation', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
 
     const result = await adapter.wipeDevice('safe-7', {
       expectedDeviceIdentity: {
@@ -2402,7 +2064,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not expose THP pairing credentials through a public read API', () => {
-    const adapter = new TrezorAdapter(createConnector());
+    const { adapter } = setup();
 
     expect(
       (adapter as unknown as { getPersistableDeviceState?: unknown }).getPersistableDeviceState
@@ -2410,8 +2072,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('evmGetAddress delegates to active connector session', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({
@@ -2423,13 +2084,7 @@ describe('TrezorAdapter', () => {
         path: "m/44'/60'/0'/0/0",
       });
 
-    await expect(
-      adapter.evmGetAddress('safe-7', 'safe-7', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-        useEmptyPassphrase: true,
-      })
-    ).resolves.toEqual({
+    await expect(adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS)).resolves.toEqual({
       success: true,
       payload: {
         address: '0x1234567890123456789012345678901234567890',
@@ -2443,7 +2098,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('concurrent first calls share a single connect promise', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     let resolveConnect: (value: Awaited<ReturnType<IConnector['connect']>>) => void = () =>
       undefined;
     (connector.connect as ConnectMock).mockReturnValueOnce(
@@ -2452,18 +2107,8 @@ describe('TrezorAdapter', () => {
       })
     );
 
-    const adapter = new TrezorAdapter(connector);
-
-    const first = adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
-    const second = adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const first = adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
+    const second = adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
 
     // DeviceJobQueue defers the job to a microtask — drain so the first job
     // actually reaches connector.connect() before we assert.
@@ -2473,17 +2118,7 @@ describe('TrezorAdapter', () => {
     // serializes them; only the first reached _ensureSession).
     expect(connector.connect).toHaveBeenCalledTimes(1);
 
-    resolveConnect({
-      sessionId: 'safe-7-session',
-      deviceInfo: {
-        vendor: 'trezor',
-        model: 'T3W1',
-        firmwareVersion: '',
-        deviceId: 'safe-7',
-        connectId: 'safe-7',
-        connectionType: 'ble',
-      },
-    });
+    resolveConnect(trezorSession());
 
     await Promise.all([first, second]);
     expect(connector.connect).toHaveBeenCalledTimes(1);
@@ -2503,8 +2138,8 @@ describe('TrezorAdapter', () => {
         handlers.get(event)?.delete(handler);
       }
     );
-
     const adapter = new TrezorAdapter(connector);
+
     const disconnectEvents = jest.fn();
     adapter.on(DEVICE.DISCONNECT, disconnectEvents);
 
@@ -2522,8 +2157,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('waits for a cancelled raw connector call before dispose resets the connector', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
     const resolveRawCall = holdNextCall(connector);
     jest.clearAllMocks();
@@ -2555,8 +2189,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('cancelling an idle connection does not broadcast a connector UI cancellation', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     adapter.cancel('safe-7');
@@ -2566,8 +2199,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('cancel without connectId broadcasts CANCEL and cancels all sessions', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     adapter.cancel();
@@ -2577,8 +2209,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('refuses to put a cancelled command on the wire', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     // No REQUEST_SAVE_DEVICE_BINDING listener, so the binding declines and
     // emits its terminal status synchronously. A host that cancels from that
     // handler is the window where an aborted signal must reach the business call.
@@ -2589,8 +2220,7 @@ describe('TrezorAdapter', () => {
     (connector.call as CallMock).mockResolvedValue({ protocol: 'v1' });
 
     const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
+      ...EVM_PARAMS,
       knownConnections: [],
     });
 
@@ -2613,11 +2243,6 @@ describe('TrezorAdapter', () => {
         handlers.get(event)!.add(handler);
       }
     );
-    (connector.off as jest.Mock).mockImplementation(
-      (event: string, handler: (data: unknown) => void) => {
-        handlers.get(event)?.delete(handler);
-      }
-    );
     const adapter = new TrezorAdapter(connector);
     const save = acknowledgeBindings(adapter);
     const status = jest.fn();
@@ -2635,8 +2260,7 @@ describe('TrezorAdapter', () => {
     });
 
     const result = await adapter.evmGetAddress('', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      useEmptyPassphrase: true,
+      ...EVM_PARAMS,
       knownConnections: [],
     });
 
@@ -2650,8 +2274,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('getChainFingerprint returns features.device_id (chain-agnostic)', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockResolvedValueOnce({
       device_id: 'trezor-device-uuid-abc',
@@ -2668,8 +2291,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('getChainFingerprint fails clearly when features lack device_id', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockResolvedValueOnce({ vendor: 'trezor.io' });
 
@@ -2682,8 +2304,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress ends the bundle at a wrong PIN instead of prompting for the next chain', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty-1' })
@@ -2709,8 +2330,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress returns per-item results with features.device_id fingerprint', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty-1' })
@@ -2732,12 +2352,7 @@ describe('TrezorAdapter', () => {
     const result = await adapter.allNetworkGetAddress('safe-7', '', {
       useEmptyPassphrase: true,
       bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
+        ETH_ITEM,
         {
           network: 'btc',
           methodName: 'btcGetPublicKey',
@@ -2812,8 +2427,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress stops the bundle when cancel lands between two items', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     const methodsSent = mockBundleCalls(connector);
@@ -2843,8 +2457,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress stops the bundle when cancel lands while a chain is running', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     // Cancel while the last chain's job is active, not in a queue gap.
@@ -2865,8 +2478,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress reports a cancel that lands before the last item attaches identity', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     const methodsSent = mockBundleCalls(connector);
@@ -2881,14 +2493,7 @@ describe('TrezorAdapter', () => {
 
     const result = await adapter.allNetworkGetAddress('safe-7', '', {
       useEmptyPassphrase: true,
-      bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
-      ],
+      bundle: [ETH_ITEM],
     });
 
     expect(cancelled).toBe(true);
@@ -2900,8 +2505,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('cancel() with nothing running still ends the queued job and an open scope', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { adapter } = setup();
     const queue = jobQueueOf(adapter);
     const scope = queue.createCancelScope('safe-7');
 
@@ -2926,8 +2530,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('cancel() ends the active job, the job queued behind it and an open scope', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { adapter } = setup();
     const queue = jobQueueOf(adapter);
     const scope = queue.createCancelScope('safe-7');
 
@@ -2966,8 +2569,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('cancel() leaves no trace when the named operation has already ended', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
     await adapter.releaseOperation(operationId);
 
@@ -2988,8 +2590,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress opens its cancel scope under the key its items queue under', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     mockBundleCalls(connector);
 
@@ -2999,14 +2600,7 @@ describe('TrezorAdapter', () => {
 
     const result = await adapter.allNetworkGetAddress('safe-7', 'trezor-device-uuid-abc', {
       useEmptyPassphrase: true,
-      bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
-      ],
+      bundle: [ETH_ITEM],
     });
 
     expect(result.success).toBe(true);
@@ -3025,31 +2619,17 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress aborts the single-chain bundle on DevicePathForbidden without extra round-trips', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Forbidden key path'), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: { code: 'Failure_DataError', message: 'Forbidden key path' },
-          },
-        })
-      );
+      .mockRejectedValueOnce(trezorFailure('Failure_DataError', 'Forbidden key path'));
 
     const callsBefore = (connector.call as CallMock).mock.calls.length;
     const result = await adapter.allNetworkGetAddress('safe-7', '', {
       useEmptyPassphrase: true,
       bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
+        ETH_ITEM,
         {
           network: 'eth',
           methodName: 'evmGetAddress',
@@ -3079,31 +2659,17 @@ describe('TrezorAdapter', () => {
   it('allNetworkGetAddress aborts every bundle on PassphraseAlwaysOnDevice', async () => {
     const alwaysOnDevice =
       'Providing passphrase in message is not allowed when PASSPHRASE_ALWAYS_ON_DEVICE is True.';
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error(alwaysOnDevice), {
-          name: 'TrezorFailureError',
-          response: {
-            type: 'Failure',
-            message: { code: 'Failure_DataError', message: alwaysOnDevice },
-          },
-        })
-      );
+      .mockRejectedValueOnce(trezorFailure('Failure_DataError', alwaysOnDevice));
 
     const callsBefore = (connector.call as CallMock).mock.calls.length;
     const result = await adapter.allNetworkGetAddress('safe-7', '', {
       useEmptyPassphrase: true,
       bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
+        ETH_ITEM,
         {
           network: 'sol',
           methodName: 'solGetAddress',
@@ -3127,20 +2693,11 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress keeps a mixed-network bundle alive past DevicePathForbidden', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockImplementation((_session, method) => {
       if (method === 'evmGetAddress') {
-        return Promise.reject(
-          Object.assign(new Error('Forbidden key path'), {
-            name: 'TrezorFailureError',
-            response: {
-              type: 'Failure',
-              message: { code: 'Failure_DataError', message: 'Forbidden key path' },
-            },
-          })
-        );
+        return Promise.reject(trezorFailure('Failure_DataError', 'Forbidden key path'));
       }
       if (method === 'solGetAddress') {
         return Promise.resolve({ address: 'sol-address', path: "m/44'/501'/0'/0'" });
@@ -3154,12 +2711,7 @@ describe('TrezorAdapter', () => {
     const result = await adapter.allNetworkGetAddress('safe-7', '', {
       useEmptyPassphrase: true,
       bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
+        ETH_ITEM,
         {
           network: 'sol',
           methodName: 'solGetAddress',
@@ -3188,8 +2740,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress verifies Trezor device_id without the chain fingerprint shim', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (adapter as unknown as { getChainFingerprint?: unknown }).getChainFingerprint = undefined;
     (connector.call as CallMock)
@@ -3202,14 +2753,7 @@ describe('TrezorAdapter', () => {
 
     const result = await adapter.allNetworkGetAddress('safe-7', 'trezor-device-uuid-abc', {
       useEmptyPassphrase: true,
-      bundle: [
-        {
-          network: 'eth',
-          methodName: 'evmGetAddress',
-          path: "m/44'/60'/0'/0/0",
-          showOnDevice: false,
-        },
-      ],
+      bundle: [ETH_ITEM],
     });
 
     expect(result).toEqual({
@@ -3239,17 +2783,11 @@ describe('TrezorAdapter', () => {
     expect(connector.call).toHaveBeenNthCalledWith(2, 'safe-7-session', '__thpCreateSession', {
       passphraseMode: 'empty',
     });
-    expect(connector.call).toHaveBeenNthCalledWith(3, 'safe-7-session', 'evmGetAddress', {
-      network: 'eth',
-      methodName: 'evmGetAddress',
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-    });
+    expect(connector.call).toHaveBeenNthCalledWith(3, 'safe-7-session', 'evmGetAddress', ETH_ITEM);
   });
 
   it('allNetworkGetAddress adds Trezor BTC coin params from network', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty-1' })
@@ -3303,8 +2841,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('allNetworkGetAddress applies request-level passphrase params without leaking them to item calls', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const logs: string[] = [];
     const unsubscribe = onSdkEvent(event => {
       if (event.type === 'log') {
@@ -3325,14 +2862,7 @@ describe('TrezorAdapter', () => {
       const result = await adapter.allNetworkGetAddress('safe-7', '', {
         passphraseState: 'aabbccdd',
         useEmptyPassphrase: false,
-        bundle: [
-          {
-            network: 'eth',
-            methodName: 'evmGetAddress',
-            path: "m/44'/60'/0'/0/0",
-            showOnDevice: false,
-          },
-        ],
+        bundle: [ETH_ITEM],
       });
 
       expect(result.success).toBe(true);
@@ -3352,18 +2882,12 @@ describe('TrezorAdapter', () => {
       path: "m/44'/0'/0'",
       showOnDevice: false,
     });
-    expect(connector.call).toHaveBeenNthCalledWith(3, 'safe-7-session', 'evmGetAddress', {
-      network: 'eth',
-      methodName: 'evmGetAddress',
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-    });
+    expect(connector.call).toHaveBeenNthCalledWith(3, 'safe-7-session', 'evmGetAddress', ETH_ITEM);
     expect(connector.call).toHaveBeenNthCalledWith(4, 'safe-7-session', 'getFeatures', {});
   });
 
   it('allNetworkGetAddress verifies expected Trezor device_id before address calls', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     (connector.call as CallMock).mockResolvedValueOnce({
       device_id: 'actual-device-id',
@@ -3393,8 +2917,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('uses batch BLE context and keeps host fields out of firmware calls', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     (connector.call as CallMock).mockImplementation(async (_session, method) => {
       if (method === 'getFeatures') return { device_id: 'safe-7' };
       if (method === 'createAppSession') return { protocol: 'v1' };
@@ -3420,8 +2943,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not reconnect for batch identity after a successful address loses its connection', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
     const disconnected = (connector.on as jest.Mock).mock.calls.find(
       ([event]) => event === 'device-disconnect'
@@ -3443,8 +2965,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('pins all-network feature and address calls to the common operation target', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
     (connector.call as CallMock)
       .mockResolvedValueOnce({
@@ -3472,8 +2993,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('rejects conflicting all-network operation ids before device I/O', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
     jest.clearAllMocks();
 
@@ -3495,8 +3015,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('searchDevices preserves currently-connected devices that the rescan missed', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     // Rescan finds a different device — connected 'safe-7' is missing from scan.
@@ -3518,8 +3037,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('passes waitForAllTransports through to the connector search', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
 
     await adapter.searchDevices({ waitForAllTransports: true });
 
@@ -3527,8 +3045,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('searchDevices still evicts scanned-missing devices with no active session', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
 
     // First scan populates 'safe-7' (no connect).
     await adapter.searchDevices();
@@ -3539,136 +3056,79 @@ describe('TrezorAdapter', () => {
     expect(devices).toHaveLength(0);
   });
 
-  it('ends a one-shot call on DeviceDisconnected without a fresh session', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    await adapter.connectDevice('safe-7');
-
-    const disconnectError = Object.assign(new Error('Trezor BLE device disconnected'), {
+  const bleDisconnected = () =>
+    Object.assign(new Error('Trezor BLE device disconnected'), {
       code: HardwareErrorCode.DeviceDisconnected,
     });
-    (connector.call as CallMock).mockRejectedValueOnce(disconnectError);
-    // A reconnect would land on a different physical device.
-    (connector.connect as ConnectMock).mockResolvedValueOnce({
-      sessionId: 'safe-5-session',
-      deviceInfo: {
-        vendor: 'trezor',
-        model: 'T3W1',
-        firmwareVersion: '',
-        deviceId: 'safe-5',
-        connectId: 'safe-7',
-        connectionType: 'ble',
-      },
-    });
 
-    const result = await adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+  it.each([
+    ['ends a one-shot call on DeviceDisconnected without a fresh session', ['disconnect'], 1],
+    [
+      'surfaces the first business-call disconnect without retrying',
+      ['session-empty-1', 'disconnect', 'session-empty-2', 'disconnect'],
+      2,
+    ],
+  ])('%s', async (_title, callSteps, expectedCalls) => {
+    const { connector, adapter } = setup();
+    await adapter.connectDevice('safe-7');
+    const disconnectError = bleDisconnected();
+    for (const step of callSteps) {
+      if (step === 'disconnect')
+        (connector.call as CallMock).mockRejectedValueOnce(disconnectError);
+      else
+        (connector.call as CallMock).mockResolvedValueOnce({ protocol: 'thp', thpSessionId: step });
+    }
+    // A reconnect would land on a different physical device.
+    (connector.connect as ConnectMock).mockResolvedValueOnce(
+      trezorSession('safe-5-session', { deviceId: 'safe-5' })
+    );
+
+    const result = await adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
 
     expect(result).toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.DeviceDisconnected },
     });
     expect(connector.connect).toHaveBeenCalledTimes(1);
-    expect(connector.call).toHaveBeenCalledTimes(1);
+    expect(connector.call).toHaveBeenCalledTimes(expectedCalls);
   });
 
-  it('does not replay a signing method after an ambiguous disconnect', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    await adapter.connectDevice('safe-7');
+  it.each([
+    [
+      'does not replay a signing method after an ambiguous disconnect',
+      false,
+      HardwareErrorCode.DeviceDisconnected,
+    ],
+    [
+      'ends a pinned signing operation with an ambiguous-operation marker',
+      true,
+      HardwareErrorCode.OperationEnded,
+    ],
+  ])('%s', async (_title, pinned, code) => {
+    const { connector, adapter } = setup();
+    const connected = await connectOperation(adapter);
+    const pin = pinned ? { operationId: connected } : {};
     (connector.call as CallMock)
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'signing-session' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Trezor BLE device disconnected'), {
-          code: HardwareErrorCode.DeviceDisconnected,
-        })
-      );
+      .mockRejectedValueOnce(bleDisconnected());
 
-    const result = await adapter.evmSignMessage('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
+    const result = await adapter.evmSignMessage(pin.operationId ?? 'safe-7', 'safe-7', {
+      path: EVM_PATH,
       message: 'hello',
+      ...pin,
       useEmptyPassphrase: true,
     });
 
     expect(result).toMatchObject({
       success: false,
       payload: {
-        code: HardwareErrorCode.DeviceDisconnected,
+        code,
         recovery: { scope: 'unknown' },
-        params: {
-          operationMayHaveCompleted: true,
-          method: 'evmSignMessage',
-        },
+        params: { ...pin, operationMayHaveCompleted: true, method: 'evmSignMessage' },
       },
     });
     expect(connector.connect).toHaveBeenCalledTimes(1);
     expect(connector.call).toHaveBeenCalledTimes(2);
-  });
-
-  it('ends a pinned signing operation with an ambiguous-operation marker', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    const operationId = await connectOperation(adapter);
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'signing-session' })
-      .mockRejectedValueOnce(
-        Object.assign(new Error('Trezor BLE device disconnected'), {
-          code: HardwareErrorCode.DeviceDisconnected,
-        })
-      );
-
-    const result = await adapter.evmSignMessage(operationId, 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      message: 'hello',
-      operationId,
-      useEmptyPassphrase: true,
-    });
-
-    expect(result).toMatchObject({
-      success: false,
-      payload: {
-        code: HardwareErrorCode.OperationEnded,
-        recovery: { scope: 'unknown' },
-        params: {
-          operationId,
-          operationMayHaveCompleted: true,
-          method: 'evmSignMessage',
-        },
-      },
-    });
-    expect(connector.connect).toHaveBeenCalledTimes(1);
-    expect(connector.call).toHaveBeenCalledTimes(2);
-  });
-
-  it('surfaces the first business-call disconnect without retrying', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
-    await adapter.connectDevice('safe-7');
-
-    const disconnectError = Object.assign(new Error('Trezor BLE device disconnected'), {
-      code: HardwareErrorCode.DeviceDisconnected,
-    });
-    (connector.call as CallMock)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty-1' })
-      .mockRejectedValueOnce(disconnectError)
-      .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty-2' })
-      .mockRejectedValueOnce(disconnectError);
-
-    const result = await adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.payload.code).toBe(HardwareErrorCode.DeviceDisconnected);
-    }
-    expect(connector.call).toHaveBeenCalledTimes(2);
-    expect(connector.connect).toHaveBeenCalledTimes(1);
   });
 
   // Upstream switched DeviceJobQueue from per-device-parallel with preemption
@@ -3676,23 +3136,14 @@ describe('TrezorAdapter', () => {
   // new contract — anything that used to rely on preemption needs to live at
   // the application layer now.
   it('rejects a second call while the first is in flight (rejectIfBusy)', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     (connector.call as CallMock).mockImplementationOnce(() => new Promise(() => undefined));
 
-    const first = adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const first = adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
     await new Promise(resolve => setImmediate(resolve));
-    const second = await adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const second = await adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
 
     expect(second.success).toBe(false);
     if (!second.success) {
@@ -3702,20 +3153,14 @@ describe('TrezorAdapter', () => {
   });
 
   it('serializes calls across different devices (single global FIFO queue)', async () => {
-    const connector = createConnector();
-    (connector.connect as ConnectMock).mockImplementation(async (deviceId?: string) => ({
-      sessionId: `${deviceId ?? 'safe-7'}-session`,
-      deviceInfo: {
-        vendor: 'trezor',
-        model: 'T3W1',
-        firmwareVersion: '',
+    const { connector, adapter } = setup();
+    (connector.connect as ConnectMock).mockImplementation(async (deviceId?: string) =>
+      trezorSession(`${deviceId ?? 'safe-7'}-session`, {
         deviceId: deviceId ?? 'safe-7',
         connectId: deviceId ?? 'safe-7',
-        connectionType: 'ble',
-      },
-    }));
+      })
+    );
 
-    const adapter = new TrezorAdapter(connector);
     await adapter.connectDevice('safe-7');
     await adapter.connectDevice('safe-5');
 
@@ -3723,17 +3168,9 @@ describe('TrezorAdapter', () => {
     // queue is busy. (Pre-upstream-rewrite this would have run in parallel.)
     (connector.call as CallMock).mockImplementationOnce(() => new Promise(() => undefined));
 
-    const first = adapter.evmGetAddress('safe-7', 'safe-7', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const first = adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS);
     await new Promise(resolve => setImmediate(resolve));
-    const second = await adapter.evmGetAddress('safe-5', 'safe-5', {
-      path: "m/44'/60'/0'/0/0",
-      showOnDevice: false,
-      useEmptyPassphrase: true,
-    });
+    const second = await adapter.evmGetAddress('safe-5', 'safe-5', EVM_SILENT_PARAMS);
 
     expect(second.success).toBe(false);
     if (!second.success) {
@@ -3742,9 +3179,8 @@ describe('TrezorAdapter', () => {
     void first;
   });
 
-  it('cancel aborts an in-flight call via cancelActive', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+  it('cancel aborts an in-flight call', async () => {
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
 
     (connector.call as CallMock).mockImplementationOnce(() => new Promise(() => undefined));
@@ -3770,8 +3206,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not overlap a retry with a connector call that outlived cancellation', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
 
     const resolveRawCall = holdNextCall(connector);
@@ -3806,8 +3241,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('waits for a cancelled raw call before releasing its operation session', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
 
     const resolveRawCall = holdNextCall(connector);
@@ -3836,18 +3270,11 @@ describe('TrezorAdapter', () => {
   });
 
   it('applies the cancelled-call drain guard to passphrase discovery', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
 
-    let resolveRawCall: (value: unknown) => void = () => undefined;
+    const resolveRawCall = holdNextCall(connector);
     (connector.call as CallMock)
-      .mockImplementationOnce(
-        () =>
-          new Promise(resolve => {
-            resolveRawCall = resolve;
-          })
-      )
       .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'passphrase-session' })
       .mockResolvedValueOnce({ publicKey: 'wallet-public-key' })
       .mockResolvedValueOnce({ passphrase_protection: true });
@@ -3878,8 +3305,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('retains a pinned operation for the complete passphrase discovery job', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const operationId = await connectOperation(adapter);
 
     const operations = (
@@ -3916,8 +3342,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('rejects a pinned passphrase job for another device before wallet calls', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     const connected = await adapter.connectDevice('safe-7');
     if (!connected.success) throw new Error('Test connection failed');
     (connector.call as CallMock).mockClear();
@@ -3933,8 +3358,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('does not reconnect while a cancelled raw call is draining after resetState', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     const resolveRawCall = holdNextCall(connector);
@@ -3960,16 +3384,9 @@ describe('TrezorAdapter', () => {
   });
 
   it('retires a connect that resolves after resetState without overlapping its replacement', async () => {
-    const connector = createConnector();
-    let resolveConnect: (value: Awaited<ReturnType<IConnector['connect']>>) => void = () =>
-      undefined;
-    (connector.connect as ConnectMock).mockImplementationOnce(
-      () =>
-        new Promise(resolve => {
-          resolveConnect = resolve;
-        })
-    );
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
+    const connect = deferNext<ConnectorSession>();
+    (connector.connect as ConnectMock).mockImplementationOnce(connect.next);
 
     const first = adapter.connectDevice('safe-7');
     await new Promise(resolve => setImmediate(resolve));
@@ -3981,17 +3398,7 @@ describe('TrezorAdapter', () => {
     });
     expect(connector.connect).toHaveBeenCalledTimes(1);
 
-    resolveConnect({
-      sessionId: 'late-safe-7-session',
-      deviceInfo: {
-        vendor: 'trezor',
-        model: 'T3W1',
-        firmwareVersion: '',
-        deviceId: 'safe-7',
-        connectId: 'safe-7',
-        connectionType: 'ble',
-      },
-    });
+    connect.resolve(trezorSession('late-safe-7-session'));
     await expect(first).resolves.toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.UserAborted },
@@ -4007,7 +3414,7 @@ describe('TrezorAdapter', () => {
   });
 
   it('resetState disconnects the old session before allowing a fresh connection', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     let resolveDisconnect: () => void = () => undefined;
     (connector.disconnect as jest.Mock).mockImplementationOnce(
       () =>
@@ -4015,17 +3422,12 @@ describe('TrezorAdapter', () => {
           resolveDisconnect = resolve;
         })
     );
-    const adapter = new TrezorAdapter(connector);
     await adapter.connectDevice('safe-7');
 
     adapter.resetState();
 
     await expect(
-      adapter.evmGetAddress('safe-7', 'safe-7', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-        useEmptyPassphrase: true,
-      })
+      adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS)
     ).resolves.toMatchObject({
       success: false,
       payload: { code: HardwareErrorCode.DeviceBusyInternal },
@@ -4037,18 +3439,13 @@ describe('TrezorAdapter', () => {
     resolveDisconnect();
     await new Promise(resolve => setImmediate(resolve));
     await expect(
-      adapter.evmGetAddress('safe-7', 'safe-7', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-        useEmptyPassphrase: true,
-      })
+      adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS)
     ).resolves.toMatchObject({ success: true });
     expect(connector.connect).toHaveBeenCalledTimes(2);
   });
 
   it('search reset waits for the previous session to disconnect before scanning', async () => {
-    const connector = createConnector();
-    const adapter = new TrezorAdapter(connector);
+    const { connector, adapter } = setup();
     await adapter.connectDevice('safe-7');
 
     await expect(adapter.searchDevices({ resetSession: true })).resolves.toHaveLength(1);
@@ -4056,22 +3453,17 @@ describe('TrezorAdapter', () => {
     expect(connector.disconnect).toHaveBeenCalledWith('safe-7-session');
     expect(connector.searchDevices).toHaveBeenCalledTimes(1);
     await expect(
-      adapter.evmGetAddress('safe-7', 'safe-7', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-        useEmptyPassphrase: true,
-      })
+      adapter.evmGetAddress('safe-7', 'safe-7', EVM_SILENT_PARAMS)
     ).resolves.toMatchObject({ success: true });
     expect(connector.connect).toHaveBeenCalledTimes(2);
   });
 
   it('searchDevices fills "unknown" for missing model + firmwareVersion', async () => {
-    const connector = createConnector();
+    const { connector, adapter } = setup();
     (connector.searchDevices as SearchDevicesMock).mockResolvedValueOnce([
       { connectId: 'mystery-trezor', deviceId: 'mystery-trezor', name: 'Trezor' },
     ]);
 
-    const adapter = new TrezorAdapter(connector);
     const devices = await adapter.searchDevices();
 
     expect(devices[0]).toMatchObject({

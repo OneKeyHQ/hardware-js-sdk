@@ -512,28 +512,45 @@ describe('TrezorAdapter passphrase sessions', () => {
     expect(connector.call).toHaveBeenCalledWith('safe-7-session', 'btcGetAddress', { path: 'p0' });
   });
 
-  it('adds passphrase routing context to REQUEST_PASSPHRASE while a call is active', async () => {
-    // Captured by the closure below but only assigned after connectDevice resolves (line ~537),
+  it.each([
+    [
+      'adds passphrase routing context to REQUEST_PASSPHRASE while a call is active',
+      'ui-request-passphrase',
+      true,
+      (operationId: string): unknown[] => [
+        {
+          type: 'ui-request-passphrase',
+          payload: { connectId: 'safe-7', useEmptyPassphrase: true, operationId },
+        },
+      ],
+    ],
+    [
+      'names the connection live operation on a prompt from an unpinned call',
+      'ui-request-pin',
+      // The call never settles: the prompt has to stay open.
+      false,
+      (operationId: string): unknown[] => [
+        expect.objectContaining({ payload: expect.objectContaining({ operationId }) }),
+      ],
+    ],
+  ] as const)('%s', async (_title, promptType, settles, expectedEvents) => {
+    // Captured by the closure below but only assigned after connectDevice resolves,
     // so it genuinely needs `let`.
     // eslint-disable-next-line prefer-const
     let uiRequestHandler: ((event: unknown) => void) | undefined;
     const connector = createConnector({
       chain: method => {
         if (method === 'btcGetAddress') {
-          uiRequestHandler?.({
-            type: 'ui-request-passphrase',
-            payload: {
-              connectId: 'safe-7',
-            },
-          });
+          uiRequestHandler?.({ type: promptType, payload: { connectId: 'safe-7' } });
+          if (!settles) return new Promise(() => undefined);
         }
         return { address: 'bc1qok' };
       },
     });
     const adapter = new TrezorAdapter(connector);
-    const passphraseEvents: unknown[] = [];
-    adapter.on('ui-request-passphrase', event => {
-      passphraseEvents.push(event);
+    const promptEvents: unknown[] = [];
+    adapter.on(promptType, event => {
+      promptEvents.push(event);
     });
 
     const connected = await adapter.connectDevice('safe-7');
@@ -542,57 +559,21 @@ describe('TrezorAdapter passphrase sessions', () => {
     uiRequestHandler = connector.on.mock.calls.find(c => c[0] === 'ui-request')?.[1];
     expect(uiRequestHandler).toBeDefined();
 
-    await adapter.btcGetAddress('safe-7', 'safe-7', {
+    // The call carries no operationId, so it queues under the connectId; the
+    // live operation on that connection still owns the prompt.
+    const call = adapter.btcGetAddress('safe-7', 'safe-7', {
       path: 'p0',
       useEmptyPassphrase: true,
     });
+    if (settles) {
+      await call;
+    } else {
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10);
+      });
+    }
 
-    // The call carries no operationId, so it queues under the connectId; the
-    // live operation on that connection still owns the prompt.
-    expect(passphraseEvents).toEqual([
-      {
-        type: 'ui-request-passphrase',
-        payload: {
-          connectId: 'safe-7',
-          useEmptyPassphrase: true,
-          operationId: connected.payload,
-        },
-      },
-    ]);
-  });
-
-  it('names the connection live operation on a prompt from an unpinned call', async () => {
-    // eslint-disable-next-line prefer-const
-    let uiRequestHandler: ((event: unknown) => void) | undefined;
-    const connector = createConnector({
-      chain: method => {
-        if (method === 'btcGetAddress') {
-          uiRequestHandler?.({ type: 'ui-request-pin', payload: { connectId: 'safe-7' } });
-          return new Promise(() => {
-            // Never settles: the prompt has to stay open.
-          });
-        }
-        return { address: 'bc1qok' };
-      },
-    });
-    const adapter = new TrezorAdapter(connector);
-    const pinEvents: { payload: { operationId?: string } }[] = [];
-    adapter.on('ui-request-pin', event => {
-      pinEvents.push(event as { payload: { operationId?: string } });
-    });
-
-    const connected = await adapter.connectDevice('safe-7');
-    expect(connected.success).toBe(true);
-    if (!connected.success) return;
-    uiRequestHandler = connector.on.mock.calls.find(c => c[0] === 'ui-request')?.[1];
-
-    void adapter.btcGetAddress('safe-7', 'safe-7', { path: 'p0', useEmptyPassphrase: true });
-    await new Promise<void>(resolve => {
-      setTimeout(resolve, 10);
-    });
-
-    expect(pinEvents).toHaveLength(1);
-    expect(pinEvents[0].payload.operationId).toBe(connected.payload);
+    expect(promptEvents).toEqual(expectedEvents(connected.payload));
   });
 
   it('accepts merged params for btcGetMasterFingerprint', async () => {

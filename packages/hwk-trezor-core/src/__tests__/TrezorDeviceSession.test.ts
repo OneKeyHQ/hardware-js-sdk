@@ -12,6 +12,7 @@ import {
   TrezorDeviceSession,
   TrezorFailureError,
   type TrezorProtocolError,
+  type TrezorThpSessionOptions,
 } from '../index';
 
 class EmptyTransport implements TrezorByteTransport {
@@ -105,6 +106,99 @@ const STORED_THP_CREDENTIAL = {
   autoconnect: true,
 };
 
+const THP_CHANNEL_HEX = '1234';
+const THP_NONCE_HEX = '0102030405060708';
+
+/** BLE session whose fake core walks the THP probe and handshake up to completion. */
+function thpBleSession(options: {
+  pairingMethods: string[];
+  completionState: number;
+  sendStoredCredential: boolean;
+  afterCompletion?: QueuedResponse[];
+  hostPairingMethods?: Array<'CodeEntry' | 'SkipPairing'>;
+  nonceHex?: string;
+  channelHex?: string;
+  logger?: TrezorThpSessionOptions['logger'];
+}) {
+  const calls: CallRecord[] = [];
+  const nonceHex = options.nonceHex ?? THP_NONCE_HEX;
+  const handshakeHash = Buffer.alloc(32, 7);
+  const session = new TrezorDeviceSession({
+    transport: new EmptyTransport(),
+    connectionType: 'ble',
+    chunkSize: 244,
+    coreFactory: createFactory(calls, [
+      // v1 Initialize probe: a THP-only device replies Failure_InvalidProtocol,
+      // so initialize() re-enters via the THP path.
+      { type: 'Failure', message: { code: 'Failure_InvalidProtocol' } },
+      {
+        type: 'ThpCreateChannelResponse',
+        message: {
+          nonce: Buffer.from(nonceHex, 'hex'),
+          channel: Buffer.from(options.channelHex ?? THP_CHANNEL_HEX, 'hex'),
+          handshakeHash,
+          properties: {
+            internal_model: 'T3W1',
+            model_variant: 1,
+            protocol_version_major: 2,
+            protocol_version_minor: 1,
+            pairing_methods: options.pairingMethods,
+          },
+        },
+      },
+      {
+        type: 'ThpHandshakeInitResponse',
+        message: {
+          trezorEphemeralPubkey: Buffer.alloc(32, 1),
+          trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
+          tag: Buffer.alloc(16, 3),
+        },
+      },
+      {
+        type: 'ThpHandshakeCompletionResponse',
+        message: { state: options.completionState },
+      },
+      ...(options.afterCompletion ?? []),
+    ]),
+    thp: {
+      pairingMethods: options.hostPairingMethods,
+      logger: options.logger,
+      randomBytes: size => (size === 8 ? Buffer.from(nonceHex, 'hex') : Buffer.alloc(size, size)),
+      handleHandshakeInit: () => ({
+        trezorMaskedStaticPubkey: Buffer.alloc(32, 4),
+        trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
+        hostEncryptedStaticPubkey: Buffer.alloc(48, 5),
+        hostKey: Buffer.alloc(32, 8),
+        trezorKey: Buffer.alloc(32, 9),
+        handshakeHash,
+        ...(options.sendStoredCredential ? { credentials: STORED_THP_CREDENTIAL } : {}),
+        allCredentials: options.sendStoredCredential ? [STORED_THP_CREDENTIAL] : [],
+        encryptedPayload: Buffer.alloc(16, 6),
+        staticKey: Buffer.alloc(32, 10),
+        hostStaticKeys: { privateKey: randomBytes(32), publicKey: Buffer.alloc(32, 12) },
+      }),
+    },
+  });
+  return { session, calls };
+}
+
+/** A completed handshake with a stored credential, followed by the given responses. */
+const pairedThpBleSession = (
+  afterCompletion: QueuedResponse[],
+  options: {
+    nonceHex?: string;
+    channelHex?: string;
+    logger?: TrezorThpSessionOptions['logger'];
+  } = {}
+) =>
+  thpBleSession({
+    pairingMethods: ['CodeEntry'],
+    completionState: 2,
+    sendStoredCredential: true,
+    afterCompletion,
+    ...options,
+  });
+
 describe('TrezorDeviceSession', () => {
   test('uses v1 Initialize for non-BLE sessions', async () => {
     const calls: CallRecord[] = [];
@@ -128,67 +222,10 @@ describe('TrezorDeviceSession', () => {
   });
 
   test('bootstraps THP and reads Features for BLE sessions', async () => {
-    const calls: CallRecord[] = [];
-    const channel = Buffer.from('1234', 'hex');
-    const handshakeHash = Buffer.alloc(32, 7);
-    const hostKey = Buffer.alloc(32, 8);
-    const trezorKey = Buffer.alloc(32, 9);
-    const session = new TrezorDeviceSession({
-      transport: new EmptyTransport(),
-      connectionType: 'ble',
-      chunkSize: 244,
-      coreFactory: createFactory(calls, [
-        // v1 Initialize probe — THP-only device replies Failure_InvalidProtocol,
-        // session.initialize then re-enters via the THP path.
-        { type: 'Failure', message: { code: 'Failure_InvalidProtocol' } },
-        {
-          type: 'ThpCreateChannelResponse',
-          message: {
-            nonce: Buffer.from('0102030405060708', 'hex'),
-            channel,
-            handshakeHash,
-            properties: {
-              internal_model: 'T3W1',
-              model_variant: 1,
-              protocol_version_major: 2,
-              protocol_version_minor: 1,
-              pairing_methods: ['CodeEntry'],
-            },
-          },
-        },
-        {
-          type: 'ThpHandshakeInitResponse',
-          message: {
-            trezorEphemeralPubkey: Buffer.alloc(32, 1),
-            trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-            tag: Buffer.alloc(16, 3),
-          },
-        },
-        { type: 'ThpHandshakeCompletionResponse', message: { state: 2 } },
-        { type: 'ThpEndResponse', message: {} },
-        { type: 'Features', message: features },
-      ]),
-      thp: {
-        randomBytes: size =>
-          size === 8 ? Buffer.from('0102030405060708', 'hex') : Buffer.alloc(size, size),
-        handleHandshakeInit: () => ({
-          trezorMaskedStaticPubkey: Buffer.alloc(32, 4),
-          trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-          hostEncryptedStaticPubkey: Buffer.alloc(48, 5),
-          hostKey,
-          trezorKey,
-          handshakeHash,
-          credentials: STORED_THP_CREDENTIAL,
-          allCredentials: [STORED_THP_CREDENTIAL],
-          encryptedPayload: Buffer.alloc(16, 6),
-          staticKey: Buffer.alloc(32, 10),
-          hostStaticKeys: {
-            privateKey: randomBytes(32),
-            publicKey: Buffer.alloc(32, 12),
-          },
-        }),
-      },
-    });
+    const { session, calls } = pairedThpBleSession([
+      { type: 'ThpEndResponse', message: {} },
+      { type: 'Features', message: features },
+    ]);
 
     await session.initialize();
 
@@ -204,80 +241,12 @@ describe('TrezorDeviceSession', () => {
     const thpCalls = calls.slice(1);
     expect(thpCalls[0].data).toEqual({ nonce: Buffer.from('0102030405060708', 'hex') });
     expect(thpCalls.every(call => call.thpState === thpCalls[0].thpState)).toBe(true);
-    expect(thpCalls[0].thpState?.channel.toString('hex')).toBe(channel.toString('hex'));
-    expect(thpCalls[0].thpState?.handshakeCredentials?.hostKey).toEqual(hostKey);
-    expect(thpCalls[0].thpState?.handshakeCredentials?.trezorKey).toEqual(trezorKey);
+    expect(thpCalls[0].thpState?.channel.toString('hex')).toBe(THP_CHANNEL_HEX);
+    expect(thpCalls[0].thpState?.handshakeCredentials?.hostKey).toEqual(Buffer.alloc(32, 8));
+    expect(thpCalls[0].thpState?.handshakeCredentials?.trezorKey).toEqual(Buffer.alloc(32, 9));
   });
 
   describe('refuses a Bluetooth peer that cannot prove it is the paired Trezor', () => {
-    const channel = Buffer.from('1234', 'hex');
-    const handshakeHash = Buffer.alloc(32, 7);
-
-    function thpBleSession(options: {
-      pairingMethods: string[];
-      completionState: number;
-      sendStoredCredential: boolean;
-      afterCompletion?: QueuedResponse[];
-      hostPairingMethods?: Array<'CodeEntry' | 'SkipPairing'>;
-    }) {
-      const calls: CallRecord[] = [];
-      const session = new TrezorDeviceSession({
-        transport: new EmptyTransport(),
-        connectionType: 'ble',
-        chunkSize: 244,
-        coreFactory: createFactory(calls, [
-          { type: 'Failure', message: { code: 'Failure_InvalidProtocol' } },
-          {
-            type: 'ThpCreateChannelResponse',
-            message: {
-              nonce: Buffer.from('0102030405060708', 'hex'),
-              channel,
-              handshakeHash,
-              properties: {
-                internal_model: 'T3W1',
-                model_variant: 1,
-                protocol_version_major: 2,
-                protocol_version_minor: 1,
-                pairing_methods: options.pairingMethods,
-              },
-            },
-          },
-          {
-            type: 'ThpHandshakeInitResponse',
-            message: {
-              trezorEphemeralPubkey: Buffer.alloc(32, 1),
-              trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-              tag: Buffer.alloc(16, 3),
-            },
-          },
-          {
-            type: 'ThpHandshakeCompletionResponse',
-            message: { state: options.completionState },
-          },
-          ...(options.afterCompletion ?? []),
-        ]),
-        thp: {
-          pairingMethods: options.hostPairingMethods,
-          randomBytes: size =>
-            size === 8 ? Buffer.from('0102030405060708', 'hex') : Buffer.alloc(size, size),
-          handleHandshakeInit: () => ({
-            trezorMaskedStaticPubkey: Buffer.alloc(32, 4),
-            trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-            hostEncryptedStaticPubkey: Buffer.alloc(48, 5),
-            hostKey: Buffer.alloc(32, 8),
-            trezorKey: Buffer.alloc(32, 9),
-            handshakeHash,
-            ...(options.sendStoredCredential ? { credentials: STORED_THP_CREDENTIAL } : {}),
-            allCredentials: options.sendStoredCredential ? [STORED_THP_CREDENTIAL] : [],
-            encryptedPayload: Buffer.alloc(16, 6),
-            staticKey: Buffer.alloc(32, 10),
-            hostStaticKeys: { privateKey: randomBytes(32), publicKey: Buffer.alloc(32, 12) },
-          }),
-        },
-      });
-      return { session, calls };
-    }
-
     test('a peer answering unencrypted v1 Initialize', async () => {
       const calls: CallRecord[] = [];
       const session = new TrezorDeviceSession({
@@ -343,63 +312,10 @@ describe('TrezorDeviceSession', () => {
   test('does not write THP initialization diagnostics to console by default', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     try {
-      const calls: CallRecord[] = [];
-      const channel = Buffer.from('1234', 'hex');
-      const handshakeHash = Buffer.alloc(32, 7);
-      const session = new TrezorDeviceSession({
-        transport: new EmptyTransport(),
-        connectionType: 'ble',
-        chunkSize: 244,
-        coreFactory: createFactory(calls, [
-          { type: 'Failure', message: { code: 'Failure_InvalidProtocol' } },
-          {
-            type: 'ThpCreateChannelResponse',
-            message: {
-              nonce: Buffer.from('0102030405060708', 'hex'),
-              channel,
-              handshakeHash,
-              properties: {
-                internal_model: 'T3W1',
-                model_variant: 1,
-                protocol_version_major: 2,
-                protocol_version_minor: 1,
-                pairing_methods: ['CodeEntry'],
-              },
-            },
-          },
-          {
-            type: 'ThpHandshakeInitResponse',
-            message: {
-              trezorEphemeralPubkey: Buffer.alloc(32, 1),
-              trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-              tag: Buffer.alloc(16, 3),
-            },
-          },
-          { type: 'ThpHandshakeCompletionResponse', message: { state: 2 } },
-          { type: 'ThpEndResponse', message: {} },
-          { type: 'Features', message: { ...features, session_id: 'do-not-log' } },
-        ]),
-        thp: {
-          randomBytes: size =>
-            size === 8 ? Buffer.from('0102030405060708', 'hex') : Buffer.alloc(size, size),
-          handleHandshakeInit: () => ({
-            trezorMaskedStaticPubkey: Buffer.alloc(32, 4),
-            trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-            hostEncryptedStaticPubkey: Buffer.alloc(48, 5),
-            hostKey: Buffer.alloc(32, 8),
-            trezorKey: Buffer.alloc(32, 9),
-            handshakeHash,
-            credentials: STORED_THP_CREDENTIAL,
-            allCredentials: [STORED_THP_CREDENTIAL],
-            encryptedPayload: Buffer.alloc(16, 6),
-            staticKey: Buffer.alloc(32, 10),
-            hostStaticKeys: {
-              privateKey: randomBytes(32),
-              publicKey: Buffer.alloc(32, 12),
-            },
-          }),
-        },
-      });
+      const { session } = pairedThpBleSession([
+        { type: 'ThpEndResponse', message: {} },
+        { type: 'Features', message: { ...features, session_id: 'do-not-log' } },
+      ]);
 
       await session.initialize();
 
@@ -414,66 +330,18 @@ describe('TrezorDeviceSession', () => {
   });
 
   test('does not log raw THP create-channel wire packets', async () => {
-    const calls: CallRecord[] = [];
     const logs: Array<{ event: string; data?: Record<string, unknown> }> = [];
-    const nonce = Buffer.from('639ba57ff4e0c234', 'hex');
-    const channel = Buffer.from('3c83', 'hex');
-    const handshakeHash = Buffer.alloc(32, 7);
-    const session = new TrezorDeviceSession({
-      transport: new EmptyTransport(),
-      connectionType: 'ble',
-      chunkSize: 244,
-      coreFactory: createFactory(calls, [
-        // v1 Initialize probe — replies trigger the THP fallback path.
-        { type: 'Failure', message: { code: 'Failure_InvalidProtocol' } },
-        {
-          type: 'ThpCreateChannelResponse',
-          message: {
-            nonce,
-            channel,
-            handshakeHash,
-            properties: {
-              internal_model: 'T3W1',
-              model_variant: 1,
-              protocol_version_major: 2,
-              protocol_version_minor: 1,
-              pairing_methods: ['CodeEntry'],
-            },
-          },
-        },
-        {
-          type: 'ThpHandshakeInitResponse',
-          message: {
-            trezorEphemeralPubkey: Buffer.alloc(32, 1),
-            trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-            tag: Buffer.alloc(16, 3),
-          },
-        },
-        { type: 'ThpHandshakeCompletionResponse', message: { state: 2 } },
+    const { session, calls } = pairedThpBleSession(
+      [
         { type: 'ThpEndResponse', message: {} },
         { type: 'Features', message: features },
-      ]),
-      thp: {
-        randomBytes: size => (size === 8 ? nonce : Buffer.alloc(size, size)),
+      ],
+      {
+        nonceHex: '639ba57ff4e0c234',
+        channelHex: '3c83',
         logger: entry => logs.push({ event: entry.event, data: entry.data }),
-        handleHandshakeInit: () => ({
-          trezorMaskedStaticPubkey: Buffer.alloc(32, 4),
-          trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
-          hostEncryptedStaticPubkey: Buffer.alloc(48, 5),
-          hostKey: Buffer.alloc(32, 8),
-          trezorKey: Buffer.alloc(32, 9),
-          handshakeHash,
-          credentials: STORED_THP_CREDENTIAL,
-          allCredentials: [STORED_THP_CREDENTIAL],
-          encryptedPayload: Buffer.alloc(16, 6),
-          staticKey: Buffer.alloc(32, 10),
-          hostStaticKeys: {
-            privateKey: randomBytes(32),
-            publicKey: Buffer.alloc(32, 12),
-          },
-        }),
-      },
-    });
+      }
+    );
 
     await session.initialize();
 
