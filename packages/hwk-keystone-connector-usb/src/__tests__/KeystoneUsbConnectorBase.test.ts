@@ -1,4 +1,5 @@
 import { UR, URDecoder, UREncoder } from '@ngraveio/bc-ur';
+import bytewords from '@ngraveio/bc-ur/dist/bytewords';
 import { Actions } from '@keystonehq/hw-transport-usb';
 import { Status, TransportError } from '@keystonehq/hw-transport-error';
 import { ETHSignature, EthSignRequest } from '@keystonehq/bc-ur-registry-eth';
@@ -31,6 +32,41 @@ function encodeUrString(urType: string, urData: string): string {
   return new UREncoder(new UR(Buffer.from(urData, 'hex'), urType), Infinity)
     .nextPart()
     .toUpperCase();
+}
+
+/** CBOR head for a major type and an unsigned argument. */
+function cborHead(major: number, value: number): Buffer {
+  if (value < 24) return Buffer.from([major * 32 + value]);
+  if (value < 0x1_00_00) {
+    const out = Buffer.alloc(3);
+    out[0] = major * 32 + 25;
+    out.writeUInt16BE(value, 1);
+    return out;
+  }
+  const out = Buffer.alloc(5);
+  out[0] = major * 32 + 26;
+  out.writeUInt32BE(value, 1);
+  return out;
+}
+
+/** A fountain part whose headers say whatever the test needs. */
+function fountainFrame(options: {
+  seqNum: number;
+  seqLength: number;
+  messageLength: number;
+  fragmentLength: number;
+}): string {
+  const cbor = Buffer.concat([
+    Buffer.from([0x85]),
+    cborHead(0, options.seqNum),
+    cborHead(0, options.seqLength),
+    cborHead(0, options.messageLength),
+    cborHead(0, 0),
+    cborHead(2, options.fragmentLength),
+    Buffer.alloc(options.fragmentLength, 7),
+  ]);
+  const body = bytewords.encode(cbor.toString('hex'), bytewords.STYLES.MINIMAL);
+  return `ur:bytes/${options.seqNum}-${options.seqLength}/${body}`;
 }
 
 /**
@@ -500,7 +536,30 @@ describe('KeystoneUsbConnectorBase', () => {
   describe('call("resolveUr", ...)', () => {
     it.each([
       ['a payload that is not bounded CBOR', () => encodeUrString('bytes', '9f')],
-      ['more parts than any reply has', () => 'UR:BYTES/1-5000/LPADAXCSENCYLOBEMOHSGM'],
+      [
+        'more parts than the decoder can take',
+        () =>
+          fountainFrame({
+            seqNum: 1,
+            seqLength: 100_000,
+            messageLength: 1_000_000,
+            fragmentLength: 10,
+          }),
+      ],
+      [
+        'more than 1 MB of data',
+        () =>
+          fountainFrame({
+            seqNum: 1,
+            seqLength: Math.ceil((2 * 1024 * 1024) / 200),
+            messageLength: 2 * 1024 * 1024,
+            fragmentLength: 200,
+          }),
+      ],
+      [
+        'a part count that does not fit its sizes',
+        () => fountainFrame({ seqNum: 1, seqLength: 5000, messageLength: 10, fragmentLength: 1 }),
+      ],
     ])('reports a reply with %s as unreadable before decoding it', async (_case, reply) => {
       const receivePart = jest.spyOn(URDecoder.prototype, 'receivePart');
       const connector = versionConnector({
@@ -520,6 +579,23 @@ describe('KeystoneUsbConnectorBase', () => {
       } finally {
         receivePart.mockRestore();
       }
+    });
+
+    it('decodes a multi-part reply cut into small fragments', async () => {
+      const message = `5901f4${'ab'.repeat(500)}`;
+      const encoder = new UREncoder(new UR(Buffer.from(message, 'hex'), 'bytes'), 40, 0, 10);
+      const reply = Array.from({ length: encoder.fragmentsLength }, () => encoder.nextPart()).join(
+        ' '
+      );
+      const connector = versionConnector({ [Actions.CMD_RESOLVE_UR]: () => ({ payload: reply }) });
+      const session = await connector.connect();
+
+      const result = await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData: 'de',
+      });
+
+      expect(result).toMatchObject({ success: true, payload: { urData: message } });
     });
 
     it('reports a reply that does not decode as unreadable and keeps the session', async () => {

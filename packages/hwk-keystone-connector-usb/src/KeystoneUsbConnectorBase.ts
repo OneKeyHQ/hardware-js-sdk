@@ -109,23 +109,67 @@ function toUrEncoded(ur: KeystoneUr): string {
     .toUpperCase();
 }
 
+/** The most data one reply may carry, whatever its fragment size. */
+const MAX_UR_MESSAGE_BYTES = 1024 * 1024;
 /**
- * Animated replies stay far below this; the fountain decoder allocates per declared part, so an
- * unbounded count from the device would exhaust memory before any check could run.
+ * The fountain decoder's work per mixed part grows with the square of the part count, so a reply
+ * cut into tiny fragments can stall it even within the byte limit.
  */
-const MAX_UR_SEQ_LENGTH = 4096;
+const MAX_UR_SEQ_LENGTH = 32_768;
+/** Argument bytes for CBOR additional info 24, 25, 26 and 27. */
+const CBOR_ARGUMENT_BYTES = [1, 2, 4, 8];
+
+/** Reads `[seqNum, seqLen, messageLen, checksum, fragment]` from CBOR that passed the bounds. */
+function readFountainPart(input: Uint8Array) {
+  let offset = 0;
+  const readHead = (expectedMajor: number): number => {
+    const initial = input[offset];
+    offset += 1;
+    if (Math.floor(initial / 32) !== expectedMajor) {
+      throw new Error('Keystone USB reply part is not a fountain part');
+    }
+    const info = initial % 32;
+    if (info < 24) return info;
+    const size = CBOR_ARGUMENT_BYTES[info - 24];
+    let value = 0;
+    for (let i = 0; i < size; i += 1) value = value * 256 + input[offset + i];
+    offset += size;
+    return value;
+  };
+  if (readHead(4) !== 5) throw new Error('Keystone USB reply part is not a fountain part');
+  const seqNum = readHead(0);
+  const seqLength = readHead(0);
+  const messageLength = readHead(0);
+  readHead(0); // checksum
+  const fragmentLength = readHead(2);
+  return { seqNum, seqLength, messageLength, fragmentLength };
+}
 
 /** Checks one UR part from the device before the vendor decoder parses its CBOR. */
 function assertBoundedUrPart(part: string): void {
   const match = /^ur:[a-z0-9-]+\/(?:(\d{1,9})-(\d{1,9})\/)?([a-z]+)$/i.exec(part);
   if (!match) throw new Error('Keystone USB reply part is not a UR');
-  const seqLength = match[2] === undefined ? undefined : Number(match[2]);
-  if (seqLength !== undefined && (seqLength < 1 || seqLength > MAX_UR_SEQ_LENGTH)) {
-    throw new Error('Keystone USB reply declares an unsupported number of parts');
-  }
   // Minimal bytewords carry their own CRC32; decode throws on a mismatch.
-  const payloadHex = bytewords.decode(match[3].toLowerCase(), bytewords.STYLES.MINIMAL);
-  assertBoundedCbor(Buffer.from(payloadHex, 'hex'));
+  const payload = Buffer.from(
+    bytewords.decode(match[3].toLowerCase(), bytewords.STYLES.MINIMAL),
+    'hex'
+  );
+  assertBoundedCbor(payload, MAX_UR_MESSAGE_BYTES);
+  if (match[1] === undefined) return;
+  const header = readFountainPart(payload);
+  // The text header, the CBOR header and the real sizes must agree, so the declared part count
+  // is tied to the data the reply actually carries.
+  if (
+    header.seqNum !== Number(match[1]) ||
+    header.seqLength !== Number(match[2]) ||
+    header.fragmentLength < 1 ||
+    header.messageLength < 1 ||
+    header.messageLength > MAX_UR_MESSAGE_BYTES ||
+    header.seqLength > MAX_UR_SEQ_LENGTH ||
+    header.seqLength !== Math.ceil(header.messageLength / header.fragmentLength)
+  ) {
+    throw new Error('Keystone USB reply part has inconsistent or oversized headers');
+  }
 }
 
 function fromUrEncoded(encoded: unknown): KeystoneUr {
