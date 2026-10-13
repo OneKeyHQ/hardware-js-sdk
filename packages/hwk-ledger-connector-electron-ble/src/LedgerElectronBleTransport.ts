@@ -9,13 +9,14 @@ import {
 } from '@ledgerhq/device-management-kit';
 import { Left, Right } from 'purify-ts';
 import { defer, from, mergeMap, repeat } from 'rxjs';
+import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
+
 import {
   LEDGER_BLE_MIN_FRAME_SIZE,
   LEDGER_BLE_VENDOR,
   ledgerBleConnectProfile,
   ledgerBleMatch,
 } from './bleProfile';
-import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
 import type {
   BleDeviceInfos,
@@ -42,6 +43,8 @@ export class LedgerElectronBleTransport implements Transport {
     string,
     {
       close: () => boolean;
+      /** Set once the native connect is issued; before that nothing native needs undoing. */
+      nativeStarted?: boolean;
       connectedDevice?: TransportConnectedDevice;
     }
   >();
@@ -130,15 +133,24 @@ export class LedgerElectronBleTransport implements Transport {
   }
 
   /**
-   * Abandon connects still in flight in the main process. The pending
+   * Abandon connects that are not established yet. One still preparing (waiting for the scan to
+   * stop) is closed and its slot freed here, so it never starts a native pairing and the device
+   * can be retried at once. One already in the main process is cancelled there; the pending
    * `bridge.connect` then rejects and connect()'s own error path cleans up.
    */
   async cancelPairing(deviceId?: string): Promise<void> {
-    const ids = [...this.connections.entries()]
-      .filter(
-        ([id, entry]) => !entry.connectedDevice && (deviceId === undefined || id === deviceId)
-      )
-      .map(([id]) => id);
+    const pendingEntries = [...this.connections.entries()].filter(
+      ([id, entry]) => !entry.connectedDevice && (deviceId === undefined || id === deviceId)
+    );
+    const ids: string[] = [];
+    for (const [id, entry] of pendingEntries) {
+      if (entry.nativeStarted) {
+        ids.push(id);
+      } else {
+        entry.close();
+        this.connections.delete(id);
+      }
+    }
     await Promise.all(
       ids.map(id =>
         this.bridge.cancelPairing?.({ vendor: LEDGER_BLE_VENDOR, id }).catch(() => undefined)
@@ -177,13 +189,16 @@ export class LedgerElectronBleTransport implements Transport {
       if (notify) onDisconnect(deviceId);
     };
     // Reserve before the first await so concurrent acquires cannot share native GATT state.
-    this.connections.set(deviceId, { close });
+    const entry: { close: () => boolean; nativeStarted?: boolean } = { close };
+    this.connections.set(deviceId, entry);
     try {
       await this.stopDiscovering();
       if (!this.devices.has(deviceId)) {
         const info = await this.bridge.getDevice(deviceId);
         if (info) this.remember(info);
       }
+      // Cancelled while preparing: cancelPairing already freed the slot, and nothing native ran.
+      if (closed) return Left(new OpeningConnectionError('Bluetooth connection was cancelled'));
       const known = this.devices.get(deviceId);
       if (!known) {
         close();
@@ -199,6 +214,7 @@ export class LedgerElectronBleTransport implements Transport {
           onDisconnect(deviceId);
         }
       });
+      entry.nativeStarted = true;
       await this.bridge.connect(
         deviceId,
         ledgerBleConnectProfile({

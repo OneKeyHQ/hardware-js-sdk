@@ -285,6 +285,36 @@ describe('Ledger Electron BLE lifecycle', () => {
     }
   });
 
+  it('never starts pairing when cancelled while the scan is still stopping', async () => {
+    const { transport, connect, bridge } = fixture();
+    const cancelPairing = jest.fn(async (): Promise<void> => undefined);
+    Object.assign(bridge, { cancelPairing });
+    let finishStop!: () => void;
+    bridge.stopScan.mockImplementationOnce(
+      () =>
+        new Promise<undefined>(resolve => {
+          finishStop = () => resolve(undefined);
+        })
+    );
+    const cancelled = connect();
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    await transport.cancelPairing('ledger-test');
+    // Nothing native was started, and the device is free to retry at once.
+    expect(cancelPairing).not.toHaveBeenCalled();
+    const retry = connect();
+    finishStop();
+
+    expect((await cancelled).isLeft()).toBe(true);
+    const retried = await retry;
+    expect(retried.isRight()).toBe(true);
+    // Only the retry reached the native connect.
+    expect(bridge.connect).toHaveBeenCalledTimes(1);
+    await transport.disconnect({ connectedDevice: retried.unsafeCoerce() });
+  });
+
   it('forwards cancelPairing to the bridge only for connects still in flight', async () => {
     const { transport, connect, bridge } = fixture();
     const cancelPairing = jest.fn(async (): Promise<void> => undefined);

@@ -1,4 +1,5 @@
 import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
+
 import { LedgerElectronBleTransport } from './LedgerElectronBleTransport';
 
 import type { TransportArgs } from '@ledgerhq/device-management-kit';
