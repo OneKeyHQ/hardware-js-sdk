@@ -513,19 +513,12 @@ export class KeystoneAdapter implements IHardwareWallet {
       const discoveredConnectionType = this._searchDeviceTargets.get(searchTargetId);
       if (discoveredConnectionType === 'qr') {
         selectedConnectionType = 'qr';
-        // The cold-start job queues under its own label; forward a cancel aimed
-        // at this search target to it.
-        const abortColdStart = () =>
-          this._jobQueue.cancelActiveAndPending(
-            KEYSTONE_COLD_START_JOB_LABEL,
-            scope.signal.reason as Error
-          );
-        scope.signal.addEventListener('abort', abortColdStart, { once: true });
-        try {
-          connected = await this.importFromQr();
-        } finally {
-          scope.signal.removeEventListener('abort', abortColdStart);
-        }
+        // Queue under this search target so a cancel aimed at it stops only this scan, and return
+        // on that cancel instead of waiting for an earlier scan to leave the queue.
+        connected = await KeystoneAdapter._untilAborted(
+          scope.signal,
+          this._importFromQr({}, searchTargetId)
+        );
       } else if (discoveredConnectionType === 'usb') {
         selectedConnectionType = 'usb';
         if (!this._usbConnector) {
@@ -738,8 +731,15 @@ export class KeystoneAdapter implements IHardwareWallet {
   // ---------------------------------------------------------------------------
 
   async importFromQr(options: ImportFromQrOptions = {}): Promise<Response<DeviceInfo>> {
+    return this._importFromQr(options, KEYSTONE_COLD_START_JOB_LABEL);
+  }
+
+  private async _importFromQr(
+    options: ImportFromQrOptions,
+    jobKey: string
+  ): Promise<Response<DeviceInfo>> {
     try {
-      return await this._jobQueue.enqueue(KEYSTONE_COLD_START_JOB_LABEL, async signal => {
+      return await this._jobQueue.enqueue(jobKey, async signal => {
         const displayDevice = placeholderDeviceInfo();
         let responseUr: KeystoneUr;
 
@@ -2520,6 +2520,20 @@ export class KeystoneAdapter implements IHardwareWallet {
           reject(error);
         }
       );
+    });
+  }
+
+  /** Settles with `signal`'s reason once it aborts; a later outcome of `promise` is dropped. */
+  private static _untilAborted<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
+    promise.catch(() => undefined);
+    if (signal.aborted) return Promise.reject(signal.reason);
+    return new Promise<T>((resolve, reject) => {
+      const onAbort = () => reject(signal.reason);
+      signal.addEventListener('abort', onAbort, { once: true });
+      promise
+        .then(resolve, reject)
+        .finally(() => signal.removeEventListener('abort', onAbort))
+        .catch(() => undefined);
     });
   }
 

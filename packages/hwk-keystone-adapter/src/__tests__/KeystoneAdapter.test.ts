@@ -2629,6 +2629,35 @@ describe('KeystoneAdapter', () => {
       expect(fake.requests).toHaveLength(1);
     });
 
+    it('cancelling one queued QR connect leaves the scan in progress on another target', async () => {
+      const adapter = newTestAdapter();
+      const displayed: QrDisplayData[] = [];
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, event => displayed.push(event.payload.data));
+
+      const [first] = await adapter.searchDeviceTargets({ transportType: 'qr' });
+      const [firstConnect, firstSettled] = track(adapter.connectDevice(first.searchTargetId));
+      await nextImmediate();
+      expect(displayed).toHaveLength(1);
+
+      const [second] = await adapter.searchDeviceTargets({ transportType: 'qr' });
+      const secondConnect = adapter.connectDevice(second.searchTargetId);
+      await nextImmediate();
+      adapter.cancel(second.searchTargetId);
+
+      await expect(secondConnect).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      expect(firstSettled()).toBe(false);
+
+      const reply = deviceReply(displayed[0], { mfpHex: FIXTURE_MFP });
+      if (!reply) throw new Error('no reply for the displayed request');
+      adapter.uiResponse({ type: UI_RESPONSE.RECEIVE_QR_RESPONSE, payload: urJson(reply) });
+      await expect(firstConnect).resolves.toMatchObject({ success: true });
+      expect(displayed).toHaveLength(1);
+      await adapter.dispose();
+    });
+
     it('does not disconnect the replacement USB operation when the retired owner ends late', async () => {
       const usb = fakeUsbConnector({ incrementSessionIds: true });
       const disconnect = jest.spyOn(usb.connector, 'disconnect');
