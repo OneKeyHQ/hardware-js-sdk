@@ -1,7 +1,7 @@
 {
   "name": "@onekeyfe/hwk-keystone-connector-usb",
   "version": "1.2.8-alpha.12",
-  "description": "IConnector implementation for Keystone hardware wallets via USB (WebUSB + Node USB)",
+  "description": "IConnector implementation for Keystone hardware wallets via WebUSB",
   "author": "OneKey",
   "license": "MIT",
   "main": "dist/index.js",
@@ -26,16 +26,6 @@
       "require": {
         "types": "./dist/webusb.d.ts",
         "default": "./dist/webusb.js"
-      }
-    },
-    "./nodeusb": {
-      "import": {
-        "types": "./dist/nodeusb.d.mts",
-        "default": "./dist/nodeusb.mjs"
-      },
-      "require": {
-        "types": "./dist/nodeusb.d.ts",
-        "default": "./dist/nodeusb.js"
       }
     }
   },
@@ -73,17 +63,8 @@
   },
   "devDependencies": {
     "@keystonehq/bc-ur-registry-eth": "0.22.1",
-    "@keystonehq/hw-transport-nodeusb": "0.2.0",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0"
-  },
-  "peerDependencies": {
-    "@keystonehq/hw-transport-nodeusb": "0.2.0"
-  },
-  "peerDependenciesMeta": {
-    "@keystonehq/hw-transport-nodeusb": {
-      "optional": true
-    }
   }
 }

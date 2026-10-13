@@ -4109,16 +4109,6 @@
   resolved "https://registry.yarnpkg.com/@keystonehq/hw-transport-error/-/hw-transport-error-0.0.2.tgz#10a3f69b8a80e4d3fec514b4abcdae6f595770ae"
   integrity sha512-j6rOJU277Cmq9oBiFjtVHJhUZ/gELGYGZMUXBlAom1WyK8pNrD3+I8kCVGp5Ss5oB+Zqo7Az5xCx/z+0i+Y40A==
 
-"@keystonehq/hw-transport-nodeusb@0.2.0":
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/@keystonehq/hw-transport-nodeusb/-/hw-transport-nodeusb-0.2.0.tgz#26512eae9976bc6cb2babc556d9bb23e4a5dcf94"
-  integrity sha512-RO6irodMLk+SOTycwV+VTlFWzvxi79vC6q/P/PmCzBpLWS5r+bOKACH+xa/AbeYi2h/q5Biam88GP+xNo29uUA==
-  dependencies:
-    "@keystonehq/hw-transport-error" "^0.0.2"
-    "@keystonehq/hw-transport-usb" "^0.2.0"
-    buffer "^6.0.3"
-    usb "2.14.0"
-
 "@keystonehq/hw-transport-usb@0.2.0", "@keystonehq/hw-transport-usb@^0.2.0":
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/@keystonehq/hw-transport-usb/-/hw-transport-usb-0.2.0.tgz#0a340ea16230d47536789c975e9baffbf4aa3303"

@@ -57,7 +57,7 @@ function usbDisplayName(device: KeystoneUsbDeviceDescriptor): string {
   return device.productName?.trim() || 'Keystone';
 }
 
-/** Static surface of `TransportWebUSB`/`TransportNodeUSB`, injected by `_subpath/*`. */
+/** Static surface of `TransportWebUSB`, injected by `_subpath/webusb`. */
 export interface KeystoneUsbTransportStatic {
   connect(config?: TransportConfig): Promise<TransportHID>;
   connectDevice?(
