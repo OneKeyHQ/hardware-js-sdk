@@ -65,8 +65,13 @@ export type DevicePermissionResponse = {
 };
 
 /**
- * `mismatch`: the selected device is not this operation's device, surfaced as `DeviceMismatch`.
+ * `mismatch`: the host's own records do not match the selected device.
  * `skipped`: the host had nothing to bind, a host contract problem rather than a user action.
+ *
+ * Either way the binding is not saved and `DEVICE_BINDING_STATUS` reports `failed`. The SDK has
+ * already checked the device itself, so a business call continues; an explicit `bindBleDevice`
+ * fails because saving was its whole purpose. A host that must not use the result has to discard
+ * it itself.
  */
 export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
 
