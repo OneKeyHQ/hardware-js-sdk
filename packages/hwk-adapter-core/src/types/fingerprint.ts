@@ -58,11 +58,3 @@ export function parseWalletMasterFingerprint(value: unknown): string | undefined
 export function deriveDeviceFingerprint(value: string): string {
   return bytesToHex(sha256(utf8ToBytes(value))).slice(0, 16);
 }
-
-/**
- * Domain-separated 256-bit wallet id. Input must be one fixed, vendor-defined public source, never
- * a variable subset of exported accounts, or one wallet would get several ids.
- */
-export function deriveWalletId(canonicalPublicMaterial: string): string {
-  return bytesToHex(sha256(utf8ToBytes(`onekey-hwk-wallet-id:v1:${canonicalPublicMaterial}`)));
-}

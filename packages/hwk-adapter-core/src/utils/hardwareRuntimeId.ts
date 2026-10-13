@@ -9,7 +9,7 @@ const RANDOM_ID_PATTERN = /^[0-9a-f]{32}$/;
 
 /**
  * `search-target`: one device in one discovery snapshot, dead on the next search of that kind.
- * `link`: one open transport. `operation`: one business operation, outliving links via `rebind()`.
+ * `link`: one open transport. `operation`: one business operation.
  */
 export type HardwareRuntimeIdKind = 'operation' | 'search-target' | 'link';
 

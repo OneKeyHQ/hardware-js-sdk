@@ -71,6 +71,24 @@ export function resolveSearchTargetReusePolicy(
   return device.capabilities?.persistentDeviceIdentity ? 'reconnectable' : 'current-discovery';
 }
 
+/** Search target for a physical device whose connectId is the discovery handle. */
+export function toPhysicalDeviceSearchTarget(
+  vendor: VendorType,
+  device: DeviceInfo
+): DeviceSearchTarget {
+  return {
+    searchTargetId: device.connectId,
+    searchTargetReusePolicy: resolveSearchTargetReusePolicy(device),
+    vendor,
+    connectionType: device.connectionType,
+    kind: 'physical',
+    label: device.label,
+    model: device.model,
+    modelName: device.modelName,
+    serialNumber: device.serialNumber,
+  };
+}
+
 /**
  * A selectable result from hardware discovery. It may represent a physical
  * transport endpoint or an interactive entry such as Keystone QR; it is not a
@@ -89,15 +107,6 @@ export interface DeviceSearchTarget {
   modelName?: string;
   serialNumber?: string;
 }
-
-/**
- * @deprecated Use DeviceSearchTarget. Kept for consumers of the pre-release
- * connection-target API.
- */
-export type ConnectionTarget = Omit<DeviceSearchTarget, 'searchTargetId'> & {
-  targetId: string;
-  searchTargetId?: string;
-};
 
 export type WalletIdentity =
   | {

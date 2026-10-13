@@ -9,6 +9,17 @@ import type {
 import type { TypedEventEmitter } from './TypedEventEmitter';
 import type { UiRequestRegistry } from './UiRequestRegistry';
 
+export function emitDeviceBindingStatus(
+  emitter: TypedEventEmitter<HardwareEventMap>,
+  selectionRequestId: string,
+  status: DeviceBindingStatus['status']
+): void {
+  emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
+    type: UI_REQUEST.DEVICE_BINDING_STATUS,
+    payload: { selectionRequestId, status },
+  });
+}
+
 /**
  * A host refusal is reported, never thrown: the device is already connected, so a lost binding
  * is worth a warning and a retry, not failing the user's work.
@@ -26,10 +37,7 @@ export async function requestSaveDeviceBinding(
 ): Promise<SaveDeviceBindingOutcome> {
   const type = UI_REQUEST.REQUEST_SAVE_DEVICE_BINDING;
   const emitStatus = (status: DeviceBindingStatus['status']) =>
-    emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-      type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId: binding.selectionRequestId, status },
-    });
+    emitDeviceBindingStatus(emitter, binding.selectionRequestId, status);
   const declined = (reason: SaveDeviceBindingDeclineReason): SaveDeviceBindingOutcome => {
     emitStatus('failed');
     return { saved: false, reason };

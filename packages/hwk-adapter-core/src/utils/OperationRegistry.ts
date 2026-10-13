@@ -1,5 +1,5 @@
 import { HardwareErrorCode, createHwkError } from '../types/errors';
-import { createHardwareOperationId } from './hardwareRuntimeId';
+import { createHardwareOperationId, isHardwareOperationId } from './hardwareRuntimeId';
 
 import type { ConnectionType, DeviceInfo, VendorType } from '../types/device';
 
@@ -17,8 +17,6 @@ export type HardwareOperation = {
    */
   connectionType: ConnectionType;
   connectionKeys: string[];
-  createdAt: number;
-  lastActiveAt: number;
 };
 
 type EndedOperation = {
@@ -64,7 +62,6 @@ export class OperationRegistry {
     connectionType: ConnectionType;
     connectionKeys?: string[];
   }): HardwareOperation {
-    const now = Date.now();
     const operationId = createHardwareOperationId(this._vendor);
     const operation: HardwareOperation = {
       operationId,
@@ -76,8 +73,6 @@ export class OperationRegistry {
         params.connectId,
         ...(params.connectionKeys ?? []),
       ]),
-      createdAt: now,
-      lastActiveAt: now,
     };
     const timer = this._createTimer(operationId);
     this._active.set(operationId, { ...operation, timer, retainCount: 0 });
@@ -134,23 +129,23 @@ export class OperationRegistry {
     );
   }
 
-  /** Replace the live transport binding after the same target was reconnected. */
-  rebind(
-    operationId: string,
-    params: {
-      connectId: string;
-      device: DeviceInfo;
-      connectionType: ConnectionType;
-      connectionKeys?: string[];
+  /** Map a job queue key (an operation id or a connection key) to its live operation id. */
+  findOperationIdByJobKey(jobKey: string | undefined): string | undefined {
+    if (!jobKey) return undefined;
+    if (isHardwareOperationId(jobKey)) return jobKey;
+    return this.findActiveByConnectionKey(jobKey)?.operationId;
+  }
+
+  /**
+   * End an operation on the caller's explicit release. Throws for an unknown id; returns undefined
+   * when it had already ended.
+   */
+  release(operationId: string): HardwareOperation | undefined {
+    if (!this.find(operationId)) {
+      this.resolve(operationId);
+      return undefined;
     }
-  ): HardwareOperation {
-    const active = this.resolve(operationId) as ActiveOperation;
-    active.connectId = params.connectId;
-    active.device = params.device;
-    active.connectionType = params.connectionType;
-    active.connectionKeys = uniqueKeys([params.connectId, ...(params.connectionKeys ?? [])]);
-    this._touch(active);
-    return active;
+    return this.end(operationId, 'explicit');
   }
 
   end(operationId: string, reason: OperationEndReason): HardwareOperation | undefined {
@@ -186,7 +181,6 @@ export class OperationRegistry {
 
   private _touch(active: ActiveOperation): void {
     if (active.timer) clearTimeout(active.timer);
-    active.lastActiveAt = Date.now();
     active.timer = active.retainCount === 0 ? this._createTimer(active.operationId) : undefined;
   }
 

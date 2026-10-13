@@ -26,12 +26,11 @@ export type {
   DeviceInfo,
   DeviceTarget,
   DeviceCapabilities,
-  ConnectionTarget,
   DeviceSearchTarget,
   SearchTargetReusePolicy,
   WalletIdentity,
 } from './types/device';
-export { resolveSearchTargetReusePolicy } from './types/device';
+export { resolveSearchTargetReusePolicy, toPhysicalDeviceSearchTarget } from './types/device';
 
 export type {
   EvmGetAddressParams,
@@ -117,7 +116,6 @@ export type { ChainForFingerprint } from './types/fingerprint';
 export {
   CHAIN_FINGERPRINT_PATHS,
   deriveDeviceFingerprint,
-  deriveWalletId,
   parseBip32MasterFingerprint,
   parseWalletMasterFingerprint,
   MISSING_BIP32_MASTER_FINGERPRINT,
@@ -198,7 +196,10 @@ export {
   parseHardwareRuntimeId,
 } from './utils/hardwareRuntimeId';
 export type { HardwareRuntimeId, HardwareRuntimeIdKind } from './utils/hardwareRuntimeId';
-export { resolveHardwareOperationTarget } from './utils/hardwareOperationTarget';
+export {
+  pickConnectionContext,
+  resolveHardwareOperationTarget,
+} from './utils/hardwareOperationTarget';
 export type { HardwareOperationTarget } from './utils/hardwareOperationTarget';
 
 export type {
@@ -232,7 +233,10 @@ export type {
   ElectronBleScanOptions,
   ElectronBleConnectOptions,
 } from './types/electronBle';
-export { requestSaveDeviceBinding } from './utils/requestSaveDeviceBinding';
+export {
+  emitDeviceBindingStatus,
+  requestSaveDeviceBinding,
+} from './utils/requestSaveDeviceBinding';
 export { requestBleDeviceSelection } from './utils/requestBleDeviceSelection';
 export {
   UiRequestRegistry,
@@ -270,6 +274,7 @@ export type {
   HardwareMethodName,
 } from './utils/methodCatalog';
 export {
+  buildAllNetworkCancelledFailure,
   buildUnsupportedMethodResponse,
   isConnectionLost,
   isWalletSafetyFailure,

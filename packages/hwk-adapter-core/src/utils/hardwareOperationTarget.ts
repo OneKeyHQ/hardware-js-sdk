@@ -4,6 +4,7 @@ import { hasHardwareRuntimeIdPrefix, parseHardwareRuntimeId } from './hardwareRu
 
 import type { VendorType } from '../types/device';
 import type { Response } from '../types/response';
+import type { IHardwareConnectionContext } from '../types/wallet';
 
 export interface HardwareOperationTarget {
   /** Effective target accepted by existing adapter/connector call paths. */
@@ -61,4 +62,21 @@ export function resolveHardwareOperationTarget(
 
   const operationId = commonId ?? positionalOperationId;
   return success({ operationId, targetId: operationId ?? targetId });
+}
+
+/** Narrow the connection-context fields of untyped call params. */
+export function pickConnectionContext(params: {
+  knownConnections?: unknown;
+  extra?: unknown;
+  allowDeviceSelection?: unknown;
+  supportedTransports?: unknown;
+}): IHardwareConnectionContext {
+  return {
+    knownConnections: params.knownConnections as IHardwareConnectionContext['knownConnections'],
+    extra: params.extra as IHardwareConnectionContext['extra'],
+    allowDeviceSelection:
+      typeof params.allowDeviceSelection === 'boolean' ? params.allowDeviceSelection : undefined,
+    supportedTransports:
+      params.supportedTransports as IHardwareConnectionContext['supportedTransports'],
+  };
 }

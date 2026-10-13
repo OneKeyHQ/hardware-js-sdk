@@ -2,7 +2,6 @@ import type { ConnectorUiEvent, EConnectorInteraction } from './connector';
 import type { DEVICE } from '../events/device';
 import type { Response } from './response';
 import type {
-  ConnectionTarget,
   ConnectionType,
   DeviceInfo,
   DeviceSearchTarget,
@@ -595,8 +594,6 @@ export interface IHardwareWallet<TConfig = unknown>
   searchDevices(options?: SearchDevicesOptions): Promise<DeviceInfo[]>;
   /** Discover selectable hardware entries without claiming identified devices or wallets. */
   searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]>;
-  /** @deprecated Use searchDeviceTargets(). */
-  listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]>;
   /** Connect or logically bind a selected search result and return a runtime-only operation id. */
   connectDevice(searchTargetId: string): Promise<Response<string>>;
   /** Device Manager rebind: verify the existing identity before replacing its BLE locator. */

@@ -1002,17 +1002,6 @@ describe('LedgerAdapter', () => {
       ]);
     });
 
-    it('keeps the deprecated connection-target projection compatible', async () => {
-      const targets = await adapter.listConnectionTargets();
-
-      expect(targets).toEqual([
-        expect.objectContaining({
-          targetId: 'dev-1',
-        }),
-      ]);
-      expect(targets[0]).not.toHaveProperty('searchTargetId');
-    });
-
     it('connects an empty-id USB target and returns an operation id', async () => {
       connector.connect.mockResolvedValueOnce(
         ledgerSession('session-empty', { connectId: 'usb-path' })

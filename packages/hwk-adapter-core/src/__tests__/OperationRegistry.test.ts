@@ -79,13 +79,6 @@ describe('OperationRegistry', () => {
     expect(operation.connectionType).toBe('ble');
     expect(registry.resolve(operation.operationId).connectionType).toBe('ble');
 
-    const rebound = registry.rebind(operation.operationId, {
-      connectId: 'usb-target',
-      device,
-      connectionType: 'usb',
-    });
-    expect(rebound.connectionType).toBe('usb');
-
     registry.endAll('runtime-reset');
   });
 
@@ -177,33 +170,15 @@ describe('OperationRegistry', () => {
     );
   });
 
-  it('rebinds an active operation to a recovered session without reviving ended ids', () => {
+  it('keeps the excepted operation when ending by connection key or ending all', () => {
     const registry = new OperationRegistry({ vendor: 'ledger' });
     const operation = createOperation(registry, { connectionKeys: ['session-1'] });
 
     registry.endByConnectionKey('session-1', 'disconnect', operation.operationId);
     registry.endAll('explicit', operation.operationId);
 
-    registry.rebind(operation.operationId, {
-      connectId: 'usb-target-recovered',
-      device: { ...device, connectId: 'usb-target-recovered' },
-      connectionType: 'usb',
-      connectionKeys: ['session-2'],
-    });
-
-    // A rebind replaces the binding wholesale; the pre-rebind target is not carried over.
-    expect(registry.resolve(operation.operationId)).toMatchObject({
-      connectId: 'usb-target-recovered',
-      connectionKeys: ['usb-target-recovered', 'session-2'],
-    });
+    expect(registry.resolve(operation.operationId)).toMatchObject({ connectId: 'usb-target' });
     registry.end(operation.operationId, 'disconnect');
-    expect(() =>
-      registry.rebind(operation.operationId, {
-        connectId: 'usb-target-3',
-        device,
-        connectionType: 'usb',
-      })
-    ).toThrow(expect.objectContaining({ code: HardwareErrorCode.OperationEnded }));
   });
 
   it('ends a binding when its physical session disconnects', () => {

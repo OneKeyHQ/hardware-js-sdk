@@ -1,5 +1,6 @@
 import {
   HardwareErrorCode,
+  buildAllNetworkCancelledFailure,
   failure,
   isConnectionLost,
   isUserRefusal,
@@ -173,7 +174,8 @@ export function createAllNetworkGetAddress({
             ? buildUnsupportedNetworkResponse(item)
             : undefined,
         callItem: async ({ method, chain, item }) => {
-          if (cancelScope.signal.aborted) return buildCancelledFailure(cancelScope.signal);
+          if (cancelScope.signal.aborted)
+            return buildAllNetworkCancelledFailure(cancelScope.signal);
           const itemDeviceId = getItemDeviceId(item) ?? chainFingerprints.get(chain) ?? '';
           return callAllNetworkMethod(
             callChain,
@@ -226,17 +228,6 @@ export function createAllNetworkGetAddress({
       releaseOperationRetention?.();
     }
   };
-}
-
-/** UserAborted is a top-level abort code, so this ends the bundle. */
-function buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
-  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
-  const code =
-    typeof reason?.code === 'number'
-      ? (reason.code as HardwareErrorCode)
-      : HardwareErrorCode.UserAborted;
-  const message = typeof reason?.message === 'string' ? reason.message : '';
-  return failure(code, message || 'All-network get-address cancelled');
 }
 
 function isTopLevelAllNetworkFailure(response: AllNetworkAddressResponse): boolean {
@@ -299,7 +290,7 @@ async function attachLedgerIdentity(
   const knownFingerprint = getItemDeviceId(item) || chainFingerprints.get(chain) || '';
   // Bootstrapping is another device round trip, so it needs the same gap check.
   if (!knownFingerprint && cancelSignal.aborted) {
-    const cancelled = buildCancelledFailure<never>(cancelSignal);
+    const cancelled = buildAllNetworkCancelledFailure<never>(cancelSignal);
     return { ...item, success: false, payload: cancelled.payload };
   }
   const fingerprint =

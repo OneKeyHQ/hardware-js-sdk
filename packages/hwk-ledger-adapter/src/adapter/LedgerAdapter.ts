@@ -14,15 +14,17 @@ import {
   canReplayHardwareMethodAfterTransportFailure,
   createHwkError,
   deriveDeviceFingerprint,
+  emitDeviceBindingStatus,
   failure,
   isHardwareOperationId,
   isHwkRecoveryHint,
   operationMayHaveCompletedParams,
+  pickConnectionContext,
   rehydrateConnectorError,
   requestBleDeviceSelection,
   requestSaveDeviceBinding,
-  resolveSearchTargetReusePolicy,
   success,
+  toPhysicalDeviceSearchTarget,
 } from '@onekeyfe/hwk-adapter-core';
 
 import {
@@ -57,7 +59,6 @@ import type {
   BtcSignedPsbt,
   BtcSignedTx,
   ChainForFingerprint,
-  ConnectionTarget,
   ConnectionType,
   ConnectorCallResult,
   ConnectorDevice,
@@ -293,11 +294,7 @@ export class LedgerAdapter implements IHardwareWallet {
   private _finishBleBinding(status: 'failed' | 'cancelled'): void {
     const selectionRequestId = this._bindingSelectionRequestId;
     this._bindingSelectionRequestId = undefined;
-    if (selectionRequestId)
-      this.emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-        type: UI_REQUEST.DEVICE_BINDING_STATUS,
-        payload: { selectionRequestId, status },
-      });
+    if (selectionRequestId) emitDeviceBindingStatus(this.emitter, selectionRequestId, status);
   }
 
   private _isBleConnection(): boolean {
@@ -461,25 +458,7 @@ export class LedgerAdapter implements IHardwareWallet {
 
   async searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]> {
     const devices = await this.searchDevices(options);
-    return devices.map(device => ({
-      searchTargetId: device.connectId,
-      searchTargetReusePolicy: resolveSearchTargetReusePolicy(device),
-      vendor: 'ledger',
-      connectionType: device.connectionType,
-      kind: 'physical',
-      label: device.label,
-      model: device.model,
-      modelName: device.modelName,
-      serialNumber: device.serialNumber,
-    }));
-  }
-
-  async listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]> {
-    const targets = await this.searchDeviceTargets(options);
-    return targets.map(({ searchTargetId, ...target }) => ({
-      ...target,
-      targetId: searchTargetId,
-    }));
+    return devices.map(device => toPhysicalDeviceSearchTarget('ledger', device));
   }
 
   // USB single-session invariant: evict all sessions, best-effort (see connectDevice).
@@ -811,14 +790,9 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async releaseOperation(operationId: string): Promise<void> {
-    const operation = this._operations.find(operationId);
-    if (!operation) {
-      this._operations.resolve(operationId);
-      return;
-    }
-    const endedOperation = this._operations.end(operationId, 'explicit');
+    const endedOperation = this._operations.release(operationId);
     if (!endedOperation) return;
-    const { connectId } = operation;
+    const { connectId } = endedOperation;
     debugLog('[LedgerAdapter][REQ]', {
       method: 'releaseOperation',
       connectId,
@@ -1026,11 +1000,12 @@ export class LedgerAdapter implements IHardwareWallet {
         commonParams: {
           autoInstallApp: typeof autoInstallApp === 'boolean' ? autoInstallApp : undefined,
           operationId: typeof operationId === 'string' ? operationId : undefined,
-          knownConnections: knownConnections as ICommonCallParams['knownConnections'],
-          extra: extra as ICommonCallParams['extra'],
-          allowDeviceSelection:
-            typeof allowDeviceSelection === 'boolean' ? allowDeviceSelection : undefined,
-          supportedTransports: supportedTransports as ICommonCallParams['supportedTransports'],
+          ...pickConnectionContext({
+            knownConnections,
+            extra,
+            allowDeviceSelection,
+            supportedTransports,
+          }),
         },
         rest,
       };
@@ -1784,10 +1759,7 @@ export class LedgerAdapter implements IHardwareWallet {
    * Undefined at cold start when no operation owns the job.
    */
   private _activeOperationId(): string | undefined {
-    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
-    if (!activeJobId) return undefined;
-    if (isHardwareOperationId(activeJobId)) return activeJobId;
-    return this._operations.findActiveByConnectionKey(activeJobId)?.operationId;
+    return this._operations.findOperationIdByJobKey(this._jobQueue.getActiveJob()?.deviceId);
   }
 
   // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.

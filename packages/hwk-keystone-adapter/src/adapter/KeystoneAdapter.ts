@@ -15,6 +15,7 @@ import {
   UI_REQUEST_TIMEOUT_TAG,
   UI_RESPONSE,
   UiRequestRegistry,
+  buildAllNetworkCancelledFailure,
   createHardwareSearchTargetId,
   createHwkError,
   deriveDeviceFingerprint,
@@ -81,7 +82,6 @@ import type {
   CancelScopeHandle,
   ChainCapability,
   ChainForFingerprint,
-  ConnectionTarget,
   ConnectorCallResult,
   ConnectorConnectTarget,
   ConnectorDevice,
@@ -174,17 +174,6 @@ function waitForKeystoneUsbReattachProbe(): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, KEYSTONE_USB_REATTACH_PROBE_INTERVAL_MS);
   });
-}
-
-/** UserAborted is a top-level abort code, so this ends the bundle. */
-function buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
-  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
-  const code =
-    typeof reason?.code === 'number'
-      ? (reason.code as HardwareErrorCode)
-      : HardwareErrorCode.UserAborted;
-  const message = typeof reason?.message === 'string' ? reason.message : '';
-  return failure(code, message || 'All-network get-address cancelled');
 }
 
 const BIP44_COIN_TYPE_TO_CHAIN: Record<number, ChainCapability> = {
@@ -497,14 +486,6 @@ export class KeystoneAdapter implements IHardwareWallet {
       model: device.model,
       modelName: device.modelName,
       serialNumber: device.serialNumber,
-    }));
-  }
-
-  async listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]> {
-    const targets = await this.searchDeviceTargets(options);
-    return targets.map(({ searchTargetId, ...target }) => ({
-      ...target,
-      targetId: searchTargetId,
     }));
   }
 
@@ -823,7 +804,7 @@ export class KeystoneAdapter implements IHardwareWallet {
         callItem: async ({ method, item, index }) => {
           if (scope.signal.aborted) {
             cancelledIndexes.add(index);
-            return buildCancelledFailure(scope.signal);
+            return buildAllNetworkCancelledFailure(scope.signal);
           }
           const commonArgs = {
             path: item.path,

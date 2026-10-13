@@ -8,9 +8,11 @@ import {
   UI_REQUEST,
   UI_RESPONSE,
   UiRequestRegistry,
+  buildAllNetworkCancelledFailure,
   canReplayHardwareMethodAfterTransportFailure,
   createHwkError,
   defaultOriginForCode,
+  emitDeviceBindingStatus,
   failure,
   isConnectionLost,
   isHardwareOperationId,
@@ -18,13 +20,14 @@ import {
   isUserRefusal,
   isWalletSafetyFailure,
   operationMayHaveCompletedParams,
+  pickConnectionContext,
   rehydrateConnectorError,
   requestBleDeviceSelection,
   requestSaveDeviceBinding,
   resolveHardwareOperationTarget,
-  resolveSearchTargetReusePolicy,
   runAllNetworkGetAddress,
   success,
+  toPhysicalDeviceSearchTarget,
 } from '@onekeyfe/hwk-adapter-core';
 import { randomBytes } from '@noble/hashes/utils';
 
@@ -50,7 +53,6 @@ import type {
   BtcSignedPsbt,
   BtcSignedTx,
   ChainForFingerprint,
-  ConnectionTarget,
   ConnectionType,
   ConnectorCallResult,
   ConnectorDevice,
@@ -327,14 +329,12 @@ export class TrezorAdapter implements IHardwareWallet {
         useEmptyPassphrase:
           typeof useEmptyPassphrase === 'boolean' ? useEmptyPassphrase : undefined,
         operationId: typeof operationId === 'string' ? operationId : undefined,
-        connectionContext: {
-          knownConnections: knownConnections as IHardwareConnectionContext['knownConnections'],
-          extra: extra as IHardwareConnectionContext['extra'],
-          allowDeviceSelection:
-            typeof allowDeviceSelection === 'boolean' ? allowDeviceSelection : undefined,
-          supportedTransports:
-            supportedTransports as IHardwareConnectionContext['supportedTransports'],
-        },
+        connectionContext: pickConnectionContext({
+          knownConnections,
+          extra,
+          allowDeviceSelection,
+          supportedTransports,
+        }),
         rest,
       };
     }
@@ -804,25 +804,7 @@ export class TrezorAdapter implements IHardwareWallet {
 
   async searchDeviceTargets(options?: SearchDevicesOptions): Promise<DeviceSearchTarget[]> {
     const devices = await this.searchDevices(options);
-    return devices.map(device => ({
-      searchTargetId: device.connectId,
-      searchTargetReusePolicy: resolveSearchTargetReusePolicy(device),
-      vendor: 'trezor',
-      connectionType: device.connectionType,
-      kind: 'physical',
-      label: device.label,
-      model: device.model,
-      modelName: device.modelName,
-      serialNumber: device.serialNumber,
-    }));
-  }
-
-  async listConnectionTargets(options?: SearchDevicesOptions): Promise<ConnectionTarget[]> {
-    const targets = await this.searchDeviceTargets(options);
-    return targets.map(({ searchTargetId, ...target }) => ({
-      ...target,
-      targetId: searchTargetId,
-    }));
+    return devices.map(device => toPhysicalDeviceSearchTarget('trezor', device));
   }
 
   async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
@@ -915,12 +897,7 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   async releaseOperation(operationId: string): Promise<void> {
-    const operation = this._operations.find(operationId);
-    if (!operation) {
-      this._operations.resolve(operationId);
-      return;
-    }
-    const endedOperation = this._operations.end(operationId, 'explicit');
+    const endedOperation = this._operations.release(operationId);
     if (!endedOperation) return;
     await this._releaseOperationConnection(endedOperation);
   }
@@ -1017,7 +994,7 @@ export class TrezorAdapter implements IHardwareWallet {
         callItem: async ({ method, item, index }) => {
           if (cancelScope.signal.aborted) {
             topLevelFailureIndexes.add(index);
-            return TrezorAdapter._buildCancelledFailure(cancelScope.signal);
+            return buildAllNetworkCancelledFailure(cancelScope.signal);
           }
           const expectedDeviceId = TrezorAdapter._getItemDeviceId(item) ?? deviceId;
           if (expectedDeviceId) {
@@ -1044,7 +1021,7 @@ export class TrezorAdapter implements IHardwareWallet {
             // gap check.
             if (cancelScope.signal.aborted) {
               topLevelFailureIndexes.add(index);
-              const cancelled = TrezorAdapter._buildCancelledFailure<never>(cancelScope.signal);
+              const cancelled = buildAllNetworkCancelledFailure<never>(cancelScope.signal);
               return { ...item, success: false, payload: cancelled.payload };
             }
             const fingerprint = await getLiveDeviceId(deviceId);
@@ -1347,10 +1324,7 @@ export class TrezorAdapter implements IHardwareWallet {
    * operation of its connectId, so a mid-call UI request can name it.
    */
   private _activeOperationId(): string | undefined {
-    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
-    if (!activeJobId) return undefined;
-    if (isHardwareOperationId(activeJobId)) return activeJobId;
-    return this._operations.findActiveByConnectionKey(activeJobId)?.operationId;
+    return this._operations.findOperationIdByJobKey(this._jobQueue.getActiveJob()?.deviceId);
   }
 
   /**
@@ -1784,17 +1758,6 @@ export class TrezorAdapter implements IHardwareWallet {
   private static _getItemDeviceId(item: AllNetworkAddressParams): string | undefined {
     const { deviceId } = item as { deviceId?: unknown };
     return typeof deviceId === 'string' && deviceId.length > 0 ? deviceId : undefined;
-  }
-
-  /** UserAborted is a top-level abort code, so this ends the bundle. */
-  private static _buildCancelledFailure<T>(signal: AbortSignal): Response<T> {
-    const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
-    const code =
-      typeof reason?.code === 'number'
-        ? (reason.code as HardwareErrorCode)
-        : HardwareErrorCode.UserAborted;
-    const message = typeof reason?.message === 'string' ? reason.message : '';
-    return failure(code, message || 'All-network get-address cancelled');
   }
 
   private _callAllNetworkMethod(
@@ -2455,10 +2418,7 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   private _emitBindingStatus(selectionRequestId: string, status: 'cancelled' | 'failed'): void {
-    this._emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-      type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId, status },
-    });
+    emitDeviceBindingStatus(this._emitter, selectionRequestId, status);
   }
 
   private _rememberVerifiedConnection(deviceId: string, connectId: string): void {

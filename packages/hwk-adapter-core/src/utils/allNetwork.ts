@@ -154,6 +154,17 @@ export function isConnectionLost(code: HardwareErrorCode | number | undefined): 
   return code !== undefined && codes.includes(code);
 }
 
+/** UserAborted is a top-level abort code, so this ends the bundle. */
+export function buildAllNetworkCancelledFailure<T>(signal: AbortSignal): Response<T> {
+  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+  const code =
+    typeof reason?.code === 'number'
+      ? (reason.code as HardwareErrorCode)
+      : HardwareErrorCode.UserAborted;
+  const message = typeof reason?.message === 'string' ? reason.message : '';
+  return failure(code, message || 'All-network get-address cancelled');
+}
+
 export function buildUnsupportedMethodResponse(
   item: AllNetworkAddressParams
 ): AllNetworkAddressResponse {

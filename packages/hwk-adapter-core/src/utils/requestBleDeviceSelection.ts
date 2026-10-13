@@ -1,5 +1,6 @@
 import { UI_REQUEST } from '../events/ui-request';
 import { HardwareErrorCode, createHwkError } from '../types/errors';
+import { emitDeviceBindingStatus } from './requestSaveDeviceBinding';
 
 import type { DeviceInfo } from '../types/device';
 import type { DeviceSelectionRequest, HardwareEventMap } from '../types/wallet';
@@ -108,16 +109,10 @@ export async function requestBleDeviceSelection({
         message: 'Selected Bluetooth device is no longer available',
       });
     }
-    emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-      type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId: requestId, status: 'verifying' },
-    });
+    emitDeviceBindingStatus(emitter, requestId, 'verifying');
     return { device, requestId };
   } catch (error) {
-    emitter.emit(UI_REQUEST.DEVICE_BINDING_STATUS, {
-      type: UI_REQUEST.DEVICE_BINDING_STATUS,
-      payload: { selectionRequestId: requestId, status: signal.aborted ? 'cancelled' : 'failed' },
-    });
+    emitDeviceBindingStatus(emitter, requestId, signal.aborted ? 'cancelled' : 'failed');
     throw error;
   } finally {
     stop();
