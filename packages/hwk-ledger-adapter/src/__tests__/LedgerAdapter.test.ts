@@ -1,6 +1,7 @@
 import {
   EConnectorInteraction,
   HardwareErrorCode,
+  SDK,
   UI_REQUEST,
   UI_RESPONSE,
   createHardwareOperationId,
@@ -132,6 +133,25 @@ async function waitForCondition(condition: () => boolean): Promise<void> {
     await new Promise(resolve => {
       setTimeout(resolve, 0);
     });
+  }
+}
+
+/** Bounded wait: a regression that leaves `promise` hanging fails the test instead of timing it out. */
+async function settleWithin<T>(
+  promise: Promise<T>,
+  ms = 100
+): Promise<{ settled: true; value: T } | { settled: false }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ settled: false }>(resolve => {
+    timer = setTimeout(() => resolve({ settled: false }), ms);
+  });
+  try {
+    return await Promise.race([
+      promise.then(value => ({ settled: true as const, value })),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -1322,6 +1342,54 @@ describe('LedgerAdapter', () => {
 
       expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
       await expect(adapter.releaseOperation(operationId)).resolves.toBeUndefined();
+    });
+
+    it('releasing an operation cancels its unlock prompt and settles the locked call', async () => {
+      connector.callImpl.mockRejectedValue(
+        Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked })
+      );
+      const operationId = await connectOperation();
+      const unlockPrompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, event => {
+        unlockPrompts.push(event.payload);
+      });
+      const closeWindow = jest.fn();
+      adapter.on(UI_REQUEST.CLOSE_UI_WINDOW, closeWindow);
+      const ended: unknown[] = [];
+      adapter.on(SDK.OPERATION_ENDED, event => {
+        ended.push(event.payload);
+      });
+
+      const pending = adapter.evmGetAddress(operationId, '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+        operationId,
+      });
+      await waitForCondition(() => unlockPrompts.length === 1);
+      expect(unlockPrompts).toEqual([expect.objectContaining({ operationId })]);
+
+      const released = await settleWithin(adapter.releaseOperation(operationId));
+      expect(released.settled).toBe(true);
+      const result = await settleWithin(pending);
+      // The unlock wait re-tags any cancellation of its prompt as UserAborted.
+      expect(result).toEqual({
+        settled: true,
+        value: {
+          success: false,
+          payload: expect.objectContaining({ code: HardwareErrorCode.UserAborted }),
+        },
+      });
+      expect(closeWindow).toHaveBeenCalled();
+      expect(ended).toEqual([{ operationId, reason: 'explicit' }]);
+      expect(connector.disconnect).toHaveBeenCalledWith('session-abc');
+
+      // A late confirm has no prompt to land in and does not resume the call.
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
+        payload: { confirmed: true },
+      });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(connector.call).toHaveBeenCalledTimes(1);
     });
 
     it('cancels the active job without terminating its operation', async () => {

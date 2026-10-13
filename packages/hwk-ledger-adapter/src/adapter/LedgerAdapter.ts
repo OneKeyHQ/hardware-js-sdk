@@ -785,6 +785,8 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async releaseOperation(operationId: string): Promise<void> {
+    const operation = this._operations.find(operationId);
+    if (operation) this._cancelOperationWork(operation);
     const endedOperation = this._operations.release(operationId);
     if (!endedOperation) return;
     const { connectId } = endedOperation;
@@ -805,6 +807,28 @@ export class LedgerAdapter implements IHardwareWallet {
       });
       throw err;
     }
+  }
+
+  /**
+   * Ends a released operation's calls and prompts before teardown, which otherwise waits on a call
+   * that waits on a prompt nobody will answer. Device I/O already on the wire still drains.
+   */
+  private _cancelOperationWork(
+    operation: NonNullable<ReturnType<OperationRegistry['find']>>
+  ): void {
+    const { operationId } = operation;
+    const reason = createHwkError({
+      code: HardwareErrorCode.OperationEnded,
+      message: 'Ledger operation was released',
+      params: { operationId, reason: 'explicit' },
+    });
+    // A call without operationId queues under the connectId this operation owns.
+    const queueKeys = new Set([
+      ledgerQueueKey({ operationId }),
+      ledgerQueueKey({ connectId: operation.connectId }),
+    ]);
+    for (const key of queueKeys) this._jobQueue.cancelActiveAndPending(key, reason);
+    this._uiRegistry.cancel(undefined, undefined, operationId);
   }
 
   private async _releaseOperationConnection(
