@@ -706,6 +706,61 @@ describe('TrezorAdapter', () => {
     ).toBe(false);
   });
 
+  it.each([
+    ['BLE-only: no USB permission, scan or probe; the saved BLE endpoint is used', ['ble'], true],
+    ['USB-only: the saved BLE endpoint is never opened', ['usb'], false],
+  ] as const)(
+    'keeps identity routing inside supportedTransports (%s)',
+    async (_title, supportedTransports, reachesBle) => {
+      const connector: IConnector = {
+        ...createConnector(),
+        availableTransports: ['usb', 'ble'],
+      };
+      // A plugged USB device would satisfy a USB-only call; without one, only the BLE endpoint is left.
+      (connector.searchDevices as SearchDevicesMock).mockImplementation(async options =>
+        options?.transportType === 'usb' && reachesBle
+          ? [{ connectId: 'usb-safe-7', deviceId: '', name: 'Trezor USB', connectionType: 'usb' }]
+          : []
+      );
+      v1Session(connector);
+      const { adapter } = setup(connector);
+      const permissionRequests: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+        permissionRequests.push(event.payload);
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+
+      const result = await adapter.evmGetAddress('', 'safe-7', {
+        ...EVM_PARAMS,
+        knownConnections: [{ transport: 'ble', connectId: 'safe-7' }],
+        supportedTransports,
+      });
+
+      const searchedTransports = (connector.searchDevices as SearchDevicesMock).mock.calls.map(
+        ([options]) => options?.transportType
+      );
+      const connected = (connector.connect as ConnectMock).mock.calls.map(([id]) => id);
+      if (reachesBle) {
+        expect(result.success).toBe(true);
+        expect(searchedTransports).not.toContain('usb');
+        expect(connected).toEqual(['safe-7']);
+        expect(permissionRequests).not.toContainEqual(
+          expect.objectContaining({ transport: 'usb' })
+        );
+      } else {
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceNotFound },
+        });
+        expect(connected).not.toContain('safe-7');
+      }
+      await adapter.dispose();
+    }
+  );
+
   it('carries opaque context through explicit binding before the wallet call runs', async () => {
     const { connector, adapter } = setup();
     const extra = { dbDeviceId: 'db-trezor' };

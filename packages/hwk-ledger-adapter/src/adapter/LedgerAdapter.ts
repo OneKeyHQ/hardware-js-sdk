@@ -2039,7 +2039,11 @@ export class LedgerAdapter implements IHardwareWallet {
       this.connector.availableTransports.includes('ble')
     ) {
       this._activeConnectionType = 'usb';
-      const usbDevices = await this._searchDevices({ transportType: 'usb' }, internalSignal);
+      // The host's model table may rule USB out; discovery never opens a transport it excludes.
+      const usbDevices =
+        context?.supportedTransports && !context.supportedTransports.includes('usb')
+          ? []
+          : await this._searchDevices({ transportType: 'usb' }, internalSignal);
       LedgerAdapter._throwIfAborted(internalSignal);
       const knownUsb = context?.knownConnections?.find(
         connection => connection.transport === 'usb'

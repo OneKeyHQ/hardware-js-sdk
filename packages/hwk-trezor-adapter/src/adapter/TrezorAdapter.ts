@@ -1717,6 +1717,13 @@ export class TrezorAdapter implements IHardwareWallet {
     return this._connector.availableTransports ?? [this._connector.connectionType];
   }
 
+  /** Transports the connector offers and the host's model table allows; discovery opens no other. */
+  private _allowedTransports(context?: IHardwareConnectionContext): readonly ConnectionType[] {
+    const supported: readonly ConnectionType[] | undefined = context?.supportedTransports;
+    const available = this._availableTransports();
+    return supported ? available.filter(transport => supported.includes(transport)) : available;
+  }
+
   private async _releaseProvisionalConnection(
     connectId: string,
     signal: AbortSignal
@@ -2232,17 +2239,19 @@ export class TrezorAdapter implements IHardwareWallet {
     );
     if (connectedMatch) return { connectId: connectedMatch.connectId };
 
-    const availableTransports = this._availableTransports();
-    if (availableTransports.includes('usb')) {
+    const allowedTransports = this._allowedTransports(context);
+    if (allowedTransports.includes('usb')) {
       await TrezorAdapter._abortable(
         signal,
         this._ensureDevicePermission(undefined, expectedDeviceId, 'usb')
       );
     }
-    const candidates = await TrezorAdapter._abortable(
-      signal,
-      this._searchDevices({ transportType: 'usb' }, signal)
-    );
+    const candidates = allowedTransports.includes('usb')
+      ? await TrezorAdapter._abortable(
+          signal,
+          this._searchDevices({ transportType: 'usb' }, signal)
+        )
+      : [];
 
     const mismatchedDeviceIds: string[] = [];
     const knownConnection = this._knownDeviceConnections.get(expectedDeviceId);
@@ -2313,7 +2322,7 @@ export class TrezorAdapter implements IHardwareWallet {
     }
 
     const [knownBleConnectId] = knownBleIds;
-    if (knownBleConnectId && availableTransports.includes('ble')) {
+    if (knownBleConnectId && allowedTransports.includes('ble')) {
       // A saved endpoint never opens a new binding session after failure.
       await TrezorAdapter._abortable(
         signal,
@@ -2351,7 +2360,7 @@ export class TrezorAdapter implements IHardwareWallet {
     context: IHardwareConnectionContext | undefined,
     reason: 'missing-binding' | 'manual-rebind'
   ): Promise<{ connectId: string; selectionRequestId?: string }> {
-    const availableTransports = this._availableTransports();
+    const availableTransports = this._allowedTransports(context);
     const allowUsbFallback = reason !== 'manual-rebind' && availableTransports.includes('usb');
     const knownUsbIds = context?.knownConnections
       ? context.knownConnections.flatMap(connection =>
