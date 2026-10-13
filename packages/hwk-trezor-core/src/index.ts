@@ -539,6 +539,11 @@ const normalizeCreateAppSessionOptions = (
   };
 };
 
+/** A pairing the device cannot prove: surfaced as ThpPairingFailed by the adapter. */
+function thpPairingRefused(message: string): Error {
+  return Object.assign(new Error(message), { code: 'ThpPairingFailed' });
+}
+
 export class TrezorDeviceSession {
   private readonly transport: TrezorByteTransport;
 
@@ -655,6 +660,14 @@ export class TrezorDeviceSession {
       }
       this.log('error', 'session.initialize.error', { error: errorToLog(error) });
       throw error;
+    }
+
+    if (this.connectionType === 'ble') {
+      // Trezor firmware serves Bluetooth over THP only, so a peer answering plain v1 here is not
+      // a Trezor; staying would send PINs and passphrases unencrypted to it.
+      this.core = undefined;
+      this.currentFeatures = undefined;
+      throw thpPairingRefused('Trezor Bluetooth requires the encrypted THP protocol');
     }
 
     this.log('info', 'session.initialize.done', {
@@ -1074,7 +1087,8 @@ class TrezorThpSession {
 
     const pairingMethods = getPairingMethods(
       properties.pairing_methods,
-      this.options.pairingMethods ?? ['CodeEntry', 'QrCode', 'NFC', 'SkipPairing']
+      // SkipPairing is for emulators and debug firmware only; production devices offer CodeEntry.
+      this.options.pairingMethods ?? ['CodeEntry', 'QrCode', 'NFC']
     );
     if (pairingMethods.length === 0) {
       throw new Error('No compatible THP pairing method');
@@ -1153,6 +1167,11 @@ class TrezorThpSession {
     );
 
     const completionState = completion.message.state as number;
+    // A real device reports a paired state only for a credential we sent and it accepted. A
+    // paired claim without one comes from a peer that is not the device we paired with.
+    if (completionState !== 0 && !handshakeCredentials.credentials) {
+      throw thpPairingRefused('Trezor reported a pairing that no stored credential confirms');
+    }
     this.thpState.setIsPaired(completionState !== 0);
     this.thpState.setPhase('pairing');
 
@@ -1205,6 +1224,10 @@ class TrezorThpSession {
     });
 
     if (selectMethod.type === 'ThpEndResponse') {
+      // Ending pairing without a code is SkipPairing; for any other method it skips the proof.
+      if (selectedMethod !== protocolThpRuntime.ThpPairingMethod.SkipPairing) {
+        throw thpPairingRefused('Trezor ended pairing without completing the selected method');
+      }
       this.thpState.setIsPaired(true);
       this.thpState.setPhase('paired');
       this.log('info', 'thp.pair.done', { responseType: selectMethod.type });

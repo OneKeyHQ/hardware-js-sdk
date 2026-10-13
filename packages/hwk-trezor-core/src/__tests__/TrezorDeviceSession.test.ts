@@ -97,6 +97,14 @@ const features = {
   model: 'T3W1',
 };
 
+// A credential from an earlier pairing; a paired handshake is only valid when the host sent one.
+const STORED_THP_CREDENTIAL = {
+  trezor_static_public_key: '04'.repeat(32),
+  credential: 'aa'.repeat(16),
+  host_static_key: 'bb'.repeat(32),
+  autoconnect: true,
+};
+
 describe('TrezorDeviceSession', () => {
   test('uses v1 Initialize for non-BLE sessions', async () => {
     const calls: CallRecord[] = [];
@@ -170,7 +178,8 @@ describe('TrezorDeviceSession', () => {
           hostKey,
           trezorKey,
           handshakeHash,
-          allCredentials: [],
+          credentials: STORED_THP_CREDENTIAL,
+          allCredentials: [STORED_THP_CREDENTIAL],
           encryptedPayload: Buffer.alloc(16, 6),
           staticKey: Buffer.alloc(32, 10),
           hostStaticKeys: {
@@ -200,6 +209,124 @@ describe('TrezorDeviceSession', () => {
     expect(thpCalls[0].thpState?.handshakeCredentials?.trezorKey).toEqual(trezorKey);
   });
 
+  describe('refuses a Bluetooth peer that cannot prove it is the paired Trezor', () => {
+    const channel = Buffer.from('1234', 'hex');
+    const handshakeHash = Buffer.alloc(32, 7);
+
+    function thpBleSession(options: {
+      pairingMethods: string[];
+      completionState: number;
+      sendStoredCredential: boolean;
+      afterCompletion?: QueuedResponse[];
+      hostPairingMethods?: Array<'CodeEntry' | 'SkipPairing'>;
+    }) {
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'ble',
+        chunkSize: 244,
+        coreFactory: createFactory(calls, [
+          { type: 'Failure', message: { code: 'Failure_InvalidProtocol' } },
+          {
+            type: 'ThpCreateChannelResponse',
+            message: {
+              nonce: Buffer.from('0102030405060708', 'hex'),
+              channel,
+              handshakeHash,
+              properties: {
+                internal_model: 'T3W1',
+                model_variant: 1,
+                protocol_version_major: 2,
+                protocol_version_minor: 1,
+                pairing_methods: options.pairingMethods,
+              },
+            },
+          },
+          {
+            type: 'ThpHandshakeInitResponse',
+            message: {
+              trezorEphemeralPubkey: Buffer.alloc(32, 1),
+              trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
+              tag: Buffer.alloc(16, 3),
+            },
+          },
+          {
+            type: 'ThpHandshakeCompletionResponse',
+            message: { state: options.completionState },
+          },
+          ...(options.afterCompletion ?? []),
+        ]),
+        thp: {
+          pairingMethods: options.hostPairingMethods,
+          randomBytes: size =>
+            size === 8 ? Buffer.from('0102030405060708', 'hex') : Buffer.alloc(size, size),
+          handleHandshakeInit: () => ({
+            trezorMaskedStaticPubkey: Buffer.alloc(32, 4),
+            trezorEncryptedStaticPubkey: Buffer.alloc(48, 2),
+            hostEncryptedStaticPubkey: Buffer.alloc(48, 5),
+            hostKey: Buffer.alloc(32, 8),
+            trezorKey: Buffer.alloc(32, 9),
+            handshakeHash,
+            ...(options.sendStoredCredential ? { credentials: STORED_THP_CREDENTIAL } : {}),
+            allCredentials: options.sendStoredCredential ? [STORED_THP_CREDENTIAL] : [],
+            encryptedPayload: Buffer.alloc(16, 6),
+            staticKey: Buffer.alloc(32, 10),
+            hostStaticKeys: { privateKey: randomBytes(32), publicKey: Buffer.alloc(32, 12) },
+          }),
+        },
+      });
+      return { session, calls };
+    }
+
+    test('a peer answering unencrypted v1 Initialize', async () => {
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'ble',
+        coreFactory: createFactory(calls, [{ type: 'Features', message: features }]),
+      });
+
+      await expect(session.initialize()).rejects.toMatchObject({ code: 'ThpPairingFailed' });
+      expect(session.features).toBeUndefined();
+    });
+
+    test('a peer claiming a pairing when no stored credential was sent', async () => {
+      const { session, calls } = thpBleSession({
+        pairingMethods: ['CodeEntry'],
+        completionState: 2,
+        sendStoredCredential: false,
+      });
+
+      await expect(session.initialize()).rejects.toMatchObject({ code: 'ThpPairingFailed' });
+      // Nothing after the handshake reaches the peer, so no passphrase can be asked for.
+      expect(calls.map(call => call.name)).not.toContain('ThpCreateNewSession');
+    });
+
+    test('a peer offering only SkipPairing', async () => {
+      const { session } = thpBleSession({
+        pairingMethods: ['SkipPairing'],
+        completionState: 0,
+        sendStoredCredential: false,
+      });
+
+      await expect(session.initialize()).rejects.toThrow('No compatible THP pairing method');
+    });
+
+    test('a peer ending CodeEntry pairing without the code exchange', async () => {
+      const { session } = thpBleSession({
+        pairingMethods: ['CodeEntry'],
+        completionState: 0,
+        sendStoredCredential: false,
+        afterCompletion: [
+          { type: 'ThpPairingRequestApproved', message: {} },
+          { type: 'ThpEndResponse', message: {} },
+        ],
+      });
+
+      await expect(session.initialize()).rejects.toMatchObject({ code: 'ThpPairingFailed' });
+    });
+  });
+
   test('does not write THP initialization diagnostics to console by default', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     try {
@@ -223,7 +350,7 @@ describe('TrezorDeviceSession', () => {
                 model_variant: 1,
                 protocol_version_major: 2,
                 protocol_version_minor: 1,
-                pairing_methods: ['SkipPairing'],
+                pairing_methods: ['CodeEntry'],
               },
             },
           },
@@ -249,7 +376,8 @@ describe('TrezorDeviceSession', () => {
             hostKey: Buffer.alloc(32, 8),
             trezorKey: Buffer.alloc(32, 9),
             handshakeHash,
-            allCredentials: [],
+            credentials: STORED_THP_CREDENTIAL,
+            allCredentials: [STORED_THP_CREDENTIAL],
             encryptedPayload: Buffer.alloc(16, 6),
             staticKey: Buffer.alloc(32, 10),
             hostStaticKeys: {
@@ -296,7 +424,7 @@ describe('TrezorDeviceSession', () => {
               model_variant: 1,
               protocol_version_major: 2,
               protocol_version_minor: 1,
-              pairing_methods: ['SkipPairing'],
+              pairing_methods: ['CodeEntry'],
             },
           },
         },
@@ -322,7 +450,8 @@ describe('TrezorDeviceSession', () => {
           hostKey: Buffer.alloc(32, 8),
           trezorKey: Buffer.alloc(32, 9),
           handshakeHash,
-          allCredentials: [],
+          credentials: STORED_THP_CREDENTIAL,
+          allCredentials: [STORED_THP_CREDENTIAL],
           encryptedPayload: Buffer.alloc(16, 6),
           staticKey: Buffer.alloc(32, 10),
           hostStaticKeys: {
