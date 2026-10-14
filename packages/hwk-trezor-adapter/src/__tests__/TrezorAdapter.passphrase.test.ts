@@ -730,4 +730,60 @@ describe('TrezorAdapter passphrase sessions', () => {
     expect(connector.disconnect).toHaveBeenCalledWith('safe-5-session');
     expect(connector.disconnect).not.toHaveBeenCalledWith('safe-7-session');
   });
+
+  it('releasing a live operation leaves a bare-connectId call on the same device to its caller', async () => {
+    const connector = createConnector({ states: ['feedface'] });
+    const prompts = holdPassphrasePrompts(connector);
+    const adapter = new TrezorAdapter(connector);
+    const connected = await adapter.connectDevice('safe-7');
+    if (!connected.success) throw new Error('connectDevice failed');
+
+    // Not pinned to the operation, so the release must not cancel it or its prompt.
+    const pending = adapter.getPassphraseState('safe-7');
+    await waitUntil(() => prompts.isOpen('safe-7-session'));
+    const released = settleWithin(adapter.releaseOperation(connected.payload), 1000);
+
+    expect((await settleWithin(pending, 20)).settled).toBe(false);
+    expect(connector.uiResponse).not.toHaveBeenCalled();
+    expect(prompts.isOpen('safe-7-session')).toBe(true);
+
+    prompts.answer('safe-7-session');
+    expect(await settleWithin(pending)).toEqual({
+      settled: true,
+      value: { success: true, payload: 'feedface' },
+    });
+    expect((await released).settled).toBe(true);
+  });
+
+  it('releasing an already-released operation again leaves a reconnected call and its prompt open', async () => {
+    const connector = createConnector({ states: ['feedface'] });
+    const prompts = holdPassphrasePrompts(connector);
+    const adapter = new TrezorAdapter(connector);
+    const first = await adapter.connectDevice('safe-7');
+    if (!first.success) throw new Error('connectDevice failed');
+    await adapter.releaseOperation(first.payload);
+    const second = await adapter.connectDevice('safe-7');
+    if (!second.success) throw new Error('reconnect failed');
+    expect(second.payload).not.toBe(first.payload);
+    const disconnectsBefore = (connector.disconnect as jest.Mock).mock.calls.length;
+
+    // A raw-connectId call queues under the connectId the ended operation used to own.
+    const pending = adapter.getPassphraseState('safe-7');
+    await waitUntil(() => prompts.isOpen('safe-7-session'));
+
+    expect((await settleWithin(adapter.releaseOperation(first.payload))).settled).toBe(true);
+    expect((await settleWithin(pending, 20)).settled).toBe(false);
+    expect(connector.uiResponse).not.toHaveBeenCalled();
+    expect(prompts.isOpen('safe-7-session')).toBe(true);
+
+    prompts.answer('safe-7-session');
+    expect(await settleWithin(pending)).toEqual({
+      settled: true,
+      value: { success: true, payload: 'feedface' },
+    });
+    expect(connector.disconnect).toHaveBeenCalledTimes(disconnectsBefore);
+    await expect(adapter.getDeviceInfo(second.payload, 'safe-7')).resolves.toMatchObject({
+      success: true,
+    });
+  });
 });

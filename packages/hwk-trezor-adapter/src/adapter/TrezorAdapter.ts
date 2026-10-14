@@ -897,7 +897,8 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   async releaseOperation(operationId: string): Promise<void> {
-    const operation = this._operations.find(operationId);
+    // Only a live operation owns work; an ended one's connectId may already serve a newer one.
+    const operation = this._operations.findActive(operationId);
     if (operation) this._cancelOperationWork(operation);
     const endedOperation = this._operations.release(operationId);
     if (!endedOperation) return;
@@ -917,18 +918,15 @@ export class TrezorAdapter implements IHardwareWallet {
       message: 'Trezor operation was released',
       params: { operationId, reason: 'explicit' },
     });
-    // A call without operationId queues under the connectId this operation owns.
-    const queueKeys = new Set([
-      trezorQueueKey({ operationId }),
-      trezorQueueKey({ connectId: operation.connectId }),
-    ]);
-    const activeJobId = this._jobQueue.getActiveJob()?.deviceId;
-    for (const key of queueKeys) this._jobQueue.cancelActiveAndPending(key, reason);
+    // Only calls pinned to this operation are its own; a call by bare connectId on the same device
+    // belongs to its caller and keeps running.
+    const queueKey = trezorQueueKey({ operationId });
+    const ownsRunningCall = this._jobQueue.getActiveJob()?.deviceId === queueKey;
+    this._jobQueue.cancelActiveAndPending(queueKey, reason);
+    if (!ownsRunningCall) return;
     this._uiRegistry.cancel(undefined, undefined, operationId);
-    // Connector prompts are global; dismiss them only when this operation owns the running call.
-    if (activeJobId !== undefined && queueKeys.has(activeJobId)) {
-      this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
-    }
+    // Connector prompts are global, so they are dismissed only for this operation's running call.
+    this._connector.uiResponse({ type: UI_RESPONSE.CANCEL });
   }
 
   private async _releaseOperationConnection(

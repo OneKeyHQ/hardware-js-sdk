@@ -444,6 +444,51 @@ describe('LedgerAdapter', () => {
     ).toBe(false);
   });
 
+  it('keeps a BLE-only binding picker off a plugged USB Ledger', async () => {
+    Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+      options?.transportType === 'usb'
+        ? [{ connectId: 'usb-1', deviceId: 'usb-1', name: 'Nano X', connectionType: 'usb' }]
+        : []
+    );
+    const permissions: unknown[] = [];
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+      permissions.push(event.payload.transportType);
+    });
+    const selections: string[] = [];
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+      selections.push(event.payload.requestId);
+    });
+
+    const pending = adapter.acquireOperation('', {
+      supportedTransports: ['ble'],
+      knownConnections: [],
+    });
+    await waitForCondition(() => selections.length > 0);
+    expect(selections.length).toBeGreaterThan(0);
+    // Past the picker's first rescan, which is where USB used to be connected without a pick.
+    expect((await settleWithin(pending, 50)).settled).toBe(false);
+
+    adapter.uiResponse({
+      type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+      payload: { requestId: selections[0], cancelled: true },
+    });
+    expect(await settleWithin(pending)).toEqual({
+      settled: true,
+      value: {
+        success: false,
+        payload: expect.objectContaining({ code: HardwareErrorCode.UserAborted }),
+      },
+    });
+    expect(
+      connector.searchDevices.mock.calls.some(([options]) => options?.transportType === 'usb')
+    ).toBe(false);
+    expect(connector.connect).not.toHaveBeenCalled();
+    expect(permissions).not.toContain('hid');
+    expect(permissions).not.toContain('usb');
+  });
+
   it.each([
     ['without a wallet check', '', false],
     ['with a wallet check', 'expected-wallet', true],
@@ -1390,6 +1435,52 @@ describe('LedgerAdapter', () => {
       });
       await new Promise(resolve => setImmediate(resolve));
       expect(connector.call).toHaveBeenCalledTimes(1);
+    });
+
+    it('releasing an already-released operation again leaves a reconnected call and its unlock prompt open', async () => {
+      const first = await connectOperation();
+      await adapter.releaseOperation(first);
+      const second = await connectOperation();
+      expect(second).not.toBe(first);
+      connector.callImpl
+        .mockRejectedValueOnce(
+          Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked })
+        )
+        .mockResolvedValue({ address: EVM_ADDR });
+      const unlockPrompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, event => {
+        unlockPrompts.push(event.payload);
+      });
+      const closeWindow = jest.fn();
+      adapter.on(UI_REQUEST.CLOSE_UI_WINDOW, closeWindow);
+
+      // A raw-connectId call queues under the connectId the ended operation used to own.
+      const pending = adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+      await waitForCondition(() => unlockPrompts.length === 1);
+      expect(unlockPrompts).toHaveLength(1);
+
+      expect((await settleWithin(adapter.releaseOperation(first))).settled).toBe(true);
+      expect((await settleWithin(pending, 20)).settled).toBe(false);
+      expect(closeWindow).not.toHaveBeenCalled();
+
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
+        payload: { confirmed: true },
+      });
+      const result = await settleWithin(pending, 2000);
+      expect(result).toEqual({
+        settled: true,
+        value: expect.objectContaining({
+          success: true,
+          payload: expect.objectContaining({ address: EVM_ADDR }),
+        }),
+      });
+      expect(connector.callImpl).toHaveBeenCalledTimes(2);
+      expect((await adapter.getDeviceInfo(second, '')).success).toBe(true);
+      await adapter.releaseOperation(second);
     });
 
     it('cancels the active job without terminating its operation', async () => {

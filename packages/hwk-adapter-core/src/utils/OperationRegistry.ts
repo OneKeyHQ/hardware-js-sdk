@@ -117,6 +117,11 @@ export class OperationRegistry {
     };
   }
 
+  /** Return a live operation without refreshing its TTL; ended and unknown ids give undefined. */
+  findActive(operationId: string): HardwareOperation | undefined {
+    return this._active.get(operationId);
+  }
+
   /** Return active or tombstoned binding data without refreshing its TTL. */
   find(operationId: string): HardwareOperation | undefined {
     return this._active.get(operationId) ?? this._ended.get(operationId)?.operation;

@@ -785,7 +785,8 @@ export class LedgerAdapter implements IHardwareWallet {
   }
 
   async releaseOperation(operationId: string): Promise<void> {
-    const operation = this._operations.find(operationId);
+    // Only a live operation owns work; an ended one's connectId may already serve a newer one.
+    const operation = this._operations.findActive(operationId);
     if (operation) this._cancelOperationWork(operation);
     const endedOperation = this._operations.release(operationId);
     if (!endedOperation) return;
@@ -822,13 +823,12 @@ export class LedgerAdapter implements IHardwareWallet {
       message: 'Ledger operation was released',
       params: { operationId, reason: 'explicit' },
     });
-    // A call without operationId queues under the connectId this operation owns.
-    const queueKeys = new Set([
-      ledgerQueueKey({ operationId }),
-      ledgerQueueKey({ connectId: operation.connectId }),
-    ]);
-    for (const key of queueKeys) this._jobQueue.cancelActiveAndPending(key, reason);
-    this._uiRegistry.cancel(undefined, undefined, operationId);
+    // Only calls pinned to this operation are its own; a call by bare connectId on the same device
+    // belongs to its caller and keeps running.
+    const queueKey = ledgerQueueKey({ operationId });
+    const ownsRunningCall = this._jobQueue.getActiveJob()?.deviceId === queueKey;
+    this._jobQueue.cancelActiveAndPending(queueKey, reason);
+    if (ownsRunningCall) this._uiRegistry.cancel(undefined, undefined, operationId);
   }
 
   private async _releaseOperationConnection(
@@ -2237,7 +2237,8 @@ export class LedgerAdapter implements IHardwareWallet {
       if (context) context.bindingSessionId = bindingSessionId;
       const allowUsbFallback =
         context?.bindingReason !== 'manual-rebind' &&
-        Boolean(this.connector.availableTransports?.includes('usb'));
+        Boolean(this.connector.availableTransports?.includes('usb')) &&
+        (!context?.supportedTransports || context.supportedTransports.includes('usb'));
       const knownUsb = context?.knownConnections?.find(
         connection => connection.transport === 'usb'
       );
