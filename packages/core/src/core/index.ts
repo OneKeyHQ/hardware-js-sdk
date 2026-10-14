@@ -1,4 +1,5 @@
 import semver from 'semver';
+import { getOwnedUsbDeviceIdentity } from '../api/SearchDevices';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
@@ -1825,6 +1826,10 @@ export default class Core extends EventEmitter {
   public readonly sdkInstanceId: string;
 
   private requestQueue = new RequestQueue();
+
+  getOwnedUsbDeviceIdentity(descriptor: Parameters<typeof getOwnedUsbDeviceIdentity>[0]) {
+    return getOwnedUsbDeviceIdentity(descriptor, this.requestQueue);
+  }
 
   private disposePromise?: Promise<void>;
 

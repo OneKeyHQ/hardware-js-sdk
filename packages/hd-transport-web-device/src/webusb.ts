@@ -82,6 +82,10 @@ type WebUsbOperation = 'open' | 'claimInterface' | 'transferIn' | 'transferOut';
  */
 let activeWebUsbTransport: WebUsbTransport | undefined;
 let usbDisconnectListenerAttached = false;
+// Only isolated discovery owns these handles. Normal calls must never close or
+// open them, including while native open() is still pending.
+const identityProbeHandles = new WeakSet<USBDevice>();
+const openingHandles = new WeakSet<USBDevice>();
 
 function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
   activeWebUsbTransport = instance;
@@ -124,6 +128,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /** Paths currently acquired (between a successful acquire() and its release()). */
   private acquiredPaths: Set<string> = new Set();
 
+  private identityProbeDevices = new Map<string, USBDevice>();
+
   /**
    * The exact USBDevice object each cached protocol was probed against. The
    * browser returns the same object identity for a device as long as it stays
@@ -160,7 +166,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   interfaceId = INTERFACE_ID;
 
-  constructor() {
+  constructor(private readonly identityProbe = false) {
     super({
       router: PROTOCOL_V2_CHANNEL_USB,
       maxFrameBytes: PROTOCOL_V2_FRAME_MAX_BYTES,
@@ -183,7 +189,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       );
     }
     this.usb = usb;
-    registerActiveWebUsbTransport(this, usb);
+    if (!this.identityProbe) registerActiveWebUsbTransport(this, usb);
   }
 
   /**
@@ -311,6 +317,10 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    */
   async acquire(input: AcquireInput) {
     if (!input.path) return;
+    if (this.identityProbe) {
+      await this.getConnectedDevices();
+      this.claimIdentityProbeHandle(input.path, await this.findDevice(input.path));
+    }
     try {
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
@@ -394,7 +404,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     } catch (e) {
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
       this.acquiredPaths.delete(input.path);
-      await this.closeOpenDevice(input.path);
+      try {
+        await this.closeOpenDevice(input.path);
+      } finally {
+        this.releaseIdentityProbeHandle(input.path);
+      }
       throw e;
     }
   }
@@ -569,11 +583,20 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    */
   async connectToDevice(path: string, first: boolean) {
     let device: USBDevice = await this.findDevice(path);
+    if (this.identityProbe && this.identityProbeDevices.get(path) !== device) {
+      await this.closeOpenDevice(path);
+      this.releaseIdentityProbeHandle(path);
+      this.claimIdentityProbeHandle(path, device);
+    }
+    this.assertHandleAvailable(device);
     if (!device.opened) {
+      openingHandles.add(device);
       try {
         await device.open();
       } catch (error) {
-        return this.throwWebUsbIoError(path, 'open', error);
+        return await this.throwWebUsbIoError(path, 'open', error);
+      } finally {
+        openingHandles.delete(device);
       }
     }
     // A V1 packet retry continues an in-flight exchange. Preserve its endpoint
@@ -587,11 +610,20 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
     await this.getConnectedDevices();
     device = await this.findDevice(path);
+    if (this.identityProbe && this.identityProbeDevices.get(path) !== device) {
+      await this.closeOpenDevice(path);
+      this.releaseIdentityProbeHandle(path);
+      this.claimIdentityProbeHandle(path, device);
+    }
+    this.assertHandleAvailable(device);
     if (!device.opened) {
+      openingHandles.add(device);
       try {
         await device.open();
       } catch (error) {
-        return this.throwWebUsbIoError(path, 'open', error);
+        return await this.throwWebUsbIoError(path, 'open', error);
+      } finally {
+        openingHandles.delete(device);
       }
     }
 
@@ -615,9 +647,35 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     await this.clearEndpointHalt(device, 'out', endpoints.endpointOut);
   }
 
+  private assertHandleAvailable(device: USBDevice) {
+    if (
+      identityProbeHandles.has(device) &&
+      ![...this.identityProbeDevices.values()].includes(device)
+    ) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'USB device is already in use');
+    }
+  }
+
+  private claimIdentityProbeHandle(path: string, device: USBDevice) {
+    if (device.opened || openingHandles.has(device) || identityProbeHandles.has(device)) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'USB device is already in use');
+    }
+    identityProbeHandles.add(device);
+    this.identityProbeDevices.set(path, device);
+  }
+
+  private releaseIdentityProbeHandle(path: string) {
+    const device = this.identityProbeDevices.get(path);
+    if (device) identityProbeHandles.delete(device);
+    this.identityProbeDevices.delete(path);
+  }
+
   private async closeOpenDevice(path: string) {
-    const current = this.deviceList.find(device => device.path === path)?.device;
+    const current = this.identityProbe
+      ? this.identityProbeDevices.get(path)
+      : this.deviceList.find(device => device.path === path)?.device;
     if (!current?.opened) return;
+    this.assertHandleAvailable(current);
 
     const endpoints = this.deviceEndpoints.get(path);
     const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
@@ -630,6 +688,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       await current.close();
     } catch (error) {
       this.Log?.debug('[WebUsbTransport] close before reconnect failed:', error);
+      if (this.identityProbe) throw error;
     }
   }
 
@@ -984,15 +1043,15 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
 
     try {
-      await this.callProtocolV1(
+      const response = await this.callProtocolV1(
         path,
-        'Initialize',
+        this.identityProbe ? 'GetFeatures' : 'Initialize',
         {},
         {
           timeoutMs: PROTOCOL_V1_PROBE_TIMEOUT,
         }
       );
-      return true;
+      return !this.identityProbe || response.type === 'Features';
     } catch (error) {
       if (this.isWebUsbIoHardwareError(error)) throw error;
       return false;
@@ -1149,8 +1208,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    */
   async release(path: string) {
     this.acquiredPaths.delete(path);
-    await this.invalidateProtocolV2UsbLink(path, 'WebUSB transport released');
-    await this.closeOpenDevice(path);
+    try {
+      await this.invalidateProtocolV2UsbLink(path, 'WebUSB transport released');
+      await this.closeOpenDevice(path);
+    } finally {
+      this.releaseIdentityProbeHandle(path);
+    }
     // Keep deviceProtocol/deviceProtocolHints across release: the probe result is a
     // physical-device property, so the next acquire can skip the wire-level probe.
     // V2 entries are still dropped by onProtocolV2UsbLinkInvalidated via the link

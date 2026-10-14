@@ -21,6 +21,7 @@ export { executeCallback, cleanupCallback };
 export { preloadSessionCache } from './device/Device';
 export { projectFeatures as projectDeviceStateFeatures } from './device/DeviceStateProjector';
 export { getMethodSupportedProtocols } from './api/utils';
+export { probeUsbDeviceIdentitiesWithTransport } from './api/SearchDevices';
 export {
   getFirmwareUpdateHostBindingGeneration,
   registerFirmwareUpdateHostBinding,

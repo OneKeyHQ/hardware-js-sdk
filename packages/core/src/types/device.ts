@@ -85,6 +85,16 @@ export type SearchDevice = {
   commType: OneKeyDeviceCommType;
 };
 
+/** Identity confirmed over USB. The descriptor path is only a transport address. */
+export type UsbDeviceIdentity = {
+  path: string;
+  serialNo: string | null;
+  deviceId: string | null;
+  deviceType: IDeviceType;
+  connectProtocol: HardwareConnectProtocol;
+  commType: 'webusb' | 'bridge';
+};
+
 // export type UnknownDevice = {
 //   type: 'unacquired';
 //   id?: null;
