@@ -158,8 +158,12 @@ function assertBoundedUrPart(part: string): void {
   if (match[1] === undefined) return;
   const header = readFountainPart(payload);
   // The text header, the CBOR header and the real sizes must agree, so the declared part count
-  // is tied to the data the reply actually carries.
+  // is tied to the data the reply actually carries. USB is lossless and Keystone answers with a
+  // single-part UR, so a mixed fountain part (seqNum past seqLen) is refused: decoding each one
+  // costs time quadratic in the part count.
   if (
+    header.seqNum < 1 ||
+    header.seqNum > header.seqLength ||
     header.seqNum !== Number(match[1]) ||
     header.seqLength !== Number(match[2]) ||
     header.fragmentLength < 1 ||
@@ -178,6 +182,7 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
   const parts = text.split(/\s+/).filter(Boolean);
   const decoder = new URDecoder();
   try {
+    if (parts.length > MAX_UR_SEQ_LENGTH) throw new Error('Keystone USB reply has too many parts');
     for (const part of parts) {
       assertBoundedUrPart(part);
       decoder.receivePart(part);
@@ -417,14 +422,14 @@ export class KeystoneUsbConnectorBase implements IConnector {
             matched?.opened.dispose();
             throw createHwkError({
               code: HardwareErrorCode.DeviceOneDeviceOnly,
-              message: `More than one connected Keystone reports wallet fingerprint ${expectedMasterFingerprint}; keep one connected`,
+              message: 'More than one connected Keystone reports this wallet; keep one connected',
             });
           }
           if (!matched) {
             if (!readableDeviceFound && lastError) throw mapKeystoneUsbError(lastError);
             throw createHwkError({
               code: HardwareErrorCode.DeviceMismatch,
-              message: `No connected Keystone wallet matches fingerprint ${expectedMasterFingerprint}`,
+              message: 'No connected Keystone matches the requested wallet',
             });
           }
           selectedDevice = matched.device;
@@ -473,7 +478,8 @@ export class KeystoneUsbConnectorBase implements IConnector {
       ) {
         throw createHwkError({
           code: HardwareErrorCode.DeviceMismatch,
-          message: `Connected Keystone wallet (mfp ${config.mfp}) does not match the requested wallet fingerprint (${expectedMasterFingerprint})`,
+          // The master fingerprint identifies the wallet; keep it out of messages that reach logs.
+          message: 'Connected Keystone wallet does not match the requested wallet',
         });
       }
       const sessionId = createHardwareLinkId('keystone');

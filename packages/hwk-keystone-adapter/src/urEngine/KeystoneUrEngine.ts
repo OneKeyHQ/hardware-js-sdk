@@ -124,6 +124,14 @@ function relativeHdPath(relativeDerivePath: string): string {
   return `m/${segments.join('/')}`;
 }
 
+// Text a scanned export carries reaches the host UI and version gates; keep only what fits.
+const FIRMWARE_VERSION = /^\d{1,4}(\.\d{1,4}){1,3}(-[0-9A-Za-z.]{1,20})?$/;
+const DEVICE_TEXT = /^[^\p{Cc}\p{Cf}]{1,64}$/u;
+
+function deviceText(value: unknown, pattern: RegExp): string | undefined {
+  return typeof value === 'string' && pattern.test(value) ? value : undefined;
+}
+
 /**
  * Single touch point with `@keystonehq/keystone-sdk`, shared by QR and USB. Uses the bare
  * constructor: `KeystoneSDK.create()` fetches remote config at call time.
@@ -141,9 +149,9 @@ export class KeystoneUrEngine {
     const parsed = this.sdk.parseMultiAccounts(toSdkUr(ur));
     return {
       masterFingerprint: requireBip32MasterFingerprint(parsed.masterFingerprint),
-      device: parsed.device,
-      deviceId: parsed.deviceId,
-      deviceVersion: parsed.deviceVersion,
+      device: deviceText(parsed.device, DEVICE_TEXT),
+      deviceId: deviceText(parsed.deviceId, DEVICE_TEXT),
+      deviceVersion: deviceText(parsed.deviceVersion, FIRMWARE_VERSION),
       accounts: parsed.keys.map(toParsedAccount),
     };
   }

@@ -560,6 +560,19 @@ describe('KeystoneUsbConnectorBase', () => {
         'a part count that does not fit its sizes',
         () => fountainFrame({ seqNum: 1, seqLength: 5000, messageLength: 10, fragmentLength: 1 }),
       ],
+      // Mixed fountain parts cost time quadratic in the part count; USB never needs them.
+      [
+        'a mixed fountain part',
+        () => fountainFrame({ seqNum: 11, seqLength: 10, messageLength: 100, fragmentLength: 10 }),
+      ],
+      [
+        'a part numbered zero',
+        () => fountainFrame({ seqNum: 0, seqLength: 10, messageLength: 100, fragmentLength: 10 }),
+      ],
+      [
+        'more parts than any reply has',
+        () => Array.from({ length: 32_769 }, () => encodeUrString('bytes', '41aa')).join(' '),
+      ],
     ])('reports a reply with %s as unreadable before decoding it', async (_case, reply) => {
       const receivePart = jest.spyOn(URDecoder.prototype, 'receivePart');
       const connector = versionConnector({

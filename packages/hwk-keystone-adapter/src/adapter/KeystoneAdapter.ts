@@ -617,10 +617,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       const { record } = this._resolveTarget(connectId, deviceId);
       if (!record) {
         return Promise.resolve(
-          failure(
-            HardwareErrorCode.DeviceNotFound,
-            `Unknown Keystone device: ${connectId || deviceId}`
-          )
+          failure(HardwareErrorCode.DeviceNotFound, 'Unknown Keystone device')
         );
       }
       return Promise.resolve(success(toDeviceInfo(record)));
@@ -1821,7 +1818,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     ) {
       throw createHwkError({
         code: HardwareErrorCode.DeviceMismatch,
-        message: `Connected Keystone wallet (mfp ${parsed.masterFingerprint}) does not match the requested wallet fingerprint (${expected.expectedMasterFingerprint})`,
+        // The master fingerprint identifies the wallet; keep it out of messages that reach logs.
+        message: 'Connected Keystone wallet does not match the requested wallet',
       });
     }
   }

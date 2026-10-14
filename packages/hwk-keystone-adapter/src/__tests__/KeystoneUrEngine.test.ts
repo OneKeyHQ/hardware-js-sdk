@@ -32,7 +32,7 @@ import type { KeystoneUr } from '../urEngine/types';
 // material. The 4-byte MFP is protocol metadata, not a wallet identity key.
 const FAKE_MFP_HEX = '52a5d0d1';
 
-function buildMultiAccountsUr(): KeystoneUr {
+function buildMultiAccountsUr(device = 'Keystone 3 Pro', deviceVersion = '1.7.0'): KeystoneUr {
   const hdKey = new CryptoHDKey({
     isMaster: false,
     key: Buffer.alloc(33, 0x02),
@@ -51,9 +51,9 @@ function buildMultiAccountsUr(): KeystoneUr {
   const multiAccounts = new CryptoMultiAccounts(
     Buffer.from(FAKE_MFP_HEX, 'hex'),
     [hdKey],
-    'Keystone 3 Pro',
+    device,
     undefined, // deviceId omitted, matching the firmware's generic KeyDerivation response
-    '1.7.0'
+    deviceVersion
   );
   return urJson(multiAccounts.toUR());
 }
@@ -62,6 +62,25 @@ describe('KeystoneUrEngine', () => {
   const engine = new KeystoneUrEngine('OneKey-test');
 
   describe('parseMultiAccounts', () => {
+    it.each([
+      ['a name longer than any model name', 'K'.repeat(65), '1.7.0', undefined, '1.7.0'],
+      ['a name with a control character', 'Keystone\u0000 3 Pro', '1.7.0', undefined, '1.7.0'],
+      [
+        'a version that is not a number',
+        'Keystone 3 Pro',
+        '99.0.0 (verified)',
+        'Keystone 3 Pro',
+        undefined,
+      ],
+    ])(
+      'drops device text that is not a model name or version (%s)',
+      (_case, device, version, expectedDevice, expectedVersion) => {
+        const parsed = engine.parseMultiAccounts(buildMultiAccountsUr(device, version));
+        expect(parsed.device).toBe(expectedDevice);
+        expect(parsed.deviceVersion).toBe(expectedVersion);
+      }
+    );
+
     it('extracts the master fingerprint as cross-channel protocol metadata', () => {
       const parsed = engine.parseMultiAccounts(buildMultiAccountsUr());
 
