@@ -2834,6 +2834,46 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
+    it('does not reopen the device for a reconnect while a cancelled call is still on the wire', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = new KeystoneAdapter({ usbConnector: usb.connector });
+      const [target] = await adapter.searchDeviceTargets({ transportType: 'usb' });
+      const connected = await adapter.connectDevice(target.searchTargetId);
+      if (!connected.success) throw new Error('connectDevice failed');
+      const { promise: wait, resolve: resume } = deferred();
+      const originalCall = usb.connector.call.bind(usb.connector);
+      jest.spyOn(usb.connector, 'call').mockImplementationOnce(async (...args) => {
+        await wait;
+        return originalCall(...args);
+      });
+      const connect = jest.spyOn(usb.connector, 'connect');
+
+      const pending = adapter.evmGetAddress(connected.payload, '', {
+        path: EVM_PATH,
+        operationId: connected.payload,
+      });
+      await nextImmediate();
+      adapter.cancel(connected.payload);
+      await expect(pending).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+
+      await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceBusyInternal },
+      });
+      expect(connect).not.toHaveBeenCalled();
+
+      resume();
+      await nextImmediate();
+      await expect(adapter.connectDevice(target.searchTargetId)).resolves.toMatchObject({
+        success: true,
+      });
+      expect(connect).toHaveBeenCalledTimes(1);
+      await adapter.dispose();
+    });
+
     it.each([
       ['a search reset', false],
       ['a search reset', true],

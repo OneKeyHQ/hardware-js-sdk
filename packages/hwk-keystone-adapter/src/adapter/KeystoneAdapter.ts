@@ -1884,7 +1884,20 @@ export class KeystoneAdapter implements IHardwareWallet {
     // the tail until the late result has been rejected and disconnected.
     const pending = this._usbConnectTail.then(async () => {
       KeystoneAdapter._throwIfAborted(signal);
-      return this._connectUsbExclusive(connector, expected, searchTargetId, signal);
+      // A request still on the wire (e.g. from a cancelled call) would be reset by opening the
+      // device again. While the connect holds the device, calls are refused and teardowns wait.
+      if (this._unsettledUsbOperations.size > 0) {
+        return failure(
+          HardwareErrorCode.DeviceBusyInternal,
+          'Keystone USB is still finishing an earlier request'
+        );
+      }
+      const releaseConnect = this._retainUsbOperation('connect');
+      try {
+        return await this._connectUsbExclusive(connector, expected, searchTargetId, signal);
+      } finally {
+        releaseConnect();
+      }
     });
     const settled = pending.finally(() => {
       signal.removeEventListener('abort', onAbort);
