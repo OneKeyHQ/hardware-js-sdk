@@ -2475,6 +2475,99 @@ describe('LedgerAdapter', () => {
       connect.finish(ledgerSession('late-session'));
       await pending;
     });
+
+    it('a named cancel of the running call stops its shared auto-connect during discovery', async () => {
+      const combined = createMockConnector();
+      (combined as unknown as { availableTransports: string[] }).availableTransports = [
+        'usb',
+        'ble',
+      ];
+      const combinedAdapter = new LedgerAdapter(combined);
+      combinedAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        combinedAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+      // Discovery that never finishes on its own, like a scan waiting on the user.
+      combined.searchDevices.mockReturnValueOnce(new Promise<ConnectorDevice[]>(() => undefined));
+      combined.callImpl.mockResolvedValue({ address: EVM_ADDR });
+
+      const first = combinedAdapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+      await waitForCondition(() => combined.searchDevices.mock.calls.length === 1);
+      combinedAdapter.cancel('dev-1');
+      await expect(first).resolves.toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+
+      // The next call starts a fresh discovery instead of joining the cancelled one.
+      const second = settleWithin(
+        combinedAdapter.evmGetAddress('dev-1', '', {
+          path: "m/44'/60'/0'/0/0",
+          showOnDevice: false,
+        }),
+        2000
+      );
+      expect(await second).toMatchObject({ settled: true, value: { success: true } });
+      expect(combined.searchDevices.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('a named cancel leaves another device that is still being connected alone', async () => {
+      const bleConnector = createMockConnector();
+      (bleConnector as unknown as { connectionType: string }).connectionType = 'ble';
+      bleConnector.searchDevices.mockResolvedValue([]);
+      const bleAdapter = new LedgerAdapter(bleConnector);
+      bleAdapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, () => {
+        bleAdapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: { granted: true },
+        });
+      });
+      (bleConnector.connect as jest.Mock).mockResolvedValueOnce(
+        ledgerSession('session-a', { connectId: 'ble-a', connectionType: 'ble' })
+      );
+      const first = await bleAdapter.connectDevice('ble-a');
+      if (!first.success) throw new Error('connectDevice failed');
+
+      let finishPairing!: (session: ConnectorSession) => void;
+      (bleConnector.connect as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise<ConnectorSession>(resolve => {
+            finishPairing = resolve;
+          })
+      );
+      const second = bleAdapter.connectDevice('ble-b');
+      await waitForCondition(() => finishPairing !== undefined);
+
+      bleAdapter.cancel(first.payload);
+      expect(bleConnector.cancel).not.toHaveBeenCalledWith('ble-b');
+
+      finishPairing(ledgerSession('session-b', { connectId: 'ble-b', connectionType: 'ble' }));
+      await expect(second).resolves.toMatchObject({ success: true });
+
+      // Naming the device being connected still reaches its pairing.
+      let abortPairing: (() => void) | undefined;
+      (bleConnector.connect as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise<ConnectorSession>((_resolve, reject) => {
+            abortPairing = () => reject(new Error('Pairing cancelled'));
+          })
+      );
+      (bleConnector.cancel as jest.Mock).mockImplementation(async (id: string) => {
+        if (id === 'ble-c') abortPairing?.();
+      });
+      const third = bleAdapter.connectDevice('ble-c');
+      await waitForCondition(() =>
+        (bleConnector.connect as jest.Mock).mock.calls.some(([id]) => id === 'ble-c')
+      );
+      bleAdapter.cancel('ble-c');
+      expect(bleConnector.cancel).toHaveBeenCalledWith('ble-c');
+      await expect(third).resolves.toMatchObject({ success: false });
+    });
   });
 
   describe('dispose', () => {

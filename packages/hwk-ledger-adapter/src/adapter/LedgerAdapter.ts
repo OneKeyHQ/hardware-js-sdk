@@ -1600,11 +1600,27 @@ export class LedgerAdapter implements IHardwareWallet {
 
     // Snapshot guard: only abort if connect is actually in flight (avoids
     // hitting a NEW controller from a restart between resolve and re-entry).
-    if (this._connectingPromise) {
+    // A named cancel reaches an in-flight connect only when it runs for the cancelled job or
+    // targets the cancelled device; another device being connected (and paired) meanwhile must
+    // survive closing this one.
+    const connectingConnectId = this._connectingConnectId;
+    const targetKeys = new Set(
+      [
+        connectId,
+        resolvedConnectId,
+        ...(pendingOperationId
+          ? this._operations.find(pendingOperationId)?.connectionKeys ?? []
+          : []),
+      ].filter(Boolean)
+    );
+    const ownsPendingConnect =
+      !connectId ||
+      (activeJobId !== undefined && queueKeys.has(activeJobId)) ||
+      (connectingConnectId !== undefined && targetKeys.has(connectingConnectId));
+    if (this._connectingPromise && ownsPendingConnect) {
       this._doConnectAbortController?.abort(userAbortReason);
     }
-    const connectingConnectId = this._connectingConnectId;
-    if (connectingConnectId) void this.connector.cancel(connectingConnectId);
+    if (connectingConnectId && ownsPendingConnect) void this.connector.cancel(connectingConnectId);
   }
 
   // ---------------------------------------------------------------------------
