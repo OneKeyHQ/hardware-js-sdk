@@ -681,7 +681,9 @@ export const HwkScreen = () => {
     try {
       setBusy('features');
       appendLog('info', `getFeatures ${connectId}...`);
-      const result = await (adapter as TrezorAdapter).getFeatures(connectId);
+      const result = await (adapter as TrezorAdapter).getFeatures(
+        operationIdRef.current ?? connectId
+      );
       appendLog('info', { getFeatures: result });
       if (!result.success) {
         Alert.alert('getFeatures failed', responseError(result));
@@ -720,7 +722,7 @@ export const HwkScreen = () => {
     try {
       setBusy('attestation');
       appendLog('info', `verifyDeviceAuthenticity ${connectId}... (confirm on device)`);
-      const result = await verifier.verifyDeviceAuthenticity(connectId);
+      const result = await verifier.verifyDeviceAuthenticity(operationIdRef.current ?? connectId);
       appendLog('info', { verifyDeviceAuthenticity: result });
       if (!result.success) {
         Alert.alert('verifyDeviceAuthenticity failed', JSON.stringify(result.payload));
