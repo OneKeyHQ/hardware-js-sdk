@@ -21,7 +21,10 @@ describe('WebUSB identity probe ownership', () => {
   beforeEach(() => {
     originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
     device.opened = false;
-    device.close.mockClear();
+    device.close.mockReset().mockImplementation(() => {
+      device.opened = false;
+      return Promise.resolve();
+    });
     usb.getDevices.mockResolvedValue([device]);
     usb.addEventListener.mockClear();
     Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { usb } });
@@ -118,6 +121,59 @@ describe('WebUSB identity probe ownership', () => {
     expect(activeDisconnect).toHaveBeenCalledWith('USB_PATH');
     expect(probeDisconnect).not.toHaveBeenCalled();
   });
+
+  test.each(['release', 'acquire failure'])(
+    'keeps a probe handle protected after close fails during %s and recovers after cleanup',
+    async phase => {
+      Object.assign(device, {
+        open: jest.fn(() => {
+          device.opened = true;
+          return Promise.resolve();
+        }),
+        releaseInterface: jest.fn().mockResolvedValue(undefined),
+        reset: jest.fn(),
+        configurations: [],
+        configuration: { configurationValue: 1 },
+        selectConfiguration: jest.fn(),
+        claimInterface: jest.fn(),
+        clearHalt: jest.fn(),
+      });
+      const probe = new WebUsbTransport(true);
+      probe.init({ debug: jest.fn() });
+      const internals = probe as unknown as {
+        rotateProtocolV2UsbGeneration: () => Promise<void>;
+        detectProtocol: () => Promise<'V1'>;
+      };
+      jest.spyOn(internals, 'rotateProtocolV2UsbGeneration').mockResolvedValue(undefined);
+      jest.spyOn(internals, 'detectProtocol').mockResolvedValue('V1');
+      jest.spyOn(probe, 'connect').mockImplementation(() => {
+        device.opened = true;
+        if (phase === 'acquire failure') return Promise.reject(new Error('probe failed'));
+        return Promise.resolve();
+      });
+      const closeFailure = new Error('native close failed');
+      device.close.mockRejectedValueOnce(closeFailure);
+      if (phase === 'release') {
+        await probe.acquire({ path: 'USB_PATH' });
+        await expect(probe.release('USB_PATH')).rejects.toBe(closeFailure);
+      } else {
+        await expect(probe.acquire({ path: 'USB_PATH' })).rejects.toBe(closeFailure);
+      }
+      expect(device.opened).toBe(true);
+      const active = new WebUsbTransport();
+      active.init({ debug: jest.fn() });
+      await expect(active.connectToDevice('USB_PATH', true)).rejects.toThrow(
+        'USB device is already in use'
+      );
+      expect(device.close).toHaveBeenCalledTimes(1);
+
+      await probe.release('USB_PATH');
+      expect(device.opened).toBe(false);
+      await expect(active.connectToDevice('USB_PATH', true)).resolves.toBeUndefined();
+      expect(device.opened).toBe(true);
+      await active.release('USB_PATH');
+    }
+  );
 
   test.each([false, true])(
     'uses a read-only V1 probe only for isolated discovery (%s)',

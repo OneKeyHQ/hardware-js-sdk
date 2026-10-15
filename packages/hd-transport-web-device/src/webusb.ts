@@ -666,6 +666,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   private releaseIdentityProbeHandle(path: string) {
     const device = this.identityProbeDevices.get(path);
+    // A failed native close must not make an open probe handle available to other callers.
+    if (device?.opened) return;
     if (device) identityProbeHandles.delete(device);
     this.identityProbeDevices.delete(path);
   }
