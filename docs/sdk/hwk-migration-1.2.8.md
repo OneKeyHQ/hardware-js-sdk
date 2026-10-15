@@ -4,7 +4,7 @@
 > - 读者：接入 `@onekeyfe/hwk-*` 的宿主（App、Electron 主进程与 preload）
 > - 范围：`packages/hwk-*`；不涉及 `hd-*`
 > - 基线：`origin/onekey` = `git merge-base HEAD origin/onekey` = `5c9d05581`（`1.2.8-alpha.12`）
-> - 目标：PR #943（`feat/keystone-integration`），`1.2.8-alpha.13`，含工作区中尚未提交的 BLE vendor allowlist
+> - 目标：PR #943（`feat/keystone-integration`），`1.2.8-alpha.13`
 > - 事实来源：`packages/hwk-adapter-core/src/types/{wallet,device,errors,qr,electronBle}.ts`、
 >   `packages/hwk-desktop-noble-ble/src`、`packages/hwk-trezor-core/src/index.ts`
 
@@ -149,7 +149,7 @@ sdk.uiResponse({
 
 ## 行为变化
 
-### Electron BLE 主进程 vendor allowlist（工作区未提交改动）
+### Electron BLE 主进程 vendor allowlist
 
 - `NobleBleHandlerOptions.vendors` / `initThirdPartyBleSupport(..., { vendors })` 决定主进程服务哪些
   vendor，默认 `DEFAULT_THIRD_PARTY_BLE_VENDORS`（`ledger`、`trezor`）。传入 `vendors` 会**替换**默认表；
@@ -185,8 +185,8 @@ sdk.uiResponse({
   `manual-rebind`）；没有监听者时以 `DeviceNotFound` 失败。`allowDeviceSelection: false` 时直接失败。
 - 选中后发出 `REQUEST_SAVE_DEVICE_BINDING`，以 `RECEIVE_SAVE_DEVICE_BINDING`
   （`{ requestId, saved, reason? }`）应答；进度通过 `DEVICE_BINDING_STATUS`
-  （`verifying` / `saved` / `failed` / `cancelled`）通知。没有监听者、未应答或拒绝时记为 `skipped`，
-  业务调用继续，但显式的 `bindBleDevice` 会失败。
+  （`verifying` / `saved` / `failed` / `cancelled`）通知。宿主拒绝时 `reason` 为 `mismatch` 或 `skipped`；
+  没有监听者或未应答时按 `skipped` 处理。业务调用继续，但显式的 `bindBleDevice` 会失败。
 - `IHardwareConnectionContext.supportedTransports` 限定 discovery 只打开宿主允许的 transport。
 
 ### 错误对象

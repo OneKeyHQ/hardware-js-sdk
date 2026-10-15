@@ -7,6 +7,10 @@ export interface BtcGetAddressParams extends PassphraseStateAware {
   path: string;
   coin?: string;
   showOnDevice?: boolean;
+  /**
+   * Trezor only. Ledger and Keystone ignore it and derive the script of the path's purpose
+   * (44' P2PKH, 49' P2SH-P2WPKH, 84' P2WPKH, 86' P2TR; Keystone does not support 86' yet).
+   */
   scriptType?: 'p2pkh' | 'p2sh' | 'p2wpkh' | 'p2wsh' | 'p2tr';
   addressIndex?: number;
   change?: boolean;
