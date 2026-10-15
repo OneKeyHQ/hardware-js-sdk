@@ -828,7 +828,11 @@ export class LedgerAdapter implements IHardwareWallet {
     const queueKey = ledgerQueueKey({ operationId });
     const ownsRunningCall = this._jobQueue.getActiveJob()?.deviceId === queueKey;
     this._jobQueue.cancelActiveAndPending(queueKey, reason);
-    if (ownsRunningCall) this._uiRegistry.cancel(undefined, undefined, operationId);
+    if (!ownsRunningCall) return;
+    this._uiRegistry.cancel(undefined, undefined, operationId);
+    // Ledger cannot recall a prompt already on its screen, but dropping the pending device action
+    // lets teardown finish now instead of waiting for the user or the interactive timeout.
+    void this.connector.cancel(this._sessions.get(operation.connectId) ?? operation.connectId);
   }
 
   private async _releaseOperationConnection(

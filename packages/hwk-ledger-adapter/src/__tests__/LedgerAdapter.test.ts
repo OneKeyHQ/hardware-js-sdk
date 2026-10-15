@@ -1437,6 +1437,40 @@ describe('LedgerAdapter', () => {
       expect(connector.call).toHaveBeenCalledTimes(1);
     });
 
+    it('releasing an operation drops its pending device action so the release and the device free up', async () => {
+      const operationId = await connectOperation();
+      // Stands in for a DMK action waiting on the device screen: only connector.cancel settles it.
+      let dropAction: (() => void) | undefined;
+      connector.callImpl.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            dropAction = () => reject(new Error('Device action cancelled'));
+          })
+      );
+      (connector.cancel as jest.Mock).mockImplementation(async () => dropAction?.());
+
+      const pending = adapter.evmSignTransaction(operationId, '', {
+        path: "m/44'/60'/0'/0/0",
+        serializedTx: '0x02c0',
+        operationId,
+      });
+      await waitForCondition(() => dropAction !== undefined);
+
+      expect((await settleWithin(adapter.releaseOperation(operationId))).settled).toBe(true);
+      expect(connector.cancel).toHaveBeenCalledWith('session-abc');
+      expect(await settleWithin(pending)).toEqual({
+        settled: true,
+        value: expect.objectContaining({ success: false }),
+      });
+
+      // The device is free again: a new operation's call is not refused as busy.
+      connector.callImpl.mockResolvedValue({ address: EVM_ADDR });
+      const next = await connectOperation();
+      await expect(
+        adapter.evmGetAddress(next, '', { path: "m/44'/60'/0'/0/0", operationId: next })
+      ).resolves.toMatchObject({ success: true });
+    });
+
     it('releasing an already-released operation again leaves a reconnected call and its unlock prompt open', async () => {
       const first = await connectOperation();
       await adapter.releaseOperation(first);
