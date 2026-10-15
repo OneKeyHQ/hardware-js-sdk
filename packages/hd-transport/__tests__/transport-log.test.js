@@ -82,4 +82,48 @@ describe('transport log sanitization', () => {
       data: '[BINARY:128]',
     });
   });
+
+  test('redacts Zcash viewing keys and fingerprints in protocol and API field names', () => {
+    const payload = {
+      address: 'synthetic-address-marker',
+      ufvk: 'synthetic-viewing-key-marker',
+      seed_fingerprint: 'synthetic-fingerprint-marker',
+      nested: [{ seedFingerprint: 'synthetic-fingerprint-marker' }],
+    };
+    expect(getSafeTransportLogPayload(payload, 'ZcashAddress')).toEqual({
+      address: '[REDACTED]',
+      ufvk: '[REDACTED]',
+      seed_fingerprint: '[REDACTED]',
+      nested: [{ seedFingerprint: '[REDACTED]' }],
+    });
+    expect(payload.ufvk).toBe('synthetic-viewing-key-marker');
+  });
+
+  test.each([
+    'ZcashSignPczt',
+    'ZcashPcztChunkRequest',
+    'ZcashPcztChunkAck',
+    'ZcashSignedPczt',
+    'ZcashSignedPcztChunkRequest',
+  ])('redacts the complete %s request and response', name => {
+    const payload = { data_chunk: 'synthetic-pczt-marker', chunk_length: 64 };
+    expect(createTransportCallLog(name, 'V2', payload).request).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(payload, name)).toBe('[REDACTED]');
+  });
+
+  test('redacts named PCZT fields even without protocol message context', () => {
+    expect(
+      getSafeTransportLogPayload({
+        pczt: 'synthetic-pczt-marker',
+        signedPczt: 'synthetic-signed-pczt-marker',
+        data_chunk: 'synthetic-chunk-marker',
+        nested: { dataChunk: 'synthetic-chunk-marker' },
+      })
+    ).toEqual({
+      pczt: '[REDACTED]',
+      signedPczt: '[REDACTED]',
+      data_chunk: '[REDACTED]',
+      nested: { dataChunk: '[REDACTED]' },
+    });
+  });
 });
