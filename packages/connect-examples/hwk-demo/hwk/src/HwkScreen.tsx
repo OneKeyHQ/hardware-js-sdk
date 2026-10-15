@@ -17,7 +17,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 /* eslint-enable react/style-prop-object */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEVICE, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
+import { DEVICE, SDK, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
 
 import { createHwkAdapter } from './connectorFactory';
 import { HWK_BRAND_LABELS, type HwkAdapter, type HwkBrand } from './types';
@@ -298,6 +298,21 @@ export const HwkScreen = () => {
         data: { payload: event.payload },
       })
     );
+    // The SDK ends an operation on timeout, disconnect or reset; the demo's connection goes with it.
+    adapter.on(SDK.OPERATION_ENDED, event => {
+      debugLogger({
+        level: 'info',
+        scope: 'trezor-demo',
+        event: 'operation-ended',
+        data: { payload: event.payload },
+      });
+      if (event.payload.operationId !== operationIdRef.current) return;
+      operationIdRef.current = null;
+      setConnectedId(null);
+      setBtcAddress(null);
+      setAddress(null);
+      setFeatures(null);
+    });
     adapter.on(DEVICE.TREZOR_THP_CREDENTIALS_CHANGED, event => {
       const incoming = event.payload.credentials ?? [];
       // Push only credentials we don't already have. The protocol matches by
@@ -741,7 +756,12 @@ export const HwkScreen = () => {
       setBusy('address');
       const params = { path: EVM_TEST_PATH, showOnDevice: false };
       appendLog('info', { evmGetAddress: params });
-      const result = await adapter.evmGetAddress(connectId, deviceId, params);
+      // Calling through the operation keeps it alive; a bare connectId would let its TTL run out.
+      const result = await adapter.evmGetAddress(
+        operationIdRef.current ?? connectId,
+        deviceId,
+        params
+      );
       appendLog('info', { evmGetAddressRes: result });
       if (!result.success) {
         Alert.alert('evmGetAddress failed', responseError(result));
@@ -775,7 +795,11 @@ export const HwkScreen = () => {
         scriptType: 'p2wpkh' as const,
       };
       appendLog('info', { getAddress: params });
-      const result = await adapter.btcGetAddress(connectId, deviceId, params);
+      const result = await adapter.btcGetAddress(
+        operationIdRef.current ?? connectId,
+        deviceId,
+        params
+      );
       appendLog('info', { getAddressRes: result });
       if (!result.success) {
         Alert.alert('getAddress failed', responseError(result));
