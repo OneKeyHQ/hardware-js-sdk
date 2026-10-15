@@ -1,6 +1,4 @@
 import { UR, URDecoder, UREncoder } from '@ngraveio/bc-ur';
-// Not re-exported by the package root; pinned with the package version.
-import bytewords from '@ngraveio/bc-ur/dist/bytewords';
 import { Actions } from '@keystonehq/hw-transport-usb';
 import {
   EConnectorInteraction,
@@ -149,11 +147,9 @@ function readFountainPart(input: Uint8Array) {
 function assertBoundedUrPart(part: string): void {
   const match = /^ur:[a-z0-9-]+\/(?:(\d{1,9})-(\d{1,9})\/)?([a-z]+)$/i.exec(part);
   if (!match) throw new Error('Keystone USB reply part is not a UR');
-  // Minimal bytewords carry their own CRC32; decode throws on a mismatch.
-  const payload = Buffer.from(
-    bytewords.decode(match[3].toLowerCase(), bytewords.STYLES.MINIMAL),
-    'hex'
-  );
+  // Decodes the minimal bytewords body (CRC32-checked, throws on a mismatch) through the package
+  // root: a deep `dist/` import breaks strict ESM consumers of this package's `.mjs` build.
+  const payload = URDecoder.decode(`ur:bytes/${match[3].toLowerCase()}`).cbor;
   assertBoundedCbor(payload, MAX_UR_MESSAGE_BYTES);
   if (match[1] === undefined) return;
   const header = readFountainPart(payload);
@@ -188,9 +184,11 @@ function fromUrEncoded(encoded: unknown): KeystoneUr {
       decoder.receivePart(part);
       if (decoder.isComplete()) break;
     }
-  } catch {
+  } catch (error) {
     // A part that does not decode is the device's reply, not a broken link: report it below as
-    // an unreadable answer so the session is kept rather than re-claimed.
+    // an unreadable answer so the session is kept rather than re-claimed. A TypeError or
+    // ReferenceError is a bug or a broken install, not device data, so it surfaces as is.
+    if (error instanceof TypeError || error instanceof ReferenceError) throw error;
   }
   if (!parts.length || !decoder.isComplete() || !decoder.isSuccess()) {
     const shape =

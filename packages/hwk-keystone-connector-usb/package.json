@@ -33,7 +33,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/verify-esm.mjs",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
     "test": "jest"
