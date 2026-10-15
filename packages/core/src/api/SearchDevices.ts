@@ -149,19 +149,22 @@ export const probeUsbDeviceIdentitiesWithTransport = async (
         if (response.type !== 'Features') return undefined;
         let features = buildProtocolV1FeaturesPayload(response.message as PROTO.Features);
         if (!features.serialNo) {
-          const { messages } = getSupportProtocolV1MessageSchema(features);
-          if (messages) await transport.configure(JSON.stringify(messages));
-          const vendor = await transport.call(
-            session,
-            'OnekeyGetFeatures',
-            {},
-            { timeoutMs: 3000 }
-          );
-          if (vendor.type === 'OnekeyFeatures') {
-            features = buildProtocolV1FeaturesPayload({
-              ...response.message,
-              ...vendor.message,
-            } as PROTO.Features);
+          const { messages, protocolV1MessageSchema } = getSupportProtocolV1MessageSchema(features);
+          // Legacy V1 has no OnekeyGetFeatures; keep the identity confirmed by GetFeatures.
+          if (protocolV1MessageSchema === 'v1CurrentSchema') {
+            if (messages) await transport.configure(JSON.stringify(messages));
+            const vendor = await transport.call(
+              session,
+              'OnekeyGetFeatures',
+              {},
+              { timeoutMs: 3000 }
+            );
+            if (vendor.type === 'OnekeyFeatures') {
+              features = buildProtocolV1FeaturesPayload({
+                ...response.message,
+                ...vendor.message,
+              } as PROTO.Features);
+            }
           }
         }
         identified = {

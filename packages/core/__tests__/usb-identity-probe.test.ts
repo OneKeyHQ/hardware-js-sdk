@@ -1,4 +1,4 @@
-import { DeviceType } from '@onekeyfe/hd-transport';
+import protocolTransport, { DeviceType } from '@onekeyfe/hd-transport';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import {
@@ -147,6 +147,41 @@ describe('isolated USB identity probe', () => {
       [{ serialNo: 'VENDOR_SERIAL', deviceId: 'WALLET_ID' }]
     );
   });
+
+  test.each([
+    { onekey_device_type: 'CLASSIC', major_version: 2, minor_version: 8, patch_version: 0 },
+    { onekey_device_type: 'TOUCH', major_version: 4, minor_version: 4, patch_version: 0 },
+  ])(
+    'preserves GetFeatures identity when the legacy V1 schema has no vendor query (%s)',
+    async firmware => {
+      const transport = createTransport();
+      let messages = protocolTransport.parseConfigure(
+        JSON.stringify(DataManager.getProtobufMessages())
+      );
+      transport.configure.mockImplementation((schema: string) => {
+        messages = protocolTransport.parseConfigure(schema);
+      });
+      transport.call.mockImplementation((_session, name, data) => {
+        protocolTransport.ProtocolV1.encodeMessageChunks(messages, name, data);
+        return Promise.resolve({
+          type: 'Features',
+          message: { ...firmware, device_id: 'LEGACY_WALLET_ID' },
+        });
+      });
+      await expect(
+        probeUsbDeviceIdentitiesWithTransport(transport, 'webusb')
+      ).resolves.toMatchObject([
+        {
+          path: descriptor.path,
+          serialNo: null,
+          deviceId: 'LEGACY_WALLET_ID',
+          connectProtocol: 'V1',
+        },
+      ]);
+      expect(transport.call.mock.calls.map(call => call[1])).toEqual(['GetFeatures']);
+      expect(transport.release).toHaveBeenCalledWith('usb-transport-handle', false);
+    }
+  );
 
   test('does not substitute a USB path for a missing business identity', async () => {
     const transport = createTransport();
