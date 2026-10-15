@@ -68,10 +68,15 @@ export type DevicePermissionResponse = {
  * `mismatch`: the host's own records do not match the selected device.
  * `skipped`: the host had nothing to bind, a host contract problem rather than a user action.
  *
- * Either way the binding is not saved and `DEVICE_BINDING_STATUS` reports `failed`. The SDK has
- * already checked the device itself, so a business call continues; an explicit `bindBleDevice`
- * fails because saving was its whole purpose. A host that must not use the result has to discard
- * it itself.
+ * Either way the binding is not saved and `DEVICE_BINDING_STATUS` reports `failed`. A business
+ * call continues; an explicit `bindBleDevice` fails because saving was its whole purpose.
+ *
+ * The SDK has checked the device's wallet before asking only when the request carries `identity`,
+ * i.e. the call named an expected wallet (a `deviceId`); Ledger asks without one for a call that
+ * names no wallet. A decline does not retire the endpoint: its session, any operation bound to it,
+ * and the adapter's in-memory reconnect target for it stay in place, and later wallet-checked calls
+ * still verify the wallet on it. A host that must not use the endpoint again discards the result,
+ * releases the operation, and has the user select a device again.
  */
 export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
 
@@ -105,6 +110,11 @@ export type UiResponseEvent =
       // the REQUEST_SELECT_DEVICE event's `devices` list. Scope is the current
       // search session; may be ephemeral (e.g. Ledger USB DMK UUID).
       type: typeof UI_RESPONSE.RECEIVE_SELECT_DEVICE;
+      /**
+       * `requestId` must echo the `REQUEST_SELECT_DEVICE` request's id. It stays optional in the
+       * type for compatibility, but an answer without it (or with another id) is ignored and the
+       * selection keeps waiting until its timeout.
+       */
       payload: { requestId?: string } & (
         | { sdkConnectId: string; cancelled?: false }
         | { cancelled: true }

@@ -142,6 +142,7 @@ export type DeviceSelectionContext =
 
 export interface DeviceSelectionRequest extends UiRequestOperationAttribution {
   devices: DeviceInfo[];
+  /** Echo this in the `RECEIVE_SELECT_DEVICE` answer; an answer without it is ignored. */
   requestId: string;
   context: DeviceSelectionContext;
   extra?: HardwareCallExtra;
