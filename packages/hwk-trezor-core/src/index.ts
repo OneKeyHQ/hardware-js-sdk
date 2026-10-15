@@ -723,6 +723,18 @@ export class TrezorDeviceSession {
         continue;
       }
 
+      if (
+        (response.type === 'PinMatrixRequest' || response.type === 'PassphraseRequest') &&
+        this.connectionType === 'ble' &&
+        this.protocol === 'v1'
+      ) {
+        // Only a self-declared bootloader gets onto Bluetooth without THP, and a bootloader never
+        // asks for a PIN or passphrase; neither may leave the host unencrypted.
+        this.core = undefined;
+        this.currentFeatures = undefined;
+        throw thpPairingRefused('Trezor Bluetooth requires the encrypted THP protocol');
+      }
+
       if (response.type === 'PinMatrixRequest') {
         const pin = await this.handlePinMatrixRequest(
           response.message as TrezorPinMatrixRequestPayload

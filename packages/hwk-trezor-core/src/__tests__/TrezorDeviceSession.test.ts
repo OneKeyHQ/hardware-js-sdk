@@ -272,6 +272,33 @@ describe('TrezorDeviceSession', () => {
       await expect(session.initialize()).resolves.toMatchObject({ bootloader_mode: true });
     });
 
+    test.each(['PinMatrixRequest', 'PassphraseRequest'])(
+      'but never answers a %s from a Bluetooth bootloader',
+      async requestType => {
+        const calls: CallRecord[] = [];
+        const onPinMatrixRequest = jest.fn(async () => '1234');
+        const onPassphraseRequest = jest.fn(async () => ({ passphrase: 'secret' }));
+        const session = new TrezorDeviceSession({
+          transport: new EmptyTransport(),
+          connectionType: 'ble',
+          thp: { hostName: 'host', appName: 'app', onPinMatrixRequest, onPassphraseRequest },
+          coreFactory: createFactory(calls, [
+            { type: 'Features', message: { ...features, bootloader_mode: true } },
+            { type: requestType, message: {} },
+          ]),
+        });
+
+        await session.initialize();
+        await expect(session.call('GetAddress', {})).rejects.toMatchObject({
+          code: 'ThpPairingFailed',
+        });
+        expect(onPinMatrixRequest).not.toHaveBeenCalled();
+        expect(onPassphraseRequest).not.toHaveBeenCalled();
+        expect(calls.map(call => call.name)).toEqual(['Initialize', 'GetAddress']);
+        expect(session.features).toBeUndefined();
+      }
+    );
+
     test('a peer claiming a pairing when no stored credential was sent', async () => {
       const { session, calls } = thpBleSession({
         pairingMethods: ['CodeEntry'],
