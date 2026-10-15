@@ -761,6 +761,44 @@ describe('TrezorAdapter', () => {
     }
   );
 
+  it('keeps an all-network identity preflight inside supportedTransports without known connections', async () => {
+    const connector: IConnector = {
+      ...createConnector(),
+      availableTransports: ['usb', 'ble'],
+    };
+    (connector.searchDevices as SearchDevicesMock).mockImplementation(async options =>
+      options?.transportType === 'usb'
+        ? [{ connectId: 'usb-safe-7', deviceId: '', name: 'Trezor USB', connectionType: 'usb' }]
+        : []
+    );
+    v1Session(connector);
+    const { adapter } = setup(connector);
+    const permissionRequests: unknown[] = [];
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+      permissionRequests.push(event.payload);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: true },
+      });
+    });
+
+    const result = await adapter.allNetworkGetAddress('', 'safe-7', {
+      useEmptyPassphrase: true,
+      supportedTransports: ['ble'],
+      allowDeviceSelection: false,
+      bundle: [ETH_ITEM],
+    });
+
+    const searchedTransports = (connector.searchDevices as SearchDevicesMock).mock.calls.map(
+      ([options]) => options?.transportType
+    );
+    expect(result.success).toBe(false);
+    expect(searchedTransports).not.toContain('usb');
+    expect(connector.connect).not.toHaveBeenCalledWith('usb-safe-7', expect.anything());
+    expect(permissionRequests).not.toContainEqual(expect.objectContaining({ transport: 'usb' }));
+    await adapter.dispose();
+  });
+
   it('carries opaque context through explicit binding before the wallet call runs', async () => {
     const { connector, adapter } = setup();
     const extra = { dbDeviceId: 'db-trezor' };

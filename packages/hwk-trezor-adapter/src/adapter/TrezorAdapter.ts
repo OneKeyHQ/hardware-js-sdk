@@ -1258,17 +1258,21 @@ export class TrezorAdapter implements IHardwareWallet {
             'getFeatures',
             connectId,
             hasConnectionContext || !connectId ? expectedDeviceId : undefined,
-            hasConnectionContext
-              ? {
-                  operationId: commonParams.operationId,
-                  knownConnections: commonParams.knownConnections,
-                  extra: commonParams.extra,
-                  allowDeviceSelection: commonParams.allowDeviceSelection,
-                  supportedTransports: commonParams.supportedTransports,
-                  passphraseState: commonParams.passphraseState,
-                  useEmptyPassphrase: commonParams.useEmptyPassphrase,
-                }
-              : {},
+            {
+              // Routing limits always apply: the connection found here is reused by the whole
+              // bundle, so dropping them would let a bundle open a transport the host excluded.
+              operationId: commonParams?.operationId,
+              knownConnections: commonParams?.knownConnections,
+              extra: commonParams?.extra,
+              allowDeviceSelection: commonParams?.allowDeviceSelection,
+              supportedTransports: commonParams?.supportedTransports,
+              ...(hasConnectionContext
+                ? {
+                    passphraseState: commonParams.passphraseState,
+                    useEmptyPassphrase: commonParams.useEmptyPassphrase,
+                  }
+                : {}),
+            },
             false,
             bundleContext
           )
