@@ -39,7 +39,7 @@ import {
   ledgerFailure,
   mapLedgerError,
 } from '../errors';
-import { ledgerQueueKey } from '../utils/queueKey';
+import { LEDGER_DEFAULT_QUEUE_KEY, ledgerQueueKey } from '../utils/queueKey';
 import { createAllNetworkGetAddress } from './methods/allNetworkGetAddress';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
@@ -191,7 +191,7 @@ export class LedgerAdapter implements IHardwareWallet {
         type: SDK.OPERATION_ENDED,
         payload: { operationId: operation.operationId, reason },
       });
-      if (reason === 'timeout') {
+      if (reason === 'timeout' && !this._bareCallMayUseConnection(operation)) {
         void this._releaseOperationConnection(operation);
       }
     },
@@ -774,7 +774,7 @@ export class LedgerAdapter implements IHardwareWallet {
     const operation = this._operations.findActive(operationId);
     if (operation) this._cancelOperationWork(operation);
     const endedOperation = this._operations.release(operationId);
-    if (!endedOperation) return;
+    if (!endedOperation || this._bareCallMayUseConnection(endedOperation)) return;
     const { connectId } = endedOperation;
     debugLog('[LedgerAdapter][REQ]', {
       method: 'releaseOperation',
@@ -818,6 +818,24 @@ export class LedgerAdapter implements IHardwareWallet {
     // Ledger cannot recall a prompt already on its screen, but dropping the pending device action
     // lets teardown finish now instead of waiting for the user or the interactive timeout.
     void this.connector.cancel(this._sessions.get(operation.connectId) ?? operation.connectId);
+  }
+
+  /**
+   * A running call by bare connectId (or still resolving its device by identity) may be on this
+   * connection, e.g. waiting for an unlock; its later stages need it, so it stays cached for that
+   * caller like any bare call's session. A lost connection is torn down regardless.
+   */
+  private _bareCallMayUseConnection(
+    operation: NonNullable<ReturnType<OperationRegistry['find']>>
+  ): boolean {
+    const activeKey = this._jobQueue.getActiveJob()?.deviceId;
+    return (
+      activeKey !== undefined &&
+      !isHardwareOperationId(activeKey) &&
+      (activeKey === operation.connectId ||
+        activeKey === LEDGER_DEFAULT_QUEUE_KEY ||
+        operation.connectionKeys.includes(activeKey))
+    );
   }
 
   private async _releaseOperationConnection(

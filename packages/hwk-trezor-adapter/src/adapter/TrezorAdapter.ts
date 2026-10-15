@@ -952,6 +952,17 @@ export class TrezorAdapter implements IHardwareWallet {
     operation: NonNullable<ReturnType<OperationRegistry['find']>>
   ): Promise<void> {
     const { connectId } = operation;
+    // A running call by bare connectId, or routed by this device's id, may be on this connection,
+    // e.g. behind a passphrase prompt; its later stages need it, so it stays cached for that
+    // caller like any bare call's session.
+    const activeKey = this._jobQueue.getActiveJob()?.deviceId;
+    if (
+      activeKey !== undefined &&
+      !isHardwareOperationId(activeKey) &&
+      (activeKey === connectId || activeKey === '' || activeKey === operation.device.deviceId)
+    ) {
+      return;
+    }
     const connecting = this._connectingPromises.has(connectId);
     this._connectingPromises.delete(connectId);
     const sessionId = this._sessions.get(connectId);

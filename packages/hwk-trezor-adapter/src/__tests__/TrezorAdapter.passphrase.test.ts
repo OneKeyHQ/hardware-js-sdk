@@ -733,15 +733,34 @@ describe('TrezorAdapter passphrase sessions', () => {
 
   it('releasing a live operation leaves a bare-connectId call on the same device to its caller', async () => {
     const connector = createConnector({ states: ['feedface'] });
+    // Like the real connector, a disconnected session refuses every later call.
+    const closed = new Set<string>();
+    (connector.disconnect as jest.Mock).mockImplementation(async (sessionId: string) => {
+      closed.add(sessionId);
+    });
+    const live = connector.call.getMockImplementation();
+    connector.call.mockImplementation(
+      async (sessionId: string, method: string, params: unknown) => {
+        if (closed.has(sessionId)) {
+          throw Object.assign(new Error('session closed'), {
+            code: HardwareErrorCode.DeviceNotFound,
+          });
+        }
+        return live?.(sessionId, method, params);
+      }
+    );
     const prompts = holdPassphrasePrompts(connector);
     const adapter = new TrezorAdapter(connector);
     const connected = await adapter.connectDevice('safe-7');
     if (!connected.success) throw new Error('connectDevice failed');
 
-    // Not pinned to the operation, so the release must not cancel it or its prompt.
+    // Not pinned to the operation, so the release must not cancel it or its prompt, and must not
+    // take the connection its later stages need.
     const pending = adapter.getPassphraseState('safe-7');
     await waitUntil(() => prompts.isOpen('safe-7-session'));
-    const released = settleWithin(adapter.releaseOperation(connected.payload), 1000);
+    expect((await settleWithin(adapter.releaseOperation(connected.payload), 20)).settled).toBe(
+      true
+    );
 
     expect((await settleWithin(pending, 20)).settled).toBe(false);
     expect(connector.uiResponse).not.toHaveBeenCalled();
@@ -752,7 +771,49 @@ describe('TrezorAdapter passphrase sessions', () => {
       settled: true,
       value: { success: true, payload: 'feedface' },
     });
-    expect((await released).settled).toBe(true);
+    expect(connector.disconnect).not.toHaveBeenCalledWith('safe-7-session');
+    // The operation itself is over.
+    await expect(adapter.getPassphraseState(connected.payload)).resolves.toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.OperationEnded },
+    });
+  });
+
+  it('releasing a live operation leaves a call routed by the same device id to its caller', async () => {
+    const connector = createConnector({
+      states: ['aabbccdd'],
+      features: { unlocked: true, passphrase_protection: true, device_id: 'safe-7' },
+    });
+    (connector.connect as jest.Mock).mockResolvedValue({
+      sessionId: 'ble-addr-session',
+      deviceInfo: {
+        vendor: 'trezor',
+        model: 'T3W1',
+        firmwareVersion: '',
+        deviceId: 'safe-7',
+        connectId: 'ble-addr',
+        connectionType: 'ble',
+      },
+    });
+    const prompts = holdPassphrasePrompts(connector);
+    const adapter = new TrezorAdapter(connector);
+    const connected = await adapter.connectDevice('ble-addr');
+    if (!connected.success) throw new Error('connectDevice failed');
+
+    // Queued under the device id, not the connectId the operation holds.
+    const pending = adapter.evmGetAddress('', 'safe-7', {
+      path: "m/44'/60'/0'/0/0",
+      passphraseState: 'aabbccdd',
+      knownConnections: [{ transport: 'ble', connectId: 'ble-addr' }],
+    });
+    await waitUntil(() => prompts.isOpen('ble-addr-session'));
+    expect((await settleWithin(adapter.releaseOperation(connected.payload), 20)).settled).toBe(
+      true
+    );
+
+    prompts.answer('ble-addr-session');
+    expect(await settleWithin(pending)).toMatchObject({ settled: true, value: { success: true } });
+    expect(connector.disconnect).not.toHaveBeenCalledWith('ble-addr-session');
   });
 
   it('releasing an already-released operation again leaves a reconnected call and its prompt open', async () => {

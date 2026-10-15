@@ -1517,6 +1517,45 @@ describe('LedgerAdapter', () => {
       await adapter.releaseOperation(second);
     });
 
+    it('releasing a live operation keeps the connection a raw-connectId call on it still needs', async () => {
+      const operationId = await connectOperation();
+      connector.callImpl
+        .mockRejectedValueOnce(
+          Object.assign(new Error('Ledger is locked'), { code: HardwareErrorCode.DeviceLocked })
+        )
+        .mockResolvedValue({ address: EVM_ADDR });
+      const unlockPrompts: unknown[] = [];
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, event => {
+        unlockPrompts.push(event.payload);
+      });
+
+      const pending = adapter.evmGetAddress('dev-1', '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnDevice: false,
+      });
+      await waitForCondition(() => unlockPrompts.length === 1);
+
+      expect((await settleWithin(adapter.releaseOperation(operationId))).settled).toBe(true);
+      expect(connector.disconnect).not.toHaveBeenCalled();
+      expect((await settleWithin(pending, 20)).settled).toBe(false);
+
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
+        payload: { confirmed: true },
+      });
+      expect(await settleWithin(pending, 2000)).toEqual({
+        settled: true,
+        value: expect.objectContaining({
+          success: true,
+          payload: expect.objectContaining({ address: EVM_ADDR }),
+        }),
+      });
+      // The operation itself is over.
+      await expect(adapter.getDeviceInfo(operationId, '')).resolves.toMatchObject({
+        success: false,
+      });
+    });
+
     it('cancels the active job without terminating its operation', async () => {
       const operationId = await connectOperation();
 
