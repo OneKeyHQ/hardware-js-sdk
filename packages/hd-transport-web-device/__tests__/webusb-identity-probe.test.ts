@@ -1,6 +1,19 @@
 import WebUsbTransport from '../src/webusb';
+import { probeUsbDeviceIdentities } from '@onekeyfe/hd-common-connect-sdk/src';
 
 import type { MessageFromOneKey, TransportCallOptions } from '@onekeyfe/hd-transport';
+
+jest.mock('@onekeyfe/hd-core', () => jest.requireActual('../../core/src'));
+jest.mock('../../core/src/data/config', () => ({
+  getSDKVersion: () => '1.0.0-test',
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0-test/',
+}));
+jest.mock('@onekeyfe/hd-transport-web-device', () => ({
+  WebUsbTransport: jest.requireActual('../src/webusb').default,
+}));
+jest.mock('@onekeyfe/hd-transport-http', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('@onekeyfe/hd-transport-lowlevel', () => ({}));
+jest.mock('@onekeyfe/hd-transport-emulator', () => ({}));
 
 describe('WebUSB identity probe ownership', () => {
   let originalNavigator: PropertyDescriptor | undefined;
@@ -105,8 +118,10 @@ describe('WebUSB identity probe ownership', () => {
     const replacement = { ...device, close: jest.fn() };
     usb.getDevices.mockResolvedValue([replacement]);
     await probe.getConnectedDevices();
-    await probe.release('USB_PATH');
-    expect(device.close).toHaveBeenCalledTimes(1);
+    device.close.mockRejectedValueOnce(new Error('native close failed'));
+    await expect(probe.release('USB_PATH')).rejects.toThrow('native close failed');
+    await probe.enumerate();
+    expect(device.close).toHaveBeenCalledTimes(2);
     expect(replacement.close).not.toHaveBeenCalled();
   });
 
@@ -172,6 +187,59 @@ describe('WebUSB identity probe ownership', () => {
       await expect(active.connectToDevice('USB_PATH', true)).resolves.toBeUndefined();
       expect(device.opened).toBe(true);
       await active.release('USB_PATH');
+    }
+  );
+
+  test.each(['release', 'acquire failure'])(
+    'the public probe retries failed %s cleanup on its next call',
+    async phase => {
+      const internals = WebUsbTransport.prototype as unknown as {
+        rotateProtocolV2UsbGeneration: () => Promise<void>;
+        detectProtocol: () => Promise<'V1'>;
+      };
+      jest.spyOn(internals, 'rotateProtocolV2UsbGeneration').mockResolvedValue(undefined);
+      jest.spyOn(internals, 'detectProtocol').mockResolvedValue('V1');
+      jest.spyOn(WebUsbTransport.prototype, 'getProtocolType').mockReturnValue('V1');
+      jest.spyOn(WebUsbTransport.prototype, 'configure').mockImplementation(() => undefined);
+      jest
+        .spyOn(WebUsbTransport.prototype, 'configureProtocolV2')
+        .mockImplementation(() => undefined);
+      const connect = jest.spyOn(WebUsbTransport.prototype, 'connect').mockImplementation(() => {
+        device.opened = true;
+        return Promise.resolve();
+      });
+      if (phase === 'acquire failure') {
+        connect.mockImplementationOnce(() => {
+          device.opened = true;
+          return Promise.reject(new Error('probe failed'));
+        });
+      }
+      jest.spyOn(WebUsbTransport.prototype, 'call').mockResolvedValue({
+        type: 'Features',
+        message: { onekey_serial_no: 'PHYSICAL_SERIAL', onekey_device_type: 'CLASSIC1S' },
+      });
+      device.close.mockRejectedValueOnce(new Error('native close failed'));
+      try {
+        await expect(probeUsbDeviceIdentities({ commType: 'webusb' })).resolves.toEqual([]);
+        expect(device.opened).toBe(true);
+        const active = new WebUsbTransport();
+        active.init({ debug: jest.fn() });
+        await expect(active.connectToDevice('USB_PATH', true)).rejects.toThrow(
+          'USB device is already in use'
+        );
+        device.close.mockRejectedValueOnce(new Error('native close still failing'));
+        await expect(probeUsbDeviceIdentities({ commType: 'webusb' })).resolves.toEqual([]);
+        expect(device.opened).toBe(true);
+        expect(connect).toHaveBeenCalledTimes(1);
+        expect(device.close).toHaveBeenCalledTimes(2);
+        await expect(probeUsbDeviceIdentities({ commType: 'webusb' })).resolves.toMatchObject([
+          { path: 'USB_PATH', serialNo: 'PHYSICAL_SERIAL' },
+        ]);
+        expect(connect).toHaveBeenCalledTimes(2);
+        expect(device.opened).toBe(false);
+      } finally {
+        jest.restoreAllMocks();
+      }
     }
   );
 

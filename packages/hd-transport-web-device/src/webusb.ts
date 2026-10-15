@@ -130,6 +130,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   private identityProbeDevices = new Map<string, USBDevice>();
 
+  private identityProbeCleanupPaths = new Set<string>();
+
   /**
    * The exact USBDevice object each cached protocol was probed against. The
    * browser returns the same object identity for a device as long as it stays
@@ -273,6 +275,14 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * It does NOT prompt the user to select a device
    */
   async enumerate() {
+    // Retry only our failed cleanup before Core skips already-open USB handles.
+    for (const path of this.identityProbeCleanupPaths) {
+      try {
+        await this.release(path);
+      } catch {
+        // Keep ownership while native close still fails; retry on the next probe.
+      }
+    }
     await this.getConnectedDevices();
     return this.deviceList;
   }
@@ -667,9 +677,13 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   private releaseIdentityProbeHandle(path: string) {
     const device = this.identityProbeDevices.get(path);
     // A failed native close must not make an open probe handle available to other callers.
-    if (device?.opened) return;
+    if (device?.opened) {
+      this.identityProbeCleanupPaths.add(path);
+      return;
+    }
     if (device) identityProbeHandles.delete(device);
     this.identityProbeDevices.delete(path);
+    this.identityProbeCleanupPaths.delete(path);
   }
 
   private async closeOpenDevice(path: string) {
