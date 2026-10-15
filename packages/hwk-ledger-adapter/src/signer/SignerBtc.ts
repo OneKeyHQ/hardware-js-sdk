@@ -2,6 +2,7 @@ import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
 import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 import { debugError, debugLog } from '../utils/debugLog';
+import { summarizeForLog } from '../utils/logSummary';
 
 import type { CancelReason } from './deviceActionToPromise';
 import type { SignerBtc as ISdkSignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
@@ -72,9 +73,7 @@ export class SignerBtc {
         '[SignerBtc] getExtendedPublicKey result type:',
         typeof result,
         'value:',
-        typeof result === 'string'
-          ? `${result.substring(0, 20)}...`
-          : JSON.stringify(result).substring(0, 50)
+        summarizeForLog(result)
       );
       if (typeof result === 'string') return result;
       return result.extendedPublicKey;

@@ -16,6 +16,7 @@ import {
   mapLedgerError,
 } from '../errors';
 import { debugLog } from '../utils/debugLog';
+import { summarizeForLog } from '../utils/logSummary';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import {
   btcGetAddress,
@@ -735,7 +736,7 @@ export class LedgerConnectorBase implements IConnector {
   // whitelist (`toPlainError`). The SW-side adapter rehydrates and re-throws
   // locally (see LedgerAdapter._unwrapConnectorResult).
   async call(sessionId: string, method: string, params: unknown): Promise<ConnectorCallResult> {
-    debugLog('[DMK] call:', method, JSON.stringify(params));
+    debugLog('[DMK] call:', method, JSON.stringify(summarizeForLog(params, { method })));
     try {
       const payload = await this._dispatch(sessionId, method, params);
       return { success: true, payload };

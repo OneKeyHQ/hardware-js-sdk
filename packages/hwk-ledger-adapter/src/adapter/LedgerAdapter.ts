@@ -43,6 +43,7 @@ import { ledgerQueueKey } from '../utils/queueKey';
 import { createAllNetworkGetAddress } from './methods/allNetworkGetAddress';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import { debugError, debugLog } from '../utils/debugLog';
+import { summarizeForLog } from '../utils/logSummary';
 
 import type { LedgerInstallAppContext } from './methods/allNetworkGetAddress';
 import type { AppMetadata, FirmwareVersion, LedgerDeviceInfo } from '../device-apps/DeviceApps';
@@ -143,22 +144,6 @@ type LedgerCommonParams = NullableCallArg<IHardwareCommonCallParams>;
 // not secrets — safe to log.
 function formatDeviceMismatchError(expected: string, actual: string): string {
   return `Wrong device: expected ${expected}, got ${actual}`;
-}
-
-// Viewing keys reveal a Zcash account's whole shielded history; logs get exported to support.
-const LOG_REDACTED_RESULT_KEYS = ['ufvk', 'orchardFvk'];
-
-// Signing payloads and their signatures stay out of logs, as in the Trezor adapter.
-function isSigningMethod(method: string): boolean {
-  return /sign/i.test(method);
-}
-
-function redactResultForLog(result: unknown, method: string): unknown {
-  if (isSigningMethod(method)) return '[redacted]';
-  if (!result || typeof result !== 'object') return result;
-  const keys = LOG_REDACTED_RESULT_KEYS.filter(key => key in result);
-  if (!keys.length) return result;
-  return { ...result, ...Object.fromEntries(keys.map(key => [key, '[redacted]'])) };
 }
 
 /** The session is gone: disconnect, not advertising, timeout, or a connection-level tag. */
@@ -2524,7 +2509,7 @@ export class LedgerAdapter implements IHardwareWallet {
     debugLog('[LedgerAdapter][REQ]', {
       method,
       connectId: effectiveConnectId || '(empty)',
-      params: isSigningMethod(method) ? '[redacted]' : params,
+      params: summarizeForLog(params, { method }),
     });
 
     // Queue is global serial; deviceId is just a label for inspection / cancellation.
@@ -2585,7 +2570,7 @@ export class LedgerAdapter implements IHardwareWallet {
       debugLog('[LedgerAdapter][RES]', {
         method,
         success: true,
-        payload: redactResultForLog(result, method),
+        payload: summarizeForLog(result, { method, role: 'result' }),
       });
       return result;
     } catch (err) {

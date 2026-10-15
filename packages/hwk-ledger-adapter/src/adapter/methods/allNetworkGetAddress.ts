@@ -11,6 +11,7 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { debugLog } from '../../utils/debugLog';
+import { summarizeForLog } from '../../utils/logSummary';
 import { ledgerQueueKey } from '../../utils/queueKey';
 
 import type {
@@ -219,7 +220,7 @@ export function createAllNetworkGetAddress({
       debugLog('[LedgerAdapter][RES]', {
         method: 'allNetworkGetAddress',
         success: result.success,
-        payload: result,
+        payload: summarizeForLog(result, { method: 'allNetworkGetAddress', role: 'result' }),
       });
       return result;
     } finally {

@@ -1720,9 +1720,12 @@ describe('TrezorAdapter', () => {
       });
       expect(logs.some(log => log.includes('[TrezorAdapter][REQ]'))).toBe(true);
       expect(logs.some(log => log.includes('"method":"btcSignMessage"'))).toBe(true);
-      // Signing bodies are redacted wholesale (aligned with hd-core logBlockEvent).
+      // Signing bodies keep their path but reduce the message to length + hash.
       expect(logs.some(log => log.includes('"message":"hello"'))).toBe(false);
-      expect(logs.some(log => log.includes('"params":"[redacted]"'))).toBe(true);
+      expect(logs.some(log => log.includes('hello'))).toBe(false);
+      const reqLine = logs.find(log => log.startsWith('[TrezorAdapter][REQ]'));
+      expect(reqLine).toContain(`"path":"m/84'/0'/0'/0/0"`);
+      expect(reqLine).toContain('"message":"<str len=5 sha256=');
       expect(logs.some(log => log.includes('[TrezorAdapter][RES]'))).toBe(true);
       expect(logs.some(log => log.includes('"success":false'))).toBe(true);
       expect(logs.some(log => log.includes('[TrezorAdapter][ERROR]'))).toBe(true);
@@ -1731,6 +1734,196 @@ describe('TrezorAdapter', () => {
     } finally {
       unsubscribe();
     }
+  });
+
+  describe('[REQ]/[RES] log summaries', () => {
+    const XPUB =
+      'xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz';
+    const PUBKEY = `02${'ab'.repeat(32)}`;
+    const CHAIN_CODE = 'cd'.repeat(32);
+    const EVM_ADDRESS = '0x1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b9f0e';
+    const SOL_ADDRESS = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin';
+    const TX_DATA = `0xa9059cbb${'00'.repeat(12)}${'ee'.repeat(20)}${'00'.repeat(31)}01`;
+    const SIGNED_TX = `0x02f8${'5a'.repeat(100)}`;
+    const SIG_R = `0x${'11'.repeat(32)}`;
+    const SIG_S = `0x${'22'.repeat(32)}`;
+
+    function mockDevice(connector: IConnector, results: Record<string, unknown>) {
+      (connector.call as CallMock).mockImplementation(async (_sessionId, method) => {
+        if (method === '__thpCreateSession') {
+          return { protocol: 'thp', thpSessionId: 'session-empty' };
+        }
+        if (method in results) return results[method];
+        return {};
+      });
+    }
+
+    async function captureLogs(run: () => Promise<unknown>): Promise<string[]> {
+      const logs: string[] = [];
+      const unsubscribe = onSdkEvent(event => {
+        if (event.type === 'log') logs.push(event.message);
+      });
+      try {
+        await run();
+      } finally {
+        unsubscribe();
+      }
+      return logs;
+    }
+
+    const lineOf = (logs: string[], tag: 'REQ' | 'RES', method: string) =>
+      logs.find(
+        log => log.startsWith(`[TrezorAdapter][${tag}]`) && log.includes(`"method":"${method}"`)
+      );
+
+    it('btcGetPublicKey logs the path and key lengths, never the xpub, public key or chain code', async () => {
+      const { connector, adapter } = setup();
+      mockDevice(connector, {
+        btcGetPublicKey: {
+          xpub: XPUB,
+          publicKey: PUBKEY,
+          chainCode: CHAIN_CODE,
+          fingerprint: 1234,
+          depth: 3,
+          path: "m/84'/0'/0'",
+          node: { public_key: PUBKEY, chain_code: CHAIN_CODE },
+        },
+      });
+
+      let result: unknown;
+      const logs = await captureLogs(async () => {
+        result = await adapter.btcGetPublicKey('safe-7', 'safe-7', {
+          path: "m/84'/0'/0'",
+          coin: 'btc',
+          useEmptyPassphrase: true,
+        });
+      });
+
+      expect(result).toMatchObject({ success: true, payload: { xpub: XPUB } });
+      const req = lineOf(logs, 'REQ', 'btcGetPublicKey');
+      const res = lineOf(logs, 'RES', 'btcGetPublicKey');
+      expect(req).toContain(`"path":"m/84'/0'/0'"`);
+      expect(res).toContain(`"path":"m/84'/0'/0'"`);
+      expect(res).toContain(`"xpub":"xpub… len=${XPUB.length}"`);
+      expect(res).toContain(`"publicKey":"… len=${PUBKEY.length}"`);
+      expect(res).toContain(`"chainCode":"… len=${CHAIN_CODE.length}"`);
+      expect(res).toContain(`"chain_code":"… len=${CHAIN_CODE.length}"`);
+      const text = logs.join('\n');
+      expect(text).not.toContain(XPUB.slice(0, 12));
+      expect(text).not.toContain(PUBKEY);
+      expect(text).not.toContain(CHAIN_CODE);
+    });
+
+    it('evmGetAddress logs the path and a masked address', async () => {
+      const { connector, adapter } = setup();
+      mockDevice(connector, { evmGetAddress: { address: EVM_ADDRESS, path: EVM_PATH } });
+
+      let result: unknown;
+      const logs = await captureLogs(async () => {
+        result = await adapter.evmGetAddress('safe-7', 'safe-7', EVM_PARAMS);
+      });
+
+      expect(result).toMatchObject({ success: true, payload: { address: EVM_ADDRESS } });
+      expect(lineOf(logs, 'REQ', 'evmGetAddress')).toContain(`"path":"${EVM_PATH}"`);
+      const res = lineOf(logs, 'RES', 'evmGetAddress');
+      expect(res).toContain(`"path":"${EVM_PATH}"`);
+      expect(res).toContain('"address":"0x1a2b…9f0e"');
+      expect(logs.join('\n')).not.toContain(EVM_ADDRESS.slice(2, 14));
+    });
+
+    it('allNetworkGetAddress item logs mask every address and key', async () => {
+      const { connector, adapter } = setup();
+      mockDevice(connector, {
+        btcGetPublicKey: { xpub: XPUB, publicKey: PUBKEY, chainCode: CHAIN_CODE },
+        evmGetAddress: { address: EVM_ADDRESS, path: EVM_PATH },
+        solGetAddress: { address: SOL_ADDRESS, path: "m/44'/501'/0'/0'" },
+        getFeatures: { device_id: 'trezor-device-uuid-abc' },
+      });
+
+      let result: unknown;
+      const logs = await captureLogs(async () => {
+        result = await adapter.allNetworkGetAddress('safe-7', '', {
+          useEmptyPassphrase: true,
+          bundle: [
+            ETH_ITEM,
+            {
+              network: 'sol',
+              methodName: 'solGetAddress',
+              path: "m/44'/501'/0'/0'",
+              showOnDevice: false,
+            },
+          ],
+        });
+      });
+
+      expect(result).toMatchObject({ success: true });
+      const evmRes = lineOf(logs, 'RES', 'evmGetAddress');
+      const solRes = lineOf(logs, 'RES', 'solGetAddress');
+      expect(evmRes).toContain(`"path":"${EVM_PATH}"`);
+      expect(evmRes).toContain('"address":"0x1a2b…9f0e"');
+      expect(solRes).toContain(`"path":"m/44'/501'/0'/0'"`);
+      expect(solRes).toContain('"address":"9xQeWv…VFin"');
+      const text = logs.join('\n');
+      expect(text).not.toContain(EVM_ADDRESS.slice(2, 14));
+      expect(text).not.toContain(SOL_ADDRESS.slice(0, 12));
+      expect(text).not.toContain(XPUB.slice(0, 12));
+      expect(text).not.toContain(PUBKEY);
+    });
+
+    it('evmSignTransaction logs path, chain and payload length + hash instead of [redacted]', async () => {
+      const { connector, adapter } = setup();
+      mockDevice(connector, {
+        evmSignTransaction: { v: '0x1', r: SIG_R, s: SIG_S, serializedTx: SIGNED_TX },
+      });
+
+      let result: unknown;
+      const logs = await captureLogs(async () => {
+        result = await adapter.evmSignTransaction('safe-7', 'safe-7', {
+          path: EVM_PATH,
+          chainId: 137,
+          to: EVM_ADDRESS,
+          value: '0x0',
+          nonce: '0x5',
+          gasLimit: '0x5208',
+          maxFeePerGas: '0x3b9aca00',
+          maxPriorityFeePerGas: '0x3b9aca00',
+          data: TX_DATA,
+          useEmptyPassphrase: true,
+        });
+      });
+
+      expect(result).toMatchObject({ success: true, payload: { serializedTx: SIGNED_TX } });
+      const req = lineOf(logs, 'REQ', 'evmSignTransaction');
+      const res = lineOf(logs, 'RES', 'evmSignTransaction');
+      expect(req).not.toContain('"params":"[redacted]"');
+      expect(req).toContain(`"path":"${EVM_PATH}"`);
+      expect(req).toContain('"chainId":137');
+      expect(req).toContain('"to":"0x1a2b…9f0e"');
+      expect(req).toMatch(new RegExp(`"data":"<hex len=${TX_DATA.length} sha256=[0-9a-f]{16}>"`));
+      expect(res).toContain(`"serializedTx":"<signedTx len=${SIGNED_TX.length}>"`);
+      expect(res).toContain('"r":"<signature len=66>"');
+      const text = logs.join('\n');
+      expect(text).not.toContain(EVM_ADDRESS.slice(2, 14));
+      expect(text).not.toContain(TX_DATA.slice(2, 40));
+      expect(text).not.toContain(SIGNED_TX.slice(4, 40));
+      expect(text).not.toContain(SIG_R.slice(2));
+      expect(text).not.toContain(SIG_S.slice(2));
+    });
+
+    it('keeps a failed response readable as an error record', async () => {
+      const { connector, adapter } = setup();
+      (connector.call as CallMock)
+        .mockResolvedValueOnce({ protocol: 'thp', thpSessionId: 'session-empty' })
+        .mockRejectedValueOnce(trezorFailure('Failure_DataError', 'Invalid path m/1/2'));
+
+      const logs = await captureLogs(() =>
+        adapter.evmGetAddress('safe-7', 'safe-7', { path: 'm/1/2', useEmptyPassphrase: true })
+      );
+
+      const res = lineOf(logs, 'RES', 'evmGetAddress');
+      expect(res).toContain('"success":false');
+      expect(res).toContain('Invalid path m/1/2');
+    });
   });
 
   it('maps Trezor response-only action cancel failures to UserRejected', async () => {
@@ -2925,7 +3118,7 @@ describe('TrezorAdapter', () => {
         expect(result.payload[0]).not.toHaveProperty('passphraseState');
         expect(result.payload[0]).not.toHaveProperty('useEmptyPassphrase');
       }
-      expect(logs.some(log => log.includes('"passphraseState":"[redacted]"'))).toBe(true);
+      expect(logs.some(log => log.includes('"passphraseState":"<redacted len=8>"'))).toBe(true);
       expect(logs.some(log => log.includes('aabbccdd'))).toBe(false);
     } finally {
       unsubscribe();
@@ -3566,30 +3759,39 @@ function typeOnlyTrezorEvmSignTxShape(adapter: TrezorAdapter) {
 void typeOnlyTrezorEvmSignTxShape;
 
 describe('TrezorAdapter._sanitizeForLog', () => {
-  const sanitize = (value: unknown, methodName?: string) =>
+  const sanitize = (value: unknown, methodName?: string, role?: 'params' | 'result') =>
     (
       TrezorAdapter as unknown as {
-        _sanitizeForLog(v: unknown, m?: string): unknown;
+        _sanitizeForLog(v: unknown, m?: string, r?: 'params' | 'result'): unknown;
       }
-    )._sanitizeForLog(value, methodName) as Record<string, unknown>;
+    )._sanitizeForLog(value, methodName, role) as Record<string, unknown>;
 
   it('redacts secrets: red-line (pin/passphrase/THP keys) + seed-level', () => {
-    const out = sanitize({
+    const secrets: Record<string, unknown> = {
       pin: '1234',
       passphrase: 'secret',
       passphraseState: 'st',
+      password: 'pw',
       credential: 'c',
+      credentials: [{ credential: 'c' }],
       host_static_key: 'hk',
       trezor_static_public_key: 'tk',
       entropy: 'deadbeef',
       mnemonic: 'abandon abandon',
+      mnemonics: ['abandon'],
       seed: 'seedhex',
       word: 'abandon',
       words: ['abandon'],
       privateKey: 'pk',
-    });
-    for (const key of Object.keys(out)) {
-      expect(out[key]).toBe('[redacted]');
+      xprv: 'xprv-material',
+      session: 'session-hex',
+      session_id: 'session-hex',
+      knownConnections: [{ deviceId: 'safe-7', bleConnectId: 'safe-7' }],
+      extra: { anything: 1 },
+    };
+    const out = sanitize(secrets);
+    for (const key of Object.keys(secrets)) {
+      expect(out[key]).toMatch(/^<redacted len=\d+>$/);
     }
   });
 
@@ -3599,43 +3801,58 @@ describe('TrezorAdapter._sanitizeForLog', () => {
       chain_code_keep: 'not-sensitive',
       node: { private_key: 'pk2', public_key: 'pub' },
     });
-    expect(out.private_key).toBe('[redacted]');
+    expect(out.private_key).toBe('<redacted len=2>');
     expect(out.chain_code_keep).toBe('not-sensitive');
-    expect((out.node as Record<string, unknown>).private_key).toBe('[redacted]');
-    expect((out.node as Record<string, unknown>).public_key).toBe('pub');
+    expect((out.node as Record<string, unknown>).private_key).toBe('<redacted len=3>');
+    // Public keys are reduced to their length, never logged in full.
+    expect((out.node as Record<string, unknown>).public_key).toBe('… len=3');
   });
 
-  it('summarizes binary values instead of flattening them into index maps', () => {
+  it('summarizes binary values by length and hash instead of flattening them', () => {
     const out = sanitize({ definitions: new ArrayBuffer(8), raw: new Uint8Array(4) });
-    expect(out.definitions).toBe('[BINARY:8]');
-    expect(out.raw).toBe('[BINARY:4]');
+    expect(out.definitions).toMatch(/^<hex len=8 sha256=[0-9a-f]{16}>$/);
+    expect(out.raw).toMatch(/^<hex len=4 sha256=[0-9a-f]{16}>$/);
   });
 
-  it('redacts a signing method body wholesale (aligned with hd-core logBlockEvent)', () => {
-    expect(sanitize({ message: 'hello', address: '0xabc' }, 'evmSignTransaction')).toBe(
-      '[redacted]'
+  it('summarizes a signing method body instead of logging it or dropping it wholesale', () => {
+    const out = sanitize(
+      { path: "m/44'/60'/0'/0/0", message: 'hello', address: '0xabc' },
+      'evmSignMessage'
     );
-    const out = sanitize({ address: '0xabc' }, 'evmGetAddress');
-    expect(out.address).toBe('0xabc');
+    expect(out).toEqual({
+      path: "m/44'/60'/0'/0/0",
+      message: expect.stringMatching(/^<str len=5 sha256=[0-9a-f]{16}>$/),
+      address: '<addr len=5>',
+    });
+    expect(JSON.stringify(out)).not.toContain('hello');
   });
 
-  it('keeps transaction data so a failed sign can still be reproduced', () => {
+  it('keeps reproduction fields while reducing transaction contents to length + hash', () => {
     const tx = {
-      to: '0xabc',
+      to: '0x1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b9f0e',
       value: '0x16345785d8a0000',
-      data: '0xdeadbeef',
-      address: 'bc1qexample',
+      data: `0xa9059cbb${'00'.repeat(64)}`,
+      address: 'bc1qexampleexampleexampleexample',
       path: "m/84'/0'/0'/0/0",
       chainId: 1,
       message: 'hello',
     };
-    expect(sanitize({ ...tx })).toEqual(tx);
+    const out = sanitize({ ...tx }, 'evmSignTransaction');
+    expect(out).toEqual({
+      to: '0x1a2b…9f0e',
+      value: '<amount>',
+      data: expect.stringMatching(new RegExp(`^<hex len=${tx.data.length} sha256=[0-9a-f]{16}>$`)),
+      address: 'bc1qex…mple',
+      path: tx.path,
+      chainId: 1,
+      message: expect.stringMatching(/^<str len=5 sha256=[0-9a-f]{16}>$/),
+    });
   });
 
   it('redacts nested secrets while keeping sibling tx fields', () => {
     const out = sanitize({ params: { mnemonic: 'x', value: '0x1' } });
     const params = out.params as Record<string, unknown>;
-    expect(params.mnemonic).toBe('[redacted]');
-    expect(params.value).toBe('0x1');
+    expect(params.mnemonic).toBe('<redacted len=1>');
+    expect(params.value).toBe('<amount>');
   });
 });

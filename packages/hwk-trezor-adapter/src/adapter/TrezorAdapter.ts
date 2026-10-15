@@ -27,6 +27,7 @@ import {
   resolveHardwareOperationTarget,
   runAllNetworkGetAddress,
   success,
+  summarizeForLog,
   toPhysicalDeviceSearchTarget,
 } from '@onekeyfe/hwk-adapter-core';
 import { randomBytes } from '@noble/hashes/utils';
@@ -381,11 +382,26 @@ export class TrezorAdapter implements IHardwareWallet {
     return key.replace(/[_-]/g, '').toLowerCase();
   }
 
-  // Mirrors hd-core's logBlockEvent: a signing method's body is the user's
-  // transaction, so it is dropped wholesale; other methods redact by key.
-  private static _sanitizeForLog(value: unknown, methodName?: string): unknown {
-    if (methodName && /sign/i.test(methodName)) return '[redacted]';
-    return TrezorAdapter._redactForLog(value, new WeakSet());
+  // [REQ]/[RES] bodies: paths, chain ids and flags stay readable; transaction
+  // contents, keys and addresses become length + short hash; secrets are redacted.
+  private static _sanitizeForLog(
+    value: unknown,
+    methodName?: string,
+    role: 'params' | 'result' = 'params'
+  ): unknown {
+    return summarizeForLog(value, { method: methodName, role });
+  }
+
+  // A failure payload is an error record, so its message/error text stays readable.
+  private static _responseForLog(response: Response<unknown>, methodName: string): unknown {
+    if (response.success) {
+      return TrezorAdapter._sanitizeForLog(response.payload, methodName, 'result');
+    }
+    const out = summarizeForLog(
+      { error: response.payload },
+      { method: methodName, role: 'result' }
+    );
+    return out && typeof out === 'object' ? (out as { error?: unknown }).error : out;
   }
 
   private static _redactForLog(value: unknown, seen: WeakSet<object>): unknown {
@@ -421,14 +437,17 @@ export class TrezorAdapter implements IHardwareWallet {
       response?: unknown;
       statusCode?: unknown;
     };
-    return TrezorAdapter._sanitizeForLog({
-      name: typed.name,
-      message: typed.message,
-      code: typed.code,
-      errorCode: typed.errorCode,
-      statusCode: typed.statusCode,
-      response: typed.response,
-    });
+    return TrezorAdapter._redactForLog(
+      {
+        name: typed.name,
+        message: typed.message,
+        code: typed.code,
+        errorCode: typed.errorCode,
+        statusCode: typed.statusCode,
+        response: typed.response,
+      },
+      new WeakSet()
+    );
   }
 
   private _setPassphraseRequestContext(
@@ -1973,7 +1992,7 @@ export class TrezorAdapter implements IHardwareWallet {
       debugLog('[TrezorAdapter][RES]', {
         method: methodName,
         success: response.success,
-        payload: TrezorAdapter._sanitizeForLog(response.payload, methodName),
+        payload: TrezorAdapter._responseForLog(response, methodName),
       });
       return response;
     } catch (error) {
@@ -1984,7 +2003,7 @@ export class TrezorAdapter implements IHardwareWallet {
       debugLog('[TrezorAdapter][RES]', {
         method: methodName,
         success: false,
-        payload: TrezorAdapter._sanitizeForLog(response.payload, methodName),
+        payload: TrezorAdapter._responseForLog(response, methodName),
       });
       return response;
     } finally {

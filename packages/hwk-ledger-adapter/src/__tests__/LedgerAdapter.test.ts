@@ -2308,9 +2308,88 @@ describe('LedgerAdapter', () => {
         path: "m/44'/60'/0'/0/0",
         messageHex: 'beef-message-payload',
       });
-      expect(logs.some(message => message.includes('evmSignMessage'))).toBe(true);
       expect(logs.some(message => message.includes('beef-message-payload'))).toBe(false);
       expect(logs.some(message => message.includes('cafe-signature-bytes'))).toBe(false);
+      // The trace still shows what was signed where, as length and hash.
+      const req = logs.find(m => m.includes('[REQ]') && m.includes('evmSignMessage'));
+      expect(req).toContain(`"path":"m/44'/60'/0'/0/0"`);
+      expect(req).toMatch(/"messageHex":"<str len=20 sha256=[0-9a-f]{16}>"/);
+      const res = logs.find(m => m.includes('[RES]') && m.includes('evmSignMessage'));
+      expect(res).toContain('"signature":"<signature len=20>"');
+    } finally {
+      stop();
+    }
+  });
+
+  it('masks addresses, public keys and xpubs in the response logs', async () => {
+    const xpub =
+      'xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz';
+    const address = '0x1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b9f0e';
+    const publicKey = `0x04${'ab'.repeat(64)}`;
+    const logs: string[] = [];
+    const stop = onSdkEvent(event => logs.push(event.message));
+    try {
+      await adapter.connectDevice('dev-1');
+      connector.callImpl.mockResolvedValueOnce({ xpub, path: "m/84'/0'/0'" });
+      await adapter.btcGetPublicKey('dev-1', '', { path: "m/84'/0'/0'", coin: 'btc' });
+      connector.callImpl.mockResolvedValueOnce({ address, publicKey });
+      await adapter.evmGetAddress('dev-1', '', { path: "m/44'/60'/0'/0/0", chainId: 1 });
+
+      const text = logs.join('\n');
+      expect(text).not.toContain(xpub.slice(0, 12));
+      expect(text).not.toContain(address);
+      expect(text).not.toContain(publicKey.slice(0, 20));
+      expect(text).toContain(`"xpub":"xpub… len=${xpub.length}"`);
+      expect(text).toContain('"address":"0x1a2b…9f0e"');
+      expect(text).toContain(`"publicKey":"… len=${publicKey.length}"`);
+      expect(text).toContain(`"path":"m/84'/0'/0'"`);
+    } finally {
+      stop();
+    }
+  });
+
+  it('masks addresses and xpubs in the all-network response log', async () => {
+    const xpub =
+      'xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz';
+    const logs: string[] = [];
+    const stop = onSdkEvent(event => logs.push(event.message));
+    try {
+      await adapter.connectDevice('dev-1');
+      connector.callImpl.mockImplementation(async (_sid: string, method: string) => {
+        if (method === 'btcGetPublicKey') return { xpub, path: "m/84'/0'/0'" };
+        if (method === 'btcGetMasterFingerprint') return { masterFingerprint: '73c5da0a' };
+        return { address: EVM_ADDR };
+      });
+      const result = await adapter.allNetworkGetAddress('dev-1', '', {
+        bundle: [
+          {
+            network: 'evm',
+            methodName: 'evmGetAddress',
+            path: "m/44'/60'/0'/0/0",
+            chainId: 1,
+            deviceId: deriveDeviceFingerprint(EVM_ADDR),
+          },
+          {
+            network: 'btc',
+            methodName: 'btcGetPublicKey',
+            path: "m/84'/0'/0'",
+            coin: 'btc',
+            deviceId: '73c5da0a',
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+
+      const bundleRes = logs.find(
+        m => m.includes('[RES]') && m.includes('"method":"allNetworkGetAddress"')
+      );
+      expect(bundleRes).toBeDefined();
+      expect(bundleRes).toContain(`"path":"m/44'/60'/0'/0/0"`);
+      expect(bundleRes).toContain('"address":"0x1111…1111"');
+      expect(bundleRes).toContain(`"xpub":"xpub… len=${xpub.length}"`);
+      const text = logs.join('\n');
+      expect(text).not.toContain(EVM_ADDR);
+      expect(text).not.toContain(xpub.slice(0, 12));
     } finally {
       stop();
     }

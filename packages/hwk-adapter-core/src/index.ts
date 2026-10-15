@@ -254,6 +254,8 @@ export type {
   PrepareSolanaOffchainMessageV1Params,
 } from './utils/solanaOffchainMessage';
 export { enrichErrorMessage } from './utils/errorMessages';
+export { summarizeForLog } from './utils/logSummary';
+export type { LogPayloadDescriber, LogSummaryContext, LogSummaryOptions } from './utils/logSummary';
 export {
   detectHardwareVendorFromDescriptor,
   isKnownNonTargetHardwareVendor,

@@ -4,6 +4,7 @@ import { Psbt } from 'bitcoinjs-lib';
 import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerBtc } from '../../signer/SignerBtc';
 import { debugError, debugLog } from '../../utils/debugLog';
+import { summarizeForLog } from '../../utils/logSummary';
 
 import type { ConnectorContext } from './types';
 
@@ -151,7 +152,7 @@ export async function btcGetPublicKey(
     const xpub = await btcSigner.getExtendedPublicKey(path, {
       checkOnDevice: params.showOnDevice ?? false,
     });
-    debugLog('[LedgerConnector] btcGetPublicKey success, xpub:', `${xpub?.substring(0, 20)}...`);
+    debugLog('[LedgerConnector] btcGetPublicKey success, xpub:', summarizeForLog(xpub));
     return { xpub, path: params.path };
   } catch (err) {
     debugError('[LedgerConnector] btcGetPublicKey error, path:', path, 'err:', err);
