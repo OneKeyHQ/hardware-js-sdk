@@ -284,8 +284,14 @@ export class KeystoneAdapter implements IHardwareWallet {
             message: 'Keystone operation has ended',
             params: { operationId: operation.operationId, reason },
           });
-          this._jobQueue.cancelActiveAndPending(operation.operationId, ended);
-          this._uiRegistry.cancel(undefined, undefined, operation.operationId);
+          // A prompt is attributed to the operation even for a call that never named it; only a
+          // running call pinned to the operation owns its prompt, the others keep theirs.
+          const queueKey = keystoneQueueKey(operation.operationId);
+          const ownsRunningCall = this._jobQueue.getActiveJob()?.deviceId === queueKey;
+          this._jobQueue.cancelActiveAndPending(queueKey, ended);
+          if (ownsRunningCall) {
+            this._uiRegistry.cancel(undefined, undefined, operation.operationId);
+          }
         }
       }
       this.emitter.emit(SDK.OPERATION_ENDED, {

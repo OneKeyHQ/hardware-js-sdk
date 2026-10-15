@@ -1635,6 +1635,56 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
+    it.each([
+      [
+        'released',
+        (adapter: KeystoneAdapter, operationId: string) => adapter.releaseOperation(operationId),
+      ],
+      [
+        'replaced by a new connect',
+        async (adapter: KeystoneAdapter) => {
+          // Reconnecting the known wallet ends its previous operation.
+          await expect(adapter.connectDevice(FIXTURE_WALLET)).resolves.toMatchObject({
+            success: true,
+          });
+        },
+      ],
+    ])(
+      'keeps an unpinned QR prompt open when the live operation is %s',
+      async (_label, endOperation) => {
+        const adapter = newTestAdapter();
+        const fake = attachFakeDevice(adapter);
+        const connected = await connectOperation(adapter, connectQrDevice);
+        fake.detach();
+        const prompts: Array<{ payload: { data: QrDisplayData; operationId?: string } }> = [];
+        adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, event => {
+          prompts.push(event);
+        });
+
+        // No operationId on the call: the prompt names the live operation, but the call is not its.
+        const [pending, settled] = track(
+          adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX)
+        );
+        await sleep(10);
+        expect(prompts).toHaveLength(1);
+        expect(prompts[0].payload.operationId).toBe(connected);
+
+        await endOperation(adapter, connected);
+        const operations = (
+          adapter as unknown as { _operations: { _active: Map<string, unknown> } }
+        )._operations._active;
+        expect(operations.has(connected)).toBe(false);
+        await sleep(10);
+        expect(settled()).toBe(false);
+
+        const reply = deviceReply(prompts[0].payload.data, { mfpHex: FIXTURE_MFP });
+        if (!reply) throw new Error('Expected a device reply for the sign request');
+        adapter.uiResponse({ type: UI_RESPONSE.RECEIVE_QR_RESPONSE, payload: urJson(reply) });
+        await expect(pending).resolves.toMatchObject({ success: true });
+        await adapter.dispose();
+      }
+    );
+
     it('leaves no trace when the named operation has already ended', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
