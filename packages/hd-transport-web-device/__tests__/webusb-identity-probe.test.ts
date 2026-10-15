@@ -2,8 +2,11 @@ import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import WebUsbTransport from '../src/webusb';
 import { probeUsbDeviceIdentities } from '@onekeyfe/hd-common-connect-sdk/src';
+import Core from '@onekeyfe/hd-core/src/core';
+import TransportManager from '@onekeyfe/hd-core/src/data-manager/TransportManager';
+import { Device } from '@onekeyfe/hd-core/src/device/Device';
 
-import type { MessageFromOneKey, TransportCallOptions } from '@onekeyfe/hd-transport';
+import type { MessageFromOneKey, Transport, TransportCallOptions } from '@onekeyfe/hd-transport';
 
 jest.mock('@onekeyfe/hd-core', () => jest.requireActual('../../core/src'));
 jest.mock('../../core/src/data/config', () => ({
@@ -19,7 +22,7 @@ jest.mock('@onekeyfe/hd-transport-emulator', () => ({}));
 
 type PacketIoTransport = {
   rotateProtocolV2UsbGeneration: () => Promise<void>;
-  detectProtocol: () => Promise<'V1'>;
+  detectProtocol: () => Promise<'V1' | 'V2'>;
   transferInWithRetry: (path: string, length: number) => Promise<DataView>;
   transferInOnce: (path: string, length: number) => Promise<DataView>;
   transferOutWithRetry: (path: string, packet: Uint8Array) => Promise<void>;
@@ -62,6 +65,251 @@ describe('WebUSB identity probe ownership', () => {
   afterEach(() => {
     if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
     else delete (globalThis as { navigator?: Navigator }).navigator;
+  });
+
+  function createAcquiredTransport(protocol: 'V1' | 'V2' = 'V1') {
+    const active = new WebUsbTransport();
+    active.init({ debug: jest.fn() });
+    jest
+      .spyOn(active as unknown as PacketIoTransport, 'detectProtocol')
+      .mockResolvedValue(protocol);
+    jest.spyOn(active, 'connect').mockImplementation(() => {
+      device.opened = true;
+      return Promise.resolve();
+    });
+    return active;
+  }
+
+  test.each(['V1', 'V2'] as const)(
+    'Core disposal releases a retained %s USB session for a new transport',
+    async protocol => {
+      const active = createAcquiredTransport(protocol);
+      const next = createAcquiredTransport(protocol);
+      const selected = new Device({
+        path: 'USB_PATH',
+        id: 'USB_PATH',
+        name: 'Mock device',
+        commType: 'webusb',
+        debug: false,
+      });
+      selected.keepSession = true;
+      selected.mainId = 'USB_PATH';
+      jest.spyOn(selected, 'isUsedHere').mockReturnValue(true);
+      const release = jest.spyOn(active, 'release');
+      jest.spyOn(TransportManager, 'getTransport').mockReturnValue(active as unknown as Transport);
+      const core = new Core();
+      try {
+        await active.acquire({ path: 'USB_PATH' });
+        await selected.release();
+        expect(release).not.toHaveBeenCalled();
+        expect(device.opened).toBe(true);
+        await core.dispose();
+        await core.dispose();
+        expect(device.opened).toBe(false);
+        expect(device.close).toHaveBeenCalledTimes(1);
+        await expect(next.acquire({ path: 'USB_PATH' })).resolves.toBe('USB_PATH');
+      } finally {
+        await active.release('USB_PATH');
+        await next.release('USB_PATH');
+        jest.restoreAllMocks();
+      }
+    }
+  );
+
+  test('stop waits for a pending native open and closes its captured handle', async () => {
+    const entered = createDeferred<void>();
+    const opening = createDeferred<void>();
+    const native = Object.assign(device, {
+      open: jest.fn(async () => {
+        entered.resolve();
+        await opening.promise;
+        device.opened = true;
+      }),
+      reset: jest.fn(),
+      configurations: [],
+      configuration: { configurationValue: 1 },
+      selectConfiguration: jest.fn(),
+      claimInterface: jest.fn(),
+      clearHalt: jest.fn(),
+    });
+    const active = new WebUsbTransport();
+    active.init({ debug: jest.fn() });
+    const connecting = active.connectToDevice('USB_PATH', true);
+    const result = expect(connecting).rejects.toThrow('WebUSB transport is stopped');
+    try {
+      await entered.promise;
+      let stopped = false;
+      const stopping = active.stop().then(() => {
+        stopped = true;
+      });
+      await Promise.resolve();
+      expect(stopped).toBe(false);
+      opening.resolve();
+      await result;
+      await stopping;
+      expect(native.reset).not.toHaveBeenCalled();
+      expect(native.claimInterface).not.toHaveBeenCalled();
+      expect(device.opened).toBe(false);
+      const next = createAcquiredTransport();
+      await expect(next.acquire({ path: 'USB_PATH' })).resolves.toBe('USB_PATH');
+      await next.release('USB_PATH');
+    } finally {
+      opening.resolve();
+      await connecting.catch(() => undefined);
+      await active.release('USB_PATH');
+      jest.restoreAllMocks();
+    }
+  });
+
+  test.each(['read', 'read retry', 'write', 'write retry'])(
+    'stop rejects a late native %s result without touching the new owner',
+    async operation => {
+      const entered = createDeferred<void>();
+      const packet = createDeferred<{ status: 'ok'; data: DataView; bytesWritten: number }>();
+      Object.assign(device, {
+        transferIn: jest.fn(() => {
+          entered.resolve();
+          return packet.promise;
+        }),
+        transferOut: jest.fn(() => {
+          entered.resolve();
+          return packet.promise;
+        }),
+      });
+      const active = createAcquiredTransport();
+      const next = createAcquiredTransport();
+      await active.acquire({ path: 'USB_PATH' });
+      const state = active as unknown as PacketIoTransport;
+      let call: Promise<unknown>;
+      if (operation === 'read') call = state.transferInOnce('USB_PATH', 64);
+      else if (operation === 'read retry') call = state.transferInWithRetry('USB_PATH', 64);
+      else if (operation === 'write') call = state.transferOutOnce('USB_PATH', new Uint8Array([1]));
+      else call = state.transferOutWithRetry('USB_PATH', new Uint8Array([1]));
+      const result = expect(call).rejects.toThrow('WebUSB transport is stopped');
+      try {
+        await entered.promise;
+        await active.stop();
+        await next.acquire({ path: 'USB_PATH' });
+        packet.resolve({ status: 'ok', data: new DataView(new ArrayBuffer(64)), bytesWritten: 1 });
+        await result;
+        expect(device.close).toHaveBeenCalledTimes(1);
+        expect(device.opened).toBe(true);
+      } finally {
+        packet.resolve({ status: 'ok', data: new DataView(new ArrayBuffer(64)), bytesWritten: 1 });
+        await call.catch(() => undefined);
+        await active.release('USB_PATH');
+        await next.release('USB_PATH');
+        jest.restoreAllMocks();
+      }
+    }
+  );
+
+  test.each(['in', 'out'] as const)(
+    'stop prevents a delayed transfer%s retry from closing or reopening the new owner',
+    async direction => {
+      const entered = createDeferred<void>();
+      const native = Object.assign(device, {
+        transferIn: jest.fn().mockRejectedValue(new Error('transferIn NetworkError')),
+        transferOut: jest.fn().mockRejectedValue(new Error('transferOut NetworkError')),
+      });
+      const active = createAcquiredTransport();
+      const next = createAcquiredTransport();
+      await active.acquire({ path: 'USB_PATH' });
+      const state = active as unknown as PacketIoTransport;
+      const retry = state.reconnectForPacketIoRetry.bind(active);
+      jest.spyOn(state, 'reconnectForPacketIoRetry').mockImplementation((...args) => {
+        entered.resolve();
+        return retry(...args);
+      });
+      const call =
+        direction === 'in'
+          ? state.transferInWithRetry('USB_PATH', 64)
+          : state.transferOutWithRetry('USB_PATH', new Uint8Array([1]));
+      const result = expect(call).rejects.toThrow('WebUSB transport is stopped');
+      try {
+        await entered.promise;
+        await active.stop();
+        await next.acquire({ path: 'USB_PATH' });
+        await result;
+        expect(native[direction === 'in' ? 'transferIn' : 'transferOut']).toHaveBeenCalledTimes(1);
+        expect(device.close).toHaveBeenCalledTimes(1);
+        expect(device.opened).toBe(true);
+      } finally {
+        await call.catch(() => undefined);
+        await active.release('USB_PATH');
+        await next.release('USB_PATH');
+        jest.restoreAllMocks();
+      }
+    }
+  );
+
+  test('failed stop keeps ownership until a later discovery confirms native closure', async () => {
+    const active = createAcquiredTransport();
+    const next = createAcquiredTransport();
+    const failure = new Error('native close failed');
+    await active.acquire({ path: 'USB_PATH' });
+    device.close.mockRejectedValueOnce(failure).mockRejectedValueOnce(failure);
+    try {
+      await expect(active.stop()).rejects.toBe(failure);
+      await next.getConnectedDevices();
+      await expect(next.acquire({ path: 'USB_PATH' })).rejects.toThrow(
+        'USB device is already in use'
+      );
+      expect(device.opened).toBe(true);
+      await next.getConnectedDevices();
+      expect(device.opened).toBe(false);
+      await expect(next.acquire({ path: 'USB_PATH' })).resolves.toBe('USB_PATH');
+      expect(device.close).toHaveBeenCalledTimes(3);
+    } finally {
+      await active.release('USB_PATH');
+      await next.release('USB_PATH');
+      jest.restoreAllMocks();
+    }
+  });
+
+  test('stop closes captured handles across paths without closing re-enumerated or foreign handles', async () => {
+    const other = {
+      ...device,
+      serialNumber: 'OTHER_PATH',
+      close: jest.fn(() => {
+        other.opened = false;
+        return Promise.resolve();
+      }),
+    };
+    const foreign = { ...device, serialNumber: 'FOREIGN_PATH', close: jest.fn() };
+    usb.getDevices.mockResolvedValue([device, other, foreign]);
+    const active = createAcquiredTransport();
+    jest.spyOn(active, 'connect').mockImplementation(path => {
+      (path === 'USB_PATH' ? device : other).opened = true;
+      return Promise.resolve();
+    });
+    const current = createAcquiredTransport();
+    jest.spyOn(current, 'connect').mockImplementation(() => {
+      foreign.opened = true;
+      return Promise.resolve();
+    });
+    const currentDisconnect = jest.spyOn(current, 'markProtocolStale');
+    try {
+      await active.acquire({ path: 'USB_PATH' });
+      await active.acquire({ path: 'OTHER_PATH' });
+      await current.acquire({ path: 'FOREIGN_PATH' });
+      const replacement = { ...device, opened: false, close: jest.fn() };
+      usb.getDevices.mockResolvedValue([replacement, foreign]);
+      await active.getConnectedDevices();
+      await active.stop();
+      expect(device.opened).toBe(false);
+      expect(other.opened).toBe(false);
+      expect(replacement.close).not.toHaveBeenCalled();
+      expect(foreign.close).not.toHaveBeenCalled();
+      expect(foreign.opened).toBe(true);
+      disconnectListener({ device: replacement });
+      expect(currentDisconnect).toHaveBeenCalledWith('USB_PATH');
+    } finally {
+      await active.release('USB_PATH');
+      await active.release('OTHER_PATH');
+      await current.release('FOREIGN_PATH');
+      jest.restoreAllMocks();
+    }
   });
 
   test('does not close a handle already opened by another operation', async () => {
