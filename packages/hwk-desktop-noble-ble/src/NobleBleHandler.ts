@@ -5,13 +5,11 @@ import {
   THIRD_PARTY_BLE_SCAN_DURATION_MS,
   THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS,
 } from './constants';
+import { DEFAULT_THIRD_PARTY_BLE_VENDORS, normalizeBleUuid } from './vendorProfiles';
 
+import type { ThirdPartyBleVendorProfile } from './vendorProfiles';
 import type { ThirdPartyBleAvailability, ThirdPartyBleDeviceInfo } from './types/desktop-api';
-import type {
-  ElectronBleConnectOptions,
-  ElectronBleMatch,
-  ElectronBleScanOptions,
-} from '@onekeyfe/hwk-adapter-core';
+import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyfe/hwk-adapter-core';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -97,7 +95,7 @@ interface ConnectClaim {
 }
 
 interface DeviceEntry {
-  /** Opaque partition key from the caller; this handler never interprets it. */
+  /** Registered vendor key; results and links never mix across it. */
   vendor?: string;
   write?: ElectronBleConnectOptions['write'];
   peripheral: NoblePeripheralLike;
@@ -107,27 +105,41 @@ interface DeviceEntry {
   disconnectHandler?: () => void;
 }
 
-const normalizeUuid = (uuid: string): string => uuid.replace(/-/g, '').toLowerCase();
+// Longer than any real vendor name, and bounds the work a vendor name rule does per advertisement.
+const BLE_NAME_MATCH_MAX_LENGTH = 64;
 
 /**
- * Matches a peripheral against caller-supplied criteria (service UUID or every
- * name pattern), standing in for the scan filter we cannot use (see `scan`).
+ * Stands in for the scan filter we cannot use (see `scan`). Only the vendor profile decides; the
+ * caller's service UUIDs can narrow the profile's set, and caller name patterns are never run.
  */
-const matchesPeripheral = (p: NoblePeripheralLike, match?: ElectronBleMatch): boolean => {
-  if (!match) return false;
+const matchesPeripheral = (
+  p: NoblePeripheralLike,
+  profile: ThirdPartyBleVendorProfile,
+  narrowTo?: Set<string>
+): boolean => {
   const adv = p.advertisement ?? {};
   const advertised = adv.serviceUuids ?? [];
   if (
-    match.serviceUuids?.length &&
-    advertised.some(uuid =>
-      match.serviceUuids?.some(wanted => normalizeUuid(wanted) === normalizeUuid(uuid))
+    advertised.some(
+      uuid =>
+        typeof uuid === 'string' &&
+        profile.isServiceUuid(uuid) &&
+        (!narrowTo || narrowTo.has(normalizeBleUuid(uuid)))
     )
   ) {
     return true;
   }
   const name = adv.localName;
-  if (!match.namePatterns?.length || !name) return false;
-  return match.namePatterns.every(pattern => new RegExp(pattern, 'i').test(name));
+  if (!profile.isName || typeof name !== 'string' || !name) return false;
+  return profile.isName(name.slice(0, BLE_NAME_MATCH_MAX_LENGTH));
+};
+
+/** Renderer `serviceUuids` may only narrow the vendor's set; anything malformed is ignored. */
+const requestedServiceUuids = (options?: ElectronBleScanOptions): Set<string> | undefined => {
+  const requested = options?.match ? options.match.serviceUuids : options?.serviceUuids;
+  if (!Array.isArray(requested)) return undefined;
+  const uuids = requested.filter((uuid): uuid is string => typeof uuid === 'string');
+  return uuids.length ? new Set(uuids.map(normalizeBleUuid)) : undefined;
 };
 
 /** Hex-encodes buffers so the info survives the IPC structured clone. */
@@ -196,6 +208,11 @@ export interface NobleBleHandlerOptions {
   /** Override the overall connect timeout (tests only; defaults to 31s). */
   connectTimeoutMs?: number;
   logger?: BleDebugLogger;
+  /**
+   * Vendors served over IPC, keyed by the `vendor` the renderer sends. Replaces the default map
+   * (spread `DEFAULT_THIRD_PARTY_BLE_VENDORS` to add one); unknown vendors are rejected.
+   */
+  vendors?: Record<string, ThirdPartyBleVendorProfile>;
 }
 
 /** Noble BLE logic decoupled from Electron IPC, so tests can use a fake noble. */
@@ -207,6 +224,8 @@ export class NobleBleHandler {
   private readonly _connectTimeoutMs: number;
 
   private readonly _logger?: NobleBleHandlerOptions['logger'];
+
+  private readonly _vendors: ReadonlyMap<string, ThirdPartyBleVendorProfile>;
 
   private readonly _discovered = new Map<string, NoblePeripheralLike>();
 
@@ -259,6 +278,17 @@ export class NobleBleHandler {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
     this._connectTimeoutMs = options.connectTimeoutMs ?? BLE_CONNECT_TIMEOUT_MS;
     this._logger = options.logger;
+    // A Map, so an IPC vendor like `__proto__` cannot reach an inherited property.
+    this._vendors = new Map(Object.entries(options.vendors ?? DEFAULT_THIRD_PARTY_BLE_VENDORS));
+  }
+
+  private _resolveVendor(vendor: unknown): {
+    vendor: string;
+    profile: ThirdPartyBleVendorProfile;
+  } {
+    const profile = typeof vendor === 'string' ? this._vendors.get(vendor) : undefined;
+    if (typeof vendor !== 'string' || !profile) throw new Error('Unsupported BLE vendor');
+    return { vendor, profile };
   }
 
   setNotificationListener(handler: (id: string, hexData: string) => void): void {
@@ -316,16 +346,18 @@ export class NobleBleHandler {
    * packet, and a Safe 7 ADV carries only its name (UUID is in the scan response).
    */
   async scan(options?: ElectronBleScanOptions): Promise<ThirdPartyBleDeviceInfo[]> {
+    // Before any radio or owner bookkeeping: an unregistered caller gets nothing.
+    const { vendor, profile } = this._resolveVendor(options?.vendor);
     // Claim before init: a stopScan/cancelPairing during the power-on wait must
     // find this owner, or the scan revives once the adapter powers on.
-    this._scanOwners.add(options?.vendor);
+    this._scanOwners.add(vendor);
     try {
       await this.init();
     } catch (error) {
-      this._scanOwners.delete(options?.vendor);
+      this._scanOwners.delete(vendor);
       throw error;
     }
-    if (!this._scanOwners.has(options?.vendor)) return [];
+    if (!this._scanOwners.has(vendor)) return [];
     try {
       await this._setScanning(true);
     } catch (error) {
@@ -334,7 +366,7 @@ export class NobleBleHandler {
     }
     this._assertActive();
     this._armIdleStop();
-    const devices = this._snapshot(options);
+    const devices = this._snapshot(vendor, profile, requestedServiceUuids(options));
     // raw=0: nothing on air; raw>0: the match criteria dropped it. Counts only,
     // so bystanders' devices from the unfiltered scan stay out of support logs.
     if (devices.length === 0) {
@@ -351,9 +383,12 @@ export class NobleBleHandler {
    * In-range devices matching the caller, minus TTL-expired ones. `_discovered`
    * is only a cache; a missing device can still be reached by `_directConnect`.
    */
-  private _snapshot(options?: ElectronBleScanOptions): ThirdPartyBleDeviceInfo[] {
+  private _snapshot(
+    vendor: string,
+    profile: ThirdPartyBleVendorProfile,
+    narrowTo?: Set<string>
+  ): ThirdPartyBleDeviceInfo[] {
     const now = Date.now();
-    const match = options?.match ?? { serviceUuids: options?.serviceUuids };
     const result: ThirdPartyBleDeviceInfo[] = [];
     for (const [id, peripheral] of this._discovered) {
       if (now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS) {
@@ -361,13 +396,13 @@ export class NobleBleHandler {
         this._lastSeen.delete(id);
         continue;
       }
-      if (!matchesPeripheral(peripheral, match)) continue;
+      if (!matchesPeripheral(peripheral, profile, narrowTo)) continue;
       result.push(peripheralToInfo(peripheral));
     }
     // A linked device stops advertising and ages out above, so merge held links
     // back in (field-verified on Safe 7: holding the link silences it).
     for (const [id, entry] of this._connected) {
-      if (entry.vendor !== options?.vendor) continue;
+      if (entry.vendor !== vendor) continue;
       if (result.some(info => info.id === id)) continue;
       result.push(peripheralToInfo(entry.peripheral));
     }
@@ -499,7 +534,10 @@ export class NobleBleHandler {
    */
   getDevice(id: string): ThirdPartyBleDeviceInfo | null {
     const p = this._discovered.get(id);
-    if (!p) return null;
+    // The scan cache holds every advertiser in range; only a registered vendor's device is exposed.
+    if (!p || ![...this._vendors.values()].some(profile => matchesPeripheral(p, profile))) {
+      return null;
+    }
     return peripheralToInfo(p);
   }
 
@@ -639,10 +677,14 @@ export class NobleBleHandler {
       !options ||
       !options.vendor ||
       ![options.serviceUuid, options.writeUuid, options.notifyUuid].every(
-        uuid => typeof uuid === 'string' && /^[0-9a-f]{32}$/i.test(normalizeUuid(uuid))
+        uuid => typeof uuid === 'string' && /^[0-9a-f]{32}$/i.test(normalizeBleUuid(uuid))
       )
     ) {
       throw new Error('Invalid BLE GATT profile');
+    }
+    // Before any native work: only a registered vendor's own GATT profile and framing.
+    if (!this._resolveVendor(options.vendor).profile.acceptsConnect(options)) {
+      throw new Error(`BLE GATT profile not allowed for ${options.vendor}`);
     }
     this._assertActive();
     // Promise.race cannot stop _connectInner; the claim makes a late success tear
@@ -775,10 +817,10 @@ export class NobleBleHandler {
         [options.serviceUuid],
         [options.writeUuid, options.notifyUuid]
       );
-      const writeUuid = normalizeUuid(options.writeUuid);
-      const notifyUuid = normalizeUuid(options.notifyUuid);
-      const writeChar = characteristics.find(c => normalizeUuid(c.uuid) === writeUuid);
-      const notifyChar = characteristics.find(c => normalizeUuid(c.uuid) === notifyUuid);
+      const writeUuid = normalizeBleUuid(options.writeUuid);
+      const notifyUuid = normalizeBleUuid(options.notifyUuid);
+      const writeChar = characteristics.find(c => normalizeBleUuid(c.uuid) === writeUuid);
+      const notifyChar = characteristics.find(c => normalizeBleUuid(c.uuid) === notifyUuid);
       if (!writeChar || !notifyChar) {
         throw new Error(`BLE characteristics not found on device ${id}`);
       }

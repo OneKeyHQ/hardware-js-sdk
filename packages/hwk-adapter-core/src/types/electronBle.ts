@@ -8,7 +8,9 @@ export interface ElectronBleDeviceInfo {
 
 /**
  * IPC-safe peripheral match: advertises one of `serviceUuids`, or its local name matches every
- * `namePatterns` entry (case-insensitive regex sources).
+ * `namePatterns` entry (case-insensitive regex sources). The desktop noble-ble host treats this
+ * as a hint only: its vendor allowlist decides, `serviceUuids` can only narrow it, and
+ * `namePatterns` are never compiled.
  */
 export interface ElectronBleMatch {
   serviceUuids?: string[];

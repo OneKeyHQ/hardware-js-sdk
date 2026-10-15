@@ -1,6 +1,9 @@
 export { NobleBleHandler } from './NobleBleHandler';
 export type { NobleBleHandlerOptions } from './NobleBleHandler';
 
+export { DEFAULT_THIRD_PARTY_BLE_VENDORS } from './vendorProfiles';
+export type { ThirdPartyBleVendorProfile } from './vendorProfiles';
+
 export { initThirdPartyBleSupport } from './main';
 export type {
   InitThirdPartyBleSupportOptions,

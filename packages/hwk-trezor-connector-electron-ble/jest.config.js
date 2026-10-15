@@ -16,6 +16,7 @@ module.exports = {
     '^@onekeyfe/hwk-trezor-utils$': '<rootDir>/../hwk-trezor-utils/src/index.ts',
     '^@onekeyfe/hwk-trezor-schema-utils$': '<rootDir>/../hwk-trezor-schema-utils/src/index.ts',
     '^@onekeyfe/hwk-adapter-core$': '<rootDir>/../hwk-adapter-core/src/index.ts',
+    '^@onekeyfe/hwk-desktop-noble-ble$': '<rootDir>/../hwk-desktop-noble-ble/src/index.ts',
     '^@trezor/protobuf$': '<rootDir>/../hwk-trezor-protobuf/src/index.ts',
     '^@trezor/protocol$': '<rootDir>/../hwk-trezor-protocol/src/index.ts',
     '^@trezor/protocol/src/errors$': '<rootDir>/../hwk-trezor-protocol/src/errors.ts',

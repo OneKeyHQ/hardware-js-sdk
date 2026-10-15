@@ -8,8 +8,8 @@ import type { NobleBleHandlerOptions, NoblePeripheralLike } from '../NobleBleHan
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// A stand-in vendor. The handler holds no vendor knowledge, so these tests
-// supply the same shape a real connector would send over IPC.
+// The payloads the Trezor and Ledger connectors send over IPC; the handler only
+// serves them because its default vendor allowlist accepts them.
 const TREZOR_BLE_UUIDS = {
   service: '8c000001-a59b-4d58-a9ad-073df69fa1b1',
   write: '8c000002-a59b-4d58-a9ad-073df69fa1b1',
@@ -17,7 +17,7 @@ const TREZOR_BLE_UUIDS = {
 };
 
 const PADDED_VENDOR = {
-  vendor: 'padded-vendor',
+  vendor: 'trezor',
   match: {
     serviceUuids: [TREZOR_BLE_UUIDS.service],
     namePatterns: ['\\bTrezor\\b', '\\bSafe\\s*7\\b|\\bT3W1\\b'],
@@ -30,6 +30,23 @@ const PADDED_PROFILE = {
   writeUuid: TREZOR_BLE_UUIDS.write,
   notifyUuid: TREZOR_BLE_UUIDS.notify,
   write: { mode: 'padded' as const, chunkSize: 244, chunkDelayMs: 5 },
+};
+
+const ledgerGatt = (model: string) => ({
+  serviceUuid: `13d63400-2c97-${model}-0000-4c6564676572`,
+  notifyUuid: `13d63400-2c97-${model}-0001-4c6564676572`,
+  writeUuid: `13d63400-2c97-${model}-0002-4c6564676572`,
+  writeCmdUuid: `13d63400-2c97-${model}-0003-4c6564676572`,
+});
+
+const LEDGER_NANO_X = ledgerGatt('0004');
+
+const LEDGER_PROFILE = {
+  vendor: 'ledger',
+  serviceUuid: LEDGER_NANO_X.serviceUuid,
+  writeUuid: LEDGER_NANO_X.writeUuid,
+  notifyUuid: LEDGER_NANO_X.notifyUuid,
+  write: { mode: 'raw' as const, maxLength: 255 },
 };
 
 class FakeCharacteristic extends EventEmitter {
@@ -73,6 +90,13 @@ class FakePeripheral extends EventEmitter {
     super();
   }
 }
+
+const ledgerPeripheral = (id: string, gatt = LEDGER_NANO_X, localName = 'Ledger fixture') => {
+  const peripheral = new FakePeripheral(id, { localName, serviceUuids: [gatt.serviceUuid] });
+  peripheral.writeChar = new FakeCharacteristic(gatt.writeUuid);
+  peripheral.notifyChar = new FakeCharacteristic(gatt.notifyUuid);
+  return peripheral;
+};
 
 class FakeNoble extends EventEmitter {
   state = 'poweredOn';
@@ -145,15 +169,8 @@ async function connectedHandler() {
 
 describe('NobleBleHandler', () => {
   test('keeps one vendor GATT and unpadded frames separate from another padded profile', async () => {
-    const serviceUuid = '13d63400-2c97-0004-0000-4c6564676572';
-    const writeUuid = '13d63400-2c97-0004-0002-4c6564676572';
-    const notifyUuid = '13d63400-2c97-0004-0001-4c6564676572';
-    const ledger = new FakePeripheral('ledger-fixture', {
-      localName: 'Ledger fixture',
-      serviceUuids: [serviceUuid],
-    });
-    ledger.writeChar = new FakeCharacteristic(writeUuid);
-    ledger.notifyChar = new FakeCharacteristic(notifyUuid);
+    const { serviceUuid } = LEDGER_NANO_X;
+    const ledger = ledgerPeripheral('ledger-fixture');
     const trezor = new FakePeripheral('trezor-fixture', { localName: 'Trezor Safe 7' });
     const handler = makeHandler(new FakeNoble([ledger, trezor]));
     expect((await handler.scan(PADDED_VENDOR)).map(device => device.id)).toEqual([
@@ -164,13 +181,7 @@ describe('NobleBleHandler', () => {
         device => device.id
       )
     ).toEqual(['ledger-fixture']);
-    await handler.connect(ledger.id, {
-      vendor: 'ledger',
-      serviceUuid,
-      writeUuid,
-      notifyUuid,
-      write: { mode: 'raw', maxLength: 255 },
-    });
+    await handler.connect(ledger.id, LEDGER_PROFILE);
     await handler.write(ledger.id, '0800000000');
     expect(ledger.writeChar.writeAsync).toHaveBeenCalledWith(
       Buffer.from('0800000000', 'hex'),
@@ -253,6 +264,7 @@ describe('NobleBleHandler', () => {
     const handler = makeHandler(new FakeNoble([peripheral]));
 
     const devices = await handler.scan({
+      vendor: 'trezor',
       serviceUuids: [TREZOR_BLE_UUIDS.service],
       durationMs: 0,
     });
@@ -284,23 +296,23 @@ describe('NobleBleHandler', () => {
   test('scoped scan release leaves another vendor discovery running', async () => {
     const noble = new FakeNoble([]);
     const handler = makeHandler(noble);
-    await handler.scan({ vendor: 'first' });
-    await handler.scan({ vendor: 'second' });
-    await handler.stopScan('first');
+    await handler.scan({ vendor: 'trezor' });
+    await handler.scan({ vendor: 'ledger' });
+    await handler.stopScan('trezor');
     expect(noble.stopScanningAsync).not.toHaveBeenCalled();
-    await handler.stopScan('second');
+    await handler.stopScan('ledger');
     expect(noble.stopScanningAsync).toHaveBeenCalledTimes(1);
   });
 
   test('targeted pairing cancellation preserves other vendors and same-vendor devices', async () => {
     const first = new FakePeripheral('first', { localName: 'Trezor Safe 7' });
     const second = new FakePeripheral('second', { localName: 'Trezor Safe 7' });
-    const ledger = new FakePeripheral('ledger', { localName: 'Ledger' });
+    const ledger = ledgerPeripheral('ledger', LEDGER_NANO_X, 'Ledger');
     const handler = makeHandler(new FakeNoble([first, second, ledger]));
     await handler.scan({ ...PADDED_VENDOR });
     await handler.connect('first', PADDED_PROFILE);
     await handler.connect('second', PADDED_PROFILE);
-    await handler.connect('ledger', { ...PADDED_PROFILE, vendor: 'ledger' });
+    await handler.connect('ledger', LEDGER_PROFILE);
     await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'first' });
     expect(first.disconnectAsync).toHaveBeenCalled();
     expect(second.disconnectAsync).not.toHaveBeenCalled();
@@ -381,26 +393,23 @@ describe('NobleBleHandler', () => {
     const handler = makeHandler(new FakeNoble([peripheral]));
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
 
-    // chunkSize travels with the connect profile, not the handler.
-    await handler.connect('id-1', {
-      ...PADDED_PROFILE,
-      write: { ...PADDED_PROFILE.write, chunkSize: 100 },
-    });
+    // chunkSize travels with the connect profile; the vendor allowlist pins it to 244.
+    await handler.connect('id-1', PADDED_PROFILE);
     expect(peripheral.connectAsync).toHaveBeenCalled();
     expect(peripheral.discoverSomeServicesAndCharacteristicsAsync).toHaveBeenCalled();
 
-    const hex = 'ab'.repeat(250); // 250 bytes → 3 packets at chunkSize 100
+    const hex = 'ab'.repeat(600); // 600 bytes → 3 packets at chunkSize 244
     await handler.write('id-1', hex);
     expect(peripheral.writeChar.writeAsync).toHaveBeenCalledTimes(3);
     // Every packet is padded to the full chunkSize — Trezor BLE firmware
     // expects fixed-size packets; a short final packet is dropped.
     const { calls } = peripheral.writeChar.writeAsync.mock;
-    expect(calls[0][0].length).toBe(100);
-    expect(calls[2][0].length).toBe(100);
-    // last packet = 50 bytes of data (0xab) + 50 bytes of zero padding
+    expect(calls[0][0].length).toBe(244);
+    expect(calls[2][0].length).toBe(244);
+    // last packet = 112 bytes of data (0xab) + 132 bytes of zero padding
     const last = calls[2][0];
-    expect(last.subarray(0, 50).equals(Buffer.alloc(50, 0xab))).toBe(true);
-    expect(last.subarray(50).equals(Buffer.alloc(50, 0x00))).toBe(true);
+    expect(last.subarray(0, 112).equals(Buffer.alloc(112, 0xab))).toBe(true);
+    expect(last.subarray(112).equals(Buffer.alloc(132, 0x00))).toBe(true);
   });
 
   test('subscribe wires notification forwarding', async () => {
@@ -470,6 +479,213 @@ describe('NobleBleHandler', () => {
   });
 });
 
+describe('vendor allowlist', () => {
+  test.each([undefined, {}, { vendor: 'heart-rate' }, { vendor: '__proto__' }, { vendor: 7 }])(
+    'scan rejects an unregistered vendor (%p) before touching the radio',
+    async options => {
+      const noble = new FakeNoble([new FakePeripheral('id-1', { localName: 'Trezor Safe 7' })]);
+      const factory = jest.fn(() => noble);
+      const handler = new NobleBleHandler({ nobleFactory: factory });
+      await expect(handler.scan(options as any)).rejects.toThrow('Unsupported BLE vendor');
+      expect(factory).not.toHaveBeenCalled();
+      expect(noble.startScanningAsync).not.toHaveBeenCalled();
+      // No owner was left behind: a registered vendor's scan and release work as usual.
+      await handler.scan(PADDED_VENDOR);
+      await handler.stopScan(PADDED_VENDOR.vendor);
+      expect(noble.scanning).toBe(false);
+      await handler.dispose();
+    }
+  );
+
+  test('a trezor scan keeps only Trezor peripherals whatever name patterns the renderer sends', async () => {
+    const trezor = new FakePeripheral('trezor', { localName: 'Trezor Safe 7 (8S9)' });
+    const t3w1 = new FakePeripheral('t3w1', { localName: 'trezor t3w1' });
+    const byUuid = new FakePeripheral('by-uuid', {
+      localName: 'unnamed',
+      serviceUuids: [TREZOR_BLE_UUIDS.service.toUpperCase()],
+    });
+    const otherModel = new FakePeripheral('safe-5', { localName: 'Trezor Safe 5' });
+    const speaker = new FakePeripheral('speaker', { localName: 'Speaker' });
+    const ledger = ledgerPeripheral('ledger');
+    const handler = makeHandler(new FakeNoble([trezor, t3w1, byUuid, otherModel, speaker, ledger]));
+    const devices = await handler.scan({
+      vendor: 'trezor',
+      match: {
+        serviceUuids: [TREZOR_BLE_UUIDS.service, LEDGER_NANO_X.serviceUuid],
+        namePatterns: ['.*'],
+      },
+    });
+    expect(devices.map(d => d.id).sort()).toEqual(['by-uuid', 't3w1', 'trezor']);
+    await handler.dispose();
+  });
+
+  test('renderer name patterns are never compiled', async () => {
+    // '(a+)+$' backtracks exponentially on this name; running it would stall the main process.
+    const victim = new FakePeripheral('victim', { localName: `${'a'.repeat(40)}b` });
+    const handler = makeHandler(new FakeNoble([victim]));
+    const startedAt = Date.now();
+    const devices = await handler.scan({ vendor: 'trezor', match: { namePatterns: ['(a+)+$'] } });
+    expect(devices).toEqual([]);
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+    await handler.dispose();
+  });
+
+  test('a ledger scan keeps only Ledger-family services, narrowed by the renderer', async () => {
+    const nanoX = ledgerPeripheral('nano-x');
+    const stax = ledgerPeripheral('stax', ledgerGatt('6004'));
+    const futureModel = ledgerPeripheral('future', ledgerGatt('a1b2'));
+    const notifyOnly = new FakePeripheral('notify-only', {
+      serviceUuids: [LEDGER_NANO_X.notifyUuid],
+    });
+    const namedOnly = new FakePeripheral('named-only', { localName: 'Ledger Nano X' });
+    const heartRate = '0000180d-0000-1000-8000-00805f9b34fb';
+    const monitor = new FakePeripheral('monitor', { serviceUuids: [heartRate] });
+    const trezor = new FakePeripheral('trezor', {
+      localName: 'Trezor Safe 7',
+      serviceUuids: [TREZOR_BLE_UUIDS.service],
+    });
+    const handler = makeHandler(
+      new FakeNoble([nanoX, stax, futureModel, notifyOnly, namedOnly, monitor, trezor])
+    );
+    expect((await handler.scan({ vendor: 'ledger' })).map(d => d.id).sort()).toEqual([
+      'future',
+      'nano-x',
+      'stax',
+    ]);
+    // The renderer's list can only narrow: foreign uuids in it do not widen the result.
+    const narrowed = await handler.scan({
+      vendor: 'ledger',
+      match: {
+        serviceUuids: [
+          LEDGER_NANO_X.serviceUuid.toUpperCase(),
+          heartRate,
+          TREZOR_BLE_UUIDS.service,
+        ],
+        namePatterns: ['.*'],
+      },
+    });
+    expect(narrowed.map(d => d.id)).toEqual(['nano-x']);
+    await handler.dispose();
+  });
+
+  test('getDevice exposes only registered vendor devices from the scan cache', async () => {
+    const nanoX = ledgerPeripheral('nano-x');
+    const speaker = new FakePeripheral('speaker', { localName: 'Speaker' });
+    const handler = makeHandler(new FakeNoble([nanoX, speaker]));
+    await handler.scan({ vendor: 'ledger' });
+    expect(handler.getDevice('nano-x')?.id).toBe('nano-x');
+    expect(handler.getDevice('speaker')).toBeNull();
+    await handler.dispose();
+  });
+
+  const rejectedProfiles: Array<[string, any]> = [
+    ['an unregistered vendor', { ...PADDED_PROFILE, vendor: 'heart-rate' }],
+    ['a missing vendor', { ...PADDED_PROFILE, vendor: undefined }],
+    ['a trezor vendor with Ledger GATT', { ...LEDGER_PROFILE, vendor: 'trezor' }],
+    ['a ledger vendor with Trezor GATT', { ...PADDED_PROFILE, vendor: 'ledger' }],
+    [
+      'a trezor profile with a foreign write characteristic',
+      { ...PADDED_PROFILE, writeUuid: '00002a37-0000-1000-8000-00805f9b34fb' },
+    ],
+    ['trezor raw framing', { ...PADDED_PROFILE, write: { mode: 'raw', maxLength: 255 } }],
+    ['trezor without framing', { ...PADDED_PROFILE, write: undefined }],
+    [
+      'trezor padded chunkSize other than 244',
+      { ...PADDED_PROFILE, write: { ...PADDED_PROFILE.write, chunkSize: 100 } },
+    ],
+    [
+      'trezor chunk delay above 50ms',
+      { ...PADDED_PROFILE, write: { ...PADDED_PROFILE.write, chunkDelayMs: 51 } },
+    ],
+    ['ledger raw without maxLength', { ...LEDGER_PROFILE, write: { mode: 'raw' } }],
+    [
+      'ledger raw maxLength above 255',
+      { ...LEDGER_PROFILE, write: { mode: 'raw', maxLength: 256 } },
+    ],
+    [
+      'ledger padded framing',
+      { ...LEDGER_PROFILE, write: { mode: 'padded', chunkSize: 244, chunkDelayMs: 5 } },
+    ],
+    [
+      'ledger characteristics from another model',
+      { ...LEDGER_PROFILE, notifyUuid: ledgerGatt('6004').notifyUuid },
+    ],
+    [
+      'ledger notify used as the write characteristic',
+      { ...LEDGER_PROFILE, writeUuid: LEDGER_NANO_X.notifyUuid },
+    ],
+    [
+      'a ledger write characteristic as the service',
+      { ...LEDGER_PROFILE, serviceUuid: LEDGER_NANO_X.writeUuid },
+    ],
+  ];
+
+  test.each(rejectedProfiles)('connect rejects %s before any native work', async (_, profile) => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const noble = Object.assign(new FakeNoble([peripheral]), { connectAsync: jest.fn() });
+    const factory = jest.fn(() => noble);
+    const handler = new NobleBleHandler({ nobleFactory: factory });
+    await expect(handler.connect('id-1', profile)).rejects.toThrow(
+      /Unsupported BLE vendor|not allowed|Invalid BLE GATT profile/
+    );
+    expect(factory).not.toHaveBeenCalled();
+    expect(peripheral.connectAsync).not.toHaveBeenCalled();
+    expect(noble.connectAsync).not.toHaveBeenCalled();
+    await handler.dispose();
+  });
+
+  test.each([
+    ['ledger write-with-response', LEDGER_NANO_X.writeUuid],
+    ['ledger write-without-response', LEDGER_NANO_X.writeCmdUuid],
+  ])('connect accepts the %s characteristic', async (_, writeUuid) => {
+    const peripheral = ledgerPeripheral('ledger');
+    peripheral.writeChar = new FakeCharacteristic(writeUuid);
+    const handler = makeHandler(new FakeNoble([peripheral]));
+    await handler.scan({ vendor: 'ledger' });
+    await expect(
+      handler.connect('ledger', {
+        ...LEDGER_PROFILE,
+        writeUuid: writeUuid.replace(/-/g, '').toUpperCase(),
+      })
+    ).resolves.toEqual({ id: 'ledger', name: 'Ledger fixture' });
+    await handler.dispose();
+  });
+
+  test('a host can register its own vendor through initThirdPartyBleSupport', async () => {
+    const serviceUuid = '0000fff0-0000-1000-8000-00805f9b34fb';
+    const peripheral = new FakePeripheral('custom', { serviceUuids: [serviceUuid] });
+    const ipcMain = new FakeIpcMain();
+    const support = initThirdPartyBleSupport(
+      { send: jest.fn() },
+      {
+        ipcMain,
+        nobleFactory: () => new FakeNoble([peripheral]),
+        vendors: {
+          custom: {
+            isServiceUuid: uuid => uuid === serviceUuid,
+            acceptsConnect: options => options.serviceUuid === serviceUuid,
+          },
+        },
+      }
+    );
+    const devices = (await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.scan, {
+      vendor: 'custom',
+    })) as Array<{ id: string }>;
+    expect(devices.map(d => d.id)).toEqual(['custom']);
+    // Replacing the map drops the defaults.
+    await expect(ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.scan, PADDED_VENDOR)).rejects.toThrow(
+      'Unsupported BLE vendor'
+    );
+    await expect(
+      ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'custom', {
+        ...PADDED_PROFILE,
+        vendor: 'custom',
+      })
+    ).rejects.toThrow('not allowed for custom');
+    await support.dispose();
+  });
+});
+
 describe('initThirdPartyBleSupport', () => {
   test('registers all request/response IPC channels and forwards push events', async () => {
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
@@ -504,7 +720,7 @@ describe('initThirdPartyBleSupport', () => {
     expect(cancel).toHaveBeenCalledWith({ vendor: 'trezor', id: 'id-1' });
     cancel.mockRestore();
 
-    await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.scan, { durationMs: 0 });
+    await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'trezor', durationMs: 0 });
     await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'id-1', PADDED_PROFILE);
     await ipcMain.invoke(THIRD_PARTY_BLE_CHANNELS.subscribe, 'id-1');
 
