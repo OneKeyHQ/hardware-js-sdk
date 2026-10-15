@@ -44,6 +44,7 @@ const REPORT_ID = PROTOCOL_V1_REPORT_ID;
 const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
+const USB_DEVICE_IN_USE = 'USB device is already in use';
 // Legacy devices can take longer to answer Initialize after a WebUSB reset.
 // Keep this aligned with Node USB so a slow Protocol V1 response is not
 // misreported as a protocol mismatch during acquire.
@@ -86,6 +87,8 @@ let usbDisconnectListenerAttached = false;
 // open them, including while native open() is still pending.
 const identityProbeHandles = new WeakSet<USBDevice>();
 const openingHandles = new WeakSet<USBDevice>();
+// A normal acquire keeps ownership even while recovery temporarily closes the handle.
+const normalHandleOwners = new WeakMap<USBDevice, WebUsbTransport>();
 
 function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
   activeWebUsbTransport = instance;
@@ -129,6 +132,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   private acquiredPaths: Set<string> = new Set();
 
   private identityProbeDevices = new Map<string, USBDevice>();
+
+  private normalDevices = new Map<USBDevice, string>();
 
   private identityProbeCleanupPaths = new Set<string>();
 
@@ -330,6 +335,8 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (this.identityProbe) {
       await this.getConnectedDevices();
       this.claimIdentityProbeHandle(input.path, await this.findDevice(input.path));
+    } else {
+      this.claimNormalHandle(input.path, await this.findDevice(input.path));
     }
     try {
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
@@ -418,6 +425,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         await this.closeOpenDevice(input.path);
       } finally {
         this.releaseIdentityProbeHandle(input.path);
+        this.releaseNormalHandles(input.path);
       }
       throw e;
     }
@@ -598,6 +606,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       this.releaseIdentityProbeHandle(path);
       this.claimIdentityProbeHandle(path, device);
     }
+    if (!this.identityProbe) this.claimNormalHandle(path, device);
     this.assertHandleAvailable(device);
     if (!device.opened) {
       openingHandles.add(device);
@@ -625,6 +634,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       this.releaseIdentityProbeHandle(path);
       this.claimIdentityProbeHandle(path, device);
     }
+    if (!this.identityProbe) this.claimNormalHandle(path, device);
     this.assertHandleAvailable(device);
     if (!device.opened) {
       openingHandles.add(device);
@@ -658,17 +668,47 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   }
 
   private assertHandleAvailable(device: USBDevice) {
+    const normalOwner = normalHandleOwners.get(device);
     if (
-      identityProbeHandles.has(device) &&
-      ![...this.identityProbeDevices.values()].includes(device)
+      (normalOwner && normalOwner !== this) ||
+      (identityProbeHandles.has(device) &&
+        ![...this.identityProbeDevices.values()].includes(device))
     ) {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'USB device is already in use');
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, USB_DEVICE_IN_USE);
     }
   }
 
+  private claimNormalHandle(path: string, device: USBDevice) {
+    this.assertHandleAvailable(device);
+    normalHandleOwners.set(device, this);
+    this.normalDevices.set(device, path);
+  }
+
+  private releaseNormalHandles(path: string) {
+    for (const [device, ownedPath] of this.normalDevices) {
+      if (ownedPath === path) {
+        normalHandleOwners.delete(device);
+        this.normalDevices.delete(device);
+      }
+    }
+  }
+
+  private isHandleOwnershipError(error: unknown): error is HardwareError {
+    return (
+      error instanceof HardwareError &&
+      error.errorCode === HardwareErrorCode.RuntimeError &&
+      this.getErrorMessage(error).includes(USB_DEVICE_IN_USE)
+    );
+  }
+
   private claimIdentityProbeHandle(path: string, device: USBDevice) {
-    if (device.opened || openingHandles.has(device) || identityProbeHandles.has(device)) {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'USB device is already in use');
+    if (
+      device.opened ||
+      openingHandles.has(device) ||
+      identityProbeHandles.has(device) ||
+      normalHandleOwners.has(device)
+    ) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, USB_DEVICE_IN_USE);
     }
     identityProbeHandles.add(device);
     this.identityProbeDevices.set(path, device);
@@ -700,6 +740,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     } catch (error) {
       this.Log?.debug('[WebUsbTransport] releaseInterface before reconnect failed:', error);
     }
+    this.assertHandleAvailable(current);
     try {
       await current.close();
     } catch (error) {
@@ -713,6 +754,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     direction: USBDirection,
     endpointNumber: number
   ) {
+    this.assertHandleAvailable(device);
     try {
       await device.clearHalt(direction, endpointNumber);
     } catch (error) {
@@ -788,7 +830,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     operation: WebUsbOperation,
     error: unknown
   ): Promise<never> {
-    if (this.isWebUsbIoHardwareError(error)) throw error;
+    if (this.isHandleOwnershipError(error) || this.isWebUsbIoHardwareError(error)) throw error;
     if (error instanceof ProtocolV2LinkError && error.code !== 'io') throw error;
 
     const nativeError = error instanceof ProtocolV2LinkError ? error.cause ?? error : error;
@@ -828,7 +870,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   }
 
   private isRetryablePacketIoError(error: unknown) {
-    if (this.isWebUsbIoHardwareError(error)) return false;
+    if (this.isHandleOwnershipError(error) || this.isWebUsbIoHardwareError(error)) return false;
     const message = this.getErrorMessage(error).toLowerCase();
     if (this.isWebUsbPermissionDeniedMessage(message)) return false;
     return (
@@ -862,6 +904,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
     try {
       const currentDevice = await this.findDevice(path);
+      this.assertHandleAvailable(currentDevice);
       if (currentDevice.opened) {
         const endpoints = this.deviceEndpoints.get(path);
         const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
@@ -870,9 +913,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         } catch (releaseError) {
           this.Log.debug('[WebUsbTransport] releaseInterface before retry error:', releaseError);
         }
+        this.assertHandleAvailable(currentDevice);
         await currentDevice.close();
       }
     } catch (closeError) {
+      if (this.isHandleOwnershipError(closeError)) throw closeError;
       this.Log.debug('[WebUsbTransport] close device before retry error:', closeError);
     }
 
@@ -914,6 +959,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         try {
           await this.reconnectForPacketIoRetry(path, 'out', attempt, error);
         } catch (reconnectError) {
+          if (this.isHandleOwnershipError(reconnectError)) throw reconnectError;
           lastError = reconnectError;
           this.Log.debug(
             `[WebUsbTransport] transferout reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
@@ -936,6 +982,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     const transferBuffer = this.toArrayBuffer(
       packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
     );
+    this.assertHandleAvailable(device);
     const result = await device.transferOut(endpointOut, transferBuffer);
     if (result.status !== 'ok') {
       return this.throwWebUsbIoError(
@@ -963,6 +1010,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
         const endpoints = this.deviceEndpoints.get(path);
         const endpointIn = endpoints?.endpointIn ?? this.endpointId;
+        this.assertHandleAvailable(device);
         const result = await device.transferIn(endpointIn, length);
         return this.getTransferInData(result);
       } catch (error) {
@@ -977,6 +1025,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         try {
           await this.reconnectForPacketIoRetry(path, 'in', attempt, error);
         } catch (reconnectError) {
+          if (this.isHandleOwnershipError(reconnectError)) throw reconnectError;
           lastError = reconnectError;
           this.Log.debug(
             `[WebUsbTransport] transferin reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
@@ -996,6 +1045,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
     const endpoints = this.deviceEndpoints.get(path);
     const endpointIn = endpoints?.endpointIn ?? this.endpointId;
+    this.assertHandleAvailable(device);
     const result = await device.transferIn(endpointIn, length);
     return this.getTransferInData(result);
   }
@@ -1229,6 +1279,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       await this.closeOpenDevice(path);
     } finally {
       this.releaseIdentityProbeHandle(path);
+      this.releaseNormalHandles(path);
     }
     // Keep deviceProtocol/deviceProtocolHints across release: the probe result is a
     // physical-device property, so the next acquire can skip the wire-level probe.
