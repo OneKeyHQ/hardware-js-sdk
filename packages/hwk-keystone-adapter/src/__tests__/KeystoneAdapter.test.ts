@@ -22,6 +22,8 @@ import {
   parseHardwareRuntimeId,
 } from '@onekeyfe/hwk-adapter-core';
 import HDKey from 'hdkey';
+import { secp256k1 } from '@noble/curves/secp256k1';
+import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 
 import { KeystoneAdapter } from '../adapter/KeystoneAdapter';
 import { KEYSTONE_COLD_START_PATH } from '../adapter/deviceTable';
@@ -715,12 +717,50 @@ describe('KeystoneAdapter', () => {
       expect(fake.requests).toHaveLength(1);
       expect(fake.requests[0].data.urType).toBe('qr-hardware-call');
     });
+
+    // Ledger Legacy puts the index straight under the hardened account: m/44'/60'/0'/<index>.
+    it.each([0, 7])(
+      "derives the Ledger Legacy address at index %i from the m/44'/60'/0' account key",
+      async index => {
+        const path = `m/44'/60'/0'/${index}`;
+        const node = FIXTURE_ROOT.derive(path);
+        const uncompressed = secp256k1.ProjectivePoint.fromHex(
+          Buffer.from(node.publicKey ?? []).toString('hex')
+        ).toRawBytes(false);
+        const expected = `0x${Buffer.from(keccak256(uncompressed.slice(1)).slice(-20)).toString(
+          'hex'
+        )}`;
+        const adapter = newTestAdapter();
+        attachFakeDevice(adapter);
+
+        const single = await adapter.evmGetAddress(null, null, { path });
+        const bundled = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: [{ methodName: 'evmGetAddress', network: 'evm', path }],
+        });
+        await adapter.dispose();
+
+        expect(single.success).toBe(true);
+        if (!single.success) return;
+        expect(single.payload.address.toLowerCase()).toBe(expected);
+        expect(bundled.success).toBe(true);
+        if (!bundled.success) return;
+        expect(bundled.payload[0]).toMatchObject({
+          success: true,
+          payload: { path, accountKey: { path: "m/44'/60'/0'" } },
+        });
+        expect((bundled.payload[0].payload as { address: string }).address.toLowerCase()).toBe(
+          expected
+        );
+      }
+    );
   });
 
   describe('accountKey', () => {
     // Hosts pin this key per account path, so it must be exactly what the device exported.
     it.each([
       ['evm', "m/44'/60'/0'/0/3", "m/44'/60'/0'"],
+      ['evm', "m/44'/60'/0'/7", "m/44'/60'/0'"],
+      ['evm', "m/44'/60'/2'/0/0", "m/44'/60'/2'"],
       ['btc', "m/84'/0'/0'/0/3", "m/84'/0'/0'"],
       ['tron', "m/44'/195'/0'/0/3", "m/44'/195'/0'"],
       ['btcPublicKey', "m/84'/0'/0'", "m/84'/0'/0'"],

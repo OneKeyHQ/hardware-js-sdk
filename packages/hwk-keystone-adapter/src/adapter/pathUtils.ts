@@ -22,8 +22,9 @@ export function isBip32Path(path: string): boolean {
 }
 
 /**
- * Splits a 5-segment BIP-44 leaf path into the 3-segment account path and the relative
- * `change/index`; a path of 3 or fewer segments is already an account path.
+ * Splits a leaf path after its last hardened segment: the account path is what Keystone exports,
+ * the unhardened rest is derived from it offline (`change/index`, or a bare `index` for Ledger
+ * Legacy `m/44'/60'/0'/<index>`). A path of 3 or fewer segments is already an account path.
  */
 export function splitAccountPath(path: string): {
   accountPath: string;
@@ -31,11 +32,15 @@ export function splitAccountPath(path: string): {
 } {
   const normalized = normalizePath(path);
   const segments = normalized.slice(2).split('/');
-  if (segments.length <= 3) {
+  let accountLength = 0;
+  segments.forEach((segment, index) => {
+    if (segment.endsWith("'")) accountLength = index + 1;
+  });
+  if (segments.length <= 3 || accountLength === 0 || accountLength === segments.length) {
     return { accountPath: normalized, relativeDerivePath: '' };
   }
-  const accountSegments = segments.slice(0, segments.length - 2);
-  const relativeSegments = segments.slice(segments.length - 2);
+  const accountSegments = segments.slice(0, accountLength);
+  const relativeSegments = segments.slice(accountLength);
   return {
     accountPath: `m/${accountSegments.join('/')}`,
     relativeDerivePath: relativeSegments.join('/'),
