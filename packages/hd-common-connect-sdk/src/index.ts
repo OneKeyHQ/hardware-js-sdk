@@ -59,28 +59,26 @@ const getTransport = async (env: ConnectSettings['env']) => {
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
 
-const usbIdentityProbeTransports: Partial<
-  Record<UsbDeviceIdentity['commType'], WebUsbTransport | HttpTransport>
-> = {};
+const usbIdentityProbeTransports: Partial<Record<UsbDeviceIdentity['commType'], WebUsbTransport>> =
+  {};
 const usbIdentityProbes: Partial<
   Record<UsbDeviceIdentity['commType'], Promise<UsbDeviceIdentity[]>>
 > = {};
 
-/** Identify USB without disposing the current SDK, changing settings, or opening a wallet. */
+/** Identify WebUSB without disposing the current SDK, changing settings, or opening a wallet. */
 export const probeUsbDeviceIdentities = ({
   commType,
 }: {
   commType: UsbDeviceIdentity['commType'];
 }): Promise<UsbDeviceIdentity[]> => {
-  if (commType !== 'webusb' && commType !== 'bridge') {
+  if (commType !== 'webusb') {
     return Promise.reject(ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter));
   }
   const pending = usbIdentityProbes[commType];
   if (pending) return pending;
   let transport = usbIdentityProbeTransports[commType];
   if (!transport) {
-    transport =
-      commType === 'webusb' ? new WebUsbTransport(true) : new HttpTransport(undefined, 3000);
+    transport = new WebUsbTransport(true);
     usbIdentityProbeTransports[commType] = transport;
   }
   const probe = probeUsbDeviceIdentitiesWithTransport(transport, commType, descriptor =>

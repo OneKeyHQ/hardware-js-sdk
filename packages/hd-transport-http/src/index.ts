@@ -36,7 +36,7 @@ export default class HttpTransport {
     return 'V1';
   }
 
-  constructor(url?: string, private readonly requestTimeout?: number) {
+  constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
   }
 
@@ -46,7 +46,6 @@ export default class HttpTransport {
     }
     return http({
       ...options,
-      timeout: options.timeout ?? this.requestTimeout,
       method: 'POST',
       url: this.url + options.url,
     });
@@ -89,7 +88,7 @@ export default class HttpTransport {
   async enumerate() {
     const devicesS = await this._post({ url: '/enumerate' });
     const devices = check.devices(devicesS);
-    return devices.map(device => ({ ...device, commType: 'bridge' as const }));
+    return devices.map(device => ({ ...device, commType: 'bridge' }));
   }
 
   _acquireMixed(input: AcquireInput) {

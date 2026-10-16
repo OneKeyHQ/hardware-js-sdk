@@ -2043,6 +2043,8 @@ export const init = async (
   }
 };
 
+let pendingTransportSwitch: Promise<void> = Promise.resolve();
+
 export const switchTransport = ({
   env,
   Transport,
@@ -2052,10 +2054,19 @@ export const switchTransport = ({
   Transport: any;
   plugin?: LowlevelTransportSharedPlugin;
 }) => {
-  DataManager.updateEnv(env);
-  TransportManager.setTransport(Transport, plugin);
-  _deviceList = undefined;
-  DevicePool.resetState();
-  _connector = undefined;
-  initConnector();
+  // Preserve request order while native transport cleanup is pending.
+  const switching = pendingTransportSwitch
+    .catch(() => undefined)
+    .then(async () => {
+      _connector?.stop();
+      await TransportManager.getTransport()?.stop?.();
+      DataManager.updateEnv(env);
+      TransportManager.setTransport(Transport, plugin);
+      _deviceList = undefined;
+      DevicePool.resetState();
+      _connector = undefined;
+      initConnector();
+    });
+  pendingTransportSwitch = switching;
+  return switching;
 };

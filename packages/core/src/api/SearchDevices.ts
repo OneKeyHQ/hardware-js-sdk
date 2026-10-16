@@ -109,14 +109,13 @@ const identityProbeLogger = {
   error: () => undefined,
 };
 
-const pendingBridgeProbeReleases = new WeakMap<UsbIdentityProbeTransport, Map<string, string>>();
-
 /** Runs on a separate transport; never initializes or switches the current Core. */
 export const probeUsbDeviceIdentitiesWithTransport = async (
   transport: UsbIdentityProbeTransport,
   commType: UsbDeviceIdentity['commType'],
   getOwnedIdentity?: (descriptor: UsbIdentityProbeDescriptor) => UsbDeviceIdentity | undefined
 ): Promise<UsbDeviceIdentity[]> => {
+  if (commType !== 'webusb') return [];
   await transport.init(identityProbeLogger);
   const defaultMessages = JSON.stringify(DataManager.getProtobufMessages());
   await transport.configure(defaultMessages);
@@ -124,16 +123,6 @@ export const probeUsbDeviceIdentitiesWithTransport = async (
     JSON.stringify(DataManager.getProtobufMessages('v2Schema'))
   );
   const descriptors = await transport.enumerate();
-  let pendingReleases = pendingBridgeProbeReleases.get(transport);
-  if (commType === 'bridge' && pendingReleases) {
-    for (const [path, session] of pendingReleases) {
-      if (
-        !descriptors.some(descriptor => descriptor.path === path && descriptor.session === session)
-      ) {
-        pendingReleases.delete(path);
-      }
-    }
-  }
   const identities: UsbDeviceIdentity[] = [];
   const readIdentity = async (
     descriptor: UsbIdentityProbeDescriptor
@@ -141,16 +130,6 @@ export const probeUsbDeviceIdentitiesWithTransport = async (
     const { path } = descriptor;
     if (!path || descriptor.commType !== commType) return undefined;
     if (descriptors.filter(candidate => candidate.path === path).length !== 1) return undefined;
-    const pendingSession = commType === 'bridge' ? pendingReleases?.get(path) : undefined;
-    if (pendingSession && descriptor.session === pendingSession) {
-      try {
-        await transport.release(pendingSession, false);
-        pendingReleases?.delete(path);
-        descriptor = { ...descriptor, session: undefined };
-      } catch {
-        return undefined;
-      }
-    }
     const owner = getOwnedIdentity?.(descriptor);
     if (owner) {
       return owner;
@@ -225,15 +204,6 @@ export const probeUsbDeviceIdentitiesWithTransport = async (
           await transport.release(session, false);
         } catch {
           identified = undefined;
-          // Retain only our own Bridge handle; enumeration must confirm ownership
-          // before a later probe retries a release whose HTTP request may be lost.
-          if (commType === 'bridge') {
-            if (!pendingReleases) {
-              pendingReleases = new Map();
-              pendingBridgeProbeReleases.set(transport, pendingReleases);
-            }
-            pendingReleases.set(path, session);
-          }
         }
       }
     }

@@ -206,71 +206,18 @@ describe('isolated USB identity probe', () => {
     expect(transport.release).not.toHaveBeenCalled();
   });
 
-  test('retries its own failed Bridge release before probing again', async () => {
-    const transport = createTransport();
-    let held: string | undefined;
-    transport.enumerate.mockImplementation(() =>
-      Promise.resolve([{ ...descriptor, commType: 'bridge', session: held }])
-    );
-    transport.acquire.mockImplementation(() => {
-      held = 'probe-transport-handle';
-      return Promise.resolve(held);
-    });
-    transport.release
-      .mockRejectedValueOnce(new Error('release request lost'))
-      .mockRejectedValueOnce(new Error('Bridge still unavailable'))
-      .mockImplementation(() => {
-        held = undefined;
-        return Promise.resolve(undefined);
-      });
-
-    await expect(probeUsbDeviceIdentitiesWithTransport(transport, 'bridge')).resolves.toEqual([]);
-    await expect(probeUsbDeviceIdentitiesWithTransport(transport, 'bridge')).resolves.toEqual([]);
-    expect(transport.acquire).toHaveBeenCalledTimes(1);
-    expect(transport.call).toHaveBeenCalledTimes(1);
-    await expect(probeUsbDeviceIdentitiesWithTransport(transport, 'bridge')).resolves.toHaveLength(
-      1
-    );
-    expect(transport.acquire).toHaveBeenCalledTimes(2);
-    expect(transport.release).toHaveBeenCalledTimes(4);
-  });
-
-  test.each([undefined, 'foreign-transport-handle'])(
-    'does not retry a stale Bridge release when ownership changes to %s',
-    async replacement => {
+  test.each([undefined, 'occupied-transport-handle'])(
+    'does not initialize or acquire a Bridge identity probe (session: %s)',
+    async session => {
       const transport = createTransport();
-      transport.enumerate.mockResolvedValue([{ ...descriptor, commType: 'bridge' }]);
-      transport.release.mockRejectedValueOnce(new Error('release response lost'));
-      await probeUsbDeviceIdentitiesWithTransport(transport, 'bridge');
-      transport.enumerate.mockResolvedValue([
-        { ...descriptor, commType: 'bridge', session: replacement },
-      ]);
-      transport.release.mockClear();
-      const result = await probeUsbDeviceIdentitiesWithTransport(transport, 'bridge');
-      expect(result).toHaveLength(replacement ? 0 : 1);
-      expect(transport.release).toHaveBeenCalledTimes(replacement ? 0 : 1);
-      if (replacement) {
-        transport.enumerate.mockResolvedValue([{ ...descriptor, commType: 'bridge' }]);
-        await expect(
-          probeUsbDeviceIdentitiesWithTransport(transport, 'bridge')
-        ).resolves.toHaveLength(1);
-      }
+      transport.enumerate.mockResolvedValue([{ ...descriptor, commType: 'bridge', session }]);
+      await expect(probeUsbDeviceIdentitiesWithTransport(transport, 'bridge')).resolves.toEqual([]);
+      expect(transport.init).not.toHaveBeenCalled();
+      expect(transport.enumerate).not.toHaveBeenCalled();
+      expect(transport.acquire).not.toHaveBeenCalled();
+      expect(transport.release).not.toHaveBeenCalled();
     }
   );
-
-  test('never cleans up a Bridge handle recorded by another transport instance', async () => {
-    const transport = createTransport();
-    transport.enumerate.mockResolvedValue([{ ...descriptor, commType: 'bridge' }]);
-    transport.release.mockRejectedValueOnce(new Error('release request lost'));
-    await probeUsbDeviceIdentitiesWithTransport(transport, 'bridge');
-    const other = createTransport();
-    other.enumerate.mockResolvedValue([
-      { ...descriptor, commType: 'bridge', session: 'usb-transport-handle' },
-    ]);
-    await expect(probeUsbDeviceIdentitiesWithTransport(other, 'bridge')).resolves.toEqual([]);
-    expect(other.release).not.toHaveBeenCalled();
-    expect(other.acquire).not.toHaveBeenCalled();
-  });
 
   test('reuses identity only for the exact active WebUSB handle', () => {
     const handle = {};

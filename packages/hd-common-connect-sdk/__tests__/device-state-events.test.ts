@@ -8,6 +8,7 @@ import {
   probeUsbDeviceIdentitiesWithTransport,
 } from '@onekeyfe/hd-core';
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import HttpTransport from '@onekeyfe/hd-transport-http';
 
 import sdkExport, { messagePromises, probeUsbDeviceIdentities } from '../src';
 
@@ -88,7 +89,7 @@ describe('SDK request cleanup', () => {
     expect(Object.keys(messagePromises)).toHaveLength(0);
   });
 
-  test.each(['webusb', 'bridge'] as const)(
+  test.each(['webusb'] as const)(
     'probes %s without disposing an outstanding BLE request and coalesces concurrent probes',
     async commType => {
       const pending = createDeferred<unknown>();
@@ -115,6 +116,17 @@ describe('SDK request cleanup', () => {
       expect(Object.keys(messagePromises)).toHaveLength(0);
     }
   );
+
+  test('rejects the withdrawn Bridge probe without creating a transport or affecting BLE', async () => {
+    jest.mocked(HttpTransport).mockClear();
+    jest.mocked(probeUsbDeviceIdentitiesWithTransport).mockClear();
+    await expect(probeUsbDeviceIdentities({ commType: 'bridge' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+    expect(HttpTransport).not.toHaveBeenCalled();
+    expect(probeUsbDeviceIdentitiesWithTransport).not.toHaveBeenCalled();
+    expect(core.dispose).not.toHaveBeenCalled();
+  });
 
   test('waits for Core disposal and does not retain old listeners after reinitialization', async () => {
     const cleanup = createDeferred<void>();

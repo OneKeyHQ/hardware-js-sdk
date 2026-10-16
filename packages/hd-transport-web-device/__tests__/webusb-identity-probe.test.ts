@@ -2,7 +2,8 @@ import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import WebUsbTransport from '../src/webusb';
 import { probeUsbDeviceIdentities } from '@onekeyfe/hd-common-connect-sdk/src';
-import Core from '@onekeyfe/hd-core/src/core';
+import Core, { switchTransport } from '@onekeyfe/hd-core/src/core';
+import DataManager from '@onekeyfe/hd-core/src/data-manager/DataManager';
 import TransportManager from '@onekeyfe/hd-core/src/data-manager/TransportManager';
 import { Device } from '@onekeyfe/hd-core/src/device/Device';
 
@@ -79,6 +80,125 @@ describe('WebUSB identity probe ownership', () => {
     });
     return active;
   }
+
+  test.each(['V1', 'V2'] as const)(
+    'reacquires %s USB after keepSession and switching away and back',
+    async protocol => {
+      const previous = TransportManager.transport;
+      const { settings } = DataManager;
+      const active = createAcquiredTransport(protocol);
+      const next = createAcquiredTransport(protocol);
+      const selected = new Device({
+        path: 'USB_PATH',
+        id: 'USB_PATH',
+        name: 'Mock device',
+        commType: 'webusb',
+        debug: false,
+      });
+      selected.keepSession = true;
+      selected.mainId = 'USB_PATH';
+      jest.spyOn(selected, 'isUsedHere').mockReturnValue(true);
+      const release = jest.spyOn(active, 'release');
+      const Emulator = jest.fn(() => ({ stop: jest.fn().mockResolvedValue(undefined) }));
+      const RestoreUsb = jest.fn(() => next);
+      TransportManager.transport = active as unknown as Transport;
+      try {
+        await active.acquire({ path: 'USB_PATH' });
+        await selected.release();
+        expect(release).not.toHaveBeenCalled();
+        await switchTransport({ env: 'emulator', Transport: Emulator });
+        expect(device.opened).toBe(false);
+        await switchTransport({ env: 'webusb', Transport: RestoreUsb });
+        await expect(next.acquire({ path: 'USB_PATH' })).resolves.toBe('USB_PATH');
+      } finally {
+        await active.stop();
+        await next.stop();
+        TransportManager.transport = previous;
+        DataManager.settings = settings;
+        jest.restoreAllMocks();
+      }
+    }
+  );
+
+  test('does not replace the transport until USB cleanup completes, or after it fails', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const active = createAcquiredTransport();
+    const closing = createDeferred<void>();
+    const entered = createDeferred<void>();
+    device.close.mockImplementation(() => {
+      entered.resolve();
+      return closing.promise;
+    });
+    const Emulator = jest.fn();
+    TransportManager.transport = active as unknown as Transport;
+    try {
+      await active.acquire({ path: 'USB_PATH' });
+      const switching = Promise.resolve(switchTransport({ env: 'emulator', Transport: Emulator }));
+      const result = switching.catch(error => error as Error);
+      await Promise.resolve();
+      expect(Emulator).not.toHaveBeenCalled();
+      await entered.promise;
+      expect(Emulator).not.toHaveBeenCalled();
+      expect(TransportManager.transport).toBe(active);
+      closing.reject(new Error('close failed'));
+      expect(await result).toEqual(new Error('close failed'));
+      expect(TransportManager.transport).toBe(active);
+      expect(DataManager.settings).toBe(settings);
+    } finally {
+      closing.resolve();
+      device.close.mockImplementation(() => {
+        device.opened = false;
+        return Promise.resolve();
+      });
+      await active.stop();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+      jest.restoreAllMocks();
+    }
+  });
+
+  test('serializes overlapping transport switches and stops each replaced instance', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const active = createAcquiredTransport();
+    const next = createAcquiredTransport();
+    const closing = createDeferred<void>();
+    const entered = createDeferred<void>();
+    const emulatorCleanup = createDeferred<void>();
+    device.close.mockImplementation(() => {
+      entered.resolve();
+      return closing.promise.then(() => {
+        device.opened = false;
+      });
+    });
+    const emulator = { stop: jest.fn(() => emulatorCleanup.promise) };
+    const Emulator = jest.fn(() => emulator);
+    const RestoreUsb = jest.fn(() => next);
+    TransportManager.transport = active as unknown as Transport;
+    try {
+      await active.acquire({ path: 'USB_PATH' });
+      const first = switchTransport({ env: 'emulator', Transport: Emulator });
+      await entered.promise;
+      const second = switchTransport({ env: 'webusb', Transport: RestoreUsb });
+      closing.resolve();
+      await first;
+      await Promise.resolve();
+      expect(emulator.stop).toHaveBeenCalledTimes(1);
+      expect(RestoreUsb).not.toHaveBeenCalled();
+      emulatorCleanup.resolve();
+      await second;
+      expect(TransportManager.transport).toBe(next);
+    } finally {
+      closing.resolve();
+      emulatorCleanup.resolve();
+      await active.stop();
+      await next.stop();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+      jest.restoreAllMocks();
+    }
+  });
 
   test.each(['V1', 'V2'] as const)(
     'Core disposal releases a retained %s USB session for a new transport',
