@@ -2520,17 +2520,13 @@ export default class ReactNativeBleTransport {
   private createProtocolMismatchError(expected: ProtocolType) {
     // A protocol probe miss alone does not prove that the OS bond is stale.
     // Native authentication/encryption failures are mapped separately.
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+    });
   }
 
   private createProtocolDetectionError() {
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 GetFeatures or Protocol V2 Ping'
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed);
   }
 
   private clearProbeProtocol(uuid: string, protocol: ProtocolType) {

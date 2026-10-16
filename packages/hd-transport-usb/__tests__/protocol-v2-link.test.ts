@@ -1,3 +1,4 @@
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 import transportPackage, { PROTOCOL_V2_CHANNEL_USB, ProtocolV2 } from '@onekeyfe/hd-transport';
 
 import NodeUsbTransport from '../src';
@@ -341,6 +342,22 @@ describe('NodeUsbTransport Protocol V2 link lifecycle', () => {
     expect(device.close).toHaveBeenCalledTimes(1);
     expect(transport.getProtocolType(path)).toBeUndefined();
   });
+
+  test.each(['V1', 'V2'] as const)(
+    'reports a typed failed %s probe and releases USB',
+    async expectedProtocol => {
+      const { transport, path, device } = createHarness();
+      jest.spyOn(transport as any, 'probeProtocolV1').mockResolvedValue(false);
+      jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
+      await transport.enumerate();
+      await expect(transport.acquire({ path, expectedProtocol })).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+        params: { expectedProtocol },
+      });
+      expect(transport.getProtocolType(path)).toBeUndefined();
+      expect(device.close).toHaveBeenCalled();
+    }
+  );
 
   test('actively probes explicit Protocol V2 during bootloader reconnect', async () => {
     const harness = createHarness();

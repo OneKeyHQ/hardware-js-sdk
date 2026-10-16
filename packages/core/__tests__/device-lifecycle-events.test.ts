@@ -610,7 +610,9 @@ describe('public device lifecycle events', () => {
   );
 
   test.each([
-    [HardwareErrorCode.RuntimeError, true],
+    [HardwareErrorCode.TransportProtocolProbeFailed, true],
+    [HardwareErrorCode.TransportProtocolMismatch, false],
+    [HardwareErrorCode.RuntimeError, false],
     [HardwareErrorCode.BleDeviceBondError, false],
   ] as const)(
     'retries a Protocol V2 probe mismatch with error code %s: %s',
@@ -618,8 +620,8 @@ describe('public device lifecycle events', () => {
       const method = { payload: { connectProtocol: 'V2' } } as never;
       const error = {
         errorCode,
-        message:
-          'Device protocol mismatch: expected V2, but device did not respond to expected protocol',
+        message: 'diagnostic wording is not used for classification',
+        params: { expectedProtocol: 'V2' },
       };
 
       expect(isRetryableBleProtocolV2ProbeError(method, error)).toBe(expected);
@@ -629,6 +631,8 @@ describe('public device lifecycle events', () => {
   test.each([
     [HardwareErrorCode.BleConnectedError, true],
     [HardwareErrorCode.BleTimeoutError, true],
+    [HardwareErrorCode.TransportProtocolProbeFailed, true],
+    [HardwareErrorCode.TransportProtocolMismatch, false],
     [HardwareErrorCode.PollingTimeout, false],
     [HardwareErrorCode.BleDeviceBondError, false],
   ] as const)('retries a BLE connection error with error code %s: %s', (errorCode, expected) => {
@@ -639,6 +643,21 @@ describe('public device lifecycle events', () => {
     };
 
     expect(isRetryableBleConnectionError(method, error)).toBe(expected);
+  });
+
+  test('does not retry a failed strict V1 probe as a V2 probe or after user cancellation', () => {
+    const error = ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: 'V1',
+    });
+    const method = { payload: { connectProtocol: 'V2' } } as never;
+    expect(isRetryableBleProtocolV2ProbeError(method, error)).toBe(false);
+    expect(isRetryableBleConnectionError(method, error)).toBe(false);
+    expect(
+      isRetryableBleConnectionError(
+        { payload: {}, device: { wasInterruptedByUser: () => true } } as never,
+        ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed)
+      )
+    ).toBe(false);
   });
 
   test('does not retry the desktop acquire deadline fallback', () => {

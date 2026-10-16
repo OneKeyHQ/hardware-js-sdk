@@ -361,17 +361,13 @@ export default class LowlevelTransport {
   }
 
   private createProtocolMismatchError(expected: ProtocolType) {
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+    });
   }
 
   private createProtocolDetectionError() {
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed);
   }
 
   private clearProbeProtocol(uuid: string, protocol: ProtocolType) {

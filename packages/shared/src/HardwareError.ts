@@ -320,6 +320,18 @@ export const HardwareErrorCode = {
   TransportInvalidProtobuf: 603,
 
   /**
+   * No supported device protocol answered the active probe.
+   * @params: { expectedProtocol?: 'V1' | 'V2'; attempts?: number }
+   */
+  TransportProtocolProbeFailed: 604,
+
+  /**
+   * The actively detected device protocol differs from the required protocol.
+   * @params: { expectedProtocol: 'V1' | 'V2'; detectedProtocol?: 'V1' | 'V2' }
+   */
+  TransportProtocolMismatch: 605,
+
+  /**
    * Bluetooth error code
    */
   BleScanError: 700,
@@ -605,6 +617,10 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.TransportCallInProgress]: 'Transport call in progress',
   [HardwareErrorCode.TransportNotFound]: 'Transport not found',
   [HardwareErrorCode.TransportInvalidProtobuf]: 'Transport invalid protobuf',
+  [HardwareErrorCode.TransportProtocolProbeFailed]:
+    'Failed to detect the device communication protocol. Reconnect the device and try again.',
+  [HardwareErrorCode.TransportProtocolMismatch]:
+    'The device communication protocol does not match the expected protocol.',
 
   /**
    * Bluetooth Error

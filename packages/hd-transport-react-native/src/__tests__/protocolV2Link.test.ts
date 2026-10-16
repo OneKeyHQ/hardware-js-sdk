@@ -821,7 +821,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
       const acquiring = transport.acquire({ uuid });
       const failure = expect(acquiring).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.BleTimeoutError,
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
       });
       const reconnecting = transport.acquire({ uuid, expectedProtocol: 'V2' });
 
@@ -860,7 +860,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
 
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.RuntimeError,
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+        params: { expectedProtocol: 'V2' },
       });
 
       expect(device.cancelConnection).toHaveBeenCalledTimes(1);
@@ -876,10 +877,12 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
 
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.RuntimeError,
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+        params: { expectedProtocol: 'V2' },
       });
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.RuntimeError,
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+        params: { expectedProtocol: 'V2' },
       });
 
       expect(device.cancelConnection).toHaveBeenCalledTimes(2);
@@ -897,7 +900,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       jest.spyOn(transport as any, 'probeProtocolV2').mockResolvedValue(false);
 
       await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).rejects.toMatchObject({
-        errorCode: HardwareErrorCode.RuntimeError,
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+        params: { expectedProtocol: 'V2' },
       });
 
       expect(device.cancelConnection).toHaveBeenCalledTimes(1);
@@ -1732,7 +1736,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await expect(transport.acquire({ uuid })).rejects.toBeDefined();
     await expect(transport.acquire({ uuid })).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleTimeoutError,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
     });
     await transport.disconnect(uuid);
     await transport.stop();
@@ -1840,7 +1844,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     jest.spyOn(transport as any, 'probeProtocolV1').mockResolvedValue(false);
 
     await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.BleTimeoutError,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
     });
 
     expect(device.onDisconnected).not.toHaveBeenCalled();

@@ -5,10 +5,20 @@ import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
 import { LoggerNames, getDeviceTypeByBleName, getLogger } from '../utils';
 import { DevicePool } from '../device/DevicePool';
+import { buildProtocolV1FeaturesPayload } from '../deviceProfile/buildDeviceFeatures';
+import { mapProtocolV2DeviceInfoToState } from '../device/DeviceStateMapper';
+import { getSupportProtocolV1MessageSchema } from '../utils/deviceFeaturesUtils';
+import { PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST } from '../protocols/protocol-v2/features';
 
-import type { SearchDevice } from '../types/device';
+import type { SearchDevice, UsbDeviceIdentity } from '../types/device';
+import type { PROTO } from '../constants';
 import type DeviceConnector from '../device/DeviceConnector';
-import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import type {
+  AcquireInput,
+  OneKeyDeviceInfo as DeviceDescriptor,
+  ProtocolV2DeviceInfo,
+  Transport,
+} from '@onekeyfe/hd-transport';
 import type { Device } from '../device/Device';
 
 const Log = getLogger(LoggerNames.DevicePool);
@@ -18,7 +28,10 @@ type RequestQueueLookup = {
   getTask: (requestId: number) => { method: { device?: Device } } | undefined;
 };
 
-const getDescriptorKeys = (descriptor: DeviceDescriptor) =>
+export type UsbIdentityProbeDescriptor = Pick<DeviceDescriptor, 'path' | 'commType'> &
+  Partial<Pick<DeviceDescriptor, 'id' | 'session'>>;
+
+const getDescriptorKeys = (descriptor: UsbIdentityProbeDescriptor) =>
   [descriptor.path, descriptor.id].filter(
     (key): key is string => typeof key === 'string' && key.length > 0
   );
@@ -33,11 +46,11 @@ const isOwnedByActiveWebUsbRequest = (
   );
 };
 
-const getUsbHandle = (descriptor?: DeviceDescriptor) =>
+const getUsbHandle = (descriptor?: UsbIdentityProbeDescriptor) =>
   (descriptor as { device?: unknown } | undefined)?.device;
 
 const getOwningRequestDevice = (
-  descriptor: DeviceDescriptor,
+  descriptor: UsbIdentityProbeDescriptor,
   requestQueue?: RequestQueueLookup
 ) => {
   if (!requestQueue) return undefined;
@@ -58,6 +71,158 @@ const getOwningRequestDevice = (
     }
   }
   return undefined;
+};
+
+export const getOwnedUsbDeviceIdentity = (
+  descriptor: UsbIdentityProbeDescriptor,
+  requestQueue: RequestQueueLookup
+): UsbDeviceIdentity | undefined => {
+  const owner = getOwningRequestDevice(descriptor, requestQueue);
+  if (!owner || descriptor.commType !== 'webusb' || owner.originalDescriptor?.commType !== 'webusb')
+    return undefined;
+  return {
+    path: descriptor.path,
+    serialNo: owner.getCurrentSerialNo() || null,
+    deviceId: owner.getCurrentDeviceId() || null,
+    deviceType: owner.getCurrentDeviceType(),
+    connectProtocol: owner.getProtocol(),
+    commType: 'webusb',
+    mode: owner.features?.mode ?? undefined,
+  };
+};
+
+export type UsbIdentityProbeTransport = Pick<
+  Transport,
+  'release' | 'call' | 'getProtocolType' | 'configureProtocolV2'
+> & {
+  init: (logger: object) => unknown;
+  enumerate: () => Promise<UsbIdentityProbeDescriptor[]>;
+  acquire: (input: AcquireInput) => Promise<string | undefined>;
+  configure: (signedData: string) => void | Promise<void>;
+};
+
+// Identity discovery must not publish device events or log raw Features/session data.
+const identityProbeLogger = {
+  debug: () => undefined,
+  log: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
+
+/** Runs on a separate transport; never initializes or switches the current Core. */
+export const probeUsbDeviceIdentitiesWithTransport = async (
+  transport: UsbIdentityProbeTransport,
+  commType: UsbDeviceIdentity['commType'],
+  getOwnedIdentity?: (descriptor: UsbIdentityProbeDescriptor) => UsbDeviceIdentity | undefined
+): Promise<UsbDeviceIdentity[]> => {
+  if (commType !== 'webusb') return [];
+  await transport.init(identityProbeLogger);
+  const defaultMessages = JSON.stringify(DataManager.getProtobufMessages());
+  await transport.configure(defaultMessages);
+  await transport.configureProtocolV2?.(
+    JSON.stringify(DataManager.getProtobufMessages('v2Schema'))
+  );
+  const descriptors = await transport.enumerate();
+  const identities: UsbDeviceIdentity[] = [];
+  const readIdentity = async (
+    descriptor: UsbIdentityProbeDescriptor
+  ): Promise<UsbDeviceIdentity | undefined> => {
+    const { path } = descriptor;
+    if (!path || descriptor.commType !== commType) return undefined;
+    if (descriptors.filter(candidate => candidate.path === path).length !== 1) return undefined;
+    const owner = getOwnedIdentity?.(descriptor);
+    if (owner) {
+      return owner;
+    }
+    // Do not borrow a browser handle or replace a Bridge session owned by another call.
+    if (descriptor.session || (getUsbHandle(descriptor) as USBDevice | undefined)?.opened)
+      return undefined;
+
+    let session: string | undefined;
+    let identified: UsbDeviceIdentity | undefined;
+    try {
+      await transport.configure(defaultMessages);
+      session = await transport.acquire({ path, previous: null, forceProtocolDetection: true });
+      if (!session) return undefined;
+      const protocol = transport.getProtocolType(path);
+      if (protocol === 'V1') {
+        const response = await transport.call(session, 'GetFeatures', {}, { timeoutMs: 3000 });
+        if (response.type !== 'Features') return undefined;
+        let features = buildProtocolV1FeaturesPayload(response.message as PROTO.Features);
+        // Classic-family loaders expose their supported information in Features.
+        // Touch/Pro retain their existing vendor-feature query.
+        if (
+          !features.serialNo &&
+          (features.mode !== 'bootloader' ||
+            features.deviceType === EDeviceType.Touch ||
+            features.deviceType === EDeviceType.Pro)
+        ) {
+          const { messages, protocolV1MessageSchema } = getSupportProtocolV1MessageSchema(features);
+          // Legacy V1 has no OnekeyGetFeatures; keep the identity confirmed by GetFeatures.
+          if (protocolV1MessageSchema === 'v1CurrentSchema') {
+            if (messages) await transport.configure(JSON.stringify(messages));
+            const vendor = await transport.call(
+              session,
+              'OnekeyGetFeatures',
+              {},
+              { timeoutMs: 3000 }
+            );
+            if (vendor.type === 'OnekeyFeatures') {
+              features = buildProtocolV1FeaturesPayload({
+                ...response.message,
+                ...vendor.message,
+              } as PROTO.Features);
+            }
+          }
+        }
+        identified = {
+          path,
+          serialNo: features.serialNo || null,
+          deviceId: features.deviceId || null,
+          deviceType: features.deviceType,
+          connectProtocol: 'V1',
+          commType,
+          mode: features.mode ?? undefined,
+        };
+      } else if (protocol === 'V2') {
+        const response = await transport.call(
+          session,
+          'DeviceInfoGet',
+          PROTOCOL_V2_FEATURES_DEVICE_INFO_REQUEST,
+          { timeoutMs: 3000 }
+        );
+        if (response.type !== 'DeviceInfo') return undefined;
+        const { identity } = mapProtocolV2DeviceInfoToState(
+          response.message as ProtocolV2DeviceInfo
+        );
+        identified = {
+          path,
+          serialNo: identity?.serialNo || null,
+          deviceId: identity?.deviceId || null,
+          deviceType: identity?.deviceType ?? EDeviceType.Unknown,
+          connectProtocol: 'V2',
+          commType,
+        };
+      }
+    } catch {
+      // Discovery is best effort; a busy/disconnected device cannot confirm identity.
+    } finally {
+      if (session) {
+        try {
+          await transport.release(session, false);
+        } catch {
+          identified = undefined;
+        }
+      }
+    }
+    return identified;
+  };
+  for (const descriptor of descriptors) {
+    const identity = await readIdentity(descriptor);
+    if (identity) identities.push(identity);
+  }
+  return identities;
 };
 
 // A USB path is a routing key (the USB serial, a synthesized usb-vid-pid-name, or the
@@ -81,7 +246,7 @@ const toSearchDevice = (device: Device): SearchDevice | null => {
 };
 
 export default class SearchDevices extends BaseMethod {
-  connector?: DeviceConnector;
+  connector?: DeviceConnector = undefined;
 
   init() {
     this.useDevice = false;
@@ -130,7 +295,7 @@ export default class SearchDevices extends BaseMethod {
             // BLE discovery cannot provide a physical-device identity before initialization.
             uuid: '',
             deviceId: null,
-            name: bleName || device.name,
+            name: bleName || device.name || '',
             deviceType: getDeviceTypeByBleName(bleName),
           });
         }

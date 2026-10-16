@@ -4,8 +4,23 @@ import {
   TypedError,
   serializeError,
 } from './HardwareError';
+import { ERROR_CODES_REQUIRE_DISCONNECT, ERROR_CODES_REQUIRE_RELEASE } from './constants';
 
 describe('HardwareErrorCode compatibility', () => {
+  test.each([
+    ['TransportProtocolProbeFailed', 604, { expectedProtocol: 'V1' }],
+    ['TransportProtocolMismatch', 605, { expectedProtocol: 'V2', detectedProtocol: 'V1' }],
+  ] as const)('serializes the dedicated %s transport error', (name, code, params) => {
+    expect(HardwareErrorCode[name]).toBe(code);
+    const message = HardwareErrorCodeMessage[HardwareErrorCode[name]];
+    expect(message).toBeTruthy();
+    expect(ERROR_CODES_REQUIRE_RELEASE).toContain(code);
+    expect(ERROR_CODES_REQUIRE_DISCONNECT).toContain(code);
+    expect(
+      JSON.parse(JSON.stringify(serializeError({ error: TypedError(code, undefined, params) })))
+    ).toEqual({ code, error: message, params });
+  });
+
   test('preserves published Protocol V2 values while leaving code 829 unused', () => {
     expect(HardwareErrorCode).not.toHaveProperty('KaspaPrevTxIdMismatch');
     expect(HardwareErrorCode.DeviceLocked).toBe(830);

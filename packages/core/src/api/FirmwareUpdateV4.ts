@@ -352,13 +352,10 @@ const PROTOCOL_V2_TARGET_STATUS_BY_DECODED_NAME = new Map<string, number>([
   ['FW_MGMT_UPDATER_TASK_STATUS_FAILED_ENTRY_OUT_OF_BOUNDS', 10],
 ]);
 
-const isProtocolV2ReconnectProbeError = (error: unknown) => {
-  const message = getProtocolV2UnknownErrorText(error).toLowerCase();
-  return (
-    (message.includes('device protocol mismatch') && message.includes('expected v2')) ||
-    message.includes('did not respond to expected protocol')
-  );
-};
+const isProtocolV2ReconnectProbeError = (error: unknown) =>
+  getProtocolV2ErrorCode(error) === HardwareErrorCode.TransportProtocolProbeFailed &&
+  (error as { params?: { expectedProtocol?: unknown } } | undefined)?.params?.expectedProtocol ===
+    'V2';
 
 const isProtocolV2FirmwareStatusEndpointUnavailable = (error: unknown) => {
   const message = getProtocolV2UnknownErrorText(error).toLowerCase();

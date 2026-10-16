@@ -1,10 +1,16 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import EventEmitter from 'events';
-import { CORE_EVENT, UI_REQUEST, initCore } from '@onekeyfe/hd-core';
+import {
+  CORE_EVENT,
+  UI_REQUEST,
+  initCore,
+  probeUsbDeviceIdentitiesWithTransport,
+} from '@onekeyfe/hd-core';
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import HttpTransport from '@onekeyfe/hd-transport-http';
 
-import sdkExport, { messagePromises } from '../src';
+import sdkExport, { messagePromises, probeUsbDeviceIdentities } from '../src';
 
 jest.mock('../../core/src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0-test'),
@@ -15,9 +21,10 @@ jest.mock('@onekeyfe/hd-core', () => ({
   __esModule: true,
   default: (options: unknown) => options,
   initCore: jest.fn(),
+  probeUsbDeviceIdentitiesWithTransport: jest.fn(),
 }));
-jest.mock('@onekeyfe/hd-transport-http', () => ({}));
-jest.mock('@onekeyfe/hd-transport-web-device', () => ({}));
+jest.mock('@onekeyfe/hd-transport-http', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('@onekeyfe/hd-transport-web-device', () => ({ WebUsbTransport: jest.fn() }));
 jest.mock('@onekeyfe/hd-transport-lowlevel', () => ({}));
 jest.mock('@onekeyfe/hd-transport-emulator', () => ({}));
 
@@ -80,6 +87,45 @@ describe('SDK request cleanup', () => {
     first.reject(new Error('Connection failed'));
     await firstCall;
     expect(Object.keys(messagePromises)).toHaveLength(0);
+  });
+
+  test.each(['webusb'] as const)(
+    'probes %s without disposing an outstanding BLE request and coalesces concurrent probes',
+    async commType => {
+      const pending = createDeferred<unknown>();
+      const discovery = createDeferred<never[]>();
+      core.handleMessage.mockReturnValueOnce(pending.promise);
+      const request = sdk.call({ method: 'getDeviceState' });
+      jest
+        .mocked(probeUsbDeviceIdentitiesWithTransport)
+        .mockReset()
+        .mockReturnValueOnce(discovery.promise);
+      const initializationCount = jest.mocked(initCore).mock.calls.length;
+      const first = probeUsbDeviceIdentities({ commType });
+      const second = probeUsbDeviceIdentities({ commType });
+      expect(second).toBe(first);
+      expect(probeUsbDeviceIdentitiesWithTransport).toHaveBeenCalledTimes(1);
+      discovery.resolve([]);
+      await first;
+      expect(core.dispose).not.toHaveBeenCalled();
+      expect(initCore).toHaveBeenCalledTimes(initializationCount);
+      expect(core.listenerCount(CORE_EVENT)).toBe(1);
+      expect(Object.keys(messagePromises)).toHaveLength(1);
+      pending.resolve({ success: true, payload: {} });
+      await expect(request).resolves.toMatchObject({ success: true });
+      expect(Object.keys(messagePromises)).toHaveLength(0);
+    }
+  );
+
+  test('rejects the withdrawn Bridge probe without creating a transport or affecting BLE', async () => {
+    jest.mocked(HttpTransport).mockClear();
+    jest.mocked(probeUsbDeviceIdentitiesWithTransport).mockClear();
+    await expect(probeUsbDeviceIdentities({ commType: 'bridge' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+    });
+    expect(HttpTransport).not.toHaveBeenCalled();
+    expect(probeUsbDeviceIdentitiesWithTransport).not.toHaveBeenCalled();
+    expect(core.dispose).not.toHaveBeenCalled();
   });
 
   test('waits for Core disposal and does not retain old listeners after reinitialization', async () => {

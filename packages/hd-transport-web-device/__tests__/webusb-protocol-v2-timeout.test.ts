@@ -102,7 +102,7 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
   });
 
-  test('reports DeviceNotFound when automatic protocol detection exhausts both probes', async () => {
+  test('reports a typed probe failure when automatic detection exhausts both protocols', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'unresponsive-webusb';
     webusb.probeProtocolV1 = jest.fn().mockResolvedValue(false);
@@ -111,7 +111,7 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
 
     await expect(webusb.detectProtocol(path)).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceNotFound,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
     });
 
     expect(webusb.probeProtocolV1).toHaveBeenCalledTimes(1);
@@ -154,7 +154,20 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     expect(webusb.deviceProtocol.get(path)).toBe('V2');
   });
 
-  test('reports a device initialization failure only after the bounded retry is exhausted', async () => {
+  test('reports a strict V1 probe miss without falling back to another protocol', async () => {
+    const webusb = new WebUsbTransport() as any;
+    webusb.probeProtocolV1 = jest.fn().mockResolvedValue(false);
+    webusb.probeProtocolV2 = jest.fn();
+    webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
+    await expect(webusb.detectProtocol('classic-webusb', 'V1')).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+      params: { expectedProtocol: 'V1' },
+    });
+    expect(webusb.probeProtocolV2).not.toHaveBeenCalled();
+    expect(webusb.closeConnectionAfterProbe).toHaveBeenCalledTimes(1);
+  });
+
+  test('reports a typed protocol probe failure only after the bounded retry is exhausted', async () => {
     const webusb = new WebUsbTransport() as any;
     const path = 'pro2-webusb';
     webusb.probeProtocolV1 = jest.fn();
@@ -163,8 +176,8 @@ describe('WebUsbTransport Protocol V2 timeout recovery', () => {
     webusb.closeConnectionAfterProbe = jest.fn().mockResolvedValue(undefined);
 
     await expect(webusb.detectProtocol(path, 'V2')).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.DeviceInitializeFailed,
-      message: 'Protocol V2 probe timeout after 2 attempts',
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+      params: { expectedProtocol: 'V2', attempts: 2 },
     });
 
     expect(webusb.probeProtocolV2).toHaveBeenCalledTimes(2);

@@ -17,6 +17,7 @@ import HardwareSdk, {
   getLogger,
   initCore,
   parseConnectSettings,
+  probeUsbDeviceIdentitiesWithTransport,
   setLoggerPostMessage,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
@@ -32,6 +33,7 @@ import type {
   CoreMessage,
   LowLevelCoreApi,
   UiResponseEvent,
+  UsbDeviceIdentity,
 } from '@onekeyfe/hd-core';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
@@ -56,6 +58,37 @@ const getTransport = async (env: ConnectSettings['env']) => {
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
+
+const usbIdentityProbeTransports: Partial<Record<UsbDeviceIdentity['commType'], WebUsbTransport>> =
+  {};
+const usbIdentityProbes: Partial<
+  Record<UsbDeviceIdentity['commType'], Promise<UsbDeviceIdentity[]>>
+> = {};
+
+/** Identify WebUSB without disposing the current SDK, changing settings, or opening a wallet. */
+export const probeUsbDeviceIdentities = ({
+  commType,
+}: {
+  commType: UsbDeviceIdentity['commType'];
+}): Promise<UsbDeviceIdentity[]> => {
+  if (commType !== 'webusb') {
+    return Promise.reject(ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter));
+  }
+  const pending = usbIdentityProbes[commType];
+  if (pending) return pending;
+  let transport = usbIdentityProbeTransports[commType];
+  if (!transport) {
+    transport = new WebUsbTransport(true);
+    usbIdentityProbeTransports[commType] = transport;
+  }
+  const probe = probeUsbDeviceIdentitiesWithTransport(transport, commType, descriptor =>
+    _core?.getOwnedUsbDeviceIdentity(descriptor)
+  ).finally(() => {
+    delete usbIdentityProbes[commType];
+  });
+  usbIdentityProbes[commType] = probe;
+  return probe;
+};
 
 let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
