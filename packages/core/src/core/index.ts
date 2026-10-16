@@ -126,6 +126,8 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
 });
 
 let _core: Core | undefined;
+let transportSwitchGeneration = 0;
+let pendingTransportSwitch: Promise<void> = Promise.resolve();
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
@@ -991,15 +993,11 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
 }
 
 export function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
-  const typedError = error as { errorCode?: unknown; message?: unknown };
-  const message =
-    typeof typedError?.message === 'string' ? typedError.message : String(error ?? '');
+  const typedError = error as { errorCode?: unknown; params?: { expectedProtocol?: unknown } };
   return (
     method.payload.connectProtocol === 'V2' &&
-    typedError?.errorCode === HardwareErrorCode.RuntimeError &&
-    message.includes('Device protocol mismatch') &&
-    message.includes('expected V2') &&
-    message.includes('did not respond to expected protocol')
+    typedError?.errorCode === HardwareErrorCode.TransportProtocolProbeFailed &&
+    typedError.params?.expectedProtocol === 'V2'
   );
 }
 
@@ -1009,7 +1007,7 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   }
   const typedError = error as {
     errorCode?: unknown;
-    params?: { acquireDeadlineExceeded?: unknown };
+    params?: { acquireDeadlineExceeded?: unknown; expectedProtocol?: unknown };
   };
   if (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError &&
@@ -1020,6 +1018,8 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   return (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
     typedError?.errorCode === HardwareErrorCode.BleConnectedError ||
+    (typedError?.errorCode === HardwareErrorCode.TransportProtocolProbeFailed &&
+      !typedError.params?.expectedProtocol) ||
     isRetryableBleProtocolV2ProbeError(method, error) ||
     isMissingDetectedProtocolV2Error(method, error)
   );
@@ -1274,6 +1274,8 @@ const ensureConnected = async (
             HardwareErrorCode.BridgeTimeoutError,
             HardwareErrorCode.BridgeNeedsPermission,
             HardwareErrorCode.WebUsbDeviceAccessError,
+            HardwareErrorCode.TransportProtocolProbeFailed,
+            HardwareErrorCode.TransportProtocolMismatch,
           ].includes(error.errorCode)
         ) {
           _deviceList = undefined;
@@ -1361,6 +1363,8 @@ const ensureConnected = async (
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.BridgeNeedsPermission,
             HardwareErrorCode.WebUsbDeviceAccessError,
+            HardwareErrorCode.TransportProtocolProbeFailed,
+            HardwareErrorCode.TransportProtocolMismatch,
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
@@ -1964,6 +1968,8 @@ export default class Core extends EventEmitter {
 
   private async disposeResources(): Promise<void> {
     Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    transportSwitchGeneration += 1;
+    pendingTransportSwitch = Promise.resolve();
     pollingManager.stopAll();
     this.requestQueue.abortAllRequests();
     cleanup();
@@ -1998,6 +2004,8 @@ export default class Core extends EventEmitter {
 }
 
 export const initCore = () => {
+  transportSwitchGeneration += 1;
+  pendingTransportSwitch = Promise.resolve();
   const core = new Core();
   _core = core;
   return core;
@@ -2027,6 +2035,8 @@ export const init = async (
   plugin?: LowlevelTransportSharedPlugin
 ) => {
   try {
+    transportSwitchGeneration += 1;
+    pendingTransportSwitch = Promise.resolve();
     await DataManager.load(settings);
     initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
@@ -2043,8 +2053,6 @@ export const init = async (
   }
 };
 
-let pendingTransportSwitch: Promise<void> = Promise.resolve();
-
 export const switchTransport = ({
   env,
   Transport,
@@ -2054,12 +2062,19 @@ export const switchTransport = ({
   Transport: any;
   plugin?: LowlevelTransportSharedPlugin;
 }) => {
+  const generation = transportSwitchGeneration;
   // Preserve request order while native transport cleanup is pending.
   const switching = pendingTransportSwitch
     .catch(() => undefined)
     .then(async () => {
+      if (generation !== transportSwitchGeneration) {
+        throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+      }
       _connector?.stop();
       await TransportManager.getTransport()?.stop?.();
+      if (generation !== transportSwitchGeneration) {
+        throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+      }
       DataManager.updateEnv(env);
       TransportManager.setTransport(Transport, plugin);
       _deviceList = undefined;

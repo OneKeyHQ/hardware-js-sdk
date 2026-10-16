@@ -44,6 +44,8 @@ export const isKnownTrezorWebUsbDevice = (descriptor: WebUsbIdentityDescriptor):
  */
 export const ERROR_CODES_REQUIRE_RELEASE = [
   HardwareErrorCode.WebUsbDeviceAccessError,
+  HardwareErrorCode.TransportProtocolProbeFailed,
+  HardwareErrorCode.TransportProtocolMismatch,
   HardwareErrorCode.DeviceInitializeFailed,
   HardwareErrorCode.DeviceInterruptedFromOutside,
   HardwareErrorCode.DeviceInterruptedFromUser,
@@ -60,6 +62,8 @@ export const ERROR_CODES_REQUIRE_RELEASE = [
  */
 export const ERROR_CODES_REQUIRE_DISCONNECT = [
   HardwareErrorCode.WebUsbDeviceAccessError,
+  HardwareErrorCode.TransportProtocolProbeFailed,
+  HardwareErrorCode.TransportProtocolMismatch,
   HardwareErrorCode.DeviceInitializeFailed,
   HardwareErrorCode.ResponseUnexpectTypeError,
 ] as const;

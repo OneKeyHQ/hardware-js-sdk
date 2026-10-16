@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
+const { HardwareErrorCode } = require('@onekeyfe/hd-shared');
+
 const LowlevelTransport = require('../src').default;
 const { parseConfigure } = require('../../hd-transport/src/serialization/protobuf/messages');
 const { ProtocolV1, ProtocolV2 } = require('../../hd-transport/src/protocols');
@@ -538,8 +540,11 @@ describe('LowlevelTransport protocol framing', () => {
     });
     const lowlevel = configureTransport(plugin);
 
-    await expect(lowlevel.acquire({ uuid: 'v2-id', expectedProtocol: 'V1' })).rejects.toThrow(
-      'Device protocol mismatch: expected V1'
+    await expect(lowlevel.acquire({ uuid: 'v2-id', expectedProtocol: 'V1' })).rejects.toMatchObject(
+      {
+        errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+        params: { expectedProtocol: 'V1' },
+      }
     );
   });
 
@@ -553,9 +558,9 @@ describe('LowlevelTransport protocol framing', () => {
     });
     const lowlevel = configureTransport(plugin);
 
-    await expect(lowlevel.acquire({ uuid: 'flaky-pro2-id' })).rejects.toThrow(
-      'Unable to detect BLE protocol'
-    );
+    await expect(lowlevel.acquire({ uuid: 'flaky-pro2-id' })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+    });
     expect(lowlevel.getProtocolType('flaky-pro2-id')).toBeUndefined();
   });
 });

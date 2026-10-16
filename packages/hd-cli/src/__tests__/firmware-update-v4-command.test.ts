@@ -1,3 +1,5 @@
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { createSDK, disposeSDK } from '../sdk';
 import { program, runFirmwareUpdateV4WithRetry } from '../cli';
 
@@ -9,7 +11,9 @@ jest.mock('../sdk', () => ({
 const transientProbeFailure = {
   success: false,
   payload: {
-    error: 'Device protocol mismatch: expected V2; device did not respond to expected protocol',
+    code: HardwareErrorCode.TransportProtocolProbeFailed,
+    error: 'probe diagnostic wording may change',
+    params: { expectedProtocol: 'V2' },
   },
 };
 

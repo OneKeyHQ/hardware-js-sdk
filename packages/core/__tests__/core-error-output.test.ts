@@ -46,6 +46,23 @@ describe('Core 错误输出边界', () => {
   });
 
   test.each([
+    [HardwareErrorCode.TransportProtocolProbeFailed, { expectedProtocol: 'V1' }],
+    [
+      HardwareErrorCode.TransportProtocolMismatch,
+      { expectedProtocol: 'V2', detectedProtocol: 'V1' },
+    ],
+  ] as const)(
+    'preserves protocol error %s and structured context across the public boundary',
+    (code, params) => {
+      const error = ERRORS.TypedError(code, undefined, params);
+      expect(JSON.parse(JSON.stringify(createErrorMessage(error)))).toEqual({
+        success: false,
+        payload: { code, error: error.message, params },
+      });
+    }
+  );
+
+  test.each([
     ['webusb', false],
     ['desktop-webusb', false],
     ['desktop-webusb', true],
@@ -129,6 +146,8 @@ describe('Core 错误输出边界', () => {
     HardwareErrorCode.BleUnsupported,
     HardwareErrorCode.BridgeNeedsPermission,
     HardwareErrorCode.WebUsbDeviceAccessError,
+    HardwareErrorCode.TransportProtocolProbeFailed,
+    HardwareErrorCode.TransportProtocolMismatch,
   ])(
     'preserves terminal transport error %s in the public response without polling again',
     async errorCode => {
@@ -138,6 +157,8 @@ describe('Core 错误输出边界', () => {
           [
             HardwareErrorCode.BridgeNeedsPermission,
             HardwareErrorCode.WebUsbDeviceAccessError,
+            HardwareErrorCode.TransportProtocolProbeFailed,
+            HardwareErrorCode.TransportProtocolMismatch,
           ].includes(errorCode)
             ? ('desktop-webusb' as never)
             : ('react-native' as never)

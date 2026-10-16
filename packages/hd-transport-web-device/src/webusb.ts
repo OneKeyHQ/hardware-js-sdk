@@ -546,21 +546,20 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * fall back to a Protocol V2 Ping probe.
    */
   private createProtocolMismatchError(expected: ProtocolType) {
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+    });
   }
 
   private createProtocolProbeTimeoutError(expected: ProtocolType, attempts: number) {
-    return ERRORS.TypedError(
-      HardwareErrorCode.DeviceInitializeFailed,
-      `Protocol ${expected} probe timeout after ${attempts} attempts`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+      attempts,
+    });
   }
 
   private createProtocolDetectionError() {
-    return ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed);
   }
 
   private async detectProtocol(

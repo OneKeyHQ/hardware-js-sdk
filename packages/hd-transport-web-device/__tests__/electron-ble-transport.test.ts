@@ -561,9 +561,9 @@ describe('ElectronBleTransport protocol detection', () => {
 
     const transport = configureTransport(nobleBle);
 
-    await expect(transport.acquire({ uuid: device.id })).rejects.toThrow(
-      /Unable to detect BLE protocol/
-    );
+    await expect(transport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+    });
     expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
     expect(transport.getProtocolType(device.id)).toBeUndefined();
@@ -629,7 +629,8 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+      params: { expectedProtocol: 'V2' },
     });
 
     expect(nobleBle.connect).toHaveBeenCalledTimes(1);
@@ -645,12 +646,14 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+      params: { expectedProtocol: 'V2' },
     });
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+      params: { expectedProtocol: 'V2' },
     });
 
     expect(transport.getProtocolType(device.id)).toBeUndefined();
@@ -755,7 +758,8 @@ describe('ElectronBleTransport protocol detection', () => {
     await expect(
       transport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
     ).rejects.toMatchObject({
-      errorCode: HardwareErrorCode.RuntimeError,
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+      params: { expectedProtocol: 'V2' },
     });
 
     expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
