@@ -87,6 +87,7 @@ export const getOwnedUsbDeviceIdentity = (
     deviceType: owner.getCurrentDeviceType(),
     connectProtocol: owner.getProtocol(),
     commType: 'webusb',
+    mode: owner.features?.mode ?? undefined,
   };
 };
 
@@ -149,7 +150,14 @@ export const probeUsbDeviceIdentitiesWithTransport = async (
         const response = await transport.call(session, 'GetFeatures', {}, { timeoutMs: 3000 });
         if (response.type !== 'Features') return undefined;
         let features = buildProtocolV1FeaturesPayload(response.message as PROTO.Features);
-        if (!features.serialNo) {
+        // Classic-family loaders expose their supported information in Features.
+        // Touch/Pro retain their existing vendor-feature query.
+        if (
+          !features.serialNo &&
+          (features.mode !== 'bootloader' ||
+            features.deviceType === EDeviceType.Touch ||
+            features.deviceType === EDeviceType.Pro)
+        ) {
           const { messages, protocolV1MessageSchema } = getSupportProtocolV1MessageSchema(features);
           // Legacy V1 has no OnekeyGetFeatures; keep the identity confirmed by GetFeatures.
           if (protocolV1MessageSchema === 'v1CurrentSchema') {
@@ -175,6 +183,7 @@ export const probeUsbDeviceIdentitiesWithTransport = async (
           deviceType: features.deviceType,
           connectProtocol: 'V1',
           commType,
+          mode: features.mode ?? undefined,
         };
       } else if (protocol === 'V2') {
         const response = await transport.call(

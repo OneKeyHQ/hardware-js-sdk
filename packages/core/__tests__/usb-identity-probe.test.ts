@@ -55,6 +55,7 @@ describe('isolated USB identity probe', () => {
           deviceType: EDeviceType.Classic1s,
           connectProtocol: 'V1',
           commType: 'webusb',
+          mode: 'normal',
         },
       ]);
       expect(DataManager.settings).toBe(settings);
@@ -192,6 +193,70 @@ describe('isolated USB identity probe', () => {
       [{ path: 'USB_DESCRIPTOR_PATH', serialNo: null, deviceId: null }]
     );
   });
+
+  test.each([
+    ['CLASSIC1S', EDeviceType.Classic1s],
+    ['PURE', EDeviceType.ClassicPure],
+  ])(
+    'retains %s bootloader state without querying unsupported vendor features',
+    async (model, deviceType) => {
+      const transport = createTransport();
+      const path = '000000000000000000000000';
+      transport.enumerate.mockResolvedValue([{ ...descriptor, path }]);
+      transport.call.mockImplementation((_session, method) => {
+        if (method !== 'GetFeatures')
+          return Promise.reject(new Error('Unsupported loader query timed out'));
+        return Promise.resolve({
+          type: 'Features',
+          message: {
+            onekey_device_type: model,
+            model: '1',
+            bootloader_mode: true,
+            firmware_present: true,
+            major_version: 3,
+            minor_version: 0,
+            patch_version: 0,
+          },
+        });
+      });
+      await expect(probeUsbDeviceIdentitiesWithTransport(transport, 'webusb')).resolves.toEqual([
+        {
+          path,
+          serialNo: null,
+          deviceId: null,
+          deviceType,
+          mode: 'bootloader',
+          connectProtocol: 'V1',
+          commType: 'webusb',
+        },
+      ]);
+      expect(transport.call.mock.calls.map(call => call[1])).toEqual(['GetFeatures']);
+      expect(transport.release).toHaveBeenCalledWith('usb-transport-handle', false);
+    }
+  );
+
+  test.each(['TOUCH', 'PRO'])(
+    'preserves the existing %s loader vendor-identity query',
+    async model => {
+      const transport = createTransport();
+      transport.call
+        .mockResolvedValueOnce({
+          type: 'Features',
+          message: { onekey_device_type: model, bootloader_mode: true },
+        })
+        .mockResolvedValueOnce({
+          type: 'OnekeyFeatures',
+          message: { onekey_serial_no: 'VENDOR_SERIAL' },
+        });
+      await expect(
+        probeUsbDeviceIdentitiesWithTransport(transport, 'webusb')
+      ).resolves.toMatchObject([{ serialNo: 'VENDOR_SERIAL', mode: 'bootloader' }]);
+      expect(transport.call.mock.calls.map(call => call[1])).toEqual([
+        'GetFeatures',
+        'OnekeyGetFeatures',
+      ]);
+    }
+  );
 
   test.each([
     { ...descriptor, device: { opened: true } },

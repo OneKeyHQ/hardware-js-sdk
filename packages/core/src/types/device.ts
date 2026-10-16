@@ -93,6 +93,8 @@ export type UsbDeviceIdentity = {
   deviceType: IDeviceType;
   connectProtocol: HardwareConnectProtocol;
   commType: 'webusb' | 'bridge';
+  /** Mode confirmed by the device response; absent when discovery cannot establish it. */
+  mode?: DeviceStateMode;
 };
 
 // export type UnknownDevice = {
