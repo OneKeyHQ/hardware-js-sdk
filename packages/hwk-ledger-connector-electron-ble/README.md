@@ -25,10 +25,3 @@ This package does not depend on the Trezor connector, Electron or noble, and doe
 not register IPC handlers or instantiate a native Bluetooth backend. The host
 owns the shared native instance, preload IPC, sender validation and pairing
 authorization. Ledger MTU negotiation and APDU framing remain in this package.
-
-## Validation
-
-Run `yarn test --runInBand`, `yarn build`, and `yarn verify:types` in this package.
-The transport tests use a synthetic bridge; they do not establish physical-device
-compatibility. Hardware validation must cover discovery, initialized request /
-response, disconnect, and reconnect for each vendor.
