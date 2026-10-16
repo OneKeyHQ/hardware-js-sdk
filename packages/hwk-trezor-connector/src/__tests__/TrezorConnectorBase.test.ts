@@ -3950,3 +3950,34 @@ describe('TrezorConnectorBase', () => {
     ).resolves.toBe('1234');
   });
 });
+
+describe('TrezorConnectorBase Bluetooth bootloader refusal', () => {
+  const frames = (name: string, data: Record<string, unknown>) => {
+    const bytes = buildMessage({ name, data, protocol: protocolV1 });
+    const [, chunkHeader] = protocolV1.getHeaders(bytes);
+    return createChunks(bytes, chunkHeader, 64);
+  };
+
+  it.each([
+    ['PinMatrixRequest', { type: 'PinMatrixRequestType_Current' }],
+    ['PassphraseRequest', {}],
+  ])('reports a %s from a bootloader peer as ThpPairingFailed', async (name, data) => {
+    const connector = new TestTrezorConnector(
+      [{ connectId: 'ble-1', deviceId: '', name: 'Trezor Safe 7', model: 'T3W1' }],
+      [[...featuresResponse({ bootloader_mode: true, model: 'T3W1' }), ...frames(name, data)]]
+    );
+    const { sessionId } = await connector.connect('ble-1');
+
+    const result = await connector.call(sessionId, 'evmGetAddress', {
+      path: "m/44'/60'/0'/0/0",
+      showOnDevice: false,
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    // The code must survive the trip to the adapter, including a host IPC hop.
+    expect(rehydrateConnectorError(JSON.parse(JSON.stringify(result.error)))).toMatchObject({
+      code: HardwareErrorCode.ThpPairingFailed,
+    });
+  });
+});

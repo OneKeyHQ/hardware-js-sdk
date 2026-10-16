@@ -498,7 +498,13 @@ export abstract class TrezorConnectorBase implements IConnector {
         durationMs: Date.now() - startedAt,
         error: errorToLog(error),
       });
-      return { success: false, error: serializeConnectorError(error) };
+      const serialized = serializeConnectorError(error);
+      // The device session marks a refused Bluetooth link with a string code, which serialization
+      // drops; keep it as the public code, as a refusal at connect already reports.
+      if ((error as { code?: unknown } | null)?.code === 'ThpPairingFailed') {
+        serialized.code = HardwareErrorCode.ThpPairingFailed;
+      }
+      return { success: false, error: serialized };
     }
   }
 
