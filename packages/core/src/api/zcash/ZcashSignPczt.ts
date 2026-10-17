@@ -11,9 +11,9 @@ import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommand
 import type { ZcashSignedPczt } from '../../types/api/zcashSignPczt';
 import type { DeviceFirmwareRange } from '../../types';
 
-// Firmware buffers the whole PCZT in RAM in both directions.
-export const ZCASH_PCZT_MAX_BYTES = 24 * 1024;
 const CHUNK_BYTE_SIZE = 1024;
+// Host memory sanity bound on the device-announced length, not a device limit.
+const SIGNED_PCZT_SANITY_MAX_BYTES = 16 * 1024 * 1024;
 
 export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
   pczt: Buffer = Buffer.alloc(0);
@@ -32,9 +32,6 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
     this.pczt = Buffer.from(formatAnyHex(this.payload.pczt), 'hex');
     if (this.pczt.length === 0) {
       throw invalidParameter('pczt is empty');
-    }
-    if (this.pczt.length > ZCASH_PCZT_MAX_BYTES) {
-      throw invalidParameter(`pczt exceeds ${ZCASH_PCZT_MAX_BYTES} bytes (${this.pczt.length})`);
     }
 
     this.params = {
@@ -99,7 +96,7 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
     res: TypedResponseMessage<'ZcashSignedPczt'>
   ): Promise<Buffer> => {
     const { pczt_length: total, pczt_initial_chunk: initial } = res.message;
-    if (!Number.isSafeInteger(total) || total <= 0 || total > ZCASH_PCZT_MAX_BYTES) {
+    if (!Number.isSafeInteger(total) || total <= 0 || total > SIGNED_PCZT_SANITY_MAX_BYTES) {
       throw ERRORS.TypedError(
         HardwareErrorCode.ResponseUnexpectTypeError,
         `device announced invalid signed pczt length ${total}`
