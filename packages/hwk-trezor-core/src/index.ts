@@ -897,10 +897,12 @@ export class TrezorDeviceSession {
     const response = await this.core!.call('Initialize', {});
     this.currentFeatures = expectMessage(response, 'Features').message;
     this.thpAppSessionActive = false;
-    if (passphraseMode === 'empty' && this.currentFeatures?.passphrase_protection == null) {
-      // Locked firmware (core >= 2.4.3) hides these settings until a silent testnet GetAddress
-      // (supported by every build, as in hd-core); its result is discarded. With the passphrase
-      // always entered on the device this costs one extra prompt before the refusal below.
+    if (passphraseMode === 'empty') {
+      // A locked device's passphrase settings are not trustworthy (hidden by core >= 2.4.3,
+      // reported as false by older builds), so always unlock with a silent testnet GetAddress
+      // (supported by every build, as in hd-core) and re-read them; its result is discarded.
+      // With the passphrase always entered on the device this costs one extra prompt before
+      // the refusal below.
       expectMessage(
         await this.call('GetAddress', {
           address_n: [0x8000002c, 0x80000001, 0x80000000, 0, 0],

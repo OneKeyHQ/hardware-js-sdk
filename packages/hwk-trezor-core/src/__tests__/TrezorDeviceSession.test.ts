@@ -584,6 +584,52 @@ describe('TrezorDeviceSession', () => {
   ])(
     'v1 empty-passphrase session with protection=%s and always-on-device=%s refuses: %s',
     async (passphraseProtection, alwaysOnDevice, refuses) => {
+      const settings = {
+        ...features,
+        passphrase_protection: passphraseProtection,
+        passphrase_always_on_device: alwaysOnDevice,
+      };
+      const calls: CallRecord[] = [];
+      const session = new TrezorDeviceSession({
+        transport: new EmptyTransport(),
+        connectionType: 'usb',
+        coreFactory: createFactory(calls, [
+          { type: 'Features', message: features },
+          { type: 'Features', message: settings },
+          { type: 'Address', message: { address: 'tb1q' } },
+          { type: 'Features', message: settings },
+        ]),
+      });
+      await session.initialize();
+
+      const created = session.createV1AppSession({ passphraseMode: 'empty' });
+
+      if (refuses) {
+        await expect(created).rejects.toMatchObject({
+          name: 'TrezorFailureError',
+          code: 'Failure_DataError',
+          message: expect.stringContaining('PASSPHRASE_ALWAYS_ON_DEVICE'),
+        });
+      } else {
+        await expect(created).resolves.toBeUndefined();
+      }
+      // Reported settings are not trusted: the session always unlocks and re-reads them.
+      expect(calls.map(call => call.name)).toEqual([
+        'Initialize',
+        'Initialize',
+        'GetAddress',
+        'GetFeatures',
+      ]);
+    }
+  );
+
+  test.each([
+    [true, true],
+    [true, false],
+    [false, false],
+  ])(
+    'v1 empty-passphrase session on a locked device that reports protection=false unlocks first, then with protection=%s refuses always-on-device=%s',
+    async (passphraseProtection, alwaysOnDevice) => {
       const calls: CallRecord[] = [];
       const session = new TrezorDeviceSession({
         transport: new EmptyTransport(),
@@ -592,8 +638,14 @@ describe('TrezorDeviceSession', () => {
           { type: 'Features', message: features },
           {
             type: 'Features',
+            message: { ...features, unlocked: false, passphrase_protection: false },
+          },
+          { type: 'Address', message: { address: 'tb1q' } },
+          {
+            type: 'Features',
             message: {
               ...features,
+              unlocked: true,
               passphrase_protection: passphraseProtection,
               passphrase_always_on_device: alwaysOnDevice,
             },
@@ -604,9 +656,8 @@ describe('TrezorDeviceSession', () => {
 
       const created = session.createV1AppSession({ passphraseMode: 'empty' });
 
-      if (refuses) {
+      if (passphraseProtection && alwaysOnDevice) {
         await expect(created).rejects.toMatchObject({
-          name: 'TrezorFailureError',
           code: 'Failure_DataError',
           message: expect.stringContaining('PASSPHRASE_ALWAYS_ON_DEVICE'),
         });
