@@ -1,5 +1,10 @@
 import { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
 
+import { debugLog } from '../../utils/debugLog';
+
+import type { ConnectorContext } from './types';
+import type { CancelReason } from '../../signer/deviceActionToPromise';
+
 /**
  * Strip the "m/" prefix from BIP-44 derivation paths.
  * Ledger DMK requires paths without the "m/" prefix.
@@ -38,5 +43,44 @@ export function collapseSignerInteraction(interaction: string): CollapsedSignerI
       return EConnectorInteraction.InteractionComplete;
     default:
       return EConnectorInteraction.ConfirmOnDevice;
+  }
+}
+
+interface IInteractiveSigner {
+  onInteraction?: (interaction: string) => void;
+  onRegisterCanceller?: (cancel: (reason?: CancelReason) => void) => void;
+}
+
+/** Forward a signer's DMK interactions and canceller to the connector session. */
+export function wireSignerToSession<T extends IInteractiveSigner>(
+  ctx: ConnectorContext,
+  sessionId: string,
+  chain: string,
+  signer: T
+): T {
+  signer.onInteraction = (interaction: string) => {
+    debugLog(`[LedgerConnector] ${chain}.onInteraction:`, interaction);
+    ctx.emit('ui-event', {
+      type: collapseSignerInteraction(interaction),
+      payload: { sessionId },
+    });
+  };
+  signer.onRegisterCanceller = cancel => ctx.registerCanceller(sessionId, cancel);
+  return signer;
+}
+
+/** Run a signer call; on failure invalidate the session, always clear the canceller. */
+export async function runSignerCall<T>(
+  ctx: ConnectorContext,
+  sessionId: string,
+  call: () => Promise<T>
+): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }

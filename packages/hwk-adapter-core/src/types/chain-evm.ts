@@ -1,6 +1,7 @@
 import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
 import type { IHardwareCallParams, NullableCallArg } from './wallet';
+import type { ExportedAccountKey } from './qr';
 
 export interface EvmGetAddressParams extends PassphraseStateAware {
   path: string;
@@ -14,6 +15,8 @@ export interface EvmAddress {
   path: string;
   /** Device-reported secp256k1 public key; populated when the transport exposes it. */
   publicKey?: string;
+  /** Set by air-gapped wallets (Keystone): the exported key this address derives from. */
+  accountKey?: ExportedAccountKey;
 }
 
 interface EvmSignTxBaseParams extends PassphraseStateAware {
@@ -129,6 +132,11 @@ export interface EvmSignTypedDataFull extends PassphraseStateAware {
     primaryType: string;
     message: Record<string, unknown>;
   };
+  /**
+   * The dApp's original EIP-712 JSON, byte for byte. Serializing vendors (Keystone) must prefer it:
+   * re-stringifying `data` rewrites integers wider than 2^53 and exponent forms.
+   */
+  dataJson?: string;
   metamaskV4Compat?: boolean;
   showMessageHash?: boolean;
   /**

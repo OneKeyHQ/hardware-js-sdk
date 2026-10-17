@@ -18,11 +18,6 @@ module.exports = {
     'max-classes-per-file': 'off',
     'no-useless-constructor': 'off',
     'no-new': 'off',
-    // `electron` / `@stoprocent/noble` are optional native deps required lazily at runtime.
-    'global-require': 'off',
-    '@typescript-eslint/no-var-requires': 'off',
-    'import/no-dynamic-require': 'off',
-    'import/no-unresolved': ['error', { ignore: ['^electron$'] }],
   },
   ignorePatterns: ['tsup.config.ts', 'jest.config.js', '.eslintrc.js'],
 };

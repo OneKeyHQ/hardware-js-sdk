@@ -1,14 +1,11 @@
 import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
-import { deviceActionToPromise } from './deviceActionToPromise';
+import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 import { debugLog } from '../utils/debugLog';
 
 import type { CancelReason } from './deviceActionToPromise';
 import type { SignerEth as ISdkSignerEth, TypedData } from '@ledgerhq/device-signer-kit-ethereum';
 import type { SignerEvmAddress, SignerEvmSignature } from '../types';
-
-/** Timeout for user-interactive operations (verify address, sign). */
-const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 
 /**
  * Wraps Ledger's SDK signer (Observable-based DeviceActions) into
