@@ -3,7 +3,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
 import { invalidParameter, validateParams } from '../helpers/paramsValidator';
-import { formatAnyHex } from '../helpers/hexUtils';
+import { stripHexPrefix } from '../helpers/hexUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 
 import type { ZcashSignPczt as HardwareZcashSignPczt } from '@onekeyfe/hd-transport';
@@ -29,7 +29,12 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
 
     validateParams(this.payload, [{ name: 'pczt', type: 'hexString', required: true }]);
 
-    this.pczt = Buffer.from(formatAnyHex(this.payload.pczt), 'hex');
+    // Reject odd-length hex instead of left-padding it, which would shift every nibble.
+    const pcztHex = stripHexPrefix(this.payload.pczt);
+    if (pcztHex.length % 2 !== 0) {
+      throw invalidParameter('pczt hex must have an even length');
+    }
+    this.pczt = Buffer.from(pcztHex, 'hex');
     if (this.pczt.length === 0) {
       throw invalidParameter('pczt is empty');
     }
@@ -118,10 +123,10 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
         chunk_length: chunkLength,
       });
       const chunk = Buffer.from(ack.message.data_chunk ?? '', 'hex');
-      if (chunk.length === 0 || received + chunk.length > total) {
+      if (chunk.length !== chunkLength) {
         throw ERRORS.TypedError(
           HardwareErrorCode.ResponseUnexpectTypeError,
-          `device returned ${chunk.length} bytes at offset ${received} of ${total}`
+          `device returned ${chunk.length} of ${chunkLength} requested bytes at offset ${received} of ${total}`
         );
       }
       parts.push(chunk);

@@ -1,3 +1,5 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import ZcashSignPczt from '../src/api/zcash/ZcashSignPczt';
 import ZcashGetAddress from '../src/api/zcash/ZcashGetAddress';
 
@@ -135,6 +137,165 @@ describe('ZcashSignPczt', () => {
     const method = createSignMethod(hex(0x00, 64 * 1024));
     expect(() => method.init()).not.toThrow();
     expect(method.params.pczt_length).toBe(64 * 1024);
+  });
+});
+
+describe('ZcashSignPczt protocol edge cases', () => {
+  const signedMessage = (signed: Buffer, initialLength = 1024) => ({
+    type: 'ZcashSignedPczt',
+    message: {
+      pczt_length: signed.length,
+      pczt_initial_chunk: signed.subarray(0, initialLength).toString('hex'),
+    },
+  });
+
+  const runWith = (pczt: string, typedCall: jest.Mock) => {
+    const method = createSignMethod(pczt);
+    method.init();
+    attachDevice(method, typedCall);
+    return method.run();
+  };
+
+  test.each([
+    { name: 'short', data: hex(0xcd, 100) },
+    { name: 'empty', data: '' },
+    { name: 'missing', data: undefined },
+  ])('rejects a $name download chunk', async ({ data }) => {
+    const signed = Buffer.alloc(1500, 0xcd);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce(signedMessage(signed))
+      .mockResolvedValueOnce({ type: 'ZcashPcztChunkAck', message: { data_chunk: data } });
+
+    await expect(runWith(hex(0x01, 100), typedCall)).rejects.toThrow(
+      'requested bytes at offset 1024 of 1500'
+    );
+    expect(typedCall).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects a download chunk longer than requested', async () => {
+    const signed = Buffer.alloc(1500, 0xcd);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce(signedMessage(signed))
+      .mockResolvedValueOnce({
+        type: 'ZcashPcztChunkAck',
+        message: { data_chunk: hex(0xcd, 477) },
+      });
+
+    await expect(runWith(hex(0x01, 100), typedCall)).rejects.toThrow(
+      'device returned 477 of 476 requested bytes'
+    );
+  });
+
+  test.each([0, -1, 1.5, Number.NaN])(
+    'rejects a device upload request for chunk length %s',
+    async chunkLength => {
+      const typedCall = jest.fn().mockResolvedValueOnce({
+        type: 'ZcashPcztChunkRequest',
+        message: { chunk_length: chunkLength },
+      });
+
+      await expect(runWith(hex(0x01, 2000), typedCall)).rejects.toThrow(
+        `device requested ${chunkLength} bytes at offset 1024`
+      );
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test('propagates a device Failure in the middle of upload', async () => {
+    const failure = ERRORS.TypedError(
+      HardwareErrorCode.ActionCancelled,
+      'Action cancelled by user'
+    );
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'ZcashPcztChunkRequest', message: { chunk_length: 500 } })
+      .mockRejectedValueOnce(failure);
+
+    await expect(runWith(hex(0x01, 2000), typedCall)).rejects.toBe(failure);
+    expect(typedCall).toHaveBeenCalledTimes(2);
+  });
+
+  test('propagates a device Failure in the middle of download', async () => {
+    const failure = ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Firmware error');
+    const signed = Buffer.alloc(3000, 0xcd);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce(signedMessage(signed))
+      .mockResolvedValueOnce({
+        type: 'ZcashPcztChunkAck',
+        message: { data_chunk: signed.subarray(1024, 2048).toString('hex') },
+      })
+      .mockRejectedValueOnce(failure);
+
+    await expect(runWith(hex(0x01, 100), typedCall)).rejects.toBe(failure);
+    expect(typedCall).toHaveBeenCalledTimes(3);
+  });
+
+  test('exactly 1024 bytes in both directions needs no extra chunks', async () => {
+    const signed = Buffer.alloc(1024, 0xcd);
+    const typedCall = jest.fn().mockResolvedValueOnce(signedMessage(signed));
+
+    await expect(runWith(hex(0xab, 1024), typedCall)).resolves.toEqual({
+      pczt: signed.toString('hex'),
+    });
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][2]).toEqual({
+      pczt_length: 1024,
+      pczt_initial_chunk: hex(0xab, 1024),
+    });
+  });
+
+  test('1025 bytes in both directions splits into 1024 + 1', async () => {
+    const pczt = `${hex(0xab, 1024)}ef`;
+    const signed = Buffer.concat([Buffer.alloc(1024, 0xcd), Buffer.from([0x99])]);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'ZcashPcztChunkRequest', message: { chunk_length: 1 } })
+      .mockResolvedValueOnce(signedMessage(signed))
+      .mockResolvedValueOnce({ type: 'ZcashPcztChunkAck', message: { data_chunk: '99' } });
+
+    await expect(runWith(pczt, typedCall)).resolves.toEqual({ pczt: signed.toString('hex') });
+    expect(typedCall.mock.calls[0][2]).toEqual({
+      pczt_length: 1025,
+      pczt_initial_chunk: hex(0xab, 1024),
+    });
+    expect(typedCall.mock.calls[1][2]).toEqual({ data_chunk: 'ef' });
+    expect(typedCall.mock.calls[2][2]).toEqual({ chunk_length: 1 });
+  });
+
+  test('2048 bytes in both directions uses one full 1024-byte chunk each way', async () => {
+    const signed = Buffer.alloc(2048, 0xcd);
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ type: 'ZcashPcztChunkRequest', message: { chunk_length: 1024 } })
+      .mockResolvedValueOnce(signedMessage(signed))
+      .mockResolvedValueOnce({
+        type: 'ZcashPcztChunkAck',
+        message: { data_chunk: signed.subarray(1024).toString('hex') },
+      });
+
+    await expect(runWith(hex(0xab, 2048), typedCall)).resolves.toEqual({
+      pczt: signed.toString('hex'),
+    });
+    expect(typedCall.mock.calls[1][2]).toEqual({ data_chunk: hex(0xab, 1024) });
+    expect(typedCall.mock.calls[2][2]).toEqual({ chunk_length: 1024 });
+    expect(typedCall).toHaveBeenCalledTimes(3);
+  });
+
+  test.each(['abc', '0xabc', 'a'])('rejects odd-length hex %s', pczt => {
+    expect(() => createSignMethod(pczt).init()).toThrow('pczt hex must have an even length');
+  });
+
+  test.each(['zz', '0xgg', 'ab cd'])('rejects non-hex input %s', pczt => {
+    expect(() => createSignMethod(pczt).init()).toThrow('should be [hexString]');
+  });
+
+  test('accepts a 0x-prefixed even-length hex string', () => {
+    const method = createSignMethod('0xABcd');
+    method.init();
+    expect(method.params).toEqual({ pczt_length: 2, pczt_initial_chunk: 'abcd' });
   });
 });
 

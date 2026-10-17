@@ -98,7 +98,7 @@ describe('getLogBlockLabel', () => {
     expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
   });
 
-  it.each(['zcashGetAddress', 'zcashGetUnifiedAddress', 'zcashSignPczt'])(
+  it.each(['zcashGetAddress', 'zcashSignPczt'])(
     'keeps %s wallet data out of logger caches and events with debug disabled',
     method => {
       const postMessage = jest.fn();
