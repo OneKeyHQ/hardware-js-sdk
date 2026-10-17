@@ -1,4 +1,4 @@
-import ZcashSignPczt, { ZCASH_PCZT_MAX_BYTES } from '../src/api/zcash/ZcashSignPczt';
+import ZcashSignPczt from '../src/api/zcash/ZcashSignPczt';
 import ZcashGetAddress from '../src/api/zcash/ZcashGetAddress';
 
 import type { Device } from '../src/device/Device';
@@ -117,10 +117,24 @@ describe('ZcashSignPczt', () => {
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
 
-  test('rejects oversized and empty input', () => {
-    expect(() => createSignMethod('').init()).toThrow();
-    expect(() => createSignMethod(hex(0x00, ZCASH_PCZT_MAX_BYTES + 1)).init()).toThrow('exceeds');
-    expect(() => createSignMethod(hex(0x00, ZCASH_PCZT_MAX_BYTES)).init()).not.toThrow();
+  test('rejects an announced signed length that is not a sane positive size', async () => {
+    for (const total of [0, 1.5, 16 * 1024 * 1024 + 1]) {
+      const method = createSignMethod(hex(0x01, 100));
+      method.init();
+      const typedCall = jest.fn().mockResolvedValueOnce({
+        type: 'ZcashSignedPczt',
+        message: { pczt_length: total, pczt_initial_chunk: '' },
+      });
+      attachDevice(method, typedCall);
+      await expect(method.run()).rejects.toThrow('invalid signed pczt length');
+    }
+  });
+
+  test('rejects empty input and leaves size limits to the device', () => {
+    expect(() => createSignMethod('').init()).toThrow('pczt is empty');
+    const method = createSignMethod(hex(0x00, 64 * 1024));
+    expect(() => method.init()).not.toThrow();
+    expect(method.params.pczt_length).toBe(64 * 1024);
   });
 });
 
