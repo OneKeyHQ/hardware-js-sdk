@@ -88,6 +88,11 @@ type WebUsbHandleOperation =
 
 type WebUsbLifecyclePhase = 'start' | 'success' | 'error' | 'skipped';
 
+interface WebUsbConnectOptions {
+  expectedProtocol?: ProtocolType;
+  forceProtocolDetection?: boolean;
+}
+
 /**
  * The navigator.usb disconnect listener is module-scoped and attached at most
  * once: listeners on navigator.usb are global and never garbage collected, so a
@@ -681,7 +686,10 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       }
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
-      await this.connect(input.path ?? '', true);
+      await this.connect(input.path ?? '', true, {
+        expectedProtocol: input.expectedProtocol,
+        forceProtocolDetection: input.forceProtocolDetection,
+      });
       if (input.skipProtocolProbe) {
         if (!input.expectedProtocol) {
           throw ERRORS.TypedError(
@@ -896,25 +904,30 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   /**
    * Connect to device with retry mechanism
    */
-  async connect(path: string, first: boolean) {
+  async connect(path: string, first: boolean, options: WebUsbConnectOptions = {}) {
     const maxRetries = 5;
     for (let i = 0; i < maxRetries; i++) {
       this.assertRunning();
       const attempt = i + 1;
       const startedAt = Date.now();
+      const connectionStrategy = this.shouldUseLegacyV1Connection(path, options)
+        ? 'protocol-v1-legacy-1.1.31'
+        : 'current';
       this.logLifecycle('connect-attempt', {
         phase: 'start',
         attempt,
         maxAttempts: maxRetries,
         first,
+        connectionStrategy,
       });
       try {
-        const result = await this.connectToDevice(path, first);
+        const result = await this.connectToDevice(path, first, options);
         this.logLifecycle('connect-attempt', {
           phase: 'success',
           attempt,
           maxAttempts: maxRetries,
           first,
+          connectionStrategy,
           durationMs: Date.now() - startedAt,
         });
         return result;
@@ -931,6 +944,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
           attempt,
           maxAttempts: maxRetries,
           first,
+          connectionStrategy,
           durationMs: Date.now() - startedAt,
           willRetry,
           ...this.getDiagnosticError(e, path),
@@ -944,6 +958,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         await wait(i * 200);
       }
     }
+  }
+
+  private shouldUseLegacyV1Connection(path: string, options: WebUsbConnectOptions) {
+    if (options.expectedProtocol) return options.expectedProtocol === 'V1';
+    return !options.forceProtocolDetection && this.deviceProtocol.get(path) === 'V1';
   }
 
   /**
@@ -983,7 +1002,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * Connect to specific device.
    * Discovers interface/endpoint numbers from USB descriptors on first connection.
    */
-  async connectToDevice(path: string, first: boolean) {
+  async connectToDevice(path: string, first: boolean, options: WebUsbConnectOptions = {}) {
     this.assertRunning();
     let device: USBDevice = await this.findDevice(path);
     if (this.identityProbe && this.identityProbeDevices.get(path) !== device) {
@@ -1008,6 +1027,40 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         openingHandles.delete(device);
       }
     }
+
+    if (this.shouldUseLegacyV1Connection(path, options)) {
+      // Match the last V1-only WebUSB lifecycle from SDK 1.1.31. Legacy devices
+      // configure before reset and keep the same USBDevice object afterwards.
+      if (first) {
+        await this.runLoggedHandleOperation({
+          operation: 'selectConfiguration',
+          device,
+          path,
+          task: () => device.selectConfiguration(this.configurationId),
+        });
+        try {
+          await this.runLoggedHandleOperation({
+            operation: 'reset',
+            device,
+            path,
+            task: () => device.reset(),
+          });
+        } catch {
+          this.assertRunning();
+          // Reset is best-effort in 1.1.31; runLoggedHandleOperation already recorded the error.
+        }
+      }
+
+      const legacyEndpoints = {
+        interfaceNumber: this.interfaceId,
+        endpointIn: this.endpointId,
+        endpointOut: this.endpointId,
+      };
+      this.deviceEndpoints.set(path, legacyEndpoints);
+      await this.claimDeviceInterface(path, device, legacyEndpoints);
+      return;
+    }
+
     // A V1 packet retry continues an in-flight exchange. Preserve its endpoint
     // state as in the legacy transport; probing and V2 recovery still reset.
     if (first || this.deviceProtocol.get(path) !== 'V1') {
@@ -1018,9 +1071,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
           path,
           task: () => device.reset(),
         });
-      } catch (error) {
+      } catch {
         this.assertRunning();
-        this.Log?.debug('[WebUsbTransport] reset before claim failed, continuing:', error);
+        // Reset remains best-effort; runLoggedHandleOperation already recorded the error.
       }
     }
     await this.getConnectedDevices();
@@ -1064,6 +1117,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     // Discover endpoints from USB descriptors; descriptors are not used for protocol selection.
     const endpoints = this.discoverEndpoints(device);
     this.deviceEndpoints.set(path, endpoints);
+    await this.claimDeviceInterface(path, device, endpoints);
+    await this.clearEndpointHalt(path, device, 'in', endpoints.endpointIn);
+    await this.clearEndpointHalt(path, device, 'out', endpoints.endpointOut);
+  }
+
+  private async claimDeviceInterface(path: string, device: USBDevice, endpoints: DeviceEndpoints) {
     try {
       await this.runLoggedHandleOperation({
         operation: 'claimInterface',
@@ -1075,8 +1134,6 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     } catch (error) {
       return this.throwWebUsbIoError(path, 'claimInterface', error);
     }
-    await this.clearEndpointHalt(path, device, 'in', endpoints.endpointIn);
-    await this.clearEndpointHalt(path, device, 'out', endpoints.endpointOut);
   }
 
   private assertHandleAvailable(device: USBDevice) {
