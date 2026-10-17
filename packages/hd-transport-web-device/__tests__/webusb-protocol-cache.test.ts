@@ -64,6 +64,75 @@ describe('WebUsbTransport protocol probe cache', () => {
     }
   );
 
+  test('uses the SDK 1.1.31 WebUSB sequence for a confirmed Protocol V1 device', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const logger = { debug: jest.fn() };
+    const path = 'legacy-v1-device';
+    const device = {
+      opened: false,
+      configuration: { configurationValue: 1 },
+      configurations: [],
+      open: jest.fn().mockImplementation(() => {
+        device.opened = true;
+        return Promise.resolve();
+      }),
+      reset: jest.fn().mockResolvedValue(undefined),
+      selectConfiguration: jest.fn().mockResolvedValue(undefined),
+      claimInterface: jest.fn().mockResolvedValue(undefined),
+      clearHalt: jest.fn().mockResolvedValue(undefined),
+    };
+    webusb.Log = logger;
+    webusb.findDevice = jest.fn().mockResolvedValue(device);
+    webusb.getConnectedDevices = jest.fn().mockResolvedValue([]);
+
+    await webusb.connect(path, true, { expectedProtocol: 'V1' });
+
+    expect(device.open).toHaveBeenCalledTimes(1);
+    expect(device.selectConfiguration).toHaveBeenCalledWith(1);
+    expect(device.reset).toHaveBeenCalledTimes(1);
+    expect(device.claimInterface).toHaveBeenCalledWith(0);
+    expect(device.selectConfiguration.mock.invocationCallOrder[0]).toBeLessThan(
+      device.reset.mock.invocationCallOrder[0]
+    );
+    expect(device.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      device.claimInterface.mock.invocationCallOrder[0]
+    );
+    expect(webusb.getConnectedDevices).not.toHaveBeenCalled();
+    expect(device.clearHalt).not.toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[WebUsbTransport][lifecycle]',
+      expect.objectContaining({
+        event: 'connect-attempt',
+        phase: 'start',
+        connectionStrategy: 'protocol-v1-legacy-1.1.31',
+      })
+    );
+  });
+
+  test('keeps the current WebUSB sequence when a cached V1 protocol is force-reprobed', async () => {
+    const webusb = new WebUsbTransport() as any;
+    const path = 'force-reprobe-device';
+    const device = {
+      opened: true,
+      configuration: { configurationValue: 1 },
+      configurations: [],
+      reset: jest.fn().mockResolvedValue(undefined),
+      selectConfiguration: jest.fn().mockResolvedValue(undefined),
+      claimInterface: jest.fn().mockResolvedValue(undefined),
+      clearHalt: jest.fn().mockResolvedValue(undefined),
+    };
+    webusb.Log = { debug: jest.fn() };
+    webusb.deviceProtocol.set(path, 'V1');
+    webusb.findDevice = jest.fn().mockResolvedValue(device);
+    webusb.getConnectedDevices = jest.fn().mockResolvedValue([]);
+
+    await webusb.connectToDevice(path, true, { forceProtocolDetection: true });
+
+    expect(device.reset).toHaveBeenCalledTimes(1);
+    expect(webusb.getConnectedDevices).toHaveBeenCalledTimes(1);
+    expect(device.clearHalt).toHaveBeenCalledTimes(2);
+  });
+
   test('reports claimInterface failures as WebUSB device access errors', async () => {
     const webusb = new WebUsbTransport();
     const path = 'connected-usb-device';
@@ -316,6 +385,10 @@ describe('WebUsbTransport protocol probe cache', () => {
 
     await expect(webusb.acquire({ path, expectedProtocol: 'V1' })).resolves.toBe(path);
 
+    expect(webusb.connect).toHaveBeenCalledWith(path, true, {
+      expectedProtocol: 'V1',
+      forceProtocolDetection: undefined,
+    });
     expect(webusb.detectProtocol).not.toHaveBeenCalled();
     expect(webusb.deviceProtocol.get(path)).toBe('V1');
     expect(webusb.acquiredPaths.has(path)).toBe(true);
