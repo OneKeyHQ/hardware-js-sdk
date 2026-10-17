@@ -7,6 +7,7 @@ const SENSITIVE_LOG_KEYS = new Set([
   'address',
   'apikey',
   'connectid',
+  'datachunk',
   'devicestate',
   'deviceid',
   'entropy',
@@ -15,16 +16,20 @@ const SENSITIVE_LOG_KEYS = new Set([
   'passphrase',
   'passphrasestate',
   'password',
+  'pczt',
   'pin',
   'privatekey',
   'publickey',
   'seed',
   'secret',
+  'seedfingerprint',
   'serialnumber',
   'session',
   'sessionid',
   'signature',
+  'signedpczt',
   'token',
+  'ufvk',
   'uuid',
   'walletsessionid',
   'xprv',
@@ -45,7 +50,7 @@ const isSensitiveLogKey = (key: string) => {
 };
 
 const isSigningMessage = (messageName?: string) =>
-  Boolean(messageName && /(?:sign|txack|transaction)/i.test(messageName));
+  Boolean(messageName && /(?:sign|txack|transaction|pczt)/i.test(messageName));
 
 const redactLogValue = (value: unknown, seen: WeakSet<object>): unknown => {
   if (ArrayBuffer.isView(value)) {
