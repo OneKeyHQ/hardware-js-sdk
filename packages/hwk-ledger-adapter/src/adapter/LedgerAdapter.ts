@@ -1284,11 +1284,18 @@ export class LedgerAdapter implements IHardwareWallet {
     );
   }
 
-  tronSignMessage(
+  async tronSignMessage(
     connectId?: string | null,
     deviceId?: string | null,
     params?: LedgerCallParams<TronSignMsgParams>
-  ) {
+  ): Promise<Response<TronSignature>> {
+    // The Ledger TRON app signs TIP-191 signMessageV2 only.
+    if (params?.messageType !== 'V2') {
+      return failure(
+        HardwareErrorCode.MethodNotSupported,
+        'Ledger signs TRON messages as TIP-191 signMessageV2 only (messageType: "V2")'
+      );
+    }
     return this.callChainWithMergedParams<TronSignature>(
       connectId,
       deviceId,

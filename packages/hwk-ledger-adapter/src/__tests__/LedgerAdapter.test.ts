@@ -2271,6 +2271,7 @@ describe('LedgerAdapter', () => {
       const result = await adapter.tronSignMessage('dev-1', '', {
         path: "m/44'/195'/0'/0/0",
         messageHex: '0x48656c6c6f',
+        messageType: 'V2',
       });
 
       expect(result.success).toBe(true);
@@ -2283,6 +2284,25 @@ describe('LedgerAdapter', () => {
         expect.objectContaining({ messageHex: '0x48656c6c6f' })
       );
     });
+
+    it.each([['V1' as const], [undefined]])(
+      'tronSignMessage refuses messageType %s without reaching the device',
+      async messageType => {
+        await adapter.connectDevice('dev-1');
+        connector.call.mockClear();
+        const result = await adapter.tronSignMessage('dev-1', '', {
+          path: "m/44'/195'/0'/0/0",
+          messageHex: '0x48656c6c6f',
+          messageType,
+        });
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.payload.code).toBe(HardwareErrorCode.MethodNotSupported);
+        }
+        expect(connector.call).not.toHaveBeenCalled();
+      }
+    );
 
     it('tronGetAddress rejects before returning a target address when fingerprint mismatches', async () => {
       const expectedFingerprint = deriveDeviceFingerprint('TExpectedFingerprintAddress');
