@@ -4,6 +4,7 @@ import {
   THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS,
   THIRD_PARTY_BLE_SCAN_DURATION_MS,
   THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS,
+  THIRD_PARTY_BLE_STATE_SETTLE_TIMEOUT_MS,
 } from './constants';
 import { DEFAULT_THIRD_PARTY_BLE_VENDORS, normalizeBleUuid } from './vendorProfiles';
 
@@ -333,6 +334,8 @@ export class NobleBleHandler {
         return { available: false, state: 'unsupported', initialized: false };
       }
     }
+    await this._waitForKnownState(THIRD_PARTY_BLE_STATE_SETTLE_TIMEOUT_MS);
+    this._assertActive();
     const state = this._noble?.state ?? 'unknown';
     return {
       available: state === 'poweredOn',
@@ -1041,6 +1044,23 @@ export class NobleBleHandler {
     this._assertActive();
     if (!this._noble) throw new Error('Desktop BLE: noble was not initialized');
     return this._noble;
+  }
+
+  /** A fresh noble reads `unknown` until its bindings report; wait for that first report. */
+  private async _waitForKnownState(timeoutMs: number): Promise<void> {
+    const noble = this._requireNoble();
+    if (noble.state !== 'unknown') return;
+    await new Promise<void>(resolve => {
+      const settle = () => {
+        clearTimeout(timer);
+        noble.removeListener('stateChange', settle);
+        this._pendingCancellations.delete(settle);
+        resolve();
+      };
+      const timer = setTimeout(settle, timeoutMs);
+      this._pendingCancellations.add(settle);
+      noble.on('stateChange', settle);
+    });
   }
 
   private async _waitForPoweredOn(timeoutMs: number): Promise<void> {

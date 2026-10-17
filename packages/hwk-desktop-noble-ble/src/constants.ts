@@ -34,3 +34,6 @@ export const THIRD_PARTY_BLE_DEVICE_TTL_MS = 5_000;
 
 /** Time we'll wait for noble to reach `poweredOn` before failing init. */
 export const THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS = 10_000;
+
+/** Time an availability check waits for a fresh noble to report its first state. */
+export const THIRD_PARTY_BLE_STATE_SETTLE_TIMEOUT_MS = 3_000;

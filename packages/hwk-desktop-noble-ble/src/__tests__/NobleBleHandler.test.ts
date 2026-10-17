@@ -862,6 +862,39 @@ describe('Trezor BLE process shutdown', () => {
     expect(recovered.listenerCount('discover')).toBe(0);
   });
 
+  test.each([
+    ['poweredOn', true],
+    ['poweredOff', false],
+  ])(
+    'answers an availability check on a cold noble with its first reported state (%s)',
+    async (reported, available) => {
+      jest.useFakeTimers({ doNotFake: ['performance'] });
+      const native = Object.assign(new FakeNoble(), { state: 'unknown' });
+      const handler = makeHandler(native);
+      const checking = handler.checkAvailability();
+      await Promise.resolve();
+      native.state = reported;
+      native.emit('stateChange', reported);
+
+      await expect(checking).resolves.toMatchObject({ available, state: reported });
+      expect(native.listenerCount('stateChange')).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  test('gives up waiting for a silent cold noble and reports it unavailable', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const native = Object.assign(new FakeNoble(), { state: 'unknown' });
+    const handler = makeHandler(native);
+    const checking = handler.checkAvailability();
+    await Promise.resolve();
+    jest.advanceTimersByTime(3_000);
+
+    await expect(checking).resolves.toMatchObject({ available: false, state: 'unknown' });
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   test('cancels power-on waits without leaving a timer or listener', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
     const native = Object.assign(new FakeNoble(), { state: 'unknown', stop: jest.fn() });
