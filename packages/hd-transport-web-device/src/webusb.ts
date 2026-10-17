@@ -45,6 +45,8 @@ const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const USB_DEVICE_IN_USE = 'USB device is already in use';
+const WEBUSB_LIFECYCLE_LOG_PREFIX = '[WebUsbTransport][lifecycle]';
+const WEBUSB_ERROR_MESSAGE_LIMIT = 240;
 // Legacy devices can take longer to answer Initialize after a WebUSB reset.
 // Keep this aligned with Node USB so a slow Protocol V1 response is not
 // misreported as a protocol mismatch during acquire.
@@ -74,6 +76,18 @@ interface TransferCancelToken {
 
 type WebUsbOperation = 'open' | 'claimInterface' | 'transferIn' | 'transferOut';
 
+type WebUsbHandleOperation =
+  | 'open'
+  | 'reset'
+  | 'selectConfiguration'
+  | 'claimInterface'
+  | 'clearHaltIn'
+  | 'clearHaltOut'
+  | 'releaseInterface'
+  | 'close';
+
+type WebUsbLifecyclePhase = 'start' | 'success' | 'error' | 'skipped';
+
 /**
  * The navigator.usb disconnect listener is module-scoped and attached at most
  * once: listeners on navigator.usb are global and never garbage collected, so a
@@ -83,6 +97,7 @@ type WebUsbOperation = 'open' | 'claimInterface' | 'transferIn' | 'transferOut';
  */
 let activeWebUsbTransport: WebUsbTransport | undefined;
 let usbDisconnectListenerAttached = false;
+let nextWebUsbTransportInstanceId = 0;
 // Only isolated discovery owns these handles. Normal calls must never close or
 // open them, including while native open() is still pending.
 const identityProbeHandles = new WeakSet<USBDevice>();
@@ -107,6 +122,14 @@ function registerActiveWebUsbTransport(instance: WebUsbTransport, usb: USB) {
 }
 
 export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> {
+  private readonly transportInstanceId = ++nextWebUsbTransportInstanceId;
+
+  private handleOperationSequence = 0;
+
+  private deviceLogSequence = 0;
+
+  private deviceLogIds = new WeakMap<USBDevice, number>();
+
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
   /** Protobuf schema for Protocol V2 transports. */
@@ -204,15 +227,30 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   }
 
   stop(): Promise<void> {
+    const startedAt = Date.now();
     this.stopped = true;
     this.acquiredPaths.clear();
     if (activeWebUsbTransport === this) activeWebUsbTransport = undefined;
     if (!this.stopPromise) {
-      this.stopPromise = this.stopResources().catch(error => {
-        // A later discovery can retry closure without dropping the handle guard.
-        this.stopPromise = undefined;
-        throw error;
-      });
+      this.logLifecycle('stop', { phase: 'start' });
+      this.stopPromise = this.stopResources().then(
+        () => {
+          this.logLifecycle('stop', {
+            phase: 'success',
+            durationMs: Date.now() - startedAt,
+          });
+        },
+        error => {
+          this.logLifecycle('stop', {
+            phase: 'error',
+            durationMs: Date.now() - startedAt,
+            ...this.getDiagnosticError(error),
+          });
+          // A later discovery can retry closure without dropping the handle guard.
+          this.stopPromise = undefined;
+          throw error;
+        }
+      );
     }
     return this.stopPromise;
   }
@@ -237,12 +275,34 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         try {
           if (device.opened) {
             const iface = this.deviceEndpoints.get(path)?.interfaceNumber ?? this.interfaceId;
-            try {
-              await device.releaseInterface(iface);
-            } catch (error) {
-              this.Log?.debug('[WebUsbTransport] stop releaseInterface failed:', error);
+            if (this.getInterfaceClaimed(device, iface) === false) {
+              this.logSkippedHandleOperation(
+                'releaseInterface',
+                device,
+                'interface-not-claimed',
+                iface
+              );
+            } else {
+              try {
+                await this.runLoggedHandleOperation({
+                  operation: 'releaseInterface',
+                  device,
+                  path,
+                  interfaceNumber: iface,
+                  allowStopped: true,
+                  task: () => device.releaseInterface(iface),
+                });
+              } catch (error) {
+                this.Log?.debug('[WebUsbTransport] stop releaseInterface failed:', error);
+              }
             }
-            await device.close();
+            await this.runLoggedHandleOperation({
+              operation: 'close',
+              device,
+              path,
+              allowStopped: true,
+              task: () => device.close(),
+            });
             if (device.opened) throw new Error('WebUSB handle remains open after stop');
           }
           if (this.identityProbe) {
@@ -290,6 +350,122 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       return result;
     } finally {
       this.pendingHandleOperations.delete(pending);
+    }
+  }
+
+  private getInterfaceClaimed(device: USBDevice, interfaceNumber: number) {
+    return device.configuration?.interfaces?.find(
+      usbInterface => usbInterface.interfaceNumber === interfaceNumber
+    )?.claimed;
+  }
+
+  private getDeviceLogId(device: USBDevice) {
+    const existing = this.deviceLogIds.get(device);
+    if (existing) return existing;
+    const next = ++this.deviceLogSequence;
+    this.deviceLogIds.set(device, next);
+    return next;
+  }
+
+  private getHandleLogState(device: USBDevice, interfaceNumber?: number) {
+    const interfaceClaimed =
+      interfaceNumber === undefined ? undefined : this.getInterfaceClaimed(device, interfaceNumber);
+    return {
+      deviceRefId: this.getDeviceLogId(device),
+      opened: device.opened,
+      configurationValue: device.configuration?.configurationValue ?? null,
+      interfaceNumber: interfaceNumber ?? null,
+      interfaceClaimed: interfaceClaimed ?? null,
+      identityProbe: this.identityProbe,
+      stopped: this.stopped,
+      acquiredPathCount: this.acquiredPaths.size,
+      normalHandleCount: this.normalDevices.size,
+      identityProbeHandleCount: this.identityProbeDevices.size,
+      pendingHandleOperationCount: this.pendingHandleOperations.size,
+    };
+  }
+
+  private getDiagnosticError(error: unknown, path?: string) {
+    const errorMessage = this.getErrorMessage(error);
+    const redactedMessage = path ? errorMessage.split(path).join('<device>') : errorMessage;
+    return {
+      errorName: this.getErrorName(error) || 'Error',
+      errorMessage: redactedMessage.slice(0, WEBUSB_ERROR_MESSAGE_LIMIT),
+      errorCode: error instanceof HardwareError ? error.errorCode : undefined,
+    };
+  }
+
+  private logLifecycle(event: string, payload: Record<string, unknown> = {}) {
+    this.Log?.debug(WEBUSB_LIFECYCLE_LOG_PREFIX, {
+      event,
+      transportInstanceId: this.transportInstanceId,
+      ...payload,
+    });
+  }
+
+  private logSkippedHandleOperation(
+    operation: WebUsbHandleOperation,
+    device: USBDevice,
+    reason: string,
+    interfaceNumber?: number
+  ) {
+    const operationId = ++this.handleOperationSequence;
+    this.logLifecycle('handle-operation', {
+      operationId,
+      operation,
+      phase: 'skipped' satisfies WebUsbLifecyclePhase,
+      reason,
+      ...this.getHandleLogState(device, interfaceNumber),
+    });
+  }
+
+  private async runLoggedHandleOperation<T>({
+    operation,
+    device,
+    task,
+    path,
+    interfaceNumber,
+    endpointNumber,
+    allowStopped = false,
+  }: {
+    operation: WebUsbHandleOperation;
+    device: USBDevice;
+    task: () => Promise<T>;
+    path?: string;
+    interfaceNumber?: number;
+    endpointNumber?: number;
+    allowStopped?: boolean;
+  }): Promise<T> {
+    const operationId = ++this.handleOperationSequence;
+    const startedAt = Date.now();
+    const details = {
+      operationId,
+      operation,
+      ...(endpointNumber === undefined ? {} : { endpointNumber }),
+    };
+    this.logLifecycle('handle-operation', {
+      ...details,
+      phase: 'start' satisfies WebUsbLifecyclePhase,
+      ...this.getHandleLogState(device, interfaceNumber),
+    });
+    try {
+      const result = allowStopped ? await task() : await this.runHandleOperation(task);
+      this.logLifecycle('handle-operation', {
+        ...details,
+        phase: 'success' satisfies WebUsbLifecyclePhase,
+        durationMs: Date.now() - startedAt,
+        ...this.getHandleLogState(device, interfaceNumber),
+      });
+      return result;
+    } catch (error) {
+      this.logLifecycle('handle-operation', {
+        ...details,
+        phase: 'error' satisfies WebUsbLifecyclePhase,
+        durationMs: Date.now() - startedAt,
+        ...this.getHandleLogState(device, interfaceNumber),
+        ...this.getDiagnosticError(error, path),
+      });
+      throw error;
     }
   }
 
@@ -356,10 +532,22 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    */
   async promptDeviceAccess() {
     if (!this.usb) return null;
+    const startedAt = Date.now();
+    this.logLifecycle('prompt-device-access', { phase: 'start' });
     try {
       const device = await this.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+      this.logLifecycle('prompt-device-access', {
+        phase: 'success',
+        durationMs: Date.now() - startedAt,
+        selected: Boolean(device),
+      });
       return device;
     } catch (e) {
+      this.logLifecycle('prompt-device-access', {
+        phase: 'error',
+        durationMs: Date.now() - startedAt,
+        ...this.getDiagnosticError(e),
+      });
       this.Log.debug(
         'requestDevice error: ',
         e instanceof Error ? `${e.name}: ${e.message}` : String(e)
@@ -374,16 +562,35 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * It does NOT prompt the user to select a device
    */
   async enumerate() {
-    // Retry only our failed cleanup before Core skips already-open USB handles.
-    for (const path of this.identityProbeCleanupPaths) {
-      try {
-        await this.release(path);
-      } catch {
-        // Keep ownership while native close still fails; retry on the next probe.
+    const startedAt = Date.now();
+    this.logLifecycle('enumerate', {
+      phase: 'start',
+      pendingProbeCleanupCount: this.identityProbeCleanupPaths.size,
+    });
+    try {
+      // Retry only our failed cleanup before Core skips already-open USB handles.
+      for (const path of this.identityProbeCleanupPaths) {
+        try {
+          await this.release(path);
+        } catch {
+          // Keep ownership while native close still fails; retry on the next probe.
+        }
       }
+      await this.getConnectedDevices();
+      this.logLifecycle('enumerate', {
+        phase: 'success',
+        durationMs: Date.now() - startedAt,
+        deviceCount: this.deviceList.length,
+      });
+      return this.deviceList;
+    } catch (error) {
+      this.logLifecycle('enumerate', {
+        phase: 'error',
+        durationMs: Date.now() - startedAt,
+        ...this.getDiagnosticError(error),
+      });
+      throw error;
     }
-    await this.getConnectedDevices();
-    return this.deviceList;
   }
 
   /**
@@ -393,7 +600,24 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     this.assertRunning();
     if (!this.usb) return [];
 
-    const devices = await this.usb.getDevices();
+    const startedAt = Date.now();
+    this.logLifecycle('get-devices', { phase: 'start' });
+    let devices: USBDevice[];
+    try {
+      devices = await this.usb.getDevices();
+      this.logLifecycle('get-devices', {
+        phase: 'success',
+        durationMs: Date.now() - startedAt,
+        authorizedDeviceCount: devices.length,
+      });
+    } catch (error) {
+      this.logLifecycle('get-devices', {
+        phase: 'error',
+        durationMs: Date.now() - startedAt,
+        ...this.getDiagnosticError(error),
+      });
+      throw error;
+    }
     this.assertRunning();
     for (const owner of new Set(devices.map(device => normalHandleOwners.get(device)))) {
       if (owner?.stopped) {
@@ -439,13 +663,22 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   async acquire(input: AcquireInput) {
     this.assertRunning();
     if (!input.path) return;
-    if (this.identityProbe) {
-      await this.getConnectedDevices();
-      this.claimIdentityProbeHandle(input.path, await this.findDevice(input.path));
-    } else {
-      this.claimNormalHandle(input.path, await this.findDevice(input.path));
-    }
+    const startedAt = Date.now();
+    this.logLifecycle('acquire', {
+      phase: 'start',
+      expectedProtocol: input.expectedProtocol ?? null,
+      protocolHint: input.protocolHint ?? null,
+      forceProtocolDetection: Boolean(input.forceProtocolDetection),
+      skipProtocolProbe: Boolean(input.skipProtocolProbe),
+      hasCachedProtocol: this.deviceProtocol.has(input.path),
+    });
     try {
+      if (this.identityProbe) {
+        await this.getConnectedDevices();
+        this.claimIdentityProbeHandle(input.path, await this.findDevice(input.path));
+      } else {
+        this.claimNormalHandle(input.path, await this.findDevice(input.path));
+      }
       await this.rotateProtocolV2UsbGeneration(input.path, 'WebUSB transport acquired');
       await this.closeOpenDevice(input.path);
       await this.connect(input.path ?? '', true);
@@ -526,8 +759,18 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       }
       this.assertRunning();
       this.acquiredPaths.add(input.path);
+      this.logLifecycle('acquire', {
+        phase: 'success',
+        durationMs: Date.now() - startedAt,
+        protocol: this.deviceProtocol.get(input.path) ?? null,
+      });
       return await Promise.resolve(input.path);
     } catch (e) {
+      this.logLifecycle('acquire', {
+        phase: 'error',
+        durationMs: Date.now() - startedAt,
+        ...this.getDiagnosticError(e, input.path),
+      });
       this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
       this.acquiredPaths.delete(input.path);
       try {
@@ -657,14 +900,45 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     const maxRetries = 5;
     for (let i = 0; i < maxRetries; i++) {
       this.assertRunning();
+      const attempt = i + 1;
+      const startedAt = Date.now();
+      this.logLifecycle('connect-attempt', {
+        phase: 'start',
+        attempt,
+        maxAttempts: maxRetries,
+        first,
+      });
       try {
-        return await this.connectToDevice(path, first);
+        const result = await this.connectToDevice(path, first);
+        this.logLifecycle('connect-attempt', {
+          phase: 'success',
+          attempt,
+          maxAttempts: maxRetries,
+          first,
+          durationMs: Date.now() - startedAt,
+        });
+        return result;
       } catch (e) {
         this.assertRunning();
-        if (e instanceof HardwareError && e.errorCode === HardwareErrorCode.BridgeNeedsPermission) {
+        const isTerminalError =
+          this.isHandleOwnershipError(e) ||
+          (e instanceof HardwareError &&
+            (e.errorCode === HardwareErrorCode.BridgeNeedsPermission ||
+              e.errorCode === HardwareErrorCode.WebUsbDeviceAccessError));
+        const willRetry = !isTerminalError && attempt < maxRetries;
+        this.logLifecycle('connect-attempt', {
+          phase: 'error',
+          attempt,
+          maxAttempts: maxRetries,
+          first,
+          durationMs: Date.now() - startedAt,
+          willRetry,
+          ...this.getDiagnosticError(e, path),
+        });
+        if (isTerminalError) {
           throw e;
         }
-        if (i === maxRetries - 1) {
+        if (!willRetry) {
           throw e;
         }
         await wait(i * 200);
@@ -722,7 +996,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (!device.opened) {
       openingHandles.add(device);
       try {
-        await this.runHandleOperation(() => device.open());
+        await this.runLoggedHandleOperation({
+          operation: 'open',
+          device,
+          path,
+          task: () => device.open(),
+        });
       } catch (error) {
         return await this.throwWebUsbIoError(path, 'open', error);
       } finally {
@@ -733,7 +1012,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     // state as in the legacy transport; probing and V2 recovery still reset.
     if (first || this.deviceProtocol.get(path) !== 'V1') {
       try {
-        await this.runHandleOperation(() => device.reset());
+        await this.runLoggedHandleOperation({
+          operation: 'reset',
+          device,
+          path,
+          task: () => device.reset(),
+        });
       } catch (error) {
         this.assertRunning();
         this.Log?.debug('[WebUsbTransport] reset before claim failed, continuing:', error);
@@ -751,7 +1035,12 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (!device.opened) {
       openingHandles.add(device);
       try {
-        await this.runHandleOperation(() => device.open());
+        await this.runLoggedHandleOperation({
+          operation: 'open',
+          device,
+          path,
+          task: () => device.open(),
+        });
       } catch (error) {
         return await this.throwWebUsbIoError(path, 'open', error);
       } finally {
@@ -764,19 +1053,30 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       !device.configuration ||
       device.configuration.configurationValue !== this.configurationId
     ) {
-      await this.runHandleOperation(() => device.selectConfiguration(this.configurationId));
+      await this.runLoggedHandleOperation({
+        operation: 'selectConfiguration',
+        device,
+        path,
+        task: () => device.selectConfiguration(this.configurationId),
+      });
     }
 
     // Discover endpoints from USB descriptors; descriptors are not used for protocol selection.
     const endpoints = this.discoverEndpoints(device);
     this.deviceEndpoints.set(path, endpoints);
     try {
-      await this.runHandleOperation(() => device.claimInterface(endpoints.interfaceNumber));
+      await this.runLoggedHandleOperation({
+        operation: 'claimInterface',
+        device,
+        path,
+        interfaceNumber: endpoints.interfaceNumber,
+        task: () => device.claimInterface(endpoints.interfaceNumber),
+      });
     } catch (error) {
       return this.throwWebUsbIoError(path, 'claimInterface', error);
     }
-    await this.clearEndpointHalt(device, 'in', endpoints.endpointIn);
-    await this.clearEndpointHalt(device, 'out', endpoints.endpointOut);
+    await this.clearEndpointHalt(path, device, 'in', endpoints.endpointIn);
+    await this.clearEndpointHalt(path, device, 'out', endpoints.endpointOut);
   }
 
   private assertHandleAvailable(device: USBDevice) {
@@ -800,7 +1100,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
   private releaseNormalHandles(path: string) {
     if (this.stopped) return;
     for (const [device, ownedPath] of this.normalDevices) {
-      if (ownedPath === path) {
+      if (ownedPath === path && !device.opened) {
+        // Do not expose a native handle to another transport while close failed.
+        // A later release/stop can retry cleanup through normalDevices.
         normalHandleOwners.delete(device);
         this.normalDevices.delete(device);
       }
@@ -844,36 +1146,83 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   private async closeOpenDevice(path: string) {
     if (this.stopped) return;
-    const current = this.identityProbe
-      ? this.identityProbeDevices.get(path)
-      : this.deviceList.find(device => device.path === path)?.device;
-    if (!current?.opened) return;
+    const devices = this.identityProbe
+      ? [this.identityProbeDevices.get(path)].filter(
+          (device): device is USBDevice => device !== undefined
+        )
+      : [...this.normalDevices]
+          .filter(([, ownedPath]) => ownedPath === path)
+          .map(([device]) => device);
+    let firstCloseError: unknown;
+    for (const device of devices) {
+      try {
+        await this.closeDeviceHandle(path, device);
+      } catch (error) {
+        firstCloseError ??= error;
+      }
+    }
+    if (firstCloseError) {
+      throw firstCloseError instanceof Error
+        ? firstCloseError
+        : new Error(this.getErrorMessage(firstCloseError));
+    }
+  }
+
+  private async closeDeviceHandle(path: string, current: USBDevice) {
+    if (!current.opened) return;
     this.assertHandleAvailable(current);
 
     const endpoints = this.deviceEndpoints.get(path);
     const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
-    try {
-      await this.runHandleOperation(() => current.releaseInterface(ifaceNum));
-    } catch (error) {
-      this.Log?.debug('[WebUsbTransport] releaseInterface before reconnect failed:', error);
+    if (this.getInterfaceClaimed(current, ifaceNum) === false) {
+      this.logSkippedHandleOperation(
+        'releaseInterface',
+        current,
+        'interface-not-claimed',
+        ifaceNum
+      );
+    } else {
+      try {
+        await this.runLoggedHandleOperation({
+          operation: 'releaseInterface',
+          device: current,
+          path,
+          interfaceNumber: ifaceNum,
+          task: () => current.releaseInterface(ifaceNum),
+        });
+      } catch (error) {
+        this.Log?.debug('[WebUsbTransport] releaseInterface before reconnect failed:', error);
+      }
     }
     this.assertHandleAvailable(current);
     try {
-      await this.runHandleOperation(() => current.close());
+      await this.runLoggedHandleOperation({
+        operation: 'close',
+        device: current,
+        path,
+        task: () => current.close(),
+      });
     } catch (error) {
       this.Log?.debug('[WebUsbTransport] close before reconnect failed:', error);
-      if (this.identityProbe) throw error;
+      throw error;
     }
   }
 
   private async clearEndpointHalt(
+    path: string,
     device: USBDevice,
     direction: USBDirection,
     endpointNumber: number
   ) {
     this.assertHandleAvailable(device);
     try {
-      await this.runHandleOperation(() => device.clearHalt(direction, endpointNumber));
+      await this.runLoggedHandleOperation({
+        operation: direction === 'in' ? 'clearHaltIn' : 'clearHaltOut',
+        device,
+        path,
+        endpointNumber,
+        task: () => device.clearHalt(direction, endpointNumber),
+      });
     } catch (error) {
       this.assertRunning();
       this.Log?.debug(
@@ -1030,13 +1379,33 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       if (currentDevice.opened) {
         const endpoints = this.deviceEndpoints.get(path);
         const ifaceNum = endpoints?.interfaceNumber ?? this.interfaceId;
-        try {
-          await this.runHandleOperation(() => currentDevice.releaseInterface(ifaceNum));
-        } catch (releaseError) {
-          this.Log.debug('[WebUsbTransport] releaseInterface before retry error:', releaseError);
+        if (this.getInterfaceClaimed(currentDevice, ifaceNum) === false) {
+          this.logSkippedHandleOperation(
+            'releaseInterface',
+            currentDevice,
+            'interface-not-claimed',
+            ifaceNum
+          );
+        } else {
+          try {
+            await this.runLoggedHandleOperation({
+              operation: 'releaseInterface',
+              device: currentDevice,
+              path,
+              interfaceNumber: ifaceNum,
+              task: () => currentDevice.releaseInterface(ifaceNum),
+            });
+          } catch (releaseError) {
+            this.Log.debug('[WebUsbTransport] releaseInterface before retry error:', releaseError);
+          }
         }
         this.assertHandleAvailable(currentDevice);
-        await this.runHandleOperation(() => currentDevice.close());
+        await this.runLoggedHandleOperation({
+          operation: 'close',
+          device: currentDevice,
+          path,
+          task: () => currentDevice.close(),
+        });
       }
     } catch (closeError) {
       this.assertRunning();
@@ -1401,10 +1770,23 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * Release device
    */
   async release(path: string) {
+    const startedAt = Date.now();
+    this.logLifecycle('release', { phase: 'start' });
     this.acquiredPaths.delete(path);
     try {
       await this.invalidateProtocolV2UsbLink(path, 'WebUSB transport released');
       await this.closeOpenDevice(path);
+      this.logLifecycle('release', {
+        phase: 'success',
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      this.logLifecycle('release', {
+        phase: 'error',
+        durationMs: Date.now() - startedAt,
+        ...this.getDiagnosticError(error, path),
+      });
+      throw error;
     } finally {
       this.releaseIdentityProbeHandle(path);
       this.releaseNormalHandles(path);
