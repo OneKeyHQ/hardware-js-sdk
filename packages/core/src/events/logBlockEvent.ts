@@ -18,7 +18,6 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'fileWrite',
   'fileRead',
   'zcashGetAddress',
-  'zcashGetUnifiedAddress',
   'zcashSignPczt',
 ]);
 
