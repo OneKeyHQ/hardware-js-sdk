@@ -64,14 +64,31 @@ describe('WebUsbTransport protocol probe cache', () => {
     }
   );
 
-  test('uses the SDK 1.1.31 WebUSB sequence for a confirmed Protocol V1 device', async () => {
+  test('uses the SDK 1.1.31 WebUSB sequence with descriptor endpoints for Protocol V1', async () => {
     const webusb = new WebUsbTransport() as any;
     const logger = { debug: jest.fn() };
     const path = 'legacy-v1-device';
     const device = {
       opened: false,
       configuration: { configurationValue: 1 },
-      configurations: [],
+      configurations: [
+        {
+          interfaces: [
+            {
+              interfaceNumber: 7,
+              alternates: [
+                {
+                  interfaceClass: 0xff,
+                  endpoints: [
+                    { direction: 'in', endpointNumber: 3 },
+                    { direction: 'out', endpointNumber: 4 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
       open: jest.fn().mockImplementation(() => {
         device.opened = true;
         return Promise.resolve();
@@ -90,7 +107,12 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(device.open).toHaveBeenCalledTimes(1);
     expect(device.selectConfiguration).toHaveBeenCalledWith(1);
     expect(device.reset).toHaveBeenCalledTimes(1);
-    expect(device.claimInterface).toHaveBeenCalledWith(0);
+    expect(device.claimInterface).toHaveBeenCalledWith(7);
+    expect(webusb.deviceEndpoints.get(path)).toEqual({
+      interfaceNumber: 7,
+      endpointIn: 3,
+      endpointOut: 4,
+    });
     expect(device.selectConfiguration.mock.invocationCallOrder[0]).toBeLessThan(
       device.reset.mock.invocationCallOrder[0]
     );

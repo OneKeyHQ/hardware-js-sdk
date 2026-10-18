@@ -1051,11 +1051,9 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
         }
       }
 
-      const legacyEndpoints = {
-        interfaceNumber: this.interfaceId,
-        endpointIn: this.endpointId,
-        endpointOut: this.endpointId,
-      };
+      // Descriptor lookup is local-only and does not alter the 1.1.31 USB
+      // operation order. Defaults remain available for legacy descriptors.
+      const legacyEndpoints = this.discoverEndpoints(device);
       this.deviceEndpoints.set(path, legacyEndpoints);
       await this.claimDeviceInterface(path, device, legacyEndpoints);
       return;
