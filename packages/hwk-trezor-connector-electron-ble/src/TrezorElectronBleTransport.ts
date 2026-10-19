@@ -6,11 +6,13 @@ import {
   filterTrezorDebugLogEntry,
 } from '@onekeyfe/hwk-trezor-connector';
 
-import type { TrezorBleApi, TrezorBleDeviceInfo } from './types/desktop-api';
+import { TREZOR_BLE_CONNECT_PROFILE, TREZOR_BLE_MATCH, TREZOR_BLE_VENDOR } from './bleProfile';
+
+import type { ThirdPartyBleApi, ThirdPartyBleDeviceInfo } from '@onekeyfe/hwk-desktop-noble-ble';
 
 export interface TrezorElectronBleTransportOptions {
   /** The IPC bridge exposed by the main process (typically `window.desktopApi.trezorBle`). */
-  bridge?: TrezorBleApi;
+  bridge?: ThirdPartyBleApi;
   logger?: TrezorDebugLogger;
 }
 
@@ -20,11 +22,11 @@ const disconnectError = (message: string): Error =>
 const notConnectedError = (id: string): Error =>
   disconnectError(`Trezor Electron BLE device is not connected: ${id}`);
 
-const resolveBridge = (options?: TrezorElectronBleTransportOptions): TrezorBleApi => {
+const resolveBridge = (options?: TrezorElectronBleTransportOptions): ThirdPartyBleApi => {
   if (options?.bridge) return options.bridge;
   const win =
     typeof window !== 'undefined'
-      ? (window as unknown as { desktopApi?: { trezorBle?: TrezorBleApi } })
+      ? (window as unknown as { desktopApi?: { trezorBle?: ThirdPartyBleApi } })
       : undefined;
   const bridge = win?.desktopApi?.trezorBle;
   if (!bridge) {
@@ -48,9 +50,11 @@ interface PendingRead {
  * sequentially without missing chunks that arrive between reads.
  */
 export class TrezorElectronBleTransport {
-  private readonly _bridge: TrezorBleApi;
+  private readonly _bridge: ThirdPartyBleApi;
 
   private readonly _connected = new Set<string>();
+
+  private readonly _connecting = new Map<string, { cancelled: boolean }>();
 
   private readonly _readQueues = new Map<string, Uint8Array[]>();
 
@@ -70,14 +74,14 @@ export class TrezorElectronBleTransport {
     this._wireGlobalListeners();
   }
 
-  async scan(durationMs?: number): Promise<TrezorBleDeviceInfo[]> {
-    // No serviceUuids filter: a native service-UUID scan filter drops a
-    // Safe 7's ADV packets on Windows (its UUID travels in the scan response,
-    // not the ADV packet), so the handler scans unfiltered and does the Trezor
-    // matching itself in JS. Passing a filter here would at best be ignored by
-    // a current handler and at worst re-break discovery on an older one.
+  async scan(durationMs?: number): Promise<ThirdPartyBleDeviceInfo[]> {
+    // `match` is applied in JS after an unfiltered radio scan, not as a native
+    // scan filter: a native service-UUID filter drops a Safe 7's ADV packets on
+    // Windows, since its UUID lives in the scan response, not the ADV packet.
     try {
       return await this._bridge.scan({
+        vendor: TREZOR_BLE_VENDOR,
+        match: TREZOR_BLE_MATCH,
         durationMs,
       });
     } catch (error) {
@@ -89,28 +93,60 @@ export class TrezorElectronBleTransport {
   }
 
   async stopScan(): Promise<void> {
-    await this._bridge.stopScan();
+    await this._bridge.stopScan(TREZOR_BLE_VENDOR);
   }
 
   /** Abandon the in-flight connect/pairing in the main process. */
-  async cancelPairing(): Promise<void> {
-    await this._bridge.cancelPairing();
+  async cancelPairing(connectId?: string): Promise<void> {
+    const ids = new Set(
+      [...this._connecting.keys(), ...this._connected].filter(
+        id => connectId === undefined || id === connectId
+      )
+    );
+    for (const id of ids) {
+      const claim = this._connecting.get(id);
+      if (claim) claim.cancelled = true;
+    }
+    await Promise.all(
+      Array.from(ids, async id => {
+        await this._bridge.cancelPairing({ vendor: TREZOR_BLE_VENDOR, id });
+        if (this._connected.has(id)) this._handleDeviceDisconnected(id);
+      })
+    );
+    if (connectId === undefined) await this.stopScan();
   }
 
   async connect(connectId: string): Promise<void> {
     if (this._connected.has(connectId)) return;
-    await this._bridge.connect(connectId);
+    // The shared handler holds no vendor defaults: every GATT uuid and the
+    // padded-write framing travel with the call.
+    const claim = { cancelled: false };
+    this._connecting.set(connectId, claim);
+    const assertActive = () => {
+      if (claim.cancelled) {
+        throw createHwkError({
+          code: HardwareErrorCode.BlePairingCancelled,
+          message: 'Trezor BLE pairing cancelled',
+        });
+      }
+    };
     try {
-      await this._bridge.subscribe(connectId);
-    } catch (error) {
-      // Main process is already connected — tear it down so we don't leak a
-      // main-side connection the renderer can no longer address.
-      await this._bridge.disconnect(connectId).catch(() => undefined);
-      throw error;
+      await this._bridge.connect(connectId, TREZOR_BLE_CONNECT_PROFILE);
+      try {
+        assertActive();
+        await this._bridge.subscribe(connectId);
+        assertActive();
+      } catch (error) {
+        // Main already owns the link; reject late completion without leaving it open.
+        await this._bridge.disconnect(connectId).catch(() => undefined);
+        throw error;
+      }
+      this._connected.add(connectId);
+      this._readQueues.set(connectId, []);
+      this._pendingReads.set(connectId, []);
+    } finally {
+      if (this._connecting.get(connectId) === claim) this._connecting.delete(connectId);
     }
-    this._connected.add(connectId);
-    this._readQueues.set(connectId, []);
-    this._pendingReads.set(connectId, []);
   }
 
   async disconnect(connectId: string): Promise<void> {
@@ -187,16 +223,20 @@ export class TrezorElectronBleTransport {
       if (queue) queue.push(data);
     });
     this._disposeDisconnectListener = this._bridge.onDeviceDisconnected(id => {
-      this._connected.delete(id);
-      this._failPendingReads(id, disconnectError(`Trezor BLE device disconnected: ${id}`));
-      this._readQueues.delete(id);
-      this._disconnectHandlers.get(id)?.forEach(handler => {
-        try {
-          handler();
-        } catch (error) {
-          this._log('error', 'disconnect.handler.threw', { id, error: String(error) });
-        }
-      });
+      this._handleDeviceDisconnected(id);
+    });
+  }
+
+  private _handleDeviceDisconnected(id: string): void {
+    this._connected.delete(id);
+    this._failPendingReads(id, disconnectError(`Trezor BLE device disconnected: ${id}`));
+    this._readQueues.delete(id);
+    this._disconnectHandlers.get(id)?.forEach(handler => {
+      try {
+        handler();
+      } catch (error) {
+        this._log('error', 'disconnect.handler.threw', { id, error: String(error) });
+      }
     });
   }
 

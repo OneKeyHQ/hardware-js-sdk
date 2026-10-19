@@ -504,7 +504,10 @@ export type TrezorThpSessionOptions = {
    * it back via `knownCredentials` on the next connect to skip pairing UX.
    */
   onPairingCredentialsChanged?: (payload: {
+    /** This device's credentials only, never other devices'. */
     credentials: TrezorThpCredentials[];
+    /** Credentials the device rejected; a host keeping one list for all devices drops these. */
+    removed?: TrezorThpCredentials[];
   }) => Promise<void> | void;
   logger?: TrezorDebugLogger;
 };
@@ -535,6 +538,11 @@ const normalizeCreateAppSessionOptions = (
     passphraseMode,
   };
 };
+
+/** A pairing the device cannot prove: surfaced as ThpPairingFailed by the adapter. */
+function thpPairingRefused(message: string): Error {
+  return Object.assign(new Error(message), { code: 'ThpPairingFailed' });
+}
 
 export class TrezorDeviceSession {
   private readonly transport: TrezorByteTransport;
@@ -654,6 +662,15 @@ export class TrezorDeviceSession {
       throw error;
     }
 
+    if (this.connectionType === 'ble' && this.currentFeatures?.bootloader_mode !== true) {
+      // Trezor firmware serves Bluetooth over THP only, so a peer answering plain v1 here is not
+      // a Trezor; staying would send PINs and passphrases unencrypted to it. The bootloader
+      // speaks v1 over Bluetooth, but it holds no keys and asks for no PIN or passphrase.
+      this.core = undefined;
+      this.currentFeatures = undefined;
+      throw thpPairingRefused('Trezor Bluetooth requires the encrypted THP protocol');
+    }
+
     this.log('info', 'session.initialize.done', {
       protocol: this.protocol,
       features: summarizeFeatures(this.currentFeatures),
@@ -704,6 +721,18 @@ export class TrezorDeviceSession {
         requestName = 'ButtonAck';
         requestData = {};
         continue;
+      }
+
+      if (
+        (response.type === 'PinMatrixRequest' || response.type === 'PassphraseRequest') &&
+        this.connectionType === 'ble' &&
+        this.protocol === 'v1'
+      ) {
+        // Only a self-declared bootloader gets onto Bluetooth without THP, and a bootloader never
+        // asks for a PIN or passphrase; neither may leave the host unencrypted.
+        this.core = undefined;
+        this.currentFeatures = undefined;
+        throw thpPairingRefused('Trezor Bluetooth requires the encrypted THP protocol');
       }
 
       if (response.type === 'PinMatrixRequest') {
@@ -868,6 +897,48 @@ export class TrezorDeviceSession {
     const response = await this.core!.call('Initialize', {});
     this.currentFeatures = expectMessage(response, 'Features').message;
     this.thpAppSessionActive = false;
+    if (passphraseMode === 'empty') {
+      // A locked device's passphrase settings are not trustworthy (hidden by core >= 2.4.3,
+      // reported as false by older builds), so always unlock with a silent testnet GetAddress
+      // (supported by every build, as in hd-core) and re-read them; its result is discarded.
+      // With the passphrase always entered on the device this costs one extra prompt before
+      // the refusal below.
+      expectMessage(
+        await this.call('GetAddress', {
+          address_n: [0x8000002c, 0x80000001, 0x80000000, 0, 0],
+          coin_name: 'Testnet',
+          script_type: 'SPENDADDRESS',
+          show_display: false,
+        }),
+        'Address'
+      );
+      expectMessage(await this.call('GetFeatures', {}), 'Features');
+      if (this.currentFeatures?.passphrase_protection == null) {
+        throw new TrezorFailureError({
+          type: 'Failure',
+          message: {
+            code: 'Failure_DataError',
+            message:
+              'Empty passphrase cannot be enforced: device did not report its passphrase setting',
+          },
+        } as TrezorMessageResponse<'Failure'>);
+      }
+    }
+    // With the passphrase always entered on the device, v1 firmware prompts on its own screen
+    // instead of sending PassphraseRequest, so an empty passphrase cannot be enforced.
+    if (
+      passphraseMode === 'empty' &&
+      this.currentFeatures?.passphrase_protection === true &&
+      this.currentFeatures?.passphrase_always_on_device === true
+    ) {
+      throw new TrezorFailureError({
+        type: 'Failure',
+        message: {
+          code: 'Failure_DataError',
+          message: 'Empty passphrase cannot be enforced with PASSPHRASE_ALWAYS_ON_DEVICE enabled',
+        },
+      } as TrezorMessageResponse<'Failure'>);
+    }
     this.log('info', 'v1.appSession.create.done', {
       features: summarizeFeatures(this.currentFeatures),
     });
@@ -1028,7 +1099,8 @@ class TrezorThpSession {
 
     const pairingMethods = getPairingMethods(
       properties.pairing_methods,
-      this.options.pairingMethods ?? ['CodeEntry', 'QrCode', 'NFC', 'SkipPairing']
+      // SkipPairing is for emulators and debug firmware only; production devices offer CodeEntry.
+      this.options.pairingMethods ?? ['CodeEntry', 'QrCode', 'NFC']
     );
     if (pairingMethods.length === 0) {
       throw new Error('No compatible THP pairing method');
@@ -1107,6 +1179,11 @@ class TrezorThpSession {
     );
 
     const completionState = completion.message.state as number;
+    // A real device reports a paired state only for a credential we sent and it accepted. A
+    // paired claim without one comes from a peer that is not the device we paired with.
+    if (completionState !== 0 && !handshakeCredentials.credentials) {
+      throw thpPairingRefused('Trezor reported a pairing that no stored credential confirms');
+    }
     this.thpState.setIsPaired(completionState !== 0);
     this.thpState.setPhase('pairing');
 
@@ -1118,6 +1195,7 @@ class TrezorThpSession {
       this.thpState.removePairingCredential(handshakeCredentials.credentials);
       await this.options.onPairingCredentialsChanged?.({
         credentials: this.thpState.pairingCredentials as TrezorThpCredentials[],
+        removed: [handshakeCredentials.credentials as TrezorThpCredentials],
       });
     }
 
@@ -1158,6 +1236,10 @@ class TrezorThpSession {
     });
 
     if (selectMethod.type === 'ThpEndResponse') {
+      // Ending pairing without a code is SkipPairing; for any other method it skips the proof.
+      if (selectedMethod !== protocolThpRuntime.ThpPairingMethod.SkipPairing) {
+        throw thpPairingRefused('Trezor ended pairing without completing the selected method');
+      }
       this.thpState.setIsPaired(true);
       this.thpState.setPhase('paired');
       this.log('info', 'thp.pair.done', { responseType: selectMethod.type });

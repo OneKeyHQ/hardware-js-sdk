@@ -115,6 +115,56 @@ export async function runAllNetworkGetAddress({
   return success(responses);
 }
 
+/** An SDK-dialog cancel or on-device reject ends the bundle; the user already answered "no". */
+export function isUserRefusal(code: HardwareErrorCode | number | undefined): boolean {
+  return (
+    code === HardwareErrorCode.UserAborted ||
+    code === HardwareErrorCode.UserRejected ||
+    code === HardwareErrorCode.PinCancelled
+  );
+}
+
+/**
+ * The device or wallet could not be shown to be the one asked for: another wallet, a locked
+ * device, a wrong PIN or passphrase. No later item may derive on it, and a PIN is not retried.
+ */
+export function isWalletSafetyFailure(code: HardwareErrorCode | number | undefined): boolean {
+  const codes: (HardwareErrorCode | number)[] = [
+    HardwareErrorCode.DeviceMismatch,
+    HardwareErrorCode.DeviceSearchMismatch,
+    HardwareErrorCode.DeviceLocked,
+    HardwareErrorCode.PinInvalid,
+    HardwareErrorCode.PinMismatch,
+    HardwareErrorCode.PassphraseRejected,
+    HardwareErrorCode.PassphraseStateMismatch,
+    HardwareErrorCode.PassphraseAlwaysOnDevice,
+  ];
+  return code !== undefined && codes.includes(code);
+}
+
+/** The bundle's session is gone, so the remaining items have nothing to run against. */
+export function isConnectionLost(code: HardwareErrorCode | number | undefined): boolean {
+  const codes: (HardwareErrorCode | number)[] = [
+    HardwareErrorCode.DeviceDisconnected,
+    HardwareErrorCode.OperationTimeout,
+    HardwareErrorCode.TransportError,
+    HardwareErrorCode.OperationEnded,
+    HardwareErrorCode.OperationNotFound,
+  ];
+  return code !== undefined && codes.includes(code);
+}
+
+/** UserAborted is a top-level abort code, so this ends the bundle. */
+export function buildAllNetworkCancelledFailure<T>(signal: AbortSignal): Response<T> {
+  const reason = signal.reason as { code?: unknown; message?: unknown } | undefined;
+  const code =
+    typeof reason?.code === 'number'
+      ? (reason.code as HardwareErrorCode)
+      : HardwareErrorCode.UserAborted;
+  const message = typeof reason?.message === 'string' ? reason.message : '';
+  return failure(code, message || 'All-network get-address cancelled');
+}
+
 export function buildUnsupportedMethodResponse(
   item: AllNetworkAddressParams
 ): AllNetworkAddressResponse {

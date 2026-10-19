@@ -45,9 +45,11 @@ export async function receive<T extends Receiver>(receiver: T, protocol: Transpo
 
         return success({ messageType, payload: result, header, length });
     } catch (e) {
+        // Local change: log the frame size and its leading header bytes, never the frame body.
         console.warn('Protocol decode failed', {
             error: e.message,
-            payload: readResult.payload.toString('hex'),
+            payloadLength: readResult.payload.length,
+            payloadHead: readResult.payload.subarray(0, 2).toString('hex'),
         });
 
         return error({ code: PROTOCOL_MALFORMED, message: e.message });

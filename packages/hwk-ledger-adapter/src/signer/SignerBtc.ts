@@ -1,7 +1,8 @@
 import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
 
-import { deviceActionToPromise } from './deviceActionToPromise';
+import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 import { debugError, debugLog } from '../utils/debugLog';
+import { summarizeForLog } from '../utils/logSummary';
 
 import type { CancelReason } from './deviceActionToPromise';
 import type { SignerBtc as ISdkSignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
@@ -17,9 +18,6 @@ type BtcMessageOptions = Parameters<ISdkSignerBtc['signMessage']>[2];
 function hexToUtf8(hex: string): string {
   return new TextDecoder().decode(hexToBytes(hex));
 }
-
-/** Timeout for user-interactive operations (sign, verify). */
-const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 
 /**
  * Wraps Ledger's BTC SDK signer (Observable-based DeviceActions) into
@@ -45,7 +43,7 @@ export class SignerBtc {
     return deviceActionToPromise<SignerBtcAddress>(
       action,
       this.onInteraction,
-      undefined,
+      options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
       this.onRegisterCanceller
     );
   }
@@ -68,16 +66,14 @@ export class SignerBtc {
       const result = await deviceActionToPromise<string | { extendedPublicKey: string }>(
         action,
         this.onInteraction,
-        undefined,
+        options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
         this.onRegisterCanceller
       );
       debugLog(
         '[SignerBtc] getExtendedPublicKey result type:',
         typeof result,
         'value:',
-        typeof result === 'string'
-          ? `${result.substring(0, 20)}...`
-          : JSON.stringify(result).substring(0, 50)
+        summarizeForLog(result)
       );
       if (typeof result === 'string') return result;
       return result.extendedPublicKey;

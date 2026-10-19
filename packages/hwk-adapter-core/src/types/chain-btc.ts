@@ -1,11 +1,16 @@
 import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
 import type { IHardwareCallParams, IHardwareCommonCallParams, NullableCallArg } from './wallet';
+import type { ExportedAccountKey } from './qr';
 
 export interface BtcGetAddressParams extends PassphraseStateAware {
   path: string;
   coin?: string;
   showOnDevice?: boolean;
+  /**
+   * Trezor only. Ledger and Keystone ignore it and derive the script of the path's purpose
+   * (44' P2PKH, 49' P2SH-P2WPKH, 84' P2WPKH, 86' P2TR; Keystone does not support 86' yet).
+   */
   scriptType?: 'p2pkh' | 'p2sh' | 'p2wpkh' | 'p2wsh' | 'p2tr';
   addressIndex?: number;
   change?: boolean;
@@ -14,6 +19,8 @@ export interface BtcGetAddressParams extends PassphraseStateAware {
 export interface BtcAddress {
   address: string;
   path: string;
+  /** Set by air-gapped wallets (Keystone): the exported key this address derives from. */
+  accountKey?: ExportedAccountKey;
 }
 
 export interface BtcGetPublicKeyParams extends PassphraseStateAware {
@@ -30,6 +37,8 @@ export interface BtcPublicKey {
   chainCode: string;
   path: string;
   depth: number;
+  /** Set by air-gapped wallets (Keystone): the exported key, for pinning by the host. */
+  accountKey?: ExportedAccountKey;
 }
 
 export interface BtcSignTxParams extends PassphraseStateAware {

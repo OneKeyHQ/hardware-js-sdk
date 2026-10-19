@@ -68,4 +68,32 @@ describe('protobufManager logging', () => {
       size: 500,
     });
   });
+
+  it('encodes finalized Solana OCMS v1 requests and signed_data responses', () => {
+    const signer = '01'.repeat(32);
+    const request = protobufManager.encode('SolanaSignMessage', {
+      address_n: [0x8000002c, 0x800001f5, 0x80000000, 0x80000000],
+      message: {
+        message: 'Hello, Solana',
+        signers: [signer],
+      },
+    });
+    expect(protobufManager.decode('SolanaSignMessage', request.message).message).toEqual({
+      address_n: [0x8000002c, 0x800001f5, 0x80000000, 0x80000000],
+      chunkify: null,
+      message: {
+        message: 'Hello, Solana',
+        signers: [signer],
+      },
+    });
+
+    const response = protobufManager.encode('SolanaMessageSignature', {
+      signature: 'ab'.repeat(64),
+      signed_data: 'ff'.repeat(18),
+    });
+    expect(protobufManager.decode('SolanaMessageSignature', response.message).message).toEqual({
+      signature: 'ab'.repeat(64),
+      signed_data: 'ff'.repeat(18),
+    });
+  });
 });

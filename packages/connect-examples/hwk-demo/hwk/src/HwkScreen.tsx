@@ -17,7 +17,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 /* eslint-enable react/style-prop-object */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEVICE, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
+import { DEVICE, SDK, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
 
 import { createHwkAdapter } from './connectorFactory';
 import { HWK_BRAND_LABELS, type HwkAdapter, type HwkBrand } from './types';
@@ -169,6 +169,7 @@ export const HwkScreen = () => {
   const [rememberedDevice, setRememberedDevice] = useState<DeviceInfo | null>(null);
   const [directConnectId, setDirectConnectId] = useState(DEFAULT_TREZOR_BLE_CONNECT_ID);
   const [connectedId, setConnectedId] = useState<string | null>(null);
+  const operationIdRef = useRef<string | null>(null);
   const [features, setFeatures] = useState<Record<string, unknown> | null>(null);
   const [btcAddress, setBtcAddress] = useState<BtcAddress | null>(null);
   const [address, setAddress] = useState<EvmAddress | null>(null);
@@ -297,6 +298,21 @@ export const HwkScreen = () => {
         data: { payload: event.payload },
       })
     );
+    // The SDK ends an operation on timeout, disconnect or reset; the demo's connection goes with it.
+    adapter.on(SDK.OPERATION_ENDED, event => {
+      debugLogger({
+        level: 'info',
+        scope: 'trezor-demo',
+        event: 'operation-ended',
+        data: { payload: event.payload },
+      });
+      if (event.payload.operationId !== operationIdRef.current) return;
+      operationIdRef.current = null;
+      setConnectedId(null);
+      setBtcAddress(null);
+      setAddress(null);
+      setFeatures(null);
+    });
     adapter.on(DEVICE.TREZOR_THP_CREDENTIALS_CHANGED, event => {
       const incoming = event.payload.credentials ?? [];
       // Push only credentials we don't already have. The protocol matches by
@@ -360,7 +376,6 @@ export const HwkScreen = () => {
               const id = payload.connectId;
               if (!id) return;
               adapter.cancel(id);
-              adapter.disconnectDevice(id).catch(() => undefined);
             },
           },
           { text: 'OK' },
@@ -570,6 +585,7 @@ export const HwkScreen = () => {
           Alert.alert('Connect failed', responseError(result));
           return;
         }
+        operationIdRef.current = result.payload;
         setConnectedId(normalizedDevice.connectId);
         setSelected(normalizedDevice);
         setSelectedSource('handshake');
@@ -665,7 +681,9 @@ export const HwkScreen = () => {
     try {
       setBusy('features');
       appendLog('info', `getFeatures ${connectId}...`);
-      const result = await (adapter as TrezorAdapter).getFeatures(connectId);
+      const result = await (adapter as TrezorAdapter).getFeatures(
+        operationIdRef.current ?? connectId
+      );
       appendLog('info', { getFeatures: result });
       if (!result.success) {
         Alert.alert('getFeatures failed', responseError(result));
@@ -704,7 +722,7 @@ export const HwkScreen = () => {
     try {
       setBusy('attestation');
       appendLog('info', `verifyDeviceAuthenticity ${connectId}... (confirm on device)`);
-      const result = await verifier.verifyDeviceAuthenticity(connectId);
+      const result = await verifier.verifyDeviceAuthenticity(operationIdRef.current ?? connectId);
       appendLog('info', { verifyDeviceAuthenticity: result });
       if (!result.success) {
         Alert.alert('verifyDeviceAuthenticity failed', JSON.stringify(result.payload));
@@ -740,7 +758,12 @@ export const HwkScreen = () => {
       setBusy('address');
       const params = { path: EVM_TEST_PATH, showOnDevice: false };
       appendLog('info', { evmGetAddress: params });
-      const result = await adapter.evmGetAddress(connectId, deviceId, params);
+      // Calling through the operation keeps it alive; a bare connectId would let its TTL run out.
+      const result = await adapter.evmGetAddress(
+        operationIdRef.current ?? connectId,
+        deviceId,
+        params
+      );
       appendLog('info', { evmGetAddressRes: result });
       if (!result.success) {
         Alert.alert('evmGetAddress failed', responseError(result));
@@ -774,7 +797,11 @@ export const HwkScreen = () => {
         scriptType: 'p2wpkh' as const,
       };
       appendLog('info', { getAddress: params });
-      const result = await adapter.btcGetAddress(connectId, deviceId, params);
+      const result = await adapter.btcGetAddress(
+        operationIdRef.current ?? connectId,
+        deviceId,
+        params
+      );
       appendLog('info', { getAddressRes: result });
       if (!result.success) {
         Alert.alert('getAddress failed', responseError(result));
@@ -795,7 +822,8 @@ export const HwkScreen = () => {
     try {
       setBusy('disconnect');
       appendLog('info', `Disconnecting ${connectedId}...`);
-      await adapter.disconnectDevice(connectedId);
+      if (operationIdRef.current) await adapter.releaseOperation(operationIdRef.current);
+      operationIdRef.current = null;
       setConnectedId(null);
       setBtcAddress(null);
       setAddress(null);
@@ -1081,7 +1109,7 @@ export const HwkScreen = () => {
             onPress={onDisconnect}
             disabled={!connectedId || !!busy}
           >
-            <Text style={styles.btnText}>disconnectDevice</Text>
+            <Text style={styles.btnText}>releaseOperation</Text>
           </TouchableOpacity>
 
           {features ? (
