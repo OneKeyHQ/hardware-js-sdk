@@ -783,6 +783,11 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       this.acquiredPaths.delete(input.path);
       try {
         await this.closeOpenDevice(input.path);
+      } catch (cleanupError) {
+        this.logLifecycle('acquire-cleanup', {
+          phase: 'error',
+          ...this.getDiagnosticError(cleanupError, input.path),
+        });
       } finally {
         this.releaseIdentityProbeHandle(input.path);
         this.releaseNormalHandles(input.path);

@@ -594,9 +594,10 @@ describe('WebUSB identity probe ownership', () => {
       };
       jest.spyOn(internals, 'rotateProtocolV2UsbGeneration').mockResolvedValue(undefined);
       jest.spyOn(internals, 'detectProtocol').mockResolvedValue('V1');
+      const acquireFailure = new Error('probe failed');
       jest.spyOn(probe, 'connect').mockImplementation(() => {
         device.opened = true;
-        if (phase === 'acquire failure') return Promise.reject(new Error('probe failed'));
+        if (phase === 'acquire failure') return Promise.reject(acquireFailure);
         return Promise.resolve();
       });
       const closeFailure = new Error('native close failed');
@@ -605,7 +606,7 @@ describe('WebUSB identity probe ownership', () => {
         await probe.acquire({ path: 'USB_PATH' });
         await expect(probe.release('USB_PATH')).rejects.toBe(closeFailure);
       } else {
-        await expect(probe.acquire({ path: 'USB_PATH' })).rejects.toBe(closeFailure);
+        await expect(probe.acquire({ path: 'USB_PATH' })).rejects.toBe(acquireFailure);
       }
       expect(device.opened).toBe(true);
       const active = new WebUsbTransport();

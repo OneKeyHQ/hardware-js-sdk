@@ -225,7 +225,7 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(webusb.connectToDevice).toHaveBeenCalledTimes(2);
   });
 
-  test('closes every owned handle after claimInterface fails across re-enumeration', async () => {
+  test.each([false, true])('retains claim error when cleanup fails=%s', async cleanupFails => {
     const webusb = new WebUsbTransport() as any;
     const logger = { debug: jest.fn() };
     const path = 'sensitive-device-path';
@@ -275,6 +275,9 @@ describe('WebUsbTransport protocol probe cache', () => {
       }),
       clearHalt: jest.fn().mockResolvedValue(undefined),
     };
+    if (cleanupFails) {
+      replacementDevice.close.mockRejectedValueOnce(new Error('native close failed'));
+    }
     webusb.Log = logger;
     webusb.usb = { getDevices: jest.fn().mockResolvedValue([replacementDevice]) };
     webusb.deviceList = [{ path, device: originalDevice, commType: 'webusb' }];
@@ -291,7 +294,26 @@ describe('WebUsbTransport protocol probe cache', () => {
     expect(originalDevice.close).toHaveBeenCalledTimes(1);
     expect(replacementDevice.close).toHaveBeenCalledTimes(1);
     expect(originalDevice.opened).toBe(false);
-    expect(replacementDevice.opened).toBe(false);
+    expect(replacementDevice.opened).toBe(cleanupFails);
+    if (cleanupFails) {
+      expect(logger.debug).toHaveBeenCalledWith(
+        '[WebUsbTransport][lifecycle]',
+        expect.objectContaining({
+          event: 'acquire-cleanup',
+          phase: 'error',
+          errorMessage: 'native close failed',
+        })
+      );
+      const competing = new WebUsbTransport();
+      jest
+        .spyOn(competing, 'findDevice')
+        .mockResolvedValue(replacementDevice as unknown as USBDevice);
+      await expect(competing.connectToDevice(path, true)).rejects.toThrow(
+        'USB device is already in use'
+      );
+      await webusb.release(path);
+      expect(replacementDevice.opened).toBe(false);
+    }
     expect(logger.debug).toHaveBeenCalledWith(
       '[WebUsbTransport][lifecycle]',
       expect.objectContaining({
