@@ -603,6 +603,18 @@ export class KeystoneUsbConnectorBase implements IConnector {
       switch (method) {
         case 'resolveUr': {
           const { urType, urData } = params as KeystoneUr;
+          // Buffer.from(hex) silently truncates odd-length or non-hex input into another request.
+          if (typeof urData !== 'string' || !/^(?:[0-9a-f]{2})+$/i.test(urData)) {
+            return {
+              success: false,
+              error: serializeConnectorError(
+                createHwkError({
+                  code: HardwareErrorCode.InvalidParams,
+                  message: 'Keystone resolveUr requires urData as non-empty, even-length hex',
+                })
+              ),
+            };
+          }
           const encoded = toUrEncoded({ urType, urData });
           const isPublicDataRequest = urType === KEYSTONE_PUBLIC_DATA_UR_TYPE;
           // Public-data export prompts once per wallet; signing always prompts. A signing request
@@ -631,15 +643,6 @@ export class KeystoneUsbConnectorBase implements IConnector {
               });
             }
           }
-        }
-        case 'checkLockStatus': {
-          const response = await session.transport.send<{ payload: boolean }>(
-            Actions.CMD_CHECK_LOCK_STATUS,
-            ''
-          );
-          // `true` = locked is inferred from the SDK method name only; unverified on hardware.
-          // Only a real boolean true counts, so a malformed reply never reads as a lock state.
-          return success({ locked: response.payload === true });
         }
         case 'getAppConfig':
           return success(await this._readAppConfig(session.transport));
