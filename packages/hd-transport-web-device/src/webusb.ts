@@ -1036,13 +1036,19 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (this.shouldUseLegacyV1Connection(path, options)) {
       // Match the last V1-only WebUSB lifecycle from SDK 1.1.31. Legacy devices
       // configure before reset and keep the same USBDevice object afterwards.
-      if (first) {
+      if (
+        first ||
+        !device.configuration ||
+        device.configuration.configurationValue !== this.configurationId
+      ) {
         await this.runLoggedHandleOperation({
           operation: 'selectConfiguration',
           device,
           path,
           task: () => device.selectConfiguration(this.configurationId),
         });
+      }
+      if (first) {
         try {
           await this.runLoggedHandleOperation({
             operation: 'reset',

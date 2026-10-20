@@ -64,6 +64,66 @@ describe('WebUsbTransport protocol probe cache', () => {
     }
   );
 
+  test.each([undefined, 2, 1])(
+    'configures a replacement V1 handle only when needed during packet recovery: %s',
+    async configurationValue => {
+      const webusb = new WebUsbTransport();
+      const path = 'replacement-v1-device';
+      const state = webusb as unknown as {
+        Log: { debug: jest.Mock };
+        deviceProtocol: Map<string, 'V1' | 'V2'>;
+        reconnectForPacketIoRetry: (
+          path: string,
+          direction: 'in' | 'out',
+          attempt: number,
+          error: unknown
+        ) => Promise<void>;
+      };
+      state.Log = { debug: jest.fn() };
+      state.deviceProtocol.set(path, 'V1');
+      const replacement = {
+        opened: false,
+        configuration: configurationValue ? { configurationValue } : undefined,
+        configurations: [],
+        open: jest.fn().mockImplementation(() => {
+          replacement.opened = true;
+          return Promise.resolve();
+        }),
+        selectConfiguration: jest.fn().mockImplementation((value: number) => {
+          replacement.configuration = { configurationValue: value };
+          return Promise.resolve();
+        }),
+        reset: jest.fn(),
+        clearHalt: jest.fn(),
+        claimInterface: jest.fn().mockImplementation(() => {
+          if (replacement.configuration?.configurationValue !== 1) {
+            return Promise.reject(new Error('USB configuration is not selected'));
+          }
+          return Promise.resolve();
+        }),
+      };
+      let current = { opened: false } as USBDevice;
+      jest.spyOn(webusb, 'findDevice').mockImplementation(() => Promise.resolve(current));
+      jest.spyOn(webusb, 'getConnectedDevices').mockImplementation(() => {
+        current = replacement as unknown as USBDevice;
+        return Promise.resolve([]);
+      });
+
+      await state.reconnectForPacketIoRetry(path, 'in', 0, new Error('transferIn failed'));
+
+      expect(replacement.selectConfiguration).toHaveBeenCalledTimes(
+        configurationValue === 1 ? 0 : 1
+      );
+      if (configurationValue !== 1) {
+        expect(replacement.selectConfiguration).toHaveBeenCalledWith(1);
+      }
+      expect(replacement.open).toHaveBeenCalledTimes(1);
+      expect(replacement.claimInterface).toHaveBeenCalledWith(0);
+      expect(replacement.reset).not.toHaveBeenCalled();
+      expect(replacement.clearHalt).not.toHaveBeenCalled();
+    }
+  );
+
   test('uses the SDK 1.1.31 WebUSB sequence with descriptor endpoints for Protocol V1', async () => {
     const webusb = new WebUsbTransport() as any;
     const logger = { debug: jest.fn() };
