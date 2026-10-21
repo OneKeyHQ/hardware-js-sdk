@@ -10,6 +10,7 @@ import {
 import ByteBuffer from 'bytebuffer';
 import transport, {
   type OneKeyDeviceInfoBase,
+  type OneKeyMobileDeviceInfo,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
@@ -28,6 +29,7 @@ import {
   HardwareErrorCode,
   createDeferred,
   isOnekeyBluetoothDevice,
+  parseOnekeyBleColorCode,
 } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
@@ -234,6 +236,25 @@ function getDeviceDisplayName(device?: Device | null) {
   return device?.name || device?.localName || null;
 }
 
+// The color is only in the primary advertisement, and the name only in the scan
+// response, so the callback a scan keeps may not carry it. A connected device stops
+// advertising. Keep the last valid color per device for the life of the process.
+// iOS reports connected peripherals with lowercased ids, so key case-insensitively.
+const bleColorCodesById = new Map<string, string>();
+
+function rememberBleColorCode(device?: Device | null) {
+  if (!device?.id || !device.manufacturerData) return;
+  const colorCode = parseOnekeyBleColorCode(Buffer.from(device.manufacturerData, 'base64'));
+  if (colorCode) {
+    bleColorCodesById.set(device.id.toLowerCase(), colorCode);
+  }
+}
+
+function withBleColorCode(device: IOneKeyDevice): IOneKeyDevice {
+  const bleColorCode = bleColorCodesById.get(device.id.toLowerCase());
+  return bleColorCode ? ({ ...device, bleColorCode } as IOneKeyDevice) : device;
+}
+
 const IOS_REQUEST_MTU = 247;
 const ANDROID_REQUEST_MTU = 517;
 const ANDROID_HIGH_PRIORITY_IDLE_MS = 1000;
@@ -356,7 +377,9 @@ const isMtuOrCancelledConnectError = (error: unknown): boolean => {
 
 type NegotiatedMtuResult = { device: Device; timedOut: boolean };
 
-export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
+export type IOneKeyDevice = OneKeyDeviceInfoBase &
+  Device &
+  Pick<OneKeyMobileDeviceInfo, 'bleColorCode'>;
 
 const tryToGetConfiguration = (device: Device) => {
   if (!device || !device.serviceUUIDs) return null;
@@ -855,7 +878,7 @@ export default class ReactNativeBleTransport {
         }).then(() => {
           this.scanCleanups.delete(cancelScan);
           if (error) reject(error);
-          else resolve(deviceList);
+          else resolve(deviceList.map(withBleColorCode));
         });
         return scanCleanup;
       };
@@ -900,6 +923,9 @@ export default class ReactNativeBleTransport {
             return;
           }
 
+          // The native scan is filtered to the OneKey communication service, so an
+          // unnamed iOS advertisement rejected below can still carry the color.
+          rememberBleColorCode(device);
           const displayName = getDeviceDisplayName(device);
           // iOS may report a service-only advertisement before the named scan response.
           // Do not cache that incomplete advertisement as an unknown device.

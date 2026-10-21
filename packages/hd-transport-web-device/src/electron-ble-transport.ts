@@ -55,7 +55,7 @@ interface PacketProcessResult {
 }
 
 const toBleDescriptor = (
-  device: { id: string; name: string | null },
+  device: { id: string; name: string | null; bleColorCode?: string },
   protocolType?: ProtocolType
 ): OneKeyDeviceInfo =>
   ({
@@ -64,6 +64,7 @@ const toBleDescriptor = (
     path: device.id,
     debug: false,
     commType: 'electron-ble',
+    ...(device.bleColorCode ? { bleColorCode: device.bleColorCode } : {}),
     ...(protocolType ? { protocolType } : {}),
   } as OneKeyDeviceInfo);
 

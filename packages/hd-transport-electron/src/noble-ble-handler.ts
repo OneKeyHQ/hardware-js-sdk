@@ -19,6 +19,7 @@ import {
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
+  parseOnekeyBleColorCode,
   wait,
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
@@ -1012,6 +1013,18 @@ function rememberBleName(deviceId: string, name?: string | null): void {
   }
 }
 
+// Noble reuses one Peripheral per id, and on macOS/Windows an event without 0xFF data
+// replaces manufacturerData with an empty buffer. Snapshot the color when the OneKey
+// advertisement is seen; it is kept like the name because a linked device stops advertising.
+const bleColorCodesById = new Map<string, string>();
+
+function rememberBleColorCode(peripheral: Peripheral): void {
+  const colorCode = parseOnekeyBleColorCode(peripheral.advertisement?.manufacturerData);
+  if (colorCode) {
+    bleColorCodesById.set(peripheral.id, colorCode);
+  }
+}
+
 function resolveBleName(deviceId: string): string | undefined {
   const live =
     connectedDevices.get(deviceId)?.advertisement?.localName?.trim() ||
@@ -1040,6 +1053,7 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
   const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
   rememberBleName(peripheral.id, peripheral.advertisement?.localName);
+  rememberBleColorCode(peripheral);
   if (isNewDevice) {
     logger?.debug('[NobleBLE] OneKey BLE device discovered', {
       deviceId: peripheral.id,
@@ -1200,6 +1214,12 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
         state: peripheral.state || 'disconnected',
       });
     };
+    // A device kept from an earlier round is pushed before this round's
+    // advertisements arrive, so apply colors when the scan resolves.
+    const withBleColorCode = (device: DeviceInfo): DeviceInfo => {
+      const bleColorCode = bleColorCodesById.get(device.id);
+      return bleColorCode ? { ...device, bleColorCode } : device;
+    };
     const checkDevices = () => {
       discoveredDevices.forEach(pushDevice);
       // A linked device stops advertising, so the scan never rediscovers it.
@@ -1213,7 +1233,7 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
       checkDevices();
       await cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
-      resolve(devices);
+      resolve(devices.map(withBleColorCode));
     }, DEVICE_SCAN_TIMEOUT);
 
     const cancel = () => cleanup().then(() => resolve([]), reject);

@@ -55,7 +55,7 @@ export async function invokeNobleBleIpc<T>(
 }
 
 export interface NobleBleAPI {
-  enumerate: () => Promise<{ id: string; name: string }[]>;
+  enumerate: () => Promise<{ id: string; name: string; bleColorCode?: string }[]>;
   getDevice: (uuid: string) => Promise<{ id: string; name: string; mtu?: number } | null>;
   connect: (uuid: string) => Promise<void>;
   // Logical end-of-operation: link stays up, idle countdown starts. Optional —

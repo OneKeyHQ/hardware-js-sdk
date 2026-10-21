@@ -10,6 +10,7 @@ import {
   isSameOnekeyBleName,
   matchesKnownBleUuid,
   normalizePro2FindMyAdvertisementName,
+  parseOnekeyBleColorCode,
   resolveOneKeyUsbDevicePath,
 } from './constants';
 
@@ -249,5 +250,32 @@ describe('hardware device identity filters', () => {
         productName: 'Trezor Safe 7',
       })
     ).toBe(false);
+  });
+});
+
+describe('Pro2 / Neo BLE advertisement color', () => {
+  it('reads the serial-number color letter from the 5-byte payload', () => {
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0x41, 0, 0, 0, 0]))).toBe('A');
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0x46, 0x12, 0x34, 0x56, 0x78]))).toBe('F');
+    expect(parseOnekeyBleColorCode(Buffer.from([0x5a, 0, 0, 0, 0]))).toBe('Z');
+  });
+
+  it('treats a missing serial number or a non-letter byte as unknown', () => {
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0x00, 0, 0, 0, 0]))).toBeUndefined();
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0x61, 0, 0, 0, 0]))).toBeUndefined();
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0x31, 0, 0, 0, 0]))).toBeUndefined();
+  });
+
+  it('does not read a color from other manufacturer data layouts', () => {
+    // Pro2 / Neo BLE firmware before the color: a 4-byte zero nonce.
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0, 0, 0, 0]))).toBeUndefined();
+    // Classic: company ID 0x00FE followed by the MAC.
+    expect(
+      parseOnekeyBleColorCode(Uint8Array.from([0xfe, 0x00, 0x41, 1, 2, 3, 4, 5]))
+    ).toBeUndefined();
+    expect(parseOnekeyBleColorCode(Uint8Array.from([0x41, 0, 0, 0, 0, 0]))).toBeUndefined();
+    expect(parseOnekeyBleColorCode(new Uint8Array())).toBeUndefined();
+    expect(parseOnekeyBleColorCode(null)).toBeUndefined();
+    expect(parseOnekeyBleColorCode(undefined)).toBeUndefined();
   });
 });

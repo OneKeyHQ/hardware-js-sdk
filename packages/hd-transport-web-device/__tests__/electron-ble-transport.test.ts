@@ -196,6 +196,33 @@ describe('ElectronBleTransport protocol detection', () => {
     });
   });
 
+  test('passes the advertised color from the native bridge into the descriptor', async () => {
+    const nobleBle = createNobleBle();
+    nobleBle.enumerate.mockResolvedValueOnce([
+      { id: 'colored-pro2-id', name: 'Pro 2 A1B2', bleColorCode: 'B' },
+      { id: 'legacy-pro2-id', name: 'Pro 2 C3D4' },
+    ] as never);
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(bleTransport.enumerate()).resolves.toEqual([
+      {
+        id: 'colored-pro2-id',
+        name: 'Pro 2 A1B2',
+        path: 'colored-pro2-id',
+        debug: false,
+        commType: 'electron-ble',
+        bleColorCode: 'B',
+      },
+      {
+        id: 'legacy-pro2-id',
+        name: 'Pro 2 C3D4',
+        path: 'legacy-pro2-id',
+        debug: false,
+        commType: 'electron-ble',
+      },
+    ]);
+  });
+
   test('does not treat an error envelope from a legacy preload as a successful connect', async () => {
     const device = { id: 'legacy-error-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
