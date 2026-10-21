@@ -177,3 +177,8 @@ export { default as neoGetAddress } from './neo/NeoGetAddress';
 export { default as neoSignTransaction } from './neo/NeoSignTransaction';
 export { default as zcashGetAddress } from './zcash/ZcashGetAddress';
 export { default as zcashSignPczt } from './zcash/ZcashSignPczt';
+
+export { default as starknetGetPublicKey } from './starknet/StarknetGetPublicKey';
+export { default as starknetGetAddress } from './starknet/StarknetGetAddress';
+export { default as starknetSignTransaction } from './starknet/StarknetSignTransaction';
+export { default as starknetExportPrivacyViewingKey } from './starknet/StarknetExportPrivacyViewingKey';

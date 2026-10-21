@@ -126,4 +126,35 @@ describe('transport log sanitization', () => {
       nested: { dataChunk: '[REDACTED]' },
     });
   });
+  test.each([
+    'StarknetSignTx',
+    'StarknetCalldataRequest',
+    'StarknetCalldataAck',
+    'StarknetSignedTx',
+  ])('redacts the complete %s request and response', name => {
+    const payload = { calldata: ['synthetic-calldata-marker'], offset: 0, count: 1 };
+    expect(createTransportCallLog(name, 'V2', payload).request).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(payload, name)).toBe('[REDACTED]');
+  });
+
+  test('redacts Starknet viewing keys and account constructor fields', () => {
+    expect(
+      getSafeTransportLogPayload(
+        {
+          viewing_key: 'synthetic-viewing-key-marker',
+          class_hash: '0x05b4',
+          contract_address_salt: 'synthetic-salt-marker',
+          constructor_calldata: ['synthetic-owner-marker'],
+          nested: { viewingKey: 'synthetic-viewing-key-marker' },
+        },
+        'StarknetPrivacyViewingKey'
+      )
+    ).toEqual({
+      viewing_key: '[REDACTED]',
+      class_hash: '0x05b4',
+      contract_address_salt: '[REDACTED]',
+      constructor_calldata: '[REDACTED]',
+      nested: { viewingKey: '[REDACTED]' },
+    });
+  });
 });

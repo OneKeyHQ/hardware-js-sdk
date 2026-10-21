@@ -229,3 +229,18 @@ export type { BenfenSignMessageParams } from './benfenSignMessage';
 export type { BenfenSignedTx, BenfenSignTransactionParams } from './benfenSignTransaction';
 export type { ZcashAddress, ZcashGetAddressParams } from './zcashGetAddress';
 export type { ZcashSignedPczt, ZcashSignPcztParams } from './zcashSignPczt';
+export type { StarknetPublicKey, StarknetGetPublicKeyParams } from './starknetGetPublicKey';
+export type { StarknetAddress, StarknetGetAddressParams } from './starknetGetAddress';
+export type {
+  StarknetDeployAccountV3Params,
+  StarknetInvokeV3Params,
+  StarknetResourceBound,
+  StarknetResourceBounds,
+  StarknetSignedTx,
+  StarknetSignTransactionParams,
+  StarknetUint64,
+} from './starknetSignTransaction';
+export type {
+  StarknetExportPrivacyViewingKeyParams,
+  StarknetPrivacyViewingKey,
+} from './starknetExportPrivacyViewingKey';

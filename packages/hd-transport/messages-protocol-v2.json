@@ -9213,6 +9213,341 @@
         }
       }
     },
+    "StarknetPublicKeyType": {
+      "values": {
+        "SECP256K1": 0,
+        "STARK": 1
+      }
+    },
+    "StarknetPrivacyViewingKeyDerivation": {
+      "values": {
+        "STARKNET_PRIVACY_VIEWING_KEY_DERIVATION_UNSPECIFIED": 0,
+        "STARKNET_PRIVACY_VIEWING_KEY_DERIVATION_ACCOUNT_LEAF_V1": 1
+      }
+    },
+    "StarknetDAMode": {
+      "values": {
+        "STARKNET_DA_MODE_L1": 0,
+        "STARKNET_DA_MODE_L2": 1
+      }
+    },
+    "StarknetGetPublicKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "type": {
+          "type": "StarknetPublicKeyType",
+          "id": 3,
+          "options": {
+            "default": "STARK"
+          }
+        }
+      }
+    },
+    "StarknetPublicKey": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "StarknetGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "public_key_type": {
+          "rule": "required",
+          "type": "StarknetPublicKeyType",
+          "id": 3
+        },
+        "class_hash": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "contract_address_salt": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "constructor_calldata": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 6
+        }
+      }
+    },
+    "StarknetAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "StarknetExportPrivacyViewingKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "public_key_type": {
+          "rule": "required",
+          "type": "StarknetPublicKeyType",
+          "id": 2
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "account_address": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        },
+        "pool_address": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "derivation_version": {
+          "rule": "required",
+          "type": "StarknetPrivacyViewingKeyDerivation",
+          "id": 5
+        }
+      }
+    },
+    "StarknetPrivacyViewingKey": {
+      "fields": {
+        "viewing_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "StarknetResourceBounds": {
+      "fields": {
+        "max_amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 1
+        },
+        "max_price_per_unit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "StarknetResourceBoundsMapping": {
+      "fields": {
+        "l1_gas": {
+          "rule": "required",
+          "type": "StarknetResourceBounds",
+          "id": 1
+        },
+        "l2_gas": {
+          "rule": "required",
+          "type": "StarknetResourceBounds",
+          "id": 2
+        },
+        "l1_data_gas": {
+          "rule": "required",
+          "type": "StarknetResourceBounds",
+          "id": 3
+        }
+      }
+    },
+    "StarknetInvokeV3": {
+      "fields": {
+        "sender_address": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "calldata_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "account_deployment_data": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 3
+        },
+        "proof_facts": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    },
+    "StarknetDeployAccountV3": {
+      "fields": {
+        "class_hash": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "contract_address_salt": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "constructor_calldata": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 3
+        },
+        "expected_contract_address": {
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    },
+    "StarknetSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "public_key_type": {
+          "rule": "required",
+          "type": "StarknetPublicKeyType",
+          "id": 2
+        },
+        "version": {
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "default": 3
+          }
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "resource_bounds": {
+          "rule": "required",
+          "type": "StarknetResourceBoundsMapping",
+          "id": 6
+        },
+        "tip": {
+          "type": "uint64",
+          "id": 7,
+          "options": {
+            "default": 0
+          }
+        },
+        "paymaster_data": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 8
+        },
+        "nonce_data_availability_mode": {
+          "type": "StarknetDAMode",
+          "id": 9,
+          "options": {
+            "default": "STARKNET_DA_MODE_L1"
+          }
+        },
+        "fee_data_availability_mode": {
+          "type": "StarknetDAMode",
+          "id": 10,
+          "options": {
+            "default": "STARKNET_DA_MODE_L1"
+          }
+        },
+        "privacy_viewing_key_derivation_version": {
+          "type": "StarknetPrivacyViewingKeyDerivation",
+          "id": 11
+        },
+        "invoke_v3": {
+          "type": "StarknetInvokeV3",
+          "id": 20
+        },
+        "deploy_account_v3": {
+          "type": "StarknetDeployAccountV3",
+          "id": 21
+        }
+      }
+    },
+    "StarknetCalldataRequest": {
+      "fields": {
+        "offset": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "StarknetCalldataAck": {
+      "fields": {
+        "calldata": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "StarknetSignedTx": {
+      "fields": {
+        "transaction_hash": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "StellarAssetType": {
       "values": {
         "NATIVE": 0,
@@ -11034,6 +11369,81 @@
         }
       }
     },
+    "ZcashAddressType": {
+      "values": {
+        "UNIFIED_ORCHARD_P2PKH": 0,
+        "TRANSPARENT_P2PKH": 1,
+        "UNIFIED_ORCHARD": 2
+      }
+    },
+    "ZcashAddressScope": {
+      "values": {
+        "EXTERNAL": 0,
+        "INTERNAL": 1
+      }
+    },
+    "ZcashGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "include_seed_fingerprint": {
+          "type": "bool",
+          "id": 3
+        },
+        "include_ufvk": {
+          "type": "bool",
+          "id": 4
+        },
+        "diversifier_index": {
+          "type": "uint32",
+          "id": 5,
+          "options": {
+            "default": 0
+          }
+        },
+        "address_type": {
+          "type": "ZcashAddressType",
+          "id": 6,
+          "options": {
+            "default": "UNIFIED_ORCHARD_P2PKH"
+          }
+        },
+        "scope": {
+          "type": "ZcashAddressScope",
+          "id": 7,
+          "options": {
+            "default": "EXTERNAL"
+          }
+        }
+      }
+    },
+    "ZcashAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "ufvk": {
+          "type": "string",
+          "id": 2
+        },
+        "seed_fingerprint": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
     "ZcashSignPczt": {
       "fields": {
         "pczt_length": {
@@ -11514,11 +11924,23 @@
         "MessageType_NeoAddress": 12302,
         "MessageType_NeoSignTx": 12303,
         "MessageType_NeoSignedTx": 12304,
+        "MessageType_ZcashGetAddress": 12400,
+        "MessageType_ZcashAddress": 12401,
         "MessageType_ZcashSignPczt": 12402,
         "MessageType_ZcashSignedPczt": 12403,
         "MessageType_ZcashPcztChunkRequest": 12404,
         "MessageType_ZcashPcztChunkAck": 12405,
         "MessageType_ZcashSignedPcztChunkRequest": 12406,
+        "MessageType_StarknetGetPublicKey": 12500,
+        "MessageType_StarknetPublicKey": 12501,
+        "MessageType_StarknetSignTx": 12502,
+        "MessageType_StarknetSignedTx": 12503,
+        "MessageType_StarknetExportPrivacyViewingKey": 12504,
+        "MessageType_StarknetPrivacyViewingKey": 12505,
+        "MessageType_StarknetGetAddress": 12506,
+        "MessageType_StarknetAddress": 12507,
+        "MessageType_StarknetCalldataRequest": 12508,
+        "MessageType_StarknetCalldataAck": 12509,
         "MessageType_DeviceFactoryInfoSet": 60000,
         "MessageType_DeviceFactoryInfoGet": 60001,
         "MessageType_DeviceFactoryInfo": 60002,
@@ -11571,9 +11993,7 @@
         "MessageType_PortfolioUpdate": 61400,
         "MessageType_NftUpdate": 61500,
         "MessageType_OnboardingStatusGet": 61600,
-        "MessageType_OnboardingStatus": 61601,
-        "MessageType_ZcashGetAddress": 12400,
-        "MessageType_ZcashAddress": 12401
+        "MessageType_OnboardingStatus": 61601
       },
       "reserved": [
         [90, 92],
@@ -13790,81 +14210,6 @@
               }
             }
           }
-        }
-      }
-    },
-    "ZcashAddressType": {
-      "values": {
-        "UNIFIED_ORCHARD_P2PKH": 0,
-        "TRANSPARENT_P2PKH": 1,
-        "UNIFIED_ORCHARD": 2
-      }
-    },
-    "ZcashAddressScope": {
-      "values": {
-        "EXTERNAL": 0,
-        "INTERNAL": 1
-      }
-    },
-    "ZcashGetAddress": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        },
-        "include_seed_fingerprint": {
-          "type": "bool",
-          "id": 3
-        },
-        "include_ufvk": {
-          "type": "bool",
-          "id": 4
-        },
-        "diversifier_index": {
-          "type": "uint32",
-          "id": 5,
-          "options": {
-            "default": 0
-          }
-        },
-        "address_type": {
-          "type": "ZcashAddressType",
-          "id": 6,
-          "options": {
-            "default": "UNIFIED_ORCHARD_P2PKH"
-          }
-        },
-        "scope": {
-          "type": "ZcashAddressScope",
-          "id": 7,
-          "options": {
-            "default": "EXTERNAL"
-          }
-        }
-      }
-    },
-    "ZcashAddress": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        },
-        "ufvk": {
-          "type": "string",
-          "id": 2
-        },
-        "seed_fingerprint": {
-          "type": "bytes",
-          "id": 3
         }
       }
     }

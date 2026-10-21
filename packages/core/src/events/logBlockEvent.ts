@@ -19,6 +19,8 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'fileRead',
   'zcashGetAddress',
   'zcashSignPczt',
+  'starknetSignTransaction',
+  'starknetExportPrivacyViewingKey',
 ]);
 
 export function getLogBlockLabel(message: unknown): string | undefined {

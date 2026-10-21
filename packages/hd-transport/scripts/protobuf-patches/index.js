@@ -211,6 +211,8 @@ const TYPE_PATCH = {
   'TonSignData.timestamp': UINT_TYPE,
   'TonSignProof.expire_at': UINT_TYPE,
   'TonSignData.timestamp': UINT_TYPE,
+  'StarknetResourceBounds.max_amount': UINT_TYPE,
+  'StarknetSignTx.tip': UINT_TYPE,
 };
 
 const DEFINITION_PATCH = {

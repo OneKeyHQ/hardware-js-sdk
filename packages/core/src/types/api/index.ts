@@ -156,6 +156,10 @@ import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
 import type { zcashGetAddress } from './zcashGetAddress';
 import type { zcashSignPczt } from './zcashSignPczt';
+import type { starknetGetPublicKey } from './starknetGetPublicKey';
+import type { starknetGetAddress } from './starknetGetAddress';
+import type { starknetSignTransaction } from './starknetSignTransaction';
+import type { starknetExportPrivacyViewingKey } from './starknetExportPrivacyViewingKey';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -480,4 +484,12 @@ export type CoreApi = {
    */
   zcashGetAddress: typeof zcashGetAddress;
   zcashSignPczt: typeof zcashSignPczt;
+
+  /**
+   * Starknet
+   */
+  starknetGetPublicKey: typeof starknetGetPublicKey;
+  starknetGetAddress: typeof starknetGetAddress;
+  starknetSignTransaction: typeof starknetSignTransaction;
+  starknetExportPrivacyViewingKey: typeof starknetExportPrivacyViewingKey;
 };
