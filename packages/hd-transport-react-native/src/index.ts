@@ -242,11 +242,20 @@ function getDeviceDisplayName(device?: Device | null) {
 // iOS reports connected peripherals with lowercased ids, so key case-insensitively.
 const bleColorCodesById = new Map<string, string>();
 
+function getManufacturerDataLength(device?: Device | null) {
+  return device?.manufacturerData ? Buffer.from(device.manufacturerData, 'base64').length : 0;
+}
+
 function rememberBleColorCode(device?: Device | null) {
   if (!device?.id || !device.manufacturerData) return;
   const colorCode = parseOnekeyBleColorCode(Buffer.from(device.manufacturerData, 'base64'));
-  if (colorCode) {
-    bleColorCodesById.set(device.id.toLowerCase(), colorCode);
+  const key = device.id.toLowerCase();
+  if (colorCode && bleColorCodesById.get(key) !== colorCode) {
+    bleColorCodesById.set(key, colorCode);
+    Log?.debug('[ReactNativeBleTransport] BLE color code', {
+      deviceId: device.id,
+      bleColorCode: colorCode,
+    });
   }
 }
 
@@ -991,6 +1000,9 @@ export default class ReactNativeBleTransport {
             deviceId: device.id,
             name: displayName,
             serviceUUIDs: device.serviceUUIDs,
+            // 5 = advertises a color slot; 4 = BLE firmware before 1.0.23.
+            manufacturerDataLength: getManufacturerDataLength(device),
+            bleColorCode: bleColorCodesById.get(device.id.toLowerCase()),
           });
         }
       };

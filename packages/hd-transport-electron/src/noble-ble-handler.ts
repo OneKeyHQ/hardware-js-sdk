@@ -1020,8 +1020,12 @@ const bleColorCodesById = new Map<string, string>();
 
 function rememberBleColorCode(peripheral: Peripheral): void {
   const colorCode = parseOnekeyBleColorCode(peripheral.advertisement?.manufacturerData);
-  if (colorCode) {
+  if (colorCode && bleColorCodesById.get(peripheral.id) !== colorCode) {
     bleColorCodesById.set(peripheral.id, colorCode);
+    logger?.debug('[NobleBLE] BLE color code', {
+      deviceId: peripheral.id,
+      bleColorCode: colorCode,
+    });
   }
 }
 
@@ -1059,6 +1063,9 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
       deviceId: peripheral.id,
       name: peripheral.advertisement?.localName || 'Unknown Device',
       serviceUUIDs: peripheral.advertisement?.serviceUuids || [],
+      // 5 = advertises a color slot; 4 = BLE firmware before 1.0.23.
+      manufacturerDataLength: peripheral.advertisement?.manufacturerData?.length ?? 0,
+      bleColorCode: bleColorCodesById.get(peripheral.id),
     });
   }
 }
