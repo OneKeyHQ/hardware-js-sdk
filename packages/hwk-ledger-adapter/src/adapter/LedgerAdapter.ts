@@ -110,6 +110,8 @@ import type {
 } from '@onekeyfe/hwk-adapter-core';
 
 type LedgerConnectionAttempt = ICommonCallParams & {
+  allowBleSelection?: boolean;
+  usbFallbackConnectId?: string;
   bindingReason?: 'manual-rebind';
   bindingSessionId?: string;
   selectedConnection?: { connectId: string; requestId: string };
@@ -332,6 +334,7 @@ export class LedgerAdapter implements IHardwareWallet {
     this._discoveredDevices.clear();
     this._sessions.clear();
     this._sessionTransports.clear();
+    this._activeConnectionType = undefined;
     this._pendingOperationBindings.clear();
     this._pendingPickBindings.clear();
     this._selectedBleReconnectTargets.clear();
@@ -2031,7 +2034,13 @@ export class LedgerAdapter implements IHardwareWallet {
     if (signal.aborted) LedgerAdapter._throwIfAborted(signal);
     this._assertConnectorReady('connectDevice');
 
-    if (this._isBleConnection() && !connectId && !allowUsbEphemeralFallback) {
+    // A failed BLE attempt must not block USB discovery on a combined connector.
+    if (
+      !this.connector.availableTransports?.includes('usb') &&
+      this._isBleConnection() &&
+      !connectId &&
+      !allowUsbEphemeralFallback
+    ) {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
@@ -2072,6 +2081,7 @@ export class LedgerAdapter implements IHardwareWallet {
           if (this._doConnectAbortController === controller) {
             this._connectingPromise = null;
             this._doConnectAbortController = null;
+            if (this._sessions.size === 0) this._activeConnectionType = undefined;
           }
         }
       })();
@@ -2135,19 +2145,17 @@ export class LedgerAdapter implements IHardwareWallet {
         // A saved endpoint follows normal connect/error behavior, never a new binding picker.
         return this._connectDeviceOrThrow(knownBle.connectId, preserveOperationId, internalSignal);
       }
-      if (targetConnectId && context?.knownConnections === undefined) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: 'Ledger connection metadata is required before starting Bluetooth binding',
-        });
-      }
+      // Keep the USB locator for USB recovery; BLE needs an explicit selection.
+      const bleContext: LedgerConnectionAttempt = context ?? {};
+      bleContext.allowBleSelection = true;
+      bleContext.usbFallbackConnectId = usbTarget ?? targetConnectId;
       const bleDevices = await this._searchDevices({ transportType: 'ble' }, internalSignal);
       return this._connectFirstOrSelect(
         bleDevices,
         undefined,
         allowUsbEphemeralFallback,
         preserveOperationId,
-        context,
+        bleContext,
         internalSignal
       );
     }
@@ -2283,7 +2291,7 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     const requiresBleSelection = this._isBleConnection();
-    if (requiresBleSelection && !allowUsbEphemeralFallback) {
+    if (requiresBleSelection && !allowUsbEphemeralFallback && !context?.allowBleSelection) {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
@@ -2299,7 +2307,14 @@ export class LedgerAdapter implements IHardwareWallet {
       const knownUsb = context?.knownConnections?.find(
         connection => connection.transport === 'usb'
       );
-      const usbConnectId = knownUsb?.transport === 'usb' ? knownUsb.connectId : targetConnectId;
+      const usbConnectId =
+        knownUsb?.transport === 'usb'
+          ? knownUsb.connectId
+          : context?.usbFallbackConnectId ?? targetConnectId;
+      const maySelectAnyUsb =
+        allowUsbEphemeralFallback ||
+        (!usbConnectId &&
+          !context?.knownConnections?.some(connection => connection.transport !== 'qr'));
       const { device, requestId } = await requestBleDeviceSelection({
         emitter: this.emitter,
         registry: this._uiRegistry,
@@ -2312,7 +2327,7 @@ export class LedgerAdapter implements IHardwareWallet {
               usbDevices.find(
                 device => device.connectionType === 'usb' && device.connectId === usbConnectId
               ) ??
-              (usbDevices.length === 1 && usbDevices[0].connectionType === 'usb'
+              (maySelectAnyUsb && usbDevices.length === 1 && usbDevices[0].connectionType === 'usb'
                 ? usbDevices[0]
                 : undefined);
             if (candidate) return [candidate];
