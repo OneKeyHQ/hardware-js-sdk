@@ -253,6 +253,16 @@ describe('KeystoneUrEngine', () => {
       expect(schemas[1].getKeypath().getPath()).toBe("44'/501'/0'");
       expect(schemas[1].getCurve()).toBe(Curve.ed25519);
     });
+
+    it("carries each schema's chain type", () => {
+      const ur = engine.buildKeyDerivationRequest({
+        schemas: [{ path: "m/86'/0'/0'", chainType: 'BTC_TAPROOT' }, { path: "m/44'/60'/0'" }],
+      });
+
+      const decoded = QRHardwareCall.fromCBOR(Buffer.from(ur.urData, 'hex'));
+      const schemas = (decoded.getParams() as KeyDerivation).getSchemas();
+      expect(schemas.map(schema => schema.getChainType())).toEqual(['BTC_TAPROOT', undefined]);
+    });
   });
 
   describe('BTC PSBT round trip', () => {

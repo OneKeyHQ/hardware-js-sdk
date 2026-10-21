@@ -66,6 +66,7 @@ import {
 import type {
   KeystoneEthSignRequestInput,
   KeystoneEthSignatureResult,
+  KeystoneHardwareCallChainType,
   KeystoneKeySchema,
   KeystoneParsedMultiAccounts,
   KeystoneSolSignRequestInput,
@@ -174,8 +175,35 @@ type CallTarget = { connectId: string | undefined; deviceId: string | undefined 
 const KEYSTONE_USB_REATTACH_PROBE_ATTEMPTS = 4;
 const KEYSTONE_USB_REATTACH_PROBE_INTERVAL_MS = 500;
 
-function keySchema(chain: string, path: string): KeystoneKeySchema {
-  return { path, curve: chain === 'sol' ? 'ed25519' : 'secp256k1' };
+const CHAIN_TYPE_BY_CHAIN: Partial<Record<ChainCapability, KeystoneHardwareCallChainType>> = {
+  evm: 'ETH',
+  sol: 'SOL',
+  tron: 'TRX',
+};
+
+const BTC_CHAIN_TYPE_BY_PURPOSE: Record<number, KeystoneHardwareCallChainType> = {
+  44: 'BTC_LEGACY',
+  49: 'BTC',
+  84: 'BTC_NATIVE_SEGWIT',
+  86: 'BTC_TAPROOT',
+};
+
+/** Firmware before 3.0.4 rejects a path whose schema names no chain type it knows. */
+function hardwareCallChainType(
+  chain: ChainCapability,
+  path: string
+): KeystoneHardwareCallChainType | undefined {
+  if (chain !== 'btc') return CHAIN_TYPE_BY_CHAIN[chain];
+  const purpose = normalizePath(path).match(/^m\/(\d+)'/)?.[1];
+  return purpose ? BTC_CHAIN_TYPE_BY_PURPOSE[Number(purpose)] : undefined;
+}
+
+function keySchema(chain: ChainCapability, path: string): KeystoneKeySchema {
+  return {
+    path,
+    curve: chain === 'sol' ? 'ed25519' : 'secp256k1',
+    chainType: hardwareCallChainType(chain, path),
+  };
 }
 
 function waitForKeystoneUsbReattachProbe(): Promise<void> {
