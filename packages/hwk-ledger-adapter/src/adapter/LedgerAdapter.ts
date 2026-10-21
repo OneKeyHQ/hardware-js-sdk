@@ -520,6 +520,7 @@ export class LedgerAdapter implements IHardwareWallet {
   /** Binds the picked BLE device; with a recorded wallet identity it must match first. */
   async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
     const identity = params.identity?.vendor === 'ledger' ? params.identity : undefined;
+    const identities = identity ? [identity, ...(params.fallbackIdentities ?? [])] : [];
     try {
       return await this._jobQueue.enqueue(
         '__ledger_bind_ble__',
@@ -556,25 +557,27 @@ export class LedgerAdapter implements IHardwareWallet {
                   message: 'Selected Ledger connection ended',
                 });
               }
-              const fingerprint = await this._computeChainFingerprint(
-                identity.chain,
-                (method, callParams) =>
-                  this._runConnectorCall(
-                    connectId,
-                    method,
-                    callParams,
-                    signal,
-                    undefined,
-                    undefined,
-                    { autoInstallApp: true },
-                    { connection: { connectId, sessionId } }
+              const checked = await this._fingerprintFirstOpenableChain(
+                identities,
+                (chain, autoInstallApp) =>
+                  this._computeChainFingerprint(chain, (method, callParams) =>
+                    this._runConnectorCall(
+                      connectId,
+                      method,
+                      callParams,
+                      signal,
+                      undefined,
+                      undefined,
+                      { autoInstallApp },
+                      { connection: { connectId, sessionId } }
+                    )
                   )
               );
-              if (fingerprint !== identity.value) {
+              if (checked.fingerprint !== checked.identity.value) {
                 await this._dropSession(connectId, signal);
                 throw createHwkError({
                   code: HardwareErrorCode.DeviceMismatch,
-                  message: formatDeviceMismatchError(identity.value, fingerprint),
+                  message: formatDeviceMismatchError(checked.identity.value, checked.fingerprint),
                 });
               }
               await this._saveSelectedBleBinding(
@@ -583,7 +586,7 @@ export class LedgerAdapter implements IHardwareWallet {
                 attempt,
                 undefined,
                 signal,
-                identity
+                checked.identity
               );
             }
             if (!attempt.bindingSaved) {
@@ -1657,6 +1660,30 @@ export class LedgerAdapter implements IHardwareWallet {
       debugError('[LedgerAdapter] getChainFingerprint error:', chain, err);
       return this.errorToFailure(err);
     }
+  }
+
+  /**
+   * Fingerprints the first recorded chain whose app the device can open. Only a missing app
+   * moves on to the next chain; when every app is missing, the first chain offers its install.
+   */
+  private async _fingerprintFirstOpenableChain(
+    identities: Extract<WalletIdentity, { vendor: 'ledger' }>[],
+    fingerprintOf: (chain: ChainForFingerprint, autoInstallApp: boolean) => Promise<string>
+  ): Promise<{ identity: Extract<WalletIdentity, { vendor: 'ledger' }>; fingerprint: string }> {
+    const [first] = identities;
+    if (identities.length > 1) {
+      for (const identity of identities) {
+        try {
+          return { identity, fingerprint: await fingerprintOf(identity.chain, false) };
+        } catch (error) {
+          const isAppMissing =
+            isAppNotInstalledError(error) ||
+            (error as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
+          if (!isAppMissing) throw error;
+        }
+      }
+    }
+    return { identity: first, fingerprint: await fingerprintOf(first.chain, true) };
   }
 
   /** Saves a picked BLE endpoint; `identity` is set when its wallet was just checked. */

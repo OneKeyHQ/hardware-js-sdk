@@ -370,6 +370,109 @@ describe('LedgerAdapter', () => {
     }
   );
 
+  describe('manual BLE binding across recorded chains', () => {
+    const evmIdentity = {
+      vendor: 'ledger' as const,
+      type: 'chainFingerprint' as const,
+      chain: 'evm' as const,
+      value: deriveDeviceFingerprint('original-wallet'),
+    };
+    const btcIdentity = {
+      vendor: 'ledger' as const,
+      type: 'chainFingerprint' as const,
+      chain: 'btc' as const,
+      value: '73c5da0a',
+    };
+    const ethereumMissing = () =>
+      Object.assign(new Error('Failed to open "Ethereum"'), {
+        _tag: 'OpenAppCommandError',
+        errorCode: '6807',
+        statusCode: '6807',
+        appName: 'Ethereum',
+      });
+    const methodsCalled = () => connector.callImpl.mock.calls.map((c: unknown[]) => c[1]);
+
+    beforeEach(() => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      selectDevOneWhenOffered();
+    });
+
+    it('checks the next recorded chain when the first app is missing', async () => {
+      const save = acknowledgeBindings();
+      const installPrompt = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, installPrompt);
+      connector.callImpl.mockImplementation(async (_sid: string, method: string) => {
+        if (method === 'evmGetAddress') throw ethereumMissing();
+        return { masterFingerprint: '73c5da0a' };
+      });
+
+      const result = await adapter.bindBleDevice({
+        identity: evmIdentity,
+        fallbackIdentities: [btcIdentity],
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+
+      expect(result.success).toBe(true);
+      expect(methodsCalled()).toEqual(['evmGetAddress', 'btcGetMasterFingerprint']);
+      expect(installPrompt).not.toHaveBeenCalled();
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save.mock.calls[0][0].identity).toEqual(btcIdentity);
+    });
+
+    it('stops at a mismatch without trying the next chain', async () => {
+      const save = acknowledgeBindings();
+      connector.callImpl.mockResolvedValue({ address: 'different-wallet' });
+
+      const result = await adapter.bindBleDevice({
+        identity: evmIdentity,
+        fallbackIdentities: [btcIdentity],
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      expect(methodsCalled()).toEqual(['evmGetAddress']);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('offers to install the first chain app when every recorded app is missing', async () => {
+      acknowledgeBindings();
+      let requestedAppName: string | undefined;
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, evt => {
+        requestedAppName = (evt as { payload: { appName: string } }).payload.appName;
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: false },
+        });
+      });
+      connector.callImpl.mockImplementation(async (_sid: string, method: string) => {
+        if (method === 'evmGetAddress') throw ethereumMissing();
+        throw Object.assign(new Error('Failed to open "Bitcoin"'), {
+          _tag: 'OpenAppCommandError',
+          errorCode: '6807',
+          statusCode: '6807',
+          appName: 'Bitcoin',
+        });
+      });
+
+      const result = await adapter.bindBleDevice({
+        identity: evmIdentity,
+        fallbackIdentities: [btcIdentity],
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(requestedAppName).toBe('Ethereum');
+      expect(methodsCalled()).toEqual([
+        'evmGetAddress',
+        'btcGetMasterFingerprint',
+        'evmGetAddress',
+      ]);
+    });
+  });
+
   it('drops the picked device when a manual binding is cancelled while saving', async () => {
     Object.defineProperty(connector, 'connectionType', { value: 'ble' });
     selectDevOneWhenOffered();
