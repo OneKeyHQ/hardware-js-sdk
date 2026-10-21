@@ -120,6 +120,53 @@ describe('WebUSB identity probe ownership', () => {
     }
   );
 
+  test('clears the Core session while retaining ownership after normal native close fails', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const active = createAcquiredTransport();
+    TransportManager.transport = active as unknown as Transport;
+    const selected = new Device({
+      path: 'USB_PATH',
+      id: 'USB_PATH',
+      name: 'Mock device',
+      commType: 'webusb',
+      session: 'USB_PATH',
+      debug: false,
+    });
+    selected.mainId = 'USB_PATH';
+    selected.deviceConnector = {
+      release: (path: string) => active.release(path),
+    } as never;
+    (selected as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+
+    try {
+      await active.acquire({ path: 'USB_PATH' });
+      device.close.mockRejectedValueOnce(new Error('native close failed'));
+
+      await selected.release();
+
+      expect(selected.originalDescriptor.session).toBeNull();
+      expect(selected.hasDeviceAcquire()).toBe(false);
+      expect(device.opened).toBe(true);
+
+      const competing = new WebUsbTransport();
+      competing.init({ debug: jest.fn() });
+      await expect(competing.connectToDevice('USB_PATH', true)).rejects.toThrow(
+        'USB device is already in use'
+      );
+    } finally {
+      device.close.mockImplementation(() => {
+        device.opened = false;
+        return Promise.resolve();
+      });
+      await active.release('USB_PATH');
+      await active.stop();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+      jest.restoreAllMocks();
+    }
+  });
+
   test('does not replace the transport until USB cleanup completes, or after it fails', async () => {
     const previous = TransportManager.transport;
     const { settings } = DataManager;
@@ -547,9 +594,10 @@ describe('WebUSB identity probe ownership', () => {
       };
       jest.spyOn(internals, 'rotateProtocolV2UsbGeneration').mockResolvedValue(undefined);
       jest.spyOn(internals, 'detectProtocol').mockResolvedValue('V1');
+      const acquireFailure = new Error('probe failed');
       jest.spyOn(probe, 'connect').mockImplementation(() => {
         device.opened = true;
-        if (phase === 'acquire failure') return Promise.reject(new Error('probe failed'));
+        if (phase === 'acquire failure') return Promise.reject(acquireFailure);
         return Promise.resolve();
       });
       const closeFailure = new Error('native close failed');
@@ -558,7 +606,7 @@ describe('WebUSB identity probe ownership', () => {
         await probe.acquire({ path: 'USB_PATH' });
         await expect(probe.release('USB_PATH')).rejects.toBe(closeFailure);
       } else {
-        await expect(probe.acquire({ path: 'USB_PATH' })).rejects.toBe(closeFailure);
+        await expect(probe.acquire({ path: 'USB_PATH' })).rejects.toBe(acquireFailure);
       }
       expect(device.opened).toBe(true);
       const active = new WebUsbTransport();
