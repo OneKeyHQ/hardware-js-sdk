@@ -197,6 +197,26 @@ describe('createCombinedConnector', () => {
     ]);
   });
 
+  test('names the channel a connected device came in on', () => {
+    const usb = new FakeConnector('usb', []);
+    const ble = new FakeConnector('ble', []);
+    const combined = createCombinedConnector([usb, ble]);
+    const connected = jest.fn();
+    const features = jest.fn();
+    combined.on('device-connect', connected);
+    combined.on('features', features);
+
+    ble.emit('device-connect', { device: device('ble-1') });
+    usb.emit('device-connect', { device: device('usb-1') });
+    ble.emit('features', { device: { ...device('ble-1'), features: {} } });
+
+    expect(connected.mock.calls.map(([data]) => data.device.connectionType)).toEqual([
+      'ble',
+      'usb',
+    ]);
+    expect(features.mock.calls[0][0].device.connectionType).toBe('ble');
+  });
+
   test('prioritizes USB devices ahead of BLE in the merged list', async () => {
     // BLE connector listed first to prove the sort, not the input order, wins.
     const ble = new FakeConnector('ble', [device('ble-1'), device('ble-2')]);
