@@ -243,3 +243,18 @@ export type {
   MoneroSignTransactionParams,
   MoneroSignTransactionResult,
 } from './moneroSignTransaction';
+export type { StarknetPublicKey, StarknetGetPublicKeyParams } from './starknetGetPublicKey';
+export type { StarknetAddress, StarknetGetAddressParams } from './starknetGetAddress';
+export type {
+  StarknetDeployAccountV3Params,
+  StarknetInvokeV3Params,
+  StarknetResourceBound,
+  StarknetResourceBounds,
+  StarknetSignedTx,
+  StarknetSignTransactionParams,
+  StarknetUint64,
+} from './starknetSignTransaction';
+export type {
+  StarknetExportPrivacyViewingKeyParams,
+  StarknetPrivacyViewingKey,
+} from './starknetExportPrivacyViewingKey';
