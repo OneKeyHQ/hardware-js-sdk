@@ -65,7 +65,7 @@ describe('SignerEth', () => {
         subscribe(observer: any) {
           observer.next({
             status: 'pending',
-            intermediateValue: { requiredUserInteraction: 'verify-address' },
+            intermediateValue: { requiredUserInteraction: 'unlock-device' },
           });
           observer.next({ status: 'completed', output: { address: '0x1', publicKey: '0x2' } });
           return { unsubscribe: () => {} };
@@ -75,6 +75,6 @@ describe('SignerEth', () => {
     const signer = new SignerEth(sdk);
     signer.onInteraction = onInteraction;
     await signer.getAddress("44'/60'/0'/0/0");
-    expect(onInteraction).toHaveBeenCalledWith('verify-address');
+    expect(onInteraction).toHaveBeenCalledWith('unlock-device');
   });
 });
