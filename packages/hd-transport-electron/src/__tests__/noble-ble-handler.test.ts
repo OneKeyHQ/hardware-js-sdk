@@ -1219,6 +1219,80 @@ describe('Electron Noble BLE advertisement color', () => {
     jest.clearAllMocks();
   });
 
+  test('keeps the color of an unnamed advertisement once the scan response names the device', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+
+    const handlers = new Map<string, IpcHandler>();
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: IpcHandler) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+    const noble = new EventEmitter() as EventEmitter & {
+      state: string;
+      startScanning: jest.Mock;
+      stopScanning: jest.Mock;
+    };
+    let resolveScanStarted = () => undefined;
+    const scanStarted = new Promise<void>(resolve => {
+      resolveScanStarted = resolve;
+    });
+    const peripheral = createPeripheral('split-advertisement-device');
+    noble.state = 'poweredOn';
+    noble.startScanning = jest.fn((_services, _duplicates, callback) => {
+      callback?.();
+      // Primary advertisement: services and color, but no name yet.
+      Object.assign(peripheral.advertisement, {
+        manufacturerData: Buffer.from([0x42, 0, 0, 0, 0]),
+      });
+      noble.emit('discover', peripheral);
+      // Scan response: the name arrives, without the manufacturer payload.
+      Object.assign(peripheral.advertisement, {
+        localName: 'Pro 2 A1B2',
+        manufacturerData: Buffer.alloc(0),
+      });
+      noble.emit('discover', peripheral);
+      resolveScanStarted();
+    });
+    noble.stopScanning = jest.fn(callback => callback?.());
+
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock('electron', () => ({ ipcMain }));
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+    setupNobleBleHandlers({
+      on: jest.fn(),
+      send: jest.fn(),
+    } as unknown as WebContents);
+
+    const enumerate = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE);
+    if (!enumerate) {
+      throw new Error('Electron Noble BLE enumerate handler was not registered');
+    }
+
+    const devicesPromise = Promise.resolve(enumerate());
+    await scanStarted;
+    jest.advanceTimersByTime(5000);
+
+    await expect(devicesPromise).resolves.toEqual([
+      {
+        commType: 'electron-ble',
+        id: 'split-advertisement-device',
+        name: 'Pro 2 A1B2',
+        state: 'disconnected',
+        bleColorCode: 'B',
+      },
+    ]);
+  });
+
   test('applies a color that arrives after the device was listed in the same scan', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
 

@@ -1048,6 +1048,12 @@ function shouldConnectByIdFirst(deviceId: string): boolean {
 }
 
 function handleDeviceDiscovered(peripheral: Peripheral): void {
+  // The color rides in the primary advertisement while the name may only come
+  // in a later scan response, so record it before the name-dependent filter.
+  if (hasOnekeyCommunicationService(peripheral.advertisement?.serviceUuids)) {
+    rememberBleColorCode(peripheral);
+  }
+
   // Only process OneKey candidates for general discovery. Avoid logging every
   // ambient BLE peripheral; it makes Pro2 debugging hard to read.
   if (!isOneKeyPeripheral(peripheral)) {
@@ -1057,7 +1063,6 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
   const isNewDevice = !discoveredDevices.has(peripheral.id);
   discoveredDevices.set(peripheral.id, peripheral);
   rememberBleName(peripheral.id, peripheral.advertisement?.localName);
-  rememberBleColorCode(peripheral);
   if (isNewDevice) {
     logger?.debug('[NobleBLE] OneKey BLE device discovered', {
       deviceId: peripheral.id,
