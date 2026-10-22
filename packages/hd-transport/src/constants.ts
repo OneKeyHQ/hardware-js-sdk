@@ -41,6 +41,13 @@ export const PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE = 900;
 /** Pro2 BLE/UART RX FIFO must hold a complete Proto Link frame. */
 export const PROTOCOL_V2_BLE_FRAME_MAX_BYTES = 2048;
 
+/**
+ * FilesystemFileWrite frames kept in flight by a file write pipeline. The main MCU copies a
+ * complete frame out of its UART FIFO before handling it, but a frame waiting to be parsed and
+ * the next one being received can both be resident: two full frames must fit (4096-byte FIFO).
+ */
+export const PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW = 2;
+
 /** @deprecated Use the transport-specific WebUSB or BLE file chunk constant. */
 export const PROTOCOL_V2_FILE_CHUNK_SIZE = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
 

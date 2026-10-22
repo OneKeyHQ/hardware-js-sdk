@@ -20,6 +20,37 @@ Primary implementation:
 - `packages/hd-transport/src/protocols/v2/session.ts`
 - `packages/hd-transport/src/protocols/v2/sequence-cursor.ts`
 
+## Ordered FileWrite Pipeline for BLE Firmware Transfer
+
+BLE firmware and resource transfer may overlap the next `FilesystemFileWrite` with the device's handling of the previous one. The rules are:
+
+- The pipeline lives inside one Session call. Calls for the same device stay serialized, and no other request interleaves with it.
+- At most `PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW` (2) chunks of one file are in flight, at contiguous offsets. Firmware still
+  handles chunks in order and answers every chunk. Core counts progress only from confirmed chunks.
+- The main-MCU BLE UART FIFO bounds the window. The parser copies a complete frame out of the FIFO before handling it, but the
+  frame waiting to be parsed and the next one being received can both be resident, together with the BLE coprocessor's own
+  command frames. Two 2028-byte staging frames need 4056 of a 4096-byte FIFO; a 2048-byte FIFO holds only one. Chunk sizes and
+  the 2048-byte BLE frame limit are unchanged.
+- The BLE coprocessor also bounds the window. BLE 1.0.23 queues every received packet in a 10-event scheduler queue and drops
+  packets silently when it is full; its UART link to the main MCU has no flow control. Two in-flight frames can put about 18
+  244-byte packets in flight, compared with 9 for one frame, so a coprocessor main-loop stall loses data sooner. Upstream
+  bootloaders do not check the request offset; the SDK detects a lost chunk from the echoed offset of the next response.
+- Transfers run under the device's current bootloader. Core enables the pipeline only for React Native and Electron BLE in
+  bootloader mode when the running bootloader is at or above a confirmed minimum version. Until firmware confirms that version,
+  and devices confirm the coprocessor margin, the minimum must stay unset in released builds. Released bootloaders already
+  report 1.0.2 with the 2048-byte FIFO, so the minimum must be a version that only 4096-byte FIFO bootloaders report. A
+  throughput-test build may temporarily use 1.0.2, but only to update test devices flashed with the 4096-byte FIFO. The
+  decision uses the version the running bootloader reports, never PID, name, or descriptor. LowLevel stays serial because
+  plugins are not required to keep notifications that arrive between `receive()` calls.
+- The Transport never replays chunks. After any failure, Core's existing recovery reconnects and rewrites the whole file from
+  offset 0. Cancellation and source read errors stop the pipeline and are raised by Core after the call returns, so they do not
+  invalidate the Link.
+
+Primary implementation:
+
+- `packages/hd-transport/src/protocols/v2/session.ts`
+- `packages/core/src/api/FirmwareUpdateV4.ts`
+
 ## Ownership of User Cancel
 
 Only SDK Core decides whether to send a protocol `Cancel`. The App may call `sdk.cancel()` at any time when closing UI, but must not decide on its own—based on device model, pairing stage, or permission dialogs—whether to send `Cancel` this time.

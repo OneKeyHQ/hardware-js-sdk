@@ -141,6 +141,13 @@ Each Transport instance holds one `ProtocolV2LinkManager`:
   the shared 5-minute default is used. The timeout signal must be passed to the platform adapter so work of the current generation can be cancelled.
 - ACK and business response share the same call timeout; there is no separate delivery watchdog. Not receiving an ACK within 5 seconds
   must not be treated as link failure, because the device may be waiting for user input normally.
+- A `FilesystemFileWrite` call with `fileWritePipeline` writes one file as ordered chunks with up to
+  `PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW` (2) chunks in flight. It is still one call in the device queue. Its timeout bounds
+  `prepareCall`, each frame write, and the wait for each chunk's response separately, because one file outlasts one chunk; ACKs
+  and skipped frames do not extend that wait. Responses are matched to chunks in order and must echo the chunk's path, offset,
+  and total size and confirm its end in `processed_byte`. Upstream bootloaders do not check the request offset, so the echoed
+  offset is what exposes a lost chunk. An ACK may echo any in-flight chunk's sequence. When the caller's `next` returns
+  undefined, the Session stops sending, drains the in-flight chunks, and returns the last confirmation.
 - Session does not automatically resend requests. Retries of side-effecting requests such as file write, settings, and firmware install can only be decided by Core flows
   that understand business idempotency.
 
@@ -149,6 +156,10 @@ then cancel reads, clear the assembler, close the platform connection, and clean
 
 protobuf `Failure` is a device business response and does not invalidate the Link by default. Transport also must not automatically resend business
 commands, because file write, settings, and firmware install may already have produced side effects on the device.
+
+Inside a file write pipeline, a `Failure` stops further chunks. The Session drains the responses of chunks already in flight and then
+returns the `Failure`, so the Link stays usable. A confirmation that does not match the oldest in-flight chunk, or an interactive
+response such as `ButtonRequest`, is a frame error and is link-fatal.
 
 ## Generation and Isolation of Stale Async Results
 

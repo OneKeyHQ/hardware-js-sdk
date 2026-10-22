@@ -26,7 +26,7 @@ Protocol V2 BLE 的生产默认值如下：
 | Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                     |
 | Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外 |
 | Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限       |
-| File response                                 | 每个 chunk 等待 `FilesystemFile` 与 `processed_byte`         | Protocol V2 响应仍按串行 session 管理，不并发发送有副作用的 file-write                     |
+| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；已确认的 bootloader 上，V4 同一调用内最多 2 块在途（见下文）                 |
 
 ### 为什么不能把所有 BLE file chunk 统一为 1960B
 
@@ -389,18 +389,48 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
 
 如果 raw write 维持在 `34 KB/s` 左右，即使放大 `FilesystemFileWrite` chunk，RN BLE 链路上限也会限制最终速度，很难接近 WebUSB 或 desktop BLE 的量级。
 
+### FileWrite 窗口：同一次调用内 2 块在途
+
+一问一答时，设备处理当前块、回包的这段时间里 BLE 链路是空闲的。`FirmwareUpdateV4` 可以在
+同一次 `FilesystemFileWrite` 调用内提前发出下一块，最多 `2` 块在途（`PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW`）：
+
+- 设备仍按顺序处理并逐块回包；SDK 按顺序把回包对应到在途块，要求回包回显该块的 path、offset、
+  total size，且 `processed_byte` 等于该块结束偏移。上游 bootloader 不检查请求里的 offset，只在自己的
+  写入位置追加；丢了一块时，是下一块回包里回显的 offset 暴露出来。进度只按已确认的块累计。
+- 主控先把整帧从 UART FIFO 拷出再处理（firmware-pro2 `proto_link.c`），但“等着被解析的一帧”和
+  “正在接收的下一帧”可能同时在 FIFO 里，蓝牙芯片自己的命令帧也走同一个 FIFO。两帧 `1960B` 数据的
+  staging frame 共 `4056B`，`4096B` FIFO 刚好放下；旧 bootloader 的 `2048B` FIFO 只放得下一帧。
+- 蓝牙芯片同样限制窗口：1.0.23 把每个收到的 BLE 包放进 10 个事件的调度队列，满了直接丢弃不报错，
+  转发到主控的 UART 也没有流控。2 块在途时 BLE 芯片里可能同时有约 18 个 `244B` 包，一问一答时约 9 个，
+  主循环卡顿时更容易丢包。开启前需要固件确认余量，并在真机上做长时间传输验证。
+- 块大小和 `2048B` BLE 帧上限保持不变：蓝牙 1.0.23 只对不超过 `2048B` 的帧做 passthrough
+  session 保护，帧更大时，蓝牙自身的命令可能插进一帧中间。
+- 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个。SDK 只在 React Native 与 Electron BLE、
+  bootloader 模式、且运行中的 bootloader 版本不低于固件确认的最低版本时才开启。线上 bootloader 已经是
+  `1.0.2`、FIFO 仍为 `2048B`，所以最低版本必须是只有 `4096B` FIFO 的 bootloader 才会报告的版本。固件尚未
+  确认该版本；测速分支临时填了 `1.0.2`，这会连线上 bootloader 一起打开，只能用来升级刷了 `4096B` FIFO
+  bootloader 的测试机，不能发布。装上新 bootloader 的那一次升级仍是一问一答。LowLevel（包括 CLI）
+  暂不开启：插件接口不要求在两次 `receive()` 之间保留通知。
+- 测速时按 `[FirmwareUpdateV4]` 过滤 SDK debug 日志：`BLE FileWrite window` 记录是否开启及 bootloader
+  版本/build ID；`Protocol V2 file transferred` 记录每个文件的字节数、耗时、第几次尝试和窗口大小；
+  `file transfer attempt failed` 记录文件内重传；`transfer completed` 与 `install completed` 分别给出传输
+  阶段与安装阶段（含设备上确认）的总耗时。
+- 设备返回 `Failure` 时停止发送，排空已在途块的回包后返回该 `Failure`，Link 保持可用。
+  回包与在途块不匹配属于 frame error，按 link-fatal 处理。用户取消或读取文件失败时也只是停止发送、
+  排空在途块，由 Core 在调用返回后报错，不会断开 BLE。Transport 不重发；Core 重连后从偏移 `0` 重写整个文件。
+
+#961 的历史数据显示，提速主要来自窗口 1 到 2（+38.8%，2560B 块、macOS Noble、带 credit 的实验固件），
+窗口 2 加 `1800B` 块约为 `39.7–43.1 KiB/s`。“`4096B` FIFO、不加 credit”的组合尚未在真机上测过，
+这些数字不能当作当前实现的结果。
+
 ## SDK 可靠性与事件开销
 
-`FirmwareUpdateV4` 在连接恢复后不再无条件从文件偏移 `0` 重传。SDK 只记录设备通过
-`processed_byte` 明确确认的文件偏移；重连、物理设备身份校验和初始化完成后，再通过
-`FilesystemPathInfoQuery` 检查 staging 文件。只有远端文件存在、不是目录，且文件大小位于
-“本地确认偏移到目标文件总大小”之间时才续传。
+`FirmwareUpdateV4` 的单个文件传输失败后，Core 重连、校验物理设备身份并初始化，然后从偏移 `0`
+覆盖重写整个文件，单个文件最多尝试 `3` 次。SDK 目前没有按已确认偏移续传。副作用命令的重试由
+Core 决定，不下沉到 Transport。CLI 输出的 `attempt`、`retried` 只描述外层 CLI 重试，看不出这种
+文件内的重写，判断有无重传需要按文件核对实际写入字节。
 
-远端大小大于本地确认偏移时，SDK 仍从本地确认偏移重写相同数据，不会跳过响应丢失后未确认的
-字节。远端文件缺失、大小落后、超过目标大小或状态查询失败时，安全回退到偏移 `0` 并重新覆盖。
-这项优化减少了 BLE 断连后的重复传输，同时不把副作用命令的自动重放下沉到 Transport。
-
-文件写入的内部确认回调仍在每个 ACK 后触发，用于保存续传水位和记录真实吞吐；App 可见的
+文件写入的内部确认回调在每个确认后触发，用于记录真实吞吐；App 可见的
 `FIRMWARE_PROGRESS` 则只在整数百分比变化、超过 `1s` 心跳间隔或单文件完成时发送。这样可减少
 RN bridge 和 Desktop renderer 的高频事件开销，不影响确认偏移的精度。
 

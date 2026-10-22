@@ -70,6 +70,19 @@ export type TransportWriteMetrics = {
   frameBytes: number;
 };
 
+/**
+ * Supplies the remaining chunks of one file for an ordered FilesystemFileWrite pipeline.
+ * The call's request data is the first chunk; `next` returns the following chunk in offset
+ * order, or undefined to stop. The call then resolves with the last confirmation (or the
+ * device Failure), so the caller must check `processed_byte` for completeness. Callbacks
+ * should not throw: an error escapes with chunks still in flight and invalidates the link.
+ */
+export type ProtocolV2FileWritePipeline = {
+  next: () => Promise<Record<string, unknown> | undefined>;
+  /** Called for each chunk after the device confirms it, in offset order. */
+  onResponse: (response: MessageFromOneKey) => void;
+};
+
 export type TransportCallOptions = {
   timeoutMs?: number;
   expectedTypes?: string[];
@@ -83,6 +96,12 @@ export type TransportCallOptions = {
   onResponseAfterWrite?: (response: MessageFromOneKey) => void;
   /** Prefer acknowledged BLE characteristic writes for this call when supported. */
   writeWithResponse?: boolean;
+  /**
+   * Protocol V2 only: keep up to PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW ordered
+   * FilesystemFileWrite frames of one file in flight within this call. `timeoutMs`
+   * bounds each frame write and each response instead of the whole file.
+   */
+  fileWritePipeline?: ProtocolV2FileWritePipeline;
 };
 
 type ITransportInitFn = (

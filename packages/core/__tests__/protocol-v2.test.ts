@@ -44,6 +44,7 @@ import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4, {
   assertProtocolV2FirmwareTargetsSupported,
   assertProtocolV2ReconnectIdentity,
+  supportsProtocolV2BleFileWriteWindow,
 } from '../src/api/FirmwareUpdateV4';
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
@@ -8881,6 +8882,244 @@ describe('Protocol V2 firmware update targets', () => {
 
     expect((method as any).isProtocolV2ResourceBundleUpToDate).toHaveBeenCalledWith(resource);
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['1.0.3', '1.0.3', true],
+    ['1.0.10', '1.0.3', true],
+    ['1.0.2', '1.0.3', false],
+    ['0.0.0.1', '1.0.3', false],
+    ['1.0.2', undefined, true],
+    ['1.0.1', undefined, false],
+  ] as const)(
+    'gates the BLE file write window on bootloader %s with minimum %s',
+    (bootloaderVersion, minBootloaderVersion, expected) => {
+      expect(supportsProtocolV2BleFileWriteWindow(bootloaderVersion, minBootloaderVersion)).toBe(
+        expected
+      );
+    }
+  );
+
+  test.each([
+    ['react-native', 'bootloader', true],
+    ['desktop-web-ble', 'bootloader', true],
+    ['lowlevel', 'bootloader', false],
+    ['webusb', 'bootloader', false],
+    ['react-native', 'normal', false],
+  ] as const)(
+    'enables the BLE file write window for %s in %s mode only with a supported bootloader',
+    (env, mode, expected) => {
+      const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).device = stubDevice({
+        features: { mode, bootloaderMode: mode === 'bootloader', bootloaderVersion: '1.0.3' },
+      });
+
+      try {
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.3')).toBe(expected);
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.4')).toBe(false);
+      } finally {
+        getSettingsSpy.mockRestore();
+      }
+    }
+  );
+
+  describe('windowed BLE file write', () => {
+    const confirm = (request: { file: { offset: number; data: ArrayBuffer } }) => ({
+      type: 'FilesystemFile',
+      message: { processed_byte: request.file.offset + request.file.data.byteLength },
+    });
+    const streamAll = (requests: any[]) =>
+      jest.fn(async (_name: string, _resType: string, first: any, options: any) => {
+        const { next, onResponse } = options.fileWritePipeline;
+        let request = first;
+        let last;
+        while (request) {
+          requests.push(request);
+          last = confirm(request);
+          onResponse(last);
+          request = await next();
+        }
+        return last;
+      });
+    const createMethod = (typedCall: jest.Mock) => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+      (method as any).shouldUseProtocolV2BleFileWriteWindow = jest.fn().mockReturnValue(true);
+      (method as any).getProtocolV2FirmwareChunkSize = jest.fn().mockReturnValue(1000);
+      (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+      method.postProgressMessage = jest.fn();
+      return method;
+    };
+    const transfer = async (method: FirmwareUpdateV4) => {
+      const source = await openFirmwareByteSource({ binary: new Uint8Array(2500).buffer });
+      try {
+        const processedSize: number = await (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol0:/application_p1.bin',
+          processedSize: 500,
+          totalSize: 3000,
+        });
+        return processedSize;
+      } finally {
+        await source?.close();
+      }
+    };
+
+    test('streams the file through one FileWrite call and reports confirmed chunks', async () => {
+      const requests: any[] = [];
+      const typedCall = streamAll(requests);
+      const method = createMethod(typedCall);
+
+      await expect(transfer(method)).resolves.toBe(3000);
+
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(typedCall).toHaveBeenCalledWith(
+        'FilesystemFileWrite',
+        'FilesystemFile',
+        expect.anything(),
+        expect.objectContaining({
+          writeWithResponse: false,
+          fileWritePipeline: expect.objectContaining({
+            next: expect.any(Function),
+            onResponse: expect.any(Function),
+          }),
+        })
+      );
+      expect(requests.map(request => request.file.offset)).toEqual([0, 1000, 2000]);
+      expect(requests.map(request => request.file.data.byteLength)).toEqual([1000, 1000, 500]);
+      expect(requests.map(request => request.overwrite)).toEqual([true, false, false]);
+      expect(requests.map(request => request.ui_percentage)).toEqual([50, 84, 99]);
+      expect(
+        requests.every(
+          request =>
+            request.append === false &&
+            request.file.total_size === 2500 &&
+            request.file.path === 'vol0:/application_p1.bin'
+        )
+      ).toBe(true);
+      const transferredBytes = (method.postProgressMessage as jest.Mock).mock.calls.map(
+        ([, , metrics]) => metrics.transferredBytes
+      );
+      expect(transferredBytes).toEqual([1500, 2500, 3000]);
+    });
+
+    test.each([
+      ['react-native', 10_000],
+      ['desktop-web-ble', undefined],
+    ] as const)('uses the serial per-chunk response timeout in %s', async (env, timeoutMs) => {
+      const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+      const typedCall = streamAll([]);
+
+      try {
+        await transfer(createMethod(typedCall));
+      } finally {
+        getSettingsSpy.mockRestore();
+      }
+
+      expect(typedCall.mock.calls[0][3]).toEqual(expect.objectContaining({ timeoutMs }));
+    });
+
+    test('restarts the whole file after a failed windowed write', async () => {
+      const requests: any[] = [];
+      const succeed = streamAll(requests);
+      const typedCall = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Protocol V2 file write response does not match'))
+        .mockImplementation(succeed);
+      const method = createMethod(typedCall);
+
+      await expect(transfer(method)).resolves.toBe(3000);
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      expect(typedCall).toHaveBeenCalledTimes(2);
+      expect(typedCall.mock.calls[1][2]).toEqual(
+        expect.objectContaining({ overwrite: true, file: expect.objectContaining({ offset: 0 }) })
+      );
+      expect(requests.map(request => request.file.offset)).toEqual([0, 1000, 2000]);
+    });
+
+    test('stops sending on cancel and raises it after the transport call returns', async () => {
+      const abortController = new AbortController();
+      const requests: any[] = [];
+      const succeed = streamAll(requests);
+      const typedCall = jest.fn((name: string, resType: string, first: any, options: any) =>
+        succeed(name, resType, first, {
+          ...options,
+          fileWritePipeline: {
+            ...options.fileWritePipeline,
+            onResponse: (response: any) => {
+              options.fileWritePipeline.onResponse(response);
+              abortController.abort();
+            },
+          },
+        })
+      );
+      const method = createMethod(typedCall);
+      method.abortSignal = abortController.signal;
+
+      await expect(transfer(method)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.CallQueueActionCancelled,
+      });
+      expect(requests.map(request => request.file.offset)).toEqual([0]);
+      expect((method as any).recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+    });
+
+    test('raises a source read error after the windowed call and retries the file', async () => {
+      const requests: any[] = [];
+      const typedCall = streamAll(requests);
+      const method = createMethod(typedCall);
+      const bytes = new Uint8Array(2500);
+      let failed = false;
+      const source = {
+        size: bytes.length,
+        readAt: jest.fn((offset: number, length: number) => {
+          if (offset === 1000 && !failed) {
+            failed = true;
+            return Promise.reject(new Error('artifact read failed'));
+          }
+          return Promise.resolve(bytes.slice(offset, offset + length).buffer);
+        }),
+        close: jest.fn(),
+      };
+
+      await expect(
+        (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol0:/application_p1.bin',
+          processedSize: 0,
+          totalSize: 2500,
+        })
+      ).resolves.toBe(2500);
+
+      expect(typedCall).toHaveBeenCalledTimes(2);
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      expect(requests.map(request => request.file.offset)).toEqual([0, 0, 1000, 2000]);
+    });
+
+    test('rejects a windowed write that does not confirm the whole file', async () => {
+      const typedCall = jest.fn((_name: string, _resType: string, first: any) =>
+        Promise.resolve(confirm(first))
+      );
+      const method = createMethod(typedCall);
+
+      await expect(transfer(method)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+        message: expect.stringContaining('invalid processed_byte 1000 for file size 2500'),
+      });
+      expect(typedCall).toHaveBeenCalledTimes(3);
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(2);
+    });
   });
 
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
