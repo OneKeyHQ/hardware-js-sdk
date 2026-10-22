@@ -63,6 +63,7 @@
     "build:docs": "cd ./packages/connect-examples/developer-portal && yarn build"
   },
   "resolutions": {
+    "handlebars": "4.7.10",
     "pbkdf2": "3.1.3",
     "es-iterator-helpers": "1.0.15",
     "wrap-ansi": "7.0.0",
