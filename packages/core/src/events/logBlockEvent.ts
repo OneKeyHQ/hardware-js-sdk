@@ -8,8 +8,8 @@ export const LogBlockEvent: Set<string> = new Set([
   UI_RESPONSE.RECEIVE_PASSPHRASE,
 ]);
 
-// These resource/file APIs did not exist in 1.1.32. Skip the payload so
-// the log layer does not copy huge Base64 or binary data.
+// Drop sensitive wallet payloads and large resource data before logger caches
+// or log events can retain them, regardless of whether debug output is enabled.
 const LogPayloadBlockMethod: Set<string> = new Set([
   'btcDeriveContextHash',
   'deviceUploadNft',
@@ -17,6 +17,8 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'uploadPortfolio',
   'fileWrite',
   'fileRead',
+  'zcashGetAddress',
+  'zcashSignPczt',
 ]);
 
 export function getLogBlockLabel(message: unknown): string | undefined {

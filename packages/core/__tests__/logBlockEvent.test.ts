@@ -5,6 +5,7 @@ import {
   getLogBlockLabel,
   getSafeLogPayload,
 } from '../src/events';
+import { getLog, initLog, setLoggerPostMessage } from '../src/utils/logger';
 
 describe('getLogBlockLabel', () => {
   it('keeps existing sensitive UI response blocking', () => {
@@ -96,4 +97,46 @@ describe('getLogBlockLabel', () => {
   it('does not classify events without an API method as method calls', () => {
     expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
   });
+
+  it.each(['zcashGetAddress', 'zcashSignPczt'])(
+    'keeps %s wallet data out of logger caches and events with debug disabled',
+    method => {
+      const postMessage = jest.fn();
+      const prefix = `sensitive-zcash-${method}`;
+      const logger = initLog(prefix, false);
+      setLoggerPostMessage(postMessage);
+      const request = {
+        event: 'iframe-call',
+        payload: { method, pczt: 'synthetic-pczt-marker', includeUfvk: true },
+      };
+      const response = {
+        success: true,
+        payload: [
+          {
+            ufvk: 'synthetic-viewing-key-marker',
+            seedFingerprint: 'synthetic-fingerprint-marker',
+            pczt: 'synthetic-signed-pczt-marker',
+          },
+        ],
+      };
+      const blockLabel = getLogBlockLabel(request);
+
+      expect(blockLabel).toBe(method);
+      expect(getLogBlockLabel(request.payload)).toBe(method);
+      logger.debug('request:', getSafeLogPayload(request, blockLabel));
+      logger.debug('response:', getSafeLogPayload(response, blockLabel));
+
+      const cached = getLog().filter(entry => entry.prefix === prefix);
+      expect(cached.map(entry => entry.message[1])).toEqual([
+        { method, payload: '[REDACTED]' },
+        { method, payload: '[REDACTED]' },
+      ]);
+      expect(postMessage).toHaveBeenCalledTimes(2);
+      for (const output of [JSON.stringify(cached), JSON.stringify(postMessage.mock.calls)]) {
+        expect(output).not.toContain('synthetic-');
+        expect(output).toContain('[REDACTED]');
+      }
+      expect(response.payload[0].ufvk).toBe('synthetic-viewing-key-marker');
+    }
+  );
 });
