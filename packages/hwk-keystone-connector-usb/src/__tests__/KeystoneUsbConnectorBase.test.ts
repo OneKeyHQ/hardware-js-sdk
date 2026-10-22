@@ -820,25 +820,25 @@ describe('KeystoneUsbConnectorBase', () => {
     });
   });
 
-  describe('call("checkLockStatus", ...)', () => {
-    it('passes through the device-reported lock status', async () => {
-      const connector = versionConnector({
-        [Actions.CMD_CHECK_LOCK_STATUS]: () => ({ payload: true }),
-      });
+  describe('call("resolveUr", ...) input', () => {
+    it.each([
+      ['odd length', 'abc'],
+      ['non-hex', 'zz'],
+      ['empty', ''],
+    ])('refuses %s urData without sending anything', async (_case, urData) => {
+      const resolve = jest.fn(() => ({ payload: encodeUrString('bytes', '44deadbeef') }));
+      const connector = versionConnector({ [Actions.CMD_RESOLVE_UR]: resolve });
       const session = await connector.connect();
 
-      const result = await connector.call(session.sessionId, 'checkLockStatus', undefined);
-      expect(result).toEqual({ success: true, payload: { locked: true } });
-    });
-
-    it('reads anything but a boolean true as not locked', async () => {
-      const connector = versionConnector({
-        [Actions.CMD_CHECK_LOCK_STATUS]: () => ({ payload: 'true' }),
+      const result = await connector.call(session.sessionId, 'resolveUr', {
+        urType: 'eth-sign-request',
+        urData,
       });
-      const session = await connector.connect();
 
-      const result = await connector.call(session.sessionId, 'checkLockStatus', undefined);
-      expect(result).toMatchObject({ success: true, payload: { locked: false } });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toMatchObject({ code: HardwareErrorCode.InvalidParams });
+      expect(resolve).not.toHaveBeenCalled();
     });
   });
 

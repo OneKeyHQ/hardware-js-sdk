@@ -169,6 +169,7 @@ export class KeystoneUrEngine {
       schemas: input.schemas.map(schema => ({
         path: schema.path,
         curve: DERIVATION_CURVE[schema.curve ?? 'secp256k1'],
+        chainType: schema.chainType,
       })),
       origin: input.origin,
       version: QRHardwareCallVersion.V1,

@@ -89,9 +89,20 @@ export interface KeystoneBtcSignatureResult {
 /** SLIP-10 secp256k1 (EVM/BTC) and ed25519 (SOL); Cardano BIP32-Ed25519 is out of scope. */
 export type KeystoneDerivationCurve = 'secp256k1' | 'ed25519';
 
+/** Chain types firmware before 3.0.4 checks each requested path against. */
+export type KeystoneHardwareCallChainType =
+  | 'ETH'
+  | 'SOL'
+  | 'TRX'
+  | 'BTC_LEGACY'
+  | 'BTC'
+  | 'BTC_NATIVE_SEGWIT'
+  | 'BTC_TAPROOT';
+
 export interface KeystoneKeySchema {
   path: string;
   curve?: KeystoneDerivationCurve;
+  chainType?: KeystoneHardwareCallChainType;
 }
 
 export interface KeystoneKeyDerivationRequestInput {

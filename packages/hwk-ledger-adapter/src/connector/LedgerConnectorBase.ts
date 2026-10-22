@@ -1,6 +1,7 @@
 import {
   EConnectorInteraction,
   HardwareErrorCode,
+  createHwkError,
   isKnownNonTargetHardwareVendor,
   serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
@@ -10,6 +11,7 @@ import { SignerManager } from '../signer/SignerManager';
 import {
   ERROR_TAG,
   isAppStuckByApdu,
+  isBleBondInvalidError,
   isConnectionOpeningTag,
   isKnownConnectionTag,
   isTransportStuck,
@@ -593,12 +595,15 @@ export class LedgerConnectorBase implements IConnector {
       // doubles the timeout the user sees before the unlock dialog appears.
       this._resetSignersAndSessions();
 
-      // BLE GATT failures split into 3 tags:
-      //   BlePairingTimeout — our 30s timeout (pre-classified above)
-      //   BleGattBondingFailed — anything else (PeerRemoved / BleError /
-      //                          iOS SMP reject / unknown transport)
-      //   DeviceNotAdvertising — pre-GATT scan miss (only from connectDevice)
       if (isLedgerBleConnectionType(this.connectionType)) {
+        if (isBleBondInvalidError(err)) {
+          throw createHwkError({
+            code: HardwareErrorCode.BleBondInvalid,
+            message:
+              'Ledger Bluetooth pairing is no longer valid. Forget this device in system Bluetooth settings, then reconnect.',
+            _tag: ERROR_TAG.PeerRemovedPairing,
+          });
+        }
         const tag = (err as { _tag?: string } | null | undefined)?._tag;
 
         // If DMK already gave a recognized tag (locked / disconnected / pairing

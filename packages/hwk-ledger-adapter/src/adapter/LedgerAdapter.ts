@@ -110,6 +110,8 @@ import type {
 } from '@onekeyfe/hwk-adapter-core';
 
 type LedgerConnectionAttempt = ICommonCallParams & {
+  allowBleSelection?: boolean;
+  usbFallbackConnectId?: string;
   bindingReason?: 'manual-rebind';
   bindingSessionId?: string;
   selectedConnection?: { connectId: string; requestId: string };
@@ -332,6 +334,7 @@ export class LedgerAdapter implements IHardwareWallet {
     this._discoveredDevices.clear();
     this._sessions.clear();
     this._sessionTransports.clear();
+    this._activeConnectionType = undefined;
     this._pendingOperationBindings.clear();
     this._pendingPickBindings.clear();
     this._selectedBleReconnectTargets.clear();
@@ -520,6 +523,7 @@ export class LedgerAdapter implements IHardwareWallet {
   /** Binds the picked BLE device; with a recorded wallet identity it must match first. */
   async bindBleDevice(params: BindBleDeviceParams): Promise<Response<string>> {
     const identity = params.identity?.vendor === 'ledger' ? params.identity : undefined;
+    const identities = identity ? [identity, ...(params.fallbackIdentities ?? [])] : [];
     try {
       return await this._jobQueue.enqueue(
         '__ledger_bind_ble__',
@@ -556,25 +560,27 @@ export class LedgerAdapter implements IHardwareWallet {
                   message: 'Selected Ledger connection ended',
                 });
               }
-              const fingerprint = await this._computeChainFingerprint(
-                identity.chain,
-                (method, callParams) =>
-                  this._runConnectorCall(
-                    connectId,
-                    method,
-                    callParams,
-                    signal,
-                    undefined,
-                    undefined,
-                    { autoInstallApp: true },
-                    { connection: { connectId, sessionId } }
+              const checked = await this._fingerprintFirstOpenableChain(
+                identities,
+                (chain, autoInstallApp) =>
+                  this._computeChainFingerprint(chain, (method, callParams) =>
+                    this._runConnectorCall(
+                      connectId,
+                      method,
+                      callParams,
+                      signal,
+                      undefined,
+                      undefined,
+                      { autoInstallApp },
+                      { connection: { connectId, sessionId } }
+                    )
                   )
               );
-              if (fingerprint !== identity.value) {
+              if (checked.fingerprint !== checked.identity.value) {
                 await this._dropSession(connectId, signal);
                 throw createHwkError({
                   code: HardwareErrorCode.DeviceMismatch,
-                  message: formatDeviceMismatchError(identity.value, fingerprint),
+                  message: formatDeviceMismatchError(checked.identity.value, checked.fingerprint),
                 });
               }
               await this._saveSelectedBleBinding(
@@ -583,7 +589,7 @@ export class LedgerAdapter implements IHardwareWallet {
                 attempt,
                 undefined,
                 signal,
-                identity
+                checked.identity
               );
             }
             if (!attempt.bindingSaved) {
@@ -1659,6 +1665,30 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   }
 
+  /**
+   * Fingerprints the first recorded chain whose app the device can open. Only a missing app
+   * moves on to the next chain; when every app is missing, the first chain offers its install.
+   */
+  private async _fingerprintFirstOpenableChain(
+    identities: Extract<WalletIdentity, { vendor: 'ledger' }>[],
+    fingerprintOf: (chain: ChainForFingerprint, autoInstallApp: boolean) => Promise<string>
+  ): Promise<{ identity: Extract<WalletIdentity, { vendor: 'ledger' }>; fingerprint: string }> {
+    const [first] = identities;
+    if (identities.length > 1) {
+      for (const identity of identities) {
+        try {
+          return { identity, fingerprint: await fingerprintOf(identity.chain, false) };
+        } catch (error) {
+          const isAppMissing =
+            isAppNotInstalledError(error) ||
+            (error as { code?: number })?.code === HardwareErrorCode.AppNotInstalled;
+          if (!isAppMissing) throw error;
+        }
+      }
+    }
+    return { identity: first, fingerprint: await fingerprintOf(first.chain, true) };
+  }
+
   /** Saves a picked BLE endpoint; `identity` is set when its wallet was just checked. */
   private async _saveSelectedBleBinding(
     connectId: string,
@@ -2004,7 +2034,13 @@ export class LedgerAdapter implements IHardwareWallet {
     if (signal.aborted) LedgerAdapter._throwIfAborted(signal);
     this._assertConnectorReady('connectDevice');
 
-    if (this._isBleConnection() && !connectId && !allowUsbEphemeralFallback) {
+    // A failed BLE attempt must not block USB discovery on a combined connector.
+    if (
+      !this.connector.availableTransports?.includes('usb') &&
+      this._isBleConnection() &&
+      !connectId &&
+      !allowUsbEphemeralFallback
+    ) {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
@@ -2045,6 +2081,7 @@ export class LedgerAdapter implements IHardwareWallet {
           if (this._doConnectAbortController === controller) {
             this._connectingPromise = null;
             this._doConnectAbortController = null;
+            if (this._sessions.size === 0) this._activeConnectionType = undefined;
           }
         }
       })();
@@ -2108,19 +2145,17 @@ export class LedgerAdapter implements IHardwareWallet {
         // A saved endpoint follows normal connect/error behavior, never a new binding picker.
         return this._connectDeviceOrThrow(knownBle.connectId, preserveOperationId, internalSignal);
       }
-      if (targetConnectId && context?.knownConnections === undefined) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: 'Ledger connection metadata is required before starting Bluetooth binding',
-        });
-      }
+      // Keep the USB locator for USB recovery; BLE needs an explicit selection.
+      const bleContext: LedgerConnectionAttempt = context ?? {};
+      bleContext.allowBleSelection = true;
+      bleContext.usbFallbackConnectId = usbTarget ?? targetConnectId;
       const bleDevices = await this._searchDevices({ transportType: 'ble' }, internalSignal);
       return this._connectFirstOrSelect(
         bleDevices,
         undefined,
         allowUsbEphemeralFallback,
         preserveOperationId,
-        context,
+        bleContext,
         internalSignal
       );
     }
@@ -2256,7 +2291,7 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     const requiresBleSelection = this._isBleConnection();
-    if (requiresBleSelection && !allowUsbEphemeralFallback) {
+    if (requiresBleSelection && !allowUsbEphemeralFallback && !context?.allowBleSelection) {
       throw Object.assign(new Error('Ledger BLE connectId is required.'), {
         code: HardwareErrorCode.DeviceNotFound,
       });
@@ -2272,7 +2307,14 @@ export class LedgerAdapter implements IHardwareWallet {
       const knownUsb = context?.knownConnections?.find(
         connection => connection.transport === 'usb'
       );
-      const usbConnectId = knownUsb?.transport === 'usb' ? knownUsb.connectId : targetConnectId;
+      const usbConnectId =
+        knownUsb?.transport === 'usb'
+          ? knownUsb.connectId
+          : context?.usbFallbackConnectId ?? targetConnectId;
+      const maySelectAnyUsb =
+        allowUsbEphemeralFallback ||
+        (!usbConnectId &&
+          !context?.knownConnections?.some(connection => connection.transport !== 'qr'));
       const { device, requestId } = await requestBleDeviceSelection({
         emitter: this.emitter,
         registry: this._uiRegistry,
@@ -2285,7 +2327,7 @@ export class LedgerAdapter implements IHardwareWallet {
               usbDevices.find(
                 device => device.connectionType === 'usb' && device.connectId === usbConnectId
               ) ??
-              (usbDevices.length === 1 && usbDevices[0].connectionType === 'usb'
+              (maySelectAnyUsb && usbDevices.length === 1 && usbDevices[0].connectionType === 'usb'
                 ? usbDevices[0]
                 : undefined);
             if (candidate) return [candidate];

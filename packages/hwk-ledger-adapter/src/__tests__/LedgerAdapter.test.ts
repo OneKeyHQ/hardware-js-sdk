@@ -173,6 +173,218 @@ describe('LedgerAdapter', () => {
     });
   });
 
+  describe('desktop connection attempts', () => {
+    beforeEach(() => {
+      Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    });
+
+    it.each([false, true])('rediscovers USB after both scans failed (reset=%s)', async reset => {
+      let usbPresent = false;
+      connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+        usbPresent && options?.transportType === 'usb'
+          ? [{ connectId: 'dev-1', connectionType: 'usb', name: 'Ledger USB' }]
+          : []
+      );
+      try {
+        expect((await adapter.getLedgerFirmwareVersion('')).success).toBe(false);
+        expect(
+          connector.searchDevices.mock.calls.map(([options]) => options?.transportType)
+        ).toEqual(['usb', 'ble']);
+        usbPresent = true;
+        if (reset) await adapter.searchDevices({ resetSession: true, transportType: 'usb' });
+        const previousScans = connector.searchDevices.mock.calls.length;
+        expect((await adapter.getLedgerFirmwareVersion('')).success).toBe(true);
+        expect(connector.searchDevices.mock.calls.slice(previousScans)).toEqual([
+          [{ transportType: 'usb', waitForAll: undefined }],
+        ]);
+        expect(connector.connect).toHaveBeenCalledWith('dev-1', { transportType: 'usb' });
+        expect(adapter.activeTransport).toBe('hid');
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it.each(['', 'legacy-usb-id'])(
+      'selects BLE for an unchecked install when USB is absent (target=%s)',
+      async target => {
+        connector.searchDevices.mockImplementation(
+          async (options?: ConnectorSearchDevicesOptions) =>
+            options?.transportType === 'usb'
+              ? []
+              : [{ connectId: 'dev-1', connectionType: 'ble', name: 'Ledger BLE' }]
+        );
+        connector.connect.mockResolvedValue(
+          ledgerSession('ble-session', { connectionType: 'ble' })
+        );
+        selectDevOneWhenOffered();
+        acknowledgeBindings();
+        try {
+          expect((await adapter.installApp(target, 'Tron')).success).toBe(true);
+          expect(connector.searchDevices.mock.calls[0][0]?.transportType).toBe('usb');
+          expect(connector.searchDevices.mock.calls[1][0]?.transportType).toBe('ble');
+          expect(connector.connect).toHaveBeenCalledTimes(1);
+          expect(connector.connect).toHaveBeenCalledWith('dev-1', { transportType: 'ble' });
+          expect(connector.call).toHaveBeenCalledWith('ble-session', 'installApp', {
+            appName: 'Tron',
+          });
+          expect(adapter.activeTransport).toBe('ble');
+        } finally {
+          await adapter.dispose();
+        }
+      }
+    );
+
+    it.each([false, true])(
+      'selects BLE for a missing chain without a fingerprint (typed USB hint=%s)',
+      async typedHint => {
+        connector.searchDevices.mockImplementation(
+          async (options?: ConnectorSearchDevicesOptions) =>
+            options?.transportType === 'usb'
+              ? []
+              : [{ connectId: 'dev-1', connectionType: 'ble', name: 'Ledger BLE' }]
+        );
+        connector.connect.mockResolvedValue(
+          ledgerSession('ble-session', { connectionType: 'ble' })
+        );
+        connector.callImpl.mockResolvedValue({ address: EVM_ADDR });
+        selectDevOneWhenOffered();
+        acknowledgeBindings();
+        try {
+          const result = await adapter.evmGetAddress(typedHint ? '' : 'legacy-usb-id', '', {
+            path: "m/44'/60'/0'/0/0",
+            ...(typedHint
+              ? { knownConnections: [{ transport: 'usb' as const, connectId: 'legacy-usb-id' }] }
+              : {}),
+          });
+          expect(result.success).toBe(true);
+          expect(connector.connect).toHaveBeenCalledWith('dev-1', { transportType: 'ble' });
+          expect(connector.callImpl).toHaveBeenCalledTimes(1);
+        } finally {
+          await adapter.dispose();
+        }
+      }
+    );
+
+    it('does not substitute an unrelated USB device while waiting for a BLE selection', async () => {
+      let usbAppeared = false;
+      let requestId: string | undefined;
+      connector.searchDevices.mockImplementation(
+        async (options?: ConnectorSearchDevicesOptions) => {
+          if (options?.transportType === 'usb') {
+            return usbAppeared
+              ? [{ connectId: 'usb-other', connectionType: 'usb', name: 'Other Ledger' }]
+              : [];
+          }
+          return [{ connectId: 'dev-1', connectionType: 'ble', name: 'Ledger BLE' }];
+        }
+      );
+      connector.connect.mockResolvedValue(ledgerSession('ble-session', { connectionType: 'ble' }));
+      adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, event => {
+        requestId = event.payload.requestId;
+        usbAppeared = true;
+      });
+      acknowledgeBindings();
+      const pending = adapter.installApp('legacy-usb-id', 'Tron');
+      try {
+        await waitForCondition(
+          () =>
+            connector.searchDevices.mock.calls.filter(
+              ([options]) => options?.transportType === 'usb'
+            ).length >= 2
+        );
+        expect(requestId).toBeDefined();
+        expect((await settleWithin(pending, 30)).settled).toBe(false);
+        expect(connector.connect).not.toHaveBeenCalled();
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
+          payload: { requestId, sdkConnectId: 'dev-1' },
+        });
+        expect((await pending).success).toBe(true);
+        expect(connector.connect).toHaveBeenCalledTimes(1);
+        expect(connector.connect).toHaveBeenCalledWith('dev-1', { transportType: 'ble' });
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('keeps a live BLE operation pinned and discovers USB only for the next operation', async () => {
+      let usbPresent = false;
+      connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+        options?.transportType === 'usb' && usbPresent
+          ? [{ connectId: 'usb-next', connectionType: 'usb', name: 'Ledger USB' }]
+          : []
+      );
+      connector.connect.mockImplementation(async (connectId: string) =>
+        ledgerSession(connectId === 'usb-next' ? 'usb-session' : 'ble-session', {
+          connectId,
+          connectionType: connectId === 'usb-next' ? 'usb' : 'ble',
+        })
+      );
+      try {
+        const acquired = await adapter.acquireOperation('', {
+          knownConnections: [{ transport: 'ble', connectId: 'ble-known' }],
+        });
+        if (!acquired.success) throw new Error('Fixture BLE acquisition failed');
+        const bleOperation = acquired.payload;
+        const previousScans = connector.searchDevices.mock.calls.length;
+        usbPresent = true;
+        expect((await adapter.installApp(bleOperation, 'Tron')).success).toBe(true);
+        expect(connector.searchDevices).toHaveBeenCalledTimes(previousScans);
+        expect(connector.call).toHaveBeenLastCalledWith('ble-session', 'installApp', {
+          appName: 'Tron',
+        });
+        expect(connector.connect).toHaveBeenCalledTimes(1);
+
+        await adapter.releaseOperation(bleOperation);
+        const next = await adapter.acquireOperation('', { knownConnections: [] });
+        if (!next.success) throw new Error('Fixture USB acquisition failed');
+        expect(next.payload).not.toBe(bleOperation);
+        expect(connector.searchDevices.mock.calls[previousScans][0]?.transportType).toBe('usb');
+        expect(connector.connect).toHaveBeenLastCalledWith('usb-next', { transportType: 'usb' });
+        const callsBefore = connector.call.mock.calls.length;
+        expect(await adapter.installApp(bleOperation, 'Tron')).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.OperationEnded },
+        });
+        expect(connector.call).toHaveBeenCalledTimes(callsBefore);
+        expect((await adapter.installApp(next.payload, 'Tron')).success).toBe(true);
+        expect(connector.call).toHaveBeenLastCalledWith('usb-session', 'installApp', {
+          appName: 'Tron',
+        });
+        await adapter.releaseOperation(next.payload);
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('does not reconnect a disconnected BLE operation over an available USB device', async () => {
+      connector.searchDevices.mockResolvedValue([]);
+      connector.connect.mockResolvedValue(
+        ledgerSession('ble-session', { connectId: 'ble-known', connectionType: 'ble' })
+      );
+      try {
+        const acquired = await adapter.acquireOperation('', {
+          knownConnections: [{ transport: 'ble', connectId: 'ble-known' }],
+        });
+        if (!acquired.success) throw new Error('Fixture BLE acquisition failed');
+        connector._emit('device-disconnect', { connectId: 'ble-known' });
+        connector.searchDevices.mockResolvedValue([
+          { connectId: 'usb-next', connectionType: 'usb', name: 'Ledger USB' },
+        ]);
+        const previousScans = connector.searchDevices.mock.calls.length;
+        expect(await adapter.installApp(acquired.payload, 'Tron')).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.OperationEnded },
+        });
+        expect(connector.searchDevices).toHaveBeenCalledTimes(previousScans);
+        expect(connector.connect).toHaveBeenCalledTimes(1);
+        expect(connector.call).not.toHaveBeenCalled();
+      } finally {
+        await adapter.dispose();
+      }
+    });
+  });
+
   it.each([
     ['usb', undefined],
     ['usb', 'dev-1'],
@@ -370,6 +582,109 @@ describe('LedgerAdapter', () => {
     }
   );
 
+  describe('manual BLE binding across recorded chains', () => {
+    const evmIdentity = {
+      vendor: 'ledger' as const,
+      type: 'chainFingerprint' as const,
+      chain: 'evm' as const,
+      value: deriveDeviceFingerprint('original-wallet'),
+    };
+    const btcIdentity = {
+      vendor: 'ledger' as const,
+      type: 'chainFingerprint' as const,
+      chain: 'btc' as const,
+      value: '73c5da0a',
+    };
+    const ethereumMissing = () =>
+      Object.assign(new Error('Failed to open "Ethereum"'), {
+        _tag: 'OpenAppCommandError',
+        errorCode: '6807',
+        statusCode: '6807',
+        appName: 'Ethereum',
+      });
+    const methodsCalled = () => connector.callImpl.mock.calls.map((c: unknown[]) => c[1]);
+
+    beforeEach(() => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      selectDevOneWhenOffered();
+    });
+
+    it('checks the next recorded chain when the first app is missing', async () => {
+      const save = acknowledgeBindings();
+      const installPrompt = jest.fn();
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, installPrompt);
+      connector.callImpl.mockImplementation(async (_sid: string, method: string) => {
+        if (method === 'evmGetAddress') throw ethereumMissing();
+        return { masterFingerprint: '73c5da0a' };
+      });
+
+      const result = await adapter.bindBleDevice({
+        identity: evmIdentity,
+        fallbackIdentities: [btcIdentity],
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+
+      expect(result.success).toBe(true);
+      expect(methodsCalled()).toEqual(['evmGetAddress', 'btcGetMasterFingerprint']);
+      expect(installPrompt).not.toHaveBeenCalled();
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save.mock.calls[0][0].identity).toEqual(btcIdentity);
+    });
+
+    it('stops at a mismatch without trying the next chain', async () => {
+      const save = acknowledgeBindings();
+      connector.callImpl.mockResolvedValue({ address: 'different-wallet' });
+
+      const result = await adapter.bindBleDevice({
+        identity: evmIdentity,
+        fallbackIdentities: [btcIdentity],
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      expect(methodsCalled()).toEqual(['evmGetAddress']);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('offers to install the first chain app when every recorded app is missing', async () => {
+      acknowledgeBindings();
+      let requestedAppName: string | undefined;
+      adapter.on(UI_REQUEST.REQUEST_INSTALL_APP, evt => {
+        requestedAppName = (evt as { payload: { appName: string } }).payload.appName;
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_INSTALL_APP,
+          payload: { confirmed: false },
+        });
+      });
+      connector.callImpl.mockImplementation(async (_sid: string, method: string) => {
+        if (method === 'evmGetAddress') throw ethereumMissing();
+        throw Object.assign(new Error('Failed to open "Bitcoin"'), {
+          _tag: 'OpenAppCommandError',
+          errorCode: '6807',
+          statusCode: '6807',
+          appName: 'Bitcoin',
+        });
+      });
+
+      const result = await adapter.bindBleDevice({
+        identity: evmIdentity,
+        fallbackIdentities: [btcIdentity],
+        extra: { dbDeviceId: 'db-ledger' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(requestedAppName).toBe('Ethereum');
+      expect(methodsCalled()).toEqual([
+        'evmGetAddress',
+        'btcGetMasterFingerprint',
+        'evmGetAddress',
+      ]);
+    });
+  });
+
   it('drops the picked device when a manual binding is cancelled while saving', async () => {
     Object.defineProperty(connector, 'connectionType', { value: 'ble' });
     selectDevOneWhenOffered();
@@ -510,13 +825,14 @@ describe('LedgerAdapter', () => {
     }
   );
 
-  it('does not treat a legacy target without transport metadata as a missing BLE binding', async () => {
+  it('does not select BLE for a legacy target when the caller disallows selection', async () => {
     Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
     connector.searchDevices.mockResolvedValue([]);
     const select = jest.fn();
     adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
     const result = await adapter.evmGetAddress('old-ble-id', 'expected-wallet', {
       path: "m/44'/60'/0'/0/0",
+      allowDeviceSelection: false,
     });
     expect(result).toMatchObject({
       success: false,
