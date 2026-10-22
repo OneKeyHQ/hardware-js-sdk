@@ -175,6 +175,12 @@ type CallTarget = { connectId: string | undefined; deviceId: string | undefined 
 
 // Keystone briefly leaves the USB bus when entering external-wallet mode, so a persisted-wallet
 // call must wait out re-enumeration instead of falling back to QR on one empty snapshot.
+/**
+ * Firmware MAX_KEY_DERIVATION_SCHEMAS (gui_key_derivation_request_widgets.c): a key request with more
+ * paths is refused on the device. The Keystone SDK does not export it; use its value once it does.
+ */
+const KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS = 24;
+
 const KEYSTONE_USB_REATTACH_PROBE_ATTEMPTS = 4;
 const KEYSTONE_USB_REATTACH_PROBE_INTERVAL_MS = 500;
 
@@ -1752,6 +1758,13 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
 
       const schemas = Array.from(requestedByKey.values());
+      if (schemas.length > KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS) {
+        throw createHwkError({
+          code: HardwareErrorCode.QrRequestTooLarge,
+          message: `Keystone accepts at most ${KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS} account paths per QR request; this one needs ${schemas.length}`,
+          params: { limit: KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS, requested: schemas.length },
+        });
+      }
       const requestUr = this.urEngine.buildKeyDerivationRequest({
         schemas: schemas.map(schema => keySchema(schema.hwkChain, schema.path)),
         origin: this._origin,
