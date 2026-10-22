@@ -7,6 +7,11 @@ PACKAGE_ROOT="$PARENT_PATH/.."
 REPO_ROOT="$PARENT_PATH/../../.."
 CORE_MESSAGES_DIR="$REPO_ROOT/packages/core/src/data/messages"
 
+if [[ "${1:-}" == "--static-only" ]]; then
+    node "$PARENT_PATH/protobuf-static.js"
+    exit 0
+fi
+
 SRC="../../submodules/firmware/common/protob"
 DIST="."
 LANG="typescript"
@@ -166,3 +171,5 @@ yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages.json"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/messages-protocol-v2.json"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
 yarn --cwd "$PACKAGE_ROOT" prettier --write "$PACKAGE_ROOT/src/types/messages.ts"
+
+node "$PARENT_PATH/protobuf-static.js"
