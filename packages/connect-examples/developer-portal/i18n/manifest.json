@@ -1028,8 +1028,8 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/basic-api/search-devices.mdx": {
-        "sourceHash": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
-        "outputHash": "d4e1684f3bb35fd8d9cd1d310a519532cf863c7c5b06215e96ea9dd337dd7f65",
+        "sourceHash": "b3b0a98037c2d545e3d1472c4cd10c8cdba4bd8e3c486557d845fa0727481a38",
+        "outputHash": "fa289efac153878552bc6219ca11bcd3c9802533fdf767b742984d4fa64f6e43",
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
@@ -1648,8 +1648,8 @@
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/transport/react-native-ble.mdx": {
-        "sourceHash": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
-        "outputHash": "2d512764fca7e824653bbefe4532cfb20302d476f91285f45a26f0071970682d",
+        "sourceHash": "0373ec1e838eaf8b21b960ba81c621320865f533fcffcbe4aca77d4824d9a7f7",
+        "outputHash": "129dfc92e53ecf849de0bd198e66dcb432dec728cfeb5ff0179e5ac2cf6497f8",
         "mode": "reviewed-baseline"
       },
       "hardware-sdk/transport/reconnect.mdx": {
@@ -2800,8 +2800,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/search-devices.mdx": {
-        "sourceHash": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
-        "outputHash": "d2ffc37f896d61214a0c4a152863dc53c39b8915d783edf6a7b0e73c3262a44a",
+        "sourceHash": "b3b0a98037c2d545e3d1472c4cd10c8cdba4bd8e3c486557d845fa0727481a38",
+        "outputHash": "6bc000905c08d5bd3c91ad6c8cc36a9fd825cff376406f9df095c765e2db5626",
         "mode": "translated"
       },
       "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
@@ -3420,8 +3420,8 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/react-native-ble.mdx": {
-        "sourceHash": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
-        "outputHash": "a1ce6c84a8cec5dcad46bab22ec11896298eafaf93e6d76cf8abda72b55d260c",
+        "sourceHash": "0373ec1e838eaf8b21b960ba81c621320865f533fcffcbe4aca77d4824d9a7f7",
+        "outputHash": "26bf3bdc8f930c934880e517f46d4c9b1507cf82f0ca97518d7720a8c6723500",
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
@@ -4567,8 +4567,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/search-devices.mdx": {
-        "sourceHash": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
-        "outputHash": "ecc529ef3d1ed577b35b29c4c710eef034ae4214f2d962b7a15a5b66a75b2000",
+        "sourceHash": "b3b0a98037c2d545e3d1472c4cd10c8cdba4bd8e3c486557d845fa0727481a38",
+        "outputHash": "bce27b5215c332a47074c784368428af15c6bd94190531c77589acbc76cbdbed",
         "mode": "translated"
       },
       "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
@@ -5187,8 +5187,8 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/react-native-ble.mdx": {
-        "sourceHash": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
-        "outputHash": "bb00e81401e2a14a1b169a82f8fc18384030d509be90d4048c74337c0b1e6596",
+        "sourceHash": "0373ec1e838eaf8b21b960ba81c621320865f533fcffcbe4aca77d4824d9a7f7",
+        "outputHash": "5c76b7c6af19d51366e8ccae95ce572a8420b8d7ac5a54ba36b28efdb0a6263e",
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
@@ -6334,8 +6334,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/search-devices.mdx": {
-        "sourceHash": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
-        "outputHash": "694c405da248e2a48049ce81912f4bf3478fb52c8539a718da7c6278d1a683e7",
+        "sourceHash": "b3b0a98037c2d545e3d1472c4cd10c8cdba4bd8e3c486557d845fa0727481a38",
+        "outputHash": "147b1d5823a386911cb00714cf391667e3cfdd28966dcd9bf757bdee06126e5f",
         "mode": "translated"
       },
       "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
@@ -6954,8 +6954,8 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/react-native-ble.mdx": {
-        "sourceHash": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
-        "outputHash": "616f72d2007234dba44767bb52aab97e50f41e89abe668d0e616a579f7407e0e",
+        "sourceHash": "0373ec1e838eaf8b21b960ba81c621320865f533fcffcbe4aca77d4824d9a7f7",
+        "outputHash": "db827431b96c8a38d06fec61850a6ef289e106d7b1df69681af8189d6df7742a",
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {
@@ -8101,8 +8101,8 @@
         "mode": "translated"
       },
       "hardware-sdk/basic-api/search-devices.mdx": {
-        "sourceHash": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
-        "outputHash": "d5bd5c7039e9ee3335d545e47be11cef4d6b97b734055ee73cb08f4b985f6289",
+        "sourceHash": "b3b0a98037c2d545e3d1472c4cd10c8cdba4bd8e3c486557d845fa0727481a38",
+        "outputHash": "e06c4be6e129ede141cb897bd0e70240fc3ed99bdd8d45232dcfe49c552618e0",
         "mode": "translated"
       },
       "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
@@ -8721,8 +8721,8 @@
         "mode": "translated"
       },
       "hardware-sdk/transport/react-native-ble.mdx": {
-        "sourceHash": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
-        "outputHash": "587440ac802fe40733e16b9a52107665d179a5919050292ec0d2c2d229c722ed",
+        "sourceHash": "0373ec1e838eaf8b21b960ba81c621320865f533fcffcbe4aca77d4824d9a7f7",
+        "outputHash": "29c083a6336c961ace00c656d901b5ae4f5790b1f38b3878dd2d1eb62e537ae2",
         "mode": "translated"
       },
       "hardware-sdk/transport/reconnect.mdx": {

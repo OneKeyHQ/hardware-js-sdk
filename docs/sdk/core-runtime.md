@@ -53,6 +53,7 @@ The Core package root keeps these device-info selectors so callers that still ho
 | `KnownDevice.serialNo` | Stable physical identity after init | Canonical field |
 | `KnownDevice.status` | Current transport use state | `available` / `used` / `occupied` for connection UI |
 | `SearchDevice.serialNo` | Serial of an initialized device; empty for unconnected BLE scan results | Canonical field |
+| `SearchDevice.bleColorCode` | Serial-number color letter advertised by Pro2 / Neo, from React Native or Electron BLE scans (may be remembered from an earlier advertisement); absent when unknown | Optional; callers interpret it per `deviceType` |
 | `getDeviceUUID()` / `KnownDevice.uuid` | Same as `serialNo` after init | Deprecated compatibility; new business must not use it |
 | `SearchDevice.uuid` | Historical mixed field; BLE scan may be a Transport UUID | Deprecated compatibility; routing uses `connectId`, hardware identity uses `serialNo` |
 

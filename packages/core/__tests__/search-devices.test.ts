@@ -338,6 +338,42 @@ describe('SearchDevices', () => {
     }
   );
 
+  test('BLE discovery returns the advertised color letter without a device identity', async () => {
+    mockIsBleConnect.mockReturnValue(true);
+
+    const descriptor = {
+      id: 'ble-peripheral-id',
+      path: 'ble-peripheral-id',
+      name: 'Neo A1B2',
+      commType: 'ble',
+      bleColorCode: 'E',
+    };
+    const method = new SearchDevices({
+      id: 1,
+      payload: {
+        method: 'searchDevices',
+      },
+    } as any);
+    method.init();
+    method.connector = {
+      enumerate: jest.fn().mockResolvedValue({
+        descriptors: [descriptor],
+      }),
+    } as any;
+
+    await expect(method.run()).resolves.toEqual([
+      {
+        ...descriptor,
+        connectId: 'ble-peripheral-id',
+        serialNo: null,
+        uuid: '',
+        deviceId: null,
+        deviceType: 'neo',
+        bleColorCode: 'E',
+      },
+    ]);
+  });
+
   test.each([
     ['Pro2 A1B2 - Find My', undefined, 'Pro 2 A1B2'],
     ['Pro2 5E9D - Finde My', undefined, 'Pro 2 5E9D'],
