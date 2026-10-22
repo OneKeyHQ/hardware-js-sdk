@@ -236,6 +236,19 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
   return { requests, detach: () => adapter.off(UI_REQUEST.REQUEST_QR_DISPLAY, handler) };
 }
 
+/** Answers every "show the oversized request as a QR?" prompt; the mock counts the prompts. */
+function answerQrFallback(adapter: KeystoneAdapter, confirmed: boolean): jest.Mock {
+  const asked = jest.fn();
+  adapter.on(UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM, event => {
+    asked(event.payload);
+    adapter.uiResponse({
+      type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
+      payload: { confirmed },
+    });
+  });
+  return asked;
+}
+
 /**
  * Fake USB `IConnector` answering with real registry URs, so these tests cover USB routing and
  * merge logic; wire encoding is tested in `KeystoneUsbConnectorBase.test.ts`.
@@ -2526,6 +2539,7 @@ describe('KeystoneAdapter', () => {
         if (route !== 'operation') await adapter.releaseOperation(connected);
         if (route === 'forced') await adapter.switchTransport('usb');
         const target = route === 'operation' ? connected : FIXTURE_WALLET;
+        const askedQrFallback = answerQrFallback(adapter, true);
         usb.failUrType({
           urType: 'eth-sign-request',
           error: {
@@ -2537,6 +2551,7 @@ describe('KeystoneAdapter', () => {
         try {
           const signed = await adapter.evmSignTransaction(target, FIXTURE_MFP, EVM_TX);
           const shouldUseQr = route === 'auto' && origin === 'transport';
+          expect(askedQrFallback).toHaveBeenCalledTimes(shouldUseQr ? 1 : 0);
           expect(signed.success).toBe(shouldUseQr);
           if (!signed.success) {
             expect(signed.payload.code).toBe(HardwareErrorCode.PayloadTooLarge);
@@ -2558,6 +2573,69 @@ describe('KeystoneAdapter', () => {
         }
       }
     );
+
+    it('fails as a user cancel without a QR when the user declines the QR for an oversized request', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      await adapter.releaseOperation(await connectOperation(adapter));
+      const askedQrFallback = answerQrFallback(adapter, false);
+      usb.failUrType({
+        urType: 'eth-sign-request',
+        error: {
+          code: HardwareErrorCode.PayloadTooLarge,
+          message: 'USB size limit',
+          params: { origin: 'transport' },
+        },
+      });
+      try {
+        const signed = await adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
+
+        expect(askedQrFallback).toHaveBeenCalledTimes(1);
+        expect(askedQrFallback).toHaveBeenCalledWith(
+          expect.objectContaining({ vendor: 'keystone' })
+        );
+        expect(signed).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        expect(qrFake.requests).toHaveLength(0);
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('asks once per USB bundle before showing its oversized items as QR codes', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      await adapter.releaseOperation(await connectOperation(adapter));
+      const askedQrFallback = answerQrFallback(adapter, true);
+      usb.failUrType({
+        urType: 'qr-hardware-call',
+        error: {
+          code: HardwareErrorCode.PayloadTooLarge,
+          message: 'USB size limit',
+          params: { origin: 'transport' },
+        },
+      });
+      try {
+        const result = await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+          bundle: [
+            { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/0" },
+            { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/1'/0/0" },
+          ],
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.payload.map(item => item.success)).toEqual([true, true]);
+        expect(askedQrFallback).toHaveBeenCalledTimes(1);
+        expect(qrFake.requests).toHaveLength(2);
+      } finally {
+        await adapter.dispose();
+      }
+    });
 
     it('keeps the USB session and warns of a possible signature when the signed reply is unreadable', async () => {
       const usb = fakeUsbConnector();

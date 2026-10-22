@@ -162,7 +162,10 @@ function keystoneBtcParamsFailure(params: {
  */
 type BundleAccess =
   | { channel: 'qr'; scanned: ReadonlyMap<string, KeystoneAccountEntry> }
-  | { channel: 'usb'; usbSessionId: string };
+  | { channel: 'usb'; usbSessionId: string; qrFallback: QrFallbackChoice };
+
+/** The answer to "show it as a QR?" for a request USB cannot carry; a bundle asks only once. */
+type QrFallbackChoice = { confirmed?: boolean };
 
 type OperationRoute = { operationId: string; connectionType: 'usb' | 'qr' };
 
@@ -1737,7 +1740,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       // not that session, decides the channel.
       if (this._forcedTransport !== 'qr' && !routedToQr && record?.usbSessionId) {
         return {
-          access: { channel: 'usb', usbSessionId: record.usbSessionId },
+          access: { channel: 'usb', usbSessionId: record.usbSessionId, qrFallback: {} },
           masterFingerprint: record.masterFingerprint,
         };
       }
@@ -2094,7 +2097,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     animated: boolean,
     operationId: string | undefined,
     signal: AbortSignal,
-    operationName?: string
+    operationName?: string,
+    qrFallback?: QrFallbackChoice
   ): Promise<KeystoneUr> {
     const releaseOperationRetention = isHardwareOperationId(operationId)
       ? this._operations.retain(operationId)
@@ -2106,7 +2110,8 @@ export class KeystoneAdapter implements IHardwareWallet {
         animated,
         operationId,
         signal,
-        operationName
+        operationName,
+        qrFallback
       );
     } finally {
       releaseOperationRetention?.();
@@ -2119,7 +2124,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     animated: boolean,
     operationId: string | undefined,
     signal: AbortSignal,
-    operationName?: string
+    operationName?: string,
+    qrFallback?: QrFallbackChoice
   ): Promise<KeystoneUr> {
     let record = callerRecord;
     let interactionRoute: OperationRoute | undefined;
@@ -2181,6 +2187,12 @@ export class KeystoneAdapter implements IHardwareWallet {
       };
       if (usbErrorCode === HardwareErrorCode.PayloadTooLarge && usbErrorOrigin !== 'device') {
         if (!interactionRoute && !this._forcedTransport) {
+          if (!(await this._confirmQrFallback(signal, qrFallback))) {
+            throw createHwkError({
+              code: HardwareErrorCode.UserAborted,
+              message: 'User declined to show the request too large for USB as a QR code',
+            });
+          }
           const displayDevice = toDeviceInfo(record);
           return this._requestQrAndAwaitResponse(displayDevice, { ...requestUr, animated }, signal);
         }
@@ -2326,7 +2338,15 @@ export class KeystoneAdapter implements IHardwareWallet {
         (this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId));
     const schemas = [keySchema(hwkChain, syncPath)];
     const requestUr = this.urEngine.buildKeyDerivationRequest({ schemas, origin: this._origin });
-    const responseUr = await this._resolveUr(existingRecord, requestUr, false, connectId, signal);
+    const responseUr = await this._resolveUr(
+      existingRecord,
+      requestUr,
+      false,
+      connectId,
+      signal,
+      undefined,
+      bundle?.channel === 'usb' ? bundle.qrFallback : undefined
+    );
     KeystoneAdapter._throwIfAborted(signal);
 
     const parsed = this.urEngine.parseAccountResponse(responseUr);
@@ -2434,6 +2454,41 @@ export class KeystoneAdapter implements IHardwareWallet {
     } finally {
       settled = true;
       signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  /**
+   * Asks whether a request too large for USB may be shown as a QR. A timeout or an unanswered
+   * prompt reads as no; a cancelled call keeps its own error.
+   */
+  private async _confirmQrFallback(
+    signal: AbortSignal,
+    choice: QrFallbackChoice | undefined
+  ): Promise<boolean> {
+    if (choice?.confirmed !== undefined) return choice.confirmed;
+    const requestType = UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
+    const operationId = this._activeOperationId();
+    const release = operationId ? this._operations.retain(operationId) : undefined;
+    try {
+      const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(requestType, {
+        operationId,
+      });
+      this.emitter.emit(requestType, {
+        type: requestType,
+        payload: { vendor: 'keystone', operationId },
+      });
+      let confirmed = false;
+      try {
+        confirmed = Boolean(
+          (await this._awaitQrResponse(requestType, waitPromise, signal))?.confirmed
+        );
+      } catch (error) {
+        if (signal.aborted) throw error;
+      }
+      if (choice) choice.confirmed = confirmed;
+      return confirmed;
+    } finally {
+      release?.();
     }
   }
 
