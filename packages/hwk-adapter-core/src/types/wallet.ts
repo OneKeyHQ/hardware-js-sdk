@@ -468,6 +468,10 @@ export interface HardwareEventMap {
     type: typeof UI_REQUEST.REQUEST_INSTALL_APP;
     payload: { vendor: string; appName: string } & UiRequestOperationAttribution;
   };
+  [UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM]: {
+    type: typeof UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
+    payload: { vendor: string } & UiRequestOperationAttribution;
+  };
   [UI_REQUEST.REQUEST_TREZOR_THP_PAIRING]: {
     type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
     payload: {
