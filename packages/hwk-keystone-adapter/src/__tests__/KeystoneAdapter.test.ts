@@ -3555,6 +3555,81 @@ describe('KeystoneAdapter', () => {
       expect(qrFake.requests).toHaveLength(0);
     });
 
+    describe('QR key request size', () => {
+      const ledgerLiveEvm = (count: number) =>
+        Array.from({ length: count }, (_, index) => ({
+          methodName: 'evmGetAddress' as const,
+          network: 'evm' as const,
+          path: `m/44'/60'/${index}'/0/0`,
+        }));
+
+      it('refuses a QR bundle needing more account paths than Keystone accepts, before asking', async () => {
+        const adapter = newTestAdapter();
+        const qrFake = attachFakeDevice(adapter);
+
+        const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: ledgerLiveEvm(25),
+        });
+
+        expect(result).toMatchObject({
+          success: false,
+          payload: {
+            code: HardwareErrorCode.QrRequestTooLarge,
+            params: { limit: 24, requested: 25 },
+          },
+        });
+        expect(qrFake.requests).toHaveLength(0);
+      });
+
+      it('asks once for a QR bundle right at the limit', async () => {
+        const adapter = newTestAdapter();
+        const qrFake = attachFakeDevice(adapter);
+
+        const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: ledgerLiveEvm(24),
+        });
+
+        expect(result.success).toBe(true);
+        expect(qrFake.requests).toHaveLength(1);
+        expect(requestedPathsOf(qrFake.requests[0])).toHaveLength(24);
+      });
+
+      it('leaves the same bundle alone over USB, which asks per key', async () => {
+        const usb = fakeUsbConnector();
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        await adapter.releaseOperation(await connectOperation(adapter));
+        try {
+          const result = await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+            bundle: ledgerLiveEvm(25),
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.payload.every(item => item.success)).toBe(true);
+          expect(qrFake.requests).toHaveLength(0);
+        } finally {
+          await adapter.dispose();
+        }
+      });
+
+      it('counts addresses under one account path once', async () => {
+        const adapter = newTestAdapter();
+        const qrFake = attachFakeDevice(adapter);
+
+        const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: Array.from({ length: 30 }, (_, index) => ({
+            methodName: 'evmGetAddress' as const,
+            network: 'evm' as const,
+            path: `m/44'/60'/0'/0/${index}`,
+          })),
+        });
+
+        expect(result.success).toBe(true);
+        expect(requestedPathsOf(qrFake.requests[0])).toEqual(["m/44'/60'/0'"]);
+      });
+    });
+
     it('keeps a SOL key apart from another chain exported at the same path in a USB bundle', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
