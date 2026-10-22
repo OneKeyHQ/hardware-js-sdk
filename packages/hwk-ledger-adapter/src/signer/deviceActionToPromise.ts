@@ -23,6 +23,14 @@ export interface CancelReason {
 }
 
 /**
+ * DMK sets most required interactions before the APDU leaves, as a guess: an app that is
+ * missing or opens on its own answers at once. Only one the device has not answered for this
+ * long becomes a prompt, so a prompt means the device is waiting on the person.
+ * `unlock-device` follows the device's own locked reply and shows at once.
+ */
+export const INTERACTION_PROMPT_DELAY_MS = 500;
+
+/**
  * Convert a DMK DeviceAction (Observable-based) into a Promise.
  * Handles pending -> completed/error state transitions and interaction callbacks.
  *
@@ -50,6 +58,8 @@ export function deviceActionToPromise<T>(
     let settled = false;
     let lastStep: string | undefined;
     let activeInteraction: string | undefined;
+    let pendingInteraction: string | undefined;
+    let pendingInteractionTimer: ReturnType<typeof setTimeout> | null = null;
     const observedSteps: string[] = [];
     // eslint-disable-next-line prefer-const -- assigned once after declaration, but must be declared before use in cleanup
     let sub: { unsubscribe: () => void };
@@ -84,21 +94,13 @@ export function deviceActionToPromise<T>(
       return false;
     };
 
-    const emitInteraction = (interaction: unknown) => {
-      if (!onInteraction) {
-        return;
-      }
+    const cancelPendingInteraction = () => {
+      if (pendingInteractionTimer) clearTimeout(pendingInteractionTimer);
+      pendingInteractionTimer = null;
+      pendingInteraction = undefined;
+    };
 
-      if (!interaction || interaction === 'none') {
-        clearActiveInteraction();
-        return;
-      }
-
-      const interactionName = String(interaction);
-      if (interactionName === activeInteraction) {
-        return;
-      }
-
+    const showInteraction = (interactionName: string) => {
       activeInteraction = interactionName;
       debugLog(
         '[DeviceAction] requiredUserInteraction',
@@ -108,14 +110,46 @@ export function deviceActionToPromise<T>(
       // unlock-device is DMK's own bounded poll. Other interaction
       // states keep the caller-provided watchdog so a stuck observable
       // cannot hold the queue slot forever.
-      if (interaction === 'unlock-device' && timer) {
+      if (interactionName === 'unlock-device' && timer) {
         clearTimeout(timer);
         timer = null;
       }
-      onInteraction(interactionName);
+      onInteraction?.(interactionName);
+    };
+
+    const emitInteraction = (interaction: unknown) => {
+      if (!onInteraction) {
+        return;
+      }
+
+      if (!interaction || interaction === 'none') {
+        cancelPendingInteraction();
+        clearActiveInteraction();
+        return;
+      }
+
+      const interactionName = String(interaction);
+      if (interactionName === activeInteraction || interactionName === pendingInteraction) {
+        return;
+      }
+
+      // The device moved on, so the prompt on screen no longer says what it waits for.
+      cancelPendingInteraction();
+      clearActiveInteraction();
+      if (interactionName === 'unlock-device') {
+        showInteraction(interactionName);
+        return;
+      }
+      pendingInteraction = interactionName;
+      pendingInteractionTimer = setTimeout(() => {
+        pendingInteractionTimer = null;
+        pendingInteraction = undefined;
+        if (!settled) showInteraction(interactionName);
+      }, INTERACTION_PROMPT_DELAY_MS);
     };
 
     const completeInteraction = () => {
+      cancelPendingInteraction();
       if (!clearActiveInteraction()) {
         onInteraction?.('interaction-complete');
       }

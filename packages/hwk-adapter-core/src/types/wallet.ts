@@ -163,7 +163,10 @@ export interface SaveDeviceBindingRequest extends UiRequestOperationAttribution 
   extra?: HardwareCallExtra;
 }
 
-export type BindBleDeviceParams = Pick<SaveDeviceBindingRequest, 'identity' | 'extra'>;
+export type BindBleDeviceParams = Pick<SaveDeviceBindingRequest, 'identity' | 'extra'> & {
+  /** Ledger: other recorded chains, tried in order only when the previous chain's app is missing. */
+  fallbackIdentities?: Extract<WalletIdentity, { vendor: 'ledger' }>[];
+};
 
 export interface DeviceBindingStatus {
   selectionRequestId: string;

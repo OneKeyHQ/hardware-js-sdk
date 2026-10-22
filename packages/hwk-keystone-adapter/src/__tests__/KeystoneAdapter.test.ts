@@ -1080,6 +1080,38 @@ describe('KeystoneAdapter', () => {
     });
   });
 
+  it("names each requested path's chain type, which firmware before 3.0.4 requires", async () => {
+    const adapter = newTestAdapter();
+    const fake = attachFakeDevice(adapter);
+    await adapter.allNetworkGetAddress(null as unknown as string, '', {
+      bundle: [
+        { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/0" },
+        { methodName: 'solGetAddress', network: 'sol', path: "m/44'/501'/0'/0'" },
+        { methodName: 'tronGetAddress', network: 'tron', path: "m/44'/195'/0'/0/0" },
+        { methodName: 'btcGetPublicKey', network: 'btc', path: "m/44'/0'/0'" },
+        { methodName: 'btcGetPublicKey', network: 'btc', path: "m/49'/0'/0'" },
+        { methodName: 'btcGetPublicKey', network: 'btc', path: "m/84'/0'/0'" },
+        { methodName: 'btcGetPublicKey', network: 'btc', path: "m/86'/0'/0'" },
+      ],
+    });
+
+    const call = QRHardwareCall.fromCBOR(Buffer.from(fake.requests[0].data.urData, 'hex'));
+    const chainTypeByPath = Object.fromEntries(
+      (call.getParams() as KeyDerivation)
+        .getSchemas()
+        .map(schema => [`m/${schema.getKeypath().getPath()}`, schema.getChainType()])
+    );
+    expect(chainTypeByPath).toEqual({
+      "m/44'/60'/0'": 'ETH',
+      "m/44'/501'/0'/0'": 'SOL',
+      "m/44'/195'/0'": 'TRX',
+      "m/44'/0'/0'": 'BTC_LEGACY',
+      "m/49'/0'/0'": 'BTC',
+      "m/84'/0'/0'": 'BTC_NATIVE_SEGWIT',
+      "m/86'/0'/0'": 'BTC_TAPROOT',
+    });
+  });
+
   describe('BTC account index guard (firmware signs account 0 only)', () => {
     it('allNetworkGetAddress fails only the non-zero BTC item and never asks the device for it', async () => {
       const adapter = newTestAdapter();

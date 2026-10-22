@@ -7,6 +7,7 @@ export type {
   KeystoneDerivationCurve,
   KeystoneEthSignatureResult,
   KeystoneEthSignRequestInput,
+  KeystoneHardwareCallChainType,
   KeystoneKeyDerivationRequestInput,
   KeystoneKeySchema,
   KeystoneParsedAccount,

@@ -260,6 +260,7 @@ export const ERROR_TAG = {
   // outcome when the user doesn't confirm pairing on the device, or the
   // existing bond is invalid. Observed in production after ~30s.
   PairingRefused: 'PairingRefusedError',
+  PeerRemovedPairing: 'PeerRemovedPairingError',
   // DMK remote-network failures (manager-api HTTP / secure-channel WS).
   WebSocketConnection: 'WebSocketConnectionError',
   HttpFetch: 'FetchError',
@@ -302,7 +303,40 @@ export function isBleGattBondingFailedError(err: unknown): boolean {
   return (err as { _tag?: string })._tag === ERROR_TAG.BleGattBondingFailed;
 }
 
-// Any BLE pairing failure (DMK-native, ble-plx, our own). All map to
+/** DMK keeps native BLE errors in `err`, which may differ from `originalError`. */
+export function isBleBondInvalidError(err: unknown): boolean {
+  const pending: unknown[] = [err];
+  const seen = new Set<object>();
+  while (pending.length > 0) {
+    const candidate = pending.pop();
+    if (candidate && typeof candidate === 'object' && !seen.has(candidate)) {
+      seen.add(candidate);
+      const e = candidate as Record<string, unknown>;
+      if (
+        e._tag === ERROR_TAG.PeerRemovedPairing ||
+        e.iosErrorCode === 14 ||
+        e.attErrorCode === 5 ||
+        (e.nativeErrorDomain === 'CBErrorDomain' && e.nativeErrorCode === 14)
+      ) {
+        return true;
+      }
+      const reason = typeof e.reason === 'string' ? e.reason : '';
+      const message = typeof e.message === 'string' ? e.message : '';
+      // Electron IPC preserves the patched native message, but drops custom error fields.
+      if (
+        /\bCBErrorDomain:14(?:\s|$)/.test(message) ||
+        reason.includes('Peer removed pairing information') ||
+        reason.includes('GATT_INSUF_AUTHENTICATION')
+      ) {
+        return true;
+      }
+      pending.push(e.originalError, e.err);
+    }
+  }
+  return false;
+}
+
+// Other BLE pairing failures (DMK-native, ble-plx, our own) map to
 // `code: BlePairingTimeout` so batch fail-closes uniformly. User-cancel of
 // the system pairing dialog also lands here — to the user it's the same
 // "didn't pair" outcome, no need to disambiguate.
@@ -327,6 +361,7 @@ const CONNECTION_LEVEL_TAGS: Set<string> = new Set([
   ERROR_TAG.BlePairingTimeout,
   ERROR_TAG.BleGattBondingFailed,
   ERROR_TAG.PairingRefused,
+  ERROR_TAG.PeerRemovedPairing,
   ERROR_TAG.DeviceNotRecognized,
   ERROR_TAG.NoAccessibleDevice,
   ERROR_TAG.UnknownDevice,
@@ -655,6 +690,8 @@ export function mapLedgerError(
     code = HardwareErrorCode.DeviceLocked;
   } else if (isDeviceNotAdvertisingError(err) || isDeviceNotFoundError(err)) {
     code = HardwareErrorCode.DeviceNotFound;
+  } else if (isBleBondInvalidError(err)) {
+    code = HardwareErrorCode.BleBondInvalid;
   } else if (isBlePairingFailureError(err)) {
     // Must precede isDeviceBusyError, which would match the raw transport error
     // the BLE wrapper keeps on `originalError`.

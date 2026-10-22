@@ -452,6 +452,22 @@ export function rehydrateConnectorError(error: ConnectorSerializedError): Error 
   });
 }
 
+/** A child's device events name the channel they came in on, as its search results do. */
+function withChildConnectionType(
+  event: ConnectorEventType,
+  data: ConnectorEventMap[ConnectorEventType],
+  connectionType: ConnectionType
+): ConnectorEventMap[ConnectorEventType] {
+  if (event !== 'device-connect' && event !== 'features') return data;
+  const { device } = data as ConnectorEventMap['device-connect'];
+  if (device.connectionType) return data;
+  // `device` keeps every field of its own variant (features included); only the channel is added.
+  return {
+    ...data,
+    device: { ...device, connectionType },
+  } as ConnectorEventMap[ConnectorEventType];
+}
+
 /**
  * Fuse several single-transport IConnectors (e.g. WebUSB + BLE for one
  * vendor) into one IConnector whose device list is the union of all of them.
@@ -753,7 +769,8 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
 
     on: (event, handler) => {
       const attached = connectors.map(child => {
-        const forward: UserHandler = data => (handler as UserHandler)(data);
+        const forward: UserHandler = data =>
+          (handler as UserHandler)(withChildConnectionType(event, data, child.connectionType));
         child.on(event, forward as Parameters<IConnector['on']>[1]);
         return { child, handler: forward };
       });
