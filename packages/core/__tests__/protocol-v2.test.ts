@@ -9014,10 +9014,22 @@ describe('Protocol V2 firmware update targets', () => {
       expect(transferredBytes).toEqual([1500, 2500, 3000]);
     });
 
+    test('caps windowed staging writes at the generic BLE chunk', async () => {
+      const requests: any[] = [];
+      const method = createMethod(streamAll(requests));
+      delete (method as any).getProtocolV2FirmwareChunkSize;
+      (method as any).params = { platform: 'native', chunkSize: 4096 };
+
+      await expect(transfer(method)).resolves.toBe(3000);
+
+      expect(requests.map(request => request.file.offset)).toEqual([0, 1800]);
+      expect(requests.map(request => request.file.data.byteLength)).toEqual([1800, 700]);
+    });
+
     test.each([
       ['react-native', 10_000],
-      ['desktop-web-ble', undefined],
-    ] as const)('uses the serial per-chunk response timeout in %s', async (env, timeoutMs) => {
+      ['desktop-web-ble', 10_000],
+    ] as const)('bounds each windowed response wait in %s', async (env, timeoutMs) => {
       const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
       const typedCall = streamAll([]);
 
@@ -9850,6 +9862,27 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.offset)).toEqual([0, 1960]);
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1960, 1]);
   });
+
+  test.each([
+    [false, 'vol0:/application_p1.bin', 1960],
+    [true, 'vol0:/application_p1.bin', 1800],
+    [true, 'vol0:/bundles/images/animation.okpkg', 1800],
+  ])(
+    'sizes BLE write chunks for fileWriteWindow=%s and %s',
+    (fileWriteWindow, filePath, expected) => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).params = { platform: 'native', chunkSize: 4096 };
+
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', filePath, fileWriteWindow)
+      ).toBe(expected);
+    }
+  );
 
   test('keeps confirmation active after the Request write until terminal Success arrives', async () => {
     const method = new FirmwareUpdateV4({

@@ -29,8 +29,9 @@ BLE firmware and resource transfer may overlap the next `FilesystemFileWrite` wi
   handles chunks in order and answers every chunk. Core counts progress only from confirmed chunks.
 - The main-MCU BLE UART FIFO bounds the window. The parser copies a complete frame out of the FIFO before handling it, but the
   frame waiting to be parsed and the next one being received can both be resident, together with the BLE coprocessor's own
-  command frames. Two 2028-byte staging frames need 4056 of a 4096-byte FIFO; a 2048-byte FIFO holds only one. Chunk sizes and
-  the 2048-byte BLE frame limit are unchanged.
+  command frames. Pipelined writes therefore use 1800-byte chunks for every file, including the fixed staging paths that use
+  1960 bytes when writes are serial: two such frames take about 3.75 KB of a 4096-byte FIFO, while two staging frames of up to
+  2020 bytes would leave under 60 bytes. A 2048-byte FIFO holds only one frame. The 2048-byte BLE frame limit is unchanged.
 - The BLE coprocessor also bounds the window. BLE 1.0.23 queues every received packet in a 10-event scheduler queue and drops
   packets silently when it is full; its UART link to the main MCU has no flow control. Two in-flight frames can put about 18
   244-byte packets in flight, compared with 9 for one frame, so a coprocessor main-loop stall loses data sooner. Upstream

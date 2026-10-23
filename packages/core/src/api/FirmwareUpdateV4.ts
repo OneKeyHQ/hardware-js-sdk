@@ -797,7 +797,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write', filePath?: string) {
+  private getProtocolV2FirmwareChunkSize(
+    direction: 'read' | 'write',
+    filePath?: string,
+    fileWriteWindow = false
+  ) {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
     const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
@@ -805,6 +809,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (isBle) {
       if (direction === 'read') {
         maxChunkSize = PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
+      } else if (fileWriteWindow) {
+        // Pipelined frames share the main MCU's 4096-byte UART FIFO. Two 1800-byte chunks
+        // (about 3.75 KB of frames) leave room to spare; two 1960-byte staging chunks would
+        // leave under 60 bytes.
+        maxChunkSize = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
       } else {
         // Firmware staging writes tolerate a larger BLE chunk than generic filesystem writes.
         maxChunkSize = PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '')
@@ -2266,8 +2275,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.throwIfAborted();
       const attemptStartedAt = Date.now();
       try {
-        const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath);
         const windowed = this.shouldUseProtocolV2BleFileWriteWindow();
+        const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath, windowed);
         if (windowed) {
           await this.writeProtocolV2SourceWindowed({
             source,
@@ -3333,11 +3342,12 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (source.size === 0) return;
     const firstRequest = await readRequest();
 
-    const env = DataManager.getSettings('env');
     const response = await this.device
       .getCommands()
       .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
-        timeoutMs: env === 'react-native' ? PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT : undefined,
+        // Both windowed transports (React Native and Electron BLE) invalidate a timed-out link,
+        // so a lost chunk is retried after 10 s instead of the 5-minute default.
+        timeoutMs: PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT,
         writeWithResponse: false,
         fileWritePipeline: {
           next: nextRequest,

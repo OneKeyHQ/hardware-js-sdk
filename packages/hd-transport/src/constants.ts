@@ -30,8 +30,9 @@ export const PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE = 4000;
 export const PROTOCOL_V2_BLE_FILE_CHUNK_SIZE = 1800;
 
 /**
- * FirmwareUpdateV4 chunk size for its fixed BLE staging paths.
+ * FirmwareUpdateV4 chunk size for its fixed BLE staging paths when writes are serial.
  * The longest current path still leaves 28 bytes below the 2048-byte BLE frame limit.
+ * Pipelined writes use PROTOCOL_V2_BLE_FILE_CHUNK_SIZE so two frames fit the UART FIFO.
  */
 export const PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE = 1960;
 
@@ -45,6 +46,7 @@ export const PROTOCOL_V2_BLE_FRAME_MAX_BYTES = 2048;
  * FilesystemFileWrite frames kept in flight by a file write pipeline. The main MCU copies a
  * complete frame out of its UART FIFO before handling it, but a frame waiting to be parsed and
  * the next one being received can both be resident: two full frames must fit (4096-byte FIFO).
+ * With 1800-byte chunks two frames take about 3.75 KB.
  */
 export const PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW = 2;
 

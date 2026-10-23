@@ -21,7 +21,7 @@ Protocol V2 BLE 的生产默认值如下：
 | --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | Protocol 选择                                 | method 明确只支持 V2 时直接按 `expected V2` 探测             | 双协议与 V1-only method 不改变原顺序；不根据名称/PID 推导 BLE 协议                         |
 | 普通 `FilesystemFileWrite`                    | `1800B`                                                      | 保留最长 127-byte filesystem path 的 frame 空间                                            |
-| firmware 固定 staging path                    | `1960B`                                                      | 最长当前路径的完整 frame 低于 `2048B`                                                      |
+| firmware 固定 staging path                    | 串行 `1960B`，窗口模式 `1800B`                               | 最长当前路径的完整 frame 低于 `2048B`；窗口模式要让 2 帧放进 `4096B` FIFO                  |
 | firmware `1.0.1+` 固定 `wallpaper.okpkg` path | `1960B`                                                      | 仅通过内部 BLE-only override 放宽；WebUSB 和 legacy wallpaper path 不受影响                |
 | Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                     |
 | Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外 |
@@ -46,14 +46,14 @@ firmware UART FIFO 的配置会卡住，因此不能使用该理论极值作为�
 
 ### FileWrite 场景审计
 
-| SDK 场景                             | Path 来源                                                       |      `1960B` 最坏 frame | 当前 BLE chunk | 判断                                      |
-| ------------------------------------ | --------------------------------------------------------------- | ----------------------: | -------------: | ----------------------------------------- |
-| Firmware 主组件                      | SDK 固定 staging path，最长 `24B`                               |                 `2020B` |        `1960B` | 已启用并有 frame test                     |
-| Wallpaper host-asset package         | SDK 固定 `32B` path                                             |                 `2028B` |        `1960B` | 已启用、frame test 与 macOS CLI 实测通过  |
-| Firmware resource archive            | 签名 package header，最多 `64B`；boot resource staging 为 `52B` | boot staging 为 `2048B` |        `1800B` | 不能提升；会命中已知卡死边界              |
-| NFT image/thumbnail/metadata/package | SDK 根据 hash 与 safe-integer timestamp 生成，最长 `45B`        |                 `2041B` |        `1800B` | 协议边界可容纳，但仅余 `7B`，尚无真机结果 |
-| Portfolio pending package            | SDK 固定 `39B` path                                             |                 `2035B` |        `1800B` | 协议边界可容纳，但尚无真机结果            |
-| 公共 `fileWrite`                     | 调用方提供，最长 `127B`                                         |                 `2123B` |        `1800B` | 必须保持通用安全值                        |
+| SDK 场景                             | Path 来源                                                       |      `1960B` 最坏 frame |              当前 BLE chunk | 判断                                      |
+| ------------------------------------ | --------------------------------------------------------------- | ----------------------: | --------------------------: | ----------------------------------------- |
+| Firmware 主组件                      | SDK 固定 staging path，最长 `24B`                               |                 `2020B` | `1960B`（窗口模式 `1800B`） | 已启用并有 frame test                     |
+| Wallpaper host-asset package         | SDK 固定 `32B` path                                             |                 `2028B` |                     `1960B` | 已启用、frame test 与 macOS CLI 实测通过  |
+| Firmware resource archive            | 签名 package header，最多 `64B`；boot resource staging 为 `52B` | boot staging 为 `2048B` |                     `1800B` | 不能提升；会命中已知卡死边界              |
+| NFT image/thumbnail/metadata/package | SDK 根据 hash 与 safe-integer timestamp 生成，最长 `45B`        |                 `2041B` |                     `1800B` | 协议边界可容纳，但仅余 `7B`，尚无真机结果 |
+| Portfolio pending package            | SDK 固定 `39B` path                                             |                 `2035B` |                     `1800B` | 协议边界可容纳，但尚无真机结果            |
+| 公共 `fileWrite`                     | 调用方提供，最长 `127B`                                         |                 `2123B` |                     `1800B` | 必须保持通用安全值                        |
 
 NFT 与 Portfolio 的数值是生产 schema 静态编码结果，不是物理平台验证结果。若后续放宽，应使用
 caller-specific BLE limit、增加固定 path frame test，并分别做真机上传与应用验证；不能修改公共
@@ -348,7 +348,7 @@ Ping RTT iters: 40 或 100
 
 ```text
 普通 FilesystemFileWrite chunkSize: 1800B
-FirmwareUpdateV4 固定 staging 路径 chunkSize: 1960B
+FirmwareUpdateV4 固定 staging 路径 chunkSize: 1960B（串行）；窗口模式所有文件 1800B
 iOS packetLength: min(协商 MTU - 3, 244B)
 Android packetLength: min(协商 MTU - 3, 244B)
 write mode: writeWithoutResponse
@@ -379,7 +379,7 @@ writeWithResponse 作为提速方案
 
 `FirmwareUpdateV4` 的固定 staging 路径已按生产 Protocol V2 schema 测量 protobuf 和帧头开销。
 最长路径 `vol0:/application_p1.bin` 在 uint32 最大 offset/total size 下最多容纳 `1988B` data，
-且完整 frame 正好为 `2048B`；SDK 使用 `1960B`，保留 `28B` 余量。固定 wallpaper package
+且完整 frame 正好为 `2048B`；串行时 SDK 使用 `1960B`，保留 `28B` 余量（窗口模式统一 `1800B`，见下文）。固定 wallpaper package
 path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrite 和未知资源路径仍保持
 `1800B`，因为允许的 path 最长可达 `127B`，此时 `1960B` data 会生成 `2123B` frame。
 
@@ -398,12 +398,13 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
   total size，且 `processed_byte` 等于该块结束偏移。上游 bootloader 不检查请求里的 offset，只在自己的
   写入位置追加；丢了一块时，是下一块回包里回显的 offset 暴露出来。进度只按已确认的块累计。
 - 主控先把整帧从 UART FIFO 拷出再处理（firmware-pro2 `proto_link.c`），但“等着被解析的一帧”和
-  “正在接收的下一帧”可能同时在 FIFO 里，蓝牙芯片自己的命令帧也走同一个 FIFO。两帧 `1960B` 数据的
-  staging frame 共 `4056B`，`4096B` FIFO 刚好放下；旧 bootloader 的 `2048B` FIFO 只放得下一帧。
+  “正在接收的下一帧”可能同时在 FIFO 里，蓝牙芯片自己的命令帧也走同一个 FIFO。所以窗口模式下所有文件
+  统一用 `1800B` 块，两帧约 `3.75KB`；串行时 staging 路径用的 `1960B` 块单帧最多 `2020B`，两帧只剩不到
+  `60B` 余量。旧 bootloader 的 `2048B` FIFO 只放得下一帧。
 - 蓝牙芯片同样限制窗口：1.0.23 把每个收到的 BLE 包放进 10 个事件的调度队列，满了直接丢弃不报错，
   转发到主控的 UART 也没有流控。2 块在途时 BLE 芯片里可能同时有约 18 个 `244B` 包，一问一答时约 9 个，
   主循环卡顿时更容易丢包。开启前需要固件确认余量，并在真机上做长时间传输验证。
-- 块大小和 `2048B` BLE 帧上限保持不变：蓝牙 1.0.23 只对不超过 `2048B` 的帧做 passthrough
+- `2048B` BLE 帧上限保持不变：蓝牙 1.0.23 只对不超过 `2048B` 的帧做 passthrough
   session 保护，帧更大时，蓝牙自身的命令可能插进一帧中间。
 - 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个。SDK 只在 React Native 与 Electron BLE、
   bootloader 模式、且运行中的 bootloader 版本不低于固件确认的最低版本时才开启。线上 bootloader 已经是
@@ -415,13 +416,37 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
   版本/build ID；`Protocol V2 file transferred` 记录每个文件的字节数、耗时、第几次尝试和窗口大小；
   `file transfer attempt failed` 记录文件内重传；`transfer completed` 与 `install completed` 分别给出传输
   阶段与安装阶段（含设备上确认）的总耗时。
+- 每一步等待（写一帧、等一块的回包）最长 `10s`，React Native 与 Electron BLE 相同；超时后 Link 失效，
+  Core 重连并重写该文件。串行路径的超时不变（桌面仍为默认 5 分钟）。
 - 设备返回 `Failure` 时停止发送，排空已在途块的回包后返回该 `Failure`，Link 保持可用。
   回包与在途块不匹配属于 frame error，按 link-fatal 处理。用户取消或读取文件失败时也只是停止发送、
   排空在途块，由 Core 在调用返回后报错，不会断开 BLE。Transport 不重发；Core 重连后从偏移 `0` 重写整个文件。
 
-#961 的历史数据显示，提速主要来自窗口 1 到 2（+38.8%，2560B 块、macOS Noble、带 credit 的实验固件），
-窗口 2 加 `1800B` 块约为 `39.7–43.1 KiB/s`。“`4096B` FIFO、不加 credit”的组合尚未在真机上测过，
-这些数字不能当作当前实现的结果。
+#961 的历史数据（`2560B` 块、带 credit 的实验固件）不再代表当前实现。下面是不加 credit 的实测：除标注
+app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/s（单文件有效字节 ÷ 首帧到最后一个确认的
+时间），标注百分比的是传输中途的实时值：
+
+| 主机 / 工具                                        | 设备与模式           | 文件               | 窗口 / 块                   | 结果                     | RTT       |
+| -------------------------------------------------- | -------------------- | ------------------ | --------------------------- | ------------------------ | --------- |
+| macOS Electron + SDK alpha.113（整包升级，改块前） | Neo，bootloader      | 21 个文件，27.9 MB | 2 / 资源 1800、staging 1960 | 单文件 `42.2–43.4`       | —         |
+| macOS 固件同事的 `ble_tool.py`                     | Neo，bootloader      | P2，`1646018B`，×3 | 1 / 1800                    | 中位 `31.6`              | `55ms`    |
+| 同上                                               | 同上                 | 同上               | 2 / 1800                    | 中位 `42.4`              | `83ms`    |
+| 同上                                               | 同上                 | 同上               | 2 / 1960                    | 中位 `43.0`              | `88ms`    |
+| 同上                                               | 同上                 | 同上               | 3 / 1800                    | 中位 `46.3`              | `114ms`   |
+| 同上                                               | Pro2，bootloader     | `1734826B`，×5     | 2 / 1800                    | 中位 `43.8`              | `77–84ms` |
+| Android（Pixel 9a）同事的工具 APK                  | bootloader，机型未记 | P2，`1646018B`     | 2 / 1800                    | `55.0`（第 1 次 22% 时） | `58ms`    |
+| Windows 同事的 `ble_tool.py`                       | Pro2，app 模式       | 5 MB 随机文件      | 2 / 1800                    | `62.6`（第 1 次 96% 时） | `55ms`    |
+
+- 同一台 Mac、同一台设备上，SDK alpha.113（staging 文件 `1960B` 块）与 demo 速度一致，SDK 每块带
+  `ui_percentage` 和 Electron 进程间转发都看不出开销。窗口模式全部改为 `1800B` 块后尚未做端到端实测；同机
+  demo 的 2/1800 比 2/1960 低约 1.4%（`42.4` 对 `43.0`），在测量波动内。
+- macOS 上窗口 1 到 2 只提升约 34%，RTT 从 `55ms` 涨到 `83ms`；Neo 窗口 3 每块约 `37.9ms`，帧字节约
+  `48.6 kB/s`（约 `47.4 KiB/s`）。Pro2 在窗口 2 时（`43.8`，RTT `77–84ms`）与 Neo 一致。Android 与 Windows
+  在窗口 2 时 RTT 仍约 `55–58ms`，说明上限在 macOS
+  主机链路（连接间隔由系统决定，之前测得 `15ms`），不在设备或 SDK。iOS 同样由 CoreBluetooth 决定连接
+  参数，需要单独实测。
+- 同事的 Android 工具与 SDK 在 Android 上的写法一致：请求 MTU `517`（实际 `247`）、HIGH 连接优先级、
+  `244B` write-without-response、每包等 `onCharacteristicWrite` 再发下一包。逐包等待本身不是瓶颈。
 
 ## SDK 可靠性与事件开销
 
