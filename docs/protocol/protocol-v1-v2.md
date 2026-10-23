@@ -204,6 +204,15 @@ BLE platform implementations include Electron, React Native, and the lowlevel pl
 - React Native Protocol V2 large-frame writes rely on the native BLE stack's write-without-response backpressure and do not add a fixed
   burst or flush pause. Bounded backoff retry is used only for explicit `GATT_CONGESTED`; disconnect or generation
   change aborts immediately, and writes must not continue across connections.
+- React Native can hand a whole Protocol V2 frame to native code in one call when the App's patched react-native-ble-plx
+  exposes `writeCharacteristicWithoutResponseFrame`. The SDK uses it only for high-throughput, without-response frames that
+  need more than one packet, when `ProtocolV2BleTuning.nativeFrameWrite` is not `false` and the native module reports
+  support (`isWriteCharacteristicWithoutResponseFrameSupported()`, which checks the native module so a newer JS bundle on an
+  older native binary falls back). Native code still writes packets in order with one write outstanding: Android uses one
+  RxAndroidBle long-write operation, iOS a sequential loop that waits for `canSendWriteWithoutResponse`. Each frame has a
+  unique transaction id and a `BLE_WRITE_PACKET_TIMEOUT_MS` watchdog; abort, watchdog expiry, generation change, release,
+  disconnect and manager reset cancel it. A failed frame is never retried and is link-fatal. Otherwise the per-packet path
+  above is used unchanged; Protocol V1 never uses the frame call.
 - Notification data uniformly enters `ProtocolV2FrameAssembler`; a single notification must not be assumed to be one frame.
 - On V1/V2 probe fallback, Electron BLE only rotates the renderer notification token and protocol buffers; it does not disconnect or
   resubscribe GATT. Unpaired devices therefore trigger the system pairing flow only once.

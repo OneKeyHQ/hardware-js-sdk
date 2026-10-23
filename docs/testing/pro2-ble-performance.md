@@ -446,7 +446,17 @@ app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/
   主机链路（连接间隔由系统决定，之前测得 `15ms`），不在设备或 SDK。iOS 同样由 CoreBluetooth 决定连接
   参数，需要单独实测。
 - 同事的 Android 工具与 SDK 在 Android 上的写法一致：请求 MTU `517`（实际 `247`）、HIGH 连接优先级、
-  `244B` write-without-response、每包等 `onCharacteristicWrite` 再发下一包。逐包等待本身不是瓶颈。
+  `244B` write-without-response、每包等 `onCharacteristicWrite` 再发下一包。区别在等待发生的位置：工具在 Java
+  线程里等，SDK 每个包都要从后台 JS 线程到原生再回来一次。OneKey App（Pixel 9a、alpha.115、窗口 2）整包传输
+  `41,082 B/s`（约 `40.1 KiB/s`，无重传），同机工具 `55–60 KiB/s`。Android 一次只允许一个 GATT 写在途，所以
+  这段往返夹在每两个包之间；iOS 会先排队多个无回复写，往返多半和空中时间重叠，可能仍受链路限制。
+- 因此 React Native 加了整帧原生写入（见 Protocol V1/V2 文档的 BLE 一节），`ProtocolV2BleTuning.nativeFrameWrite`
+  可关闭用于同包 A/B。每次带窗口的 FileWrite 结束时，`[ReactNativeBleTransport] FileWrite perf` 记录
+  `mode`（`native-frame` / `per-packet`）、帧数、包数、`writeMs`、`readWaitMs`，逐包模式还有每包耗时分布；
+  `Protocol V2 frame write mode` 记录当前链路用哪种模式。App 会保存这两条日志，按文件比较两种模式即可。
+- 刷了开发版测试 bootloader（`__DEV__DEBUG`，包头 production flag 为 `0`）的设备只接受开发签名的包。
+  App 预览环境下发的 `prod_release` 包（production flag `0xA55A5AA5`）能传完，但安装时每个目标都以
+  `FAILED_VERIFY`（`6`）失败，什么都不会装上。测完整升级要给这类设备配开发签名的包。
 
 ## SDK 可靠性与事件开销
 
