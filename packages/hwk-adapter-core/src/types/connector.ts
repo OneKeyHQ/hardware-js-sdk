@@ -149,7 +149,10 @@ export enum EConnectorInteraction {
 // session yet so it carries an empty `sessionId`.
 export type ConnectorUiEvent =
   | { type: EConnectorInteraction.Searching; payload: { sessionId: string } }
-  | { type: EConnectorInteraction.ConfirmOpenApp; payload: { sessionId: string } }
+  | {
+      type: EConnectorInteraction.ConfirmOpenApp;
+      payload: { sessionId: string; appName?: string };
+    }
   | { type: EConnectorInteraction.UnlockDevice; payload: { sessionId: string } }
   | { type: EConnectorInteraction.ConfirmOnDevice; payload: { sessionId: string } }
   | { type: EConnectorInteraction.InteractionComplete; payload: { sessionId: string } }
