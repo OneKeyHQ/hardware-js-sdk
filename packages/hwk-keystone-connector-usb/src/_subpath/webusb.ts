@@ -1,8 +1,10 @@
 import { TransportWebUSB } from '@keystonehq/hw-transport-webusb';
+import { Actions, USBTimeout } from '@keystonehq/hw-transport-usb';
 
 import { KeystoneUsbConnectorBase } from '../KeystoneUsbConnectorBase';
 
 import type { IConnector } from '@onekeyfe/hwk-adapter-core';
+import type { TransportHID } from '@keystonehq/hw-transport-usb';
 
 export function createKeystoneWebUsbConnector(options?: { timeoutMs?: number }): IConnector {
   const disconnectListenerCleanupByTransport = new WeakMap<object, () => void>();
@@ -10,7 +12,22 @@ export function createKeystoneWebUsbConnector(options?: { timeoutMs?: number }):
     device: USBDevice,
     config?: ConstructorParameters<typeof TransportWebUSB>[1]
   ) => {
-    const transport = new TransportWebUSB(device, config);
+    const requestTransport = new TransportWebUSB(device, config);
+    // Device information needs no confirmation; use the vendor's shorter transfer timeout.
+    const infoTransport = new TransportWebUSB(device, {
+      ...config,
+      timeout: Math.min(config?.timeout ?? USBTimeout, USBTimeout),
+    });
+    const transport: TransportHID = {
+      send: <T>(action: Actions, data: unknown) =>
+        (action === Actions.CMD_GET_DEVICE_VERSION ? infoTransport : requestTransport).send<T>(
+          action,
+          data
+        ),
+      receive: (action, requestId) => requestTransport.receive(action, requestId),
+      open: () => requestTransport.open(),
+      close: () => requestTransport.close(),
+    };
     let listenerAttached = true;
     function onDisconnect(event: USBConnectionEvent) {
       if (event.device !== device) return;

@@ -147,7 +147,7 @@ export enum EConnectorInteraction {
 // Discriminated union: most variants only carry `sessionId`, but
 // AppInstallProgress also carries `appName` + `progress`. Searching has no
 // session yet so it carries an empty `sessionId`.
-export type ConnectorUiEvent =
+export type ConnectorUiEvent = { operationId?: string } & (
   | { type: EConnectorInteraction.Searching; payload: { sessionId: string } }
   | {
       type: EConnectorInteraction.ConfirmOpenApp;
@@ -159,7 +159,8 @@ export type ConnectorUiEvent =
   | {
       type: EConnectorInteraction.AppInstallProgress;
       payload: { sessionId: string; appName: string; progress: number };
-    };
+    }
+);
 
 export interface ConnectorEventMap {
   'device-connect': { device: ConnectorDevice };

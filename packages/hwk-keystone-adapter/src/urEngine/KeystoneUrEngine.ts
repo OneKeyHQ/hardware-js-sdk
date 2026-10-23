@@ -1,4 +1,12 @@
 import { generateAddressFromXpub } from '@keystonehq/bc-ur-registry-eth';
+import {
+  CryptoAccount,
+  CryptoHDKey,
+  CryptoMultiAccounts,
+  ScriptExpressions,
+  extend,
+} from '@keystonehq/bc-ur-registry';
+import { ScriptExpression } from '@keystonehq/bc-ur-registry/dist/ScriptExpression.js';
 import { Curve, KeystoneSDK, QRHardwareCallVersion, UR } from '@keystonehq/keystone-sdk';
 import bs58check from 'bs58check';
 import * as bitcoin from 'bitcoinjs-lib';
@@ -193,6 +201,114 @@ export class KeystoneUrEngine {
       };
     }
     return this.parseMultiAccounts(ur);
+  }
+
+  /** Device exports are opt-in: request responses retain their existing format/path checks. */
+  parseAccountExport(ur: KeystoneUr): KeystoneParsedMultiAccounts {
+    try {
+      const { cbor } = toSdkUr(ur);
+      let parsed: KeystoneParsedMultiAccounts;
+      let keys: CryptoHDKey[];
+      if (ur.urType === 'crypto-account') {
+        // Extend both registry layers so existing account parsers also understand Taproot.
+        if (!Object.values(ScriptExpressions).some(script => script.getTag() === 409)) {
+          Object.assign(ScriptExpressions, { TAPROOT: new ScriptExpression(409, 'tr') });
+        }
+        extend.cbor.patchTags([409]);
+        const account = CryptoAccount.fromCBOR(cbor);
+        keys = account.getOutputDescriptors().map(output => {
+          const key = output.getHDKey();
+          const path = key?.getOrigin()?.getPath();
+          const script = output
+            .getScriptExpressions()
+            .map(item => item.getExpression())
+            .join('/');
+          const validScript =
+            (path?.startsWith("44'/0'/") && script === 'pkh') ||
+            (path?.startsWith("49'/0'/") && script === 'sh/wpkh') ||
+            (path?.startsWith("84'/0'/") && script === 'wpkh') ||
+            (path?.startsWith("86'/0'/") && script === 'tr');
+          // Keystone's BTC export includes the receiving-branch hint on its account xpub.
+          const children = key?.getChildren();
+          if (!key || !validScript || (children && children.getPath() !== '0/*')) {
+            throw new Error('Unsupported account descriptor');
+          }
+          return key;
+        });
+        const result = this.sdk.parseAccount(toSdkUr(ur));
+        parsed = {
+          masterFingerprint: requireBip32MasterFingerprint(result.masterFingerprint),
+          accounts: result.keys.map(toParsedAccount),
+        };
+      } else if (ur.urType === 'crypto-multi-accounts') {
+        keys = CryptoMultiAccounts.fromCBOR(cbor).getKeys();
+        parsed = this.parseMultiAccounts(ur);
+      } else if (ur.urType === 'crypto-hdkey') {
+        keys = [CryptoHDKey.fromCBOR(cbor)];
+        parsed = this.parseAccountResponse(ur);
+      } else {
+        throw new Error('Unsupported account export type');
+      }
+      if (!keys.length || keys.length !== parsed.accounts.length) {
+        throw new Error('Empty account export');
+      }
+      for (const key of keys) {
+        if (key.isMaster() || key.isPrivateKey()) throw new Error('Account public keys required');
+        const source = key.getOrigin()?.getSourceFingerprint();
+        if (source && source.toString('hex') !== parsed.masterFingerprint) {
+          throw createHwkError({
+            code: HardwareErrorCode.DeviceMismatch,
+            message: 'Account export contains a different wallet fingerprint',
+          });
+        }
+      }
+      const byPath = new Map<string, string>();
+      for (const account of parsed.accounts) {
+        if (
+          !/^m(?:\/\d+')+(?:\/\d+)*$/.test(account.path) ||
+          account.path
+            .slice(2)
+            .split('/')
+            .some(segment => Number(segment.replace("'", '')) >= BIP32_HARDENED_OFFSET)
+        ) {
+          throw new Error('Account export has an unsupported derivation path');
+        }
+        let identity = account.publicKey;
+        if (account.extendedPublicKey) {
+          const node = HDKey.fromExtendedKey(account.extendedPublicKey);
+          if (node.privateKey || !node.publicKey || !node.chainCode) {
+            throw new Error('Account public keys required');
+          }
+          if (node.publicKey.toString('hex') !== account.publicKey.toLowerCase()) {
+            throw new Error('Account public key does not match its extended key');
+          }
+          identity = `${identity}:${node.chainCode.toString('hex')}`;
+        } else if (!/^[0-9a-f]{64}$/i.test(account.publicKey)) {
+          throw new Error('Account export is missing a usable public key');
+        }
+        const previous = byPath.get(account.path);
+        if (previous !== undefined && previous !== identity) {
+          throw createHwkError({
+            code: HardwareErrorCode.DeviceMismatch,
+            message: 'Account export contains conflicting keys for the same path',
+          });
+        }
+        byPath.set(account.path, identity);
+      }
+      return parsed;
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === HardwareErrorCode.DeviceMismatch
+      )
+        throw error;
+      throw createHwkError({
+        code: HardwareErrorCode.InvalidParams,
+        message: 'Unable to read account export; scan a supported Keystone account export code',
+      });
+    }
   }
 
   // --- EVM ---

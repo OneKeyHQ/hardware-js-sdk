@@ -33,6 +33,7 @@ export type HardwareUiEvent =
   | Exclude<ConnectorUiEvent, { type: EConnectorInteraction.AppInstallProgress }>
   | {
       type: EConnectorInteraction.AppInstallProgress;
+      operationId?: string;
       payload: { connectId: string; appName: string; progress: number };
     };
 
@@ -225,6 +226,8 @@ export interface AllNetworkGetAddressParams extends IHardwareCommonCallParams {
 export type AllNetworkDeviceIdentity = WalletIdentity;
 
 export type AllNetworkAddressResponsePayload = Record<string, unknown> & {
+  /** This account came from the user's explicit device-export scan. */
+  accountExport?: boolean;
   error?: string;
   code?: HardwareErrorCode | number;
   errorCode?: string | number;

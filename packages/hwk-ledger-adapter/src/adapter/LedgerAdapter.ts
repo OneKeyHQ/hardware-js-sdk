@@ -1604,13 +1604,6 @@ export class LedgerAdapter implements IHardwareWallet {
       this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     }
 
-    if (resolvedConnectId) {
-      const sessionId = this._sessions.get(resolvedConnectId) ?? resolvedConnectId;
-      void this.connector.cancel(sessionId);
-    } else {
-      for (const sid of this._sessions.values()) void this.connector.cancel(sid);
-    }
-
     // Snapshot guard: only abort if connect is actually in flight (avoids
     // hitting a NEW controller from a restart between resolve and re-entry).
     // A named cancel reaches an in-flight connect only when it runs for the cancelled job or
@@ -1630,6 +1623,14 @@ export class LedgerAdapter implements IHardwareWallet {
       !connectId ||
       (activeJobId !== undefined && queueKeys.has(activeJobId)) ||
       (connectingConnectId !== undefined && targetKeys.has(connectingConnectId));
+    if (activeJobId === undefined || ownsPendingConnect) {
+      if (resolvedConnectId) {
+        const sessionId = this._sessions.get(resolvedConnectId) ?? resolvedConnectId;
+        void this.connector.cancel(sessionId);
+      } else {
+        for (const sid of this._sessions.values()) void this.connector.cancel(sid);
+      }
+    }
     if (this._connectingPromise && ownsPendingConnect) {
       this._doConnectAbortController?.abort(userAbortReason);
     }
@@ -1884,7 +1885,7 @@ export class LedgerAdapter implements IHardwareWallet {
       // still be set, so signal it to drop the dialog.
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
         type: UI_REQUEST.CLOSE_UI_WINDOW,
-        payload: {},
+        payload: { operationId },
       });
       // Re-tag as UserAborted so upstream classifiers stop the batch.
       throw Object.assign(new Error('User cancelled Ledger connection'), {
@@ -1969,7 +1970,7 @@ export class LedgerAdapter implements IHardwareWallet {
     } catch (err) {
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
         type: UI_REQUEST.CLOSE_UI_WINDOW,
-        payload: {},
+        payload: { operationId },
       });
       return false;
     }
@@ -2015,7 +2016,7 @@ export class LedgerAdapter implements IHardwareWallet {
     } catch (err) {
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
         type: UI_REQUEST.CLOSE_UI_WINDOW,
-        payload: {},
+        payload: { operationId },
       });
       return false;
     }
@@ -3092,7 +3093,7 @@ export class LedgerAdapter implements IHardwareWallet {
           // being absorbed by the install dialog.
           this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
             type: UI_REQUEST.CLOSE_UI_WINDOW,
-            payload: {},
+            payload: { operationId },
           });
           return await this._runConnectorCall(
             resolvedConnectId,
@@ -3176,7 +3177,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if ((err as { _tag?: string })?._tag === UI_REQUEST_PREEMPTED_TAG) {
         this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
           type: UI_REQUEST.CLOSE_UI_WINDOW,
-          payload: {},
+          payload: { operationId },
         });
         throw Object.assign(new Error('Device permission request superseded'), {
           _tag: ERROR_TAG.UserAborted,
@@ -3283,6 +3284,7 @@ export class LedgerAdapter implements IHardwareWallet {
   // need to subscribe in one place. The AppInstallProgress variant re-keys
   // sessionId to connectId via `_sessions`, and drops if no mapping exists.
   private uiEventForwarder = (event: ConnectorUiEvent): void => {
+    const operationId = this._activeOperationId();
     if (event.type === EConnectorInteraction.AppInstallProgress) {
       let connectId: string | undefined;
       for (const [cid, sid] of this._sessions) {
@@ -3314,6 +3316,7 @@ export class LedgerAdapter implements IHardwareWallet {
       this._installProgressLastEmittedValue = progress;
       this.emitter.emit('ui-event', {
         type: EConnectorInteraction.AppInstallProgress,
+        ...(operationId ? { operationId } : {}),
         payload: {
           connectId,
           appName,
@@ -3322,7 +3325,7 @@ export class LedgerAdapter implements IHardwareWallet {
       });
       return;
     }
-    this.emitter.emit('ui-event', event);
+    this.emitter.emit('ui-event', operationId ? { ...event, operationId } : event);
   };
 
   private registerEventListeners(): void {

@@ -64,6 +64,7 @@ describe('Trezor connector cancellation ownership', () => {
     'live-other',
     'ended-other',
     'same-operation',
+    'same-device-independent',
     'untargeted',
     'initial-target',
     'initial-other',
@@ -92,15 +93,20 @@ describe('Trezor connector cancellation ownership', () => {
         expect((await connecting).success).toBe(preserved);
         return;
       }
-      const b = await adapter.connectDevice('device-b');
+      const b =
+        scenario === 'same-device-independent' ? a : await adapter.connectDevice('device-b');
       if (!a.success || !b.success) throw new Error('Could not create operations');
       expect((await adapter.getDeviceInfo(a.payload, '')).success).toBe(true);
       expect((await adapter.getDeviceInfo(b.payload, '')).success).toBe(true);
       if (scenario === 'ended-other') await adapter.releaseOperation(a.payload);
-      const result = adapter.evmGetAddress(b.payload, '', {
-        path: "m/44'/60'/0'/0/0",
-        useEmptyPassphrase: true,
-      });
+      const result = adapter.evmGetAddress(
+        scenario === 'same-device-independent' ? 'device-a' : b.payload,
+        '',
+        {
+          path: "m/44'/60'/0'/0/0",
+          useEmptyPassphrase: true,
+        }
+      );
       await waitUntil(() => state.waiting);
       expect(state.waiting).toBe(true);
       adapter.cancel(
@@ -110,8 +116,12 @@ describe('Trezor connector cancellation ownership', () => {
           ? b.payload
           : a.payload
       );
-      const preservesOther = scenario === 'ended-other' || scenario === 'live-other';
+      const preservesOther =
+        scenario === 'ended-other' ||
+        scenario === 'live-other' ||
+        scenario === 'same-device-independent';
       expect(ui.hasPending(UI_REQUEST.REQUEST_PIN)).toBe(preservesOther);
+      if (scenario === 'same-device-independent') expect(connector.cancel).not.toHaveBeenCalled();
       if (preservesOther) {
         ui.resolve(UI_RESPONSE.RECEIVE_PIN, 'synthetic-answer');
       }

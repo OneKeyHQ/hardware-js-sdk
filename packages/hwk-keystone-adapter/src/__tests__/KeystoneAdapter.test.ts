@@ -1,6 +1,8 @@
 import bs58 from 'bs58';
 import {
   CryptoCoinInfo,
+  CryptoAccount,
+  CryptoOutput,
   CryptoHDKey,
   CryptoKeypath,
   CryptoMultiAccounts,
@@ -8,9 +10,11 @@ import {
   Curve,
   PathComponent,
   QRHardwareCall,
+  ScriptExpressions,
 } from '@keystonehq/bc-ur-registry';
 import { ETHSignature, EthSignRequest } from '@keystonehq/bc-ur-registry-eth';
 import { SolSignRequest, SolSignature } from '@keystonehq/bc-ur-registry-sol';
+import { UR } from '@keystonehq/keystone-sdk';
 import {
   DEVICE,
   EConnectorInteraction,
@@ -31,7 +35,7 @@ import { normalizePath } from '../adapter/pathUtils';
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest, TronSignType } from '../urEngine/TronSignRequest';
 import { TronSignature as TronUrSignature } from '../urEngine/TronSignature';
-import { psbtFixtureHex, urJson } from './fixtures';
+import { KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR, psbtFixtureHex, urJson } from './fixtures';
 
 import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type {
@@ -140,6 +144,7 @@ function echoedRequestId(
 }
 
 interface FakeDeviceOptions {
+  deviceVersion?: string;
   /** Have the fixture device echo back a requestId that doesn't match the pending request. */
   wrongRequestId?: boolean;
   /** Have the fixture device answer without any requestId. */
@@ -194,7 +199,9 @@ function deviceReply(
       return new CryptoMultiAccounts(
         Buffer.from(options.mfpHex, 'hex'),
         keys,
-        'Keystone 3 Pro (fixture)'
+        'Keystone 3 Pro (fixture)',
+        undefined,
+        options.deviceVersion
       ).toUR();
     }
     case 'eth-sign-request': {
@@ -254,6 +261,7 @@ function answerQrFallback(adapter: KeystoneAdapter, confirmed: boolean): jest.Mo
  * merge logic; wire encoding is tested in `KeystoneUsbConnectorBase.test.ts`.
  */
 interface FakeUsbOptions {
+  firmwareVersion?: string;
   /** Wallet fingerprint the device claims; defaults to the root's. */
   mfpHex?: string;
   /** Fail every call (or only calls for `failOnUrType`) with this code. */
@@ -270,6 +278,7 @@ interface FakeUsbOptions {
 type CallError = Extract<ConnectorCallResult, { success: false }>['error'];
 
 function fakeUsbConnector({
+  firmwareVersion = '1.7.0',
   mfpHex,
   failCallWith,
   failOnUrType,
@@ -356,7 +365,7 @@ function fakeUsbConnector({
         deviceInfo: {
           vendor: 'keystone',
           model: 'Keystone 3 Pro',
-          firmwareVersion: '1.7.0',
+          firmwareVersion,
           deviceId: '',
           connectId: sessionId,
           connectionType: 'usb',
@@ -406,8 +415,7 @@ function fakeUsbConnector({
       }
       const request = params as { urType: string; urData: string };
       const sessionRoot = rootsBySession.get(sessionId) ?? root;
-      // The USB fake answers only key exports and EVM signing.
-      const reply = ['qr-hardware-call', 'eth-sign-request'].includes(request.urType)
+      const reply = ['qr-hardware-call', 'eth-sign-request', 'crypto-psbt'].includes(request.urType)
         ? deviceReply(request, { root: sessionRoot, mfpHex: mfpOf(sessionRoot) })
         : undefined;
       return Promise.resolve<ConnectorCallResult>(
@@ -1143,6 +1151,9 @@ describe('KeystoneAdapter', () => {
       expect((result.payload[0].payload as { code?: number }).code).toBe(
         HardwareErrorCode.DevicePathForbidden
       );
+      expect(result.payload[0].payload).toMatchObject({
+        params: { reason: 'btc-account-limit' },
+      });
       expect(result.payload[1].success).toBe(true);
     });
   });
@@ -1626,10 +1637,10 @@ describe('KeystoneAdapter', () => {
       }
     );
 
-    it('cancels an unpinned QR wait through the connection live operation', async () => {
+    it('keeps an unnamed QR request independent of the connection operation', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
-      const connected = await connectOperation(adapter, connectQrDevice);
+      await connectOperation(adapter, connectQrDevice);
       // Leave the signing request unanswered so it stays pending.
       fake.detach();
       const prompts: { payload: { operationId?: string } }[] = [];
@@ -1641,7 +1652,7 @@ describe('KeystoneAdapter', () => {
       const pending = adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
       await sleep(10);
       expect(prompts).toHaveLength(1);
-      expect(prompts[0].payload.operationId).toBe(connected);
+      expect(prompts[0].payload.operationId).toBeUndefined();
 
       adapter.cancel(FIXTURE_WALLET);
       await expect(pending).resolves.toMatchObject({
@@ -1651,7 +1662,7 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
-    it('reaches nothing when the named connectId resolves to no operation', async () => {
+    it('does not cancel a fresh request through an omitted operation', async () => {
       const adapter = newTestAdapter();
       const fake = attachFakeDevice(adapter);
       const connected = await connectOperation(adapter, connectQrDevice);
@@ -1669,6 +1680,10 @@ describe('KeystoneAdapter', () => {
       expect(settled()).toBe(false);
 
       adapter.cancel(connected);
+      await sleep(10);
+      expect(settled()).toBe(false);
+
+      adapter.cancel(FIXTURE_WALLET);
       expect((await pending).success).toBe(false);
       await adapter.dispose();
     });
@@ -1697,28 +1712,33 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
-    it('keeps the live operation from expiring while an unpinned QR prompt is open', async () => {
-      const adapter = newTestAdapter();
-      const fake = attachFakeDevice(adapter);
-      const connected = await connectOperation(adapter, connectQrDevice);
-      fake.detach();
-      const operations = (
-        adapter as unknown as {
-          _operations: { _active: Map<string, { timer?: unknown }> };
-        }
-      )._operations._active;
+    it.each([true, false])(
+      'retains only an explicitly supplied operation during a QR prompt (supplied=%s)',
+      async supplied => {
+        const adapter = newTestAdapter();
+        const fake = attachFakeDevice(adapter);
+        const connected = await connectOperation(adapter, connectQrDevice);
+        fake.detach();
+        const operations = (
+          adapter as unknown as {
+            _operations: { _active: Map<string, { timer?: unknown }> };
+          }
+        )._operations._active;
 
-      // No operationId on the call, so it neither resolves nor retains the operation itself.
-      const pending = adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
-      await sleep(10);
-      // A retained operation runs no TTL timer, so it cannot end under the open prompt.
-      expect(operations.get(connected)?.timer).toBeUndefined();
+        const pending = adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, {
+          ...EVM_TX,
+          ...(supplied ? { operationId: connected } : {}),
+        });
+        await sleep(10);
+        if (supplied) expect(operations.get(connected)?.timer).toBeUndefined();
+        else expect(operations.get(connected)?.timer).toBeDefined();
 
-      adapter.cancel(FIXTURE_WALLET);
-      await pending;
-      expect(operations.get(connected)?.timer).toBeDefined();
-      await adapter.dispose();
-    });
+        adapter.cancel(supplied ? connected : FIXTURE_WALLET);
+        await pending;
+        expect(operations.get(connected)?.timer).toBeDefined();
+        await adapter.dispose();
+      }
+    );
 
     it.each([
       [
@@ -1746,13 +1766,13 @@ describe('KeystoneAdapter', () => {
           prompts.push(event);
         });
 
-        // No operationId on the call: the prompt names the live operation, but the call is not its.
+        // No operationId on the call: neither the prompt nor the call belongs to the operation.
         const [pending, settled] = track(
           adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX)
         );
         await sleep(10);
         expect(prompts).toHaveLength(1);
-        expect(prompts[0].payload.operationId).toBe(connected);
+        expect(prompts[0].payload.operationId).toBeUndefined();
 
         await endOperation(adapter, connected);
         const operations = (
@@ -2019,6 +2039,558 @@ describe('KeystoneAdapter', () => {
         success: false,
         payload: { code: HardwareErrorCode.OperationEnded },
       });
+    });
+  });
+
+  describe('device account export scan', () => {
+    const BTC_PATH = "m/84'/0'/0'";
+    const bundle = [
+      { methodName: 'btcGetPublicKey' as const, network: 'btc', path: BTC_PATH },
+      { methodName: 'btcGetPublicKey' as const, network: 'btc', path: "m/86'/0'/0'" },
+      { methodName: 'evmGetAddress' as const, network: 'evm', path: EVM_PATH },
+    ];
+    function exportedAccount(paths = [BTC_PATH], mfp = FIXTURE_MFP, deviceVersion = '3.1.4-C') {
+      return new CryptoMultiAccounts(
+        Buffer.from(mfp, 'hex'),
+        paths.map(path => fixtureHdKey(path, mfp)),
+        'Keystone 3 Pro',
+        undefined,
+        deviceVersion
+      ).toUR();
+    }
+    function answerExport(adapter: KeystoneAdapter, exported = exportedAccount(), optIn = true) {
+      const display = jest.fn();
+      const scan = jest.fn();
+      const respond = () =>
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+          payload: { ...urJson(exported), ...(optIn ? { accountExport: true } : {}) },
+        });
+      const onDisplay = (event: { payload: { data: QrDisplayData } }) => {
+        display(event.payload.data);
+        respond();
+      };
+      const onScan = () => {
+        scan();
+        respond();
+      };
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, onDisplay);
+      adapter.on(UI_REQUEST.REQUEST_QR_SCAN, onScan);
+      return {
+        display,
+        scan,
+        detach: () => {
+          adapter.off(UI_REQUEST.REQUEST_QR_DISPLAY, onDisplay);
+          adapter.off(UI_REQUEST.REQUEST_QR_SCAN, onScan);
+        },
+      };
+    }
+
+    it('uses exported Bitcoin paths and keeps unavailable bundle items explicit', async () => {
+      const adapter = newTestAdapter();
+      const ui = answerExport(adapter);
+      try {
+        const result = await adapter.allNetworkGetAddress('', '', { bundle });
+        expect(result).toMatchObject({
+          success: true,
+          payload: [
+            {
+              success: true,
+              network: 'btc',
+              payload: { accountExport: true, accountKey: { path: BTC_PATH } },
+            },
+            { success: false, payload: { params: { reason: 'account-not-exported' } } },
+            { success: false, payload: { params: { reason: 'account-not-exported' } } },
+          ],
+        });
+        expect(ui.display).toHaveBeenCalledWith(
+          expect.objectContaining({ allowAccountExport: true })
+        );
+        expect(
+          await adapter.btcGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+            path: `${BTC_PATH}/0/0`,
+          })
+        ).toMatchObject({ success: true });
+        expect(ui.display).toHaveBeenCalledTimes(2);
+        expect(ui.scan).not.toHaveBeenCalled();
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('retains full-path validation for a normal request response', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exportedAccount(), false);
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      await adapter.dispose();
+    });
+
+    it('keeps Bitcoin signing on its normal QR request after an export import', async () => {
+      const adapter = newTestAdapter();
+      const ui = answerExport(adapter);
+      await adapter.allNetworkGetAddress('', '', { bundle });
+      ui.detach();
+      const signing = attachFakeDevice(adapter);
+      expect(
+        await adapter.btcSignPsbt(FIXTURE_WALLET, FIXTURE_MFP, {
+          path: BTC_PATH,
+          psbt: UNSIGNED_PSBT_HEX,
+        })
+      ).toMatchObject({ success: true, payload: { signedPsbt: SIGNED_PSBT_HEX } });
+      expect(signing.requests).toHaveLength(1);
+      expect(signing.requests[0].data.urType).toBe('crypto-psbt');
+      expect(signing.requests[0].data.allowAccountExport).toBeUndefined();
+      await adapter.dispose();
+    });
+
+    it('refuses an account export offered as a signing response', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter);
+      await adapter.allNetworkGetAddress('', '', { bundle });
+      expect(
+        await adapter.btcSignPsbt(FIXTURE_WALLET, FIXTURE_MFP, {
+          path: BTC_PATH,
+          psbt: UNSIGNED_PSBT_HEX,
+        })
+      ).toMatchObject({ success: false, payload: { code: HardwareErrorCode.InvalidParams } });
+      await adapter.dispose();
+    });
+
+    it('does not create an EVM account merely because Cypherpunk exports an EVM key', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exportedAccount([BTC_PATH, "m/44'/60'/0'"]));
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: true,
+        payload: [{ success: true }, { success: false }, { success: false }],
+      });
+      await adapter.dispose();
+    });
+
+    it('reports an unmatched export without attributing it to the Bitcoin account limit', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exportedAccount(["m/44'/60'/0'"]));
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: {
+          code: HardwareErrorCode.DevicePathForbidden,
+          params: { reason: 'account-not-exported' },
+        },
+      });
+      expect(await adapter.searchDevices()).toEqual([]);
+      await adapter.dispose();
+    });
+
+    it.each([false, true])(
+      'checks wallet identity before missing paths in a single account export (wrongWallet=%s)',
+      async wrongWallet => {
+        const adapter = newTestAdapter();
+        answerExport(
+          adapter,
+          exportedAccount([BTC_PATH], wrongWallet ? mfpOf(OTHER_ROOT) : FIXTURE_MFP)
+        );
+        try {
+          expect(
+            await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
+          ).toMatchObject({
+            success: false,
+            payload: wrongWallet
+              ? { code: HardwareErrorCode.DeviceMismatch }
+              : {
+                  code: HardwareErrorCode.DevicePathForbidden,
+                  params: { reason: 'account-not-exported' },
+                },
+          });
+          expect(await adapter.searchDevices()).toEqual([]);
+        } finally {
+          await adapter.dispose();
+        }
+      }
+    );
+
+    it('refuses conflicting public keys for one exported path', async () => {
+      const adapter = newTestAdapter();
+      answerExport(
+        adapter,
+        new CryptoMultiAccounts(Buffer.from(FIXTURE_MFP, 'hex'), [
+          fixtureHdKey(BTC_PATH, FIXTURE_MFP),
+          fixtureHdKey(BTC_PATH, FIXTURE_MFP, OTHER_ROOT),
+        ]).toUR()
+      );
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      await adapter.dispose();
+    });
+
+    it('refuses a descriptor whose script disagrees with its derivation path', async () => {
+      const adapter = newTestAdapter();
+      answerExport(
+        adapter,
+        new CryptoAccount(Buffer.from(FIXTURE_MFP, 'hex'), [
+          new CryptoOutput(
+            [ScriptExpressions.PUBLIC_KEY_HASH],
+            fixtureHdKey(BTC_PATH, FIXTURE_MFP)
+          ),
+        ]).toUR()
+      );
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      await adapter.dispose();
+    });
+
+    it('accepts a standard Bitcoin crypto-account export', async () => {
+      const adapter = newTestAdapter();
+      const exported = new CryptoAccount(Buffer.from(FIXTURE_MFP, 'hex'), [
+        new CryptoOutput(
+          [ScriptExpressions.WITNESS_PUBLIC_KEY_HASH],
+          fixtureHdKey(BTC_PATH, FIXTURE_MFP)
+        ),
+      ]).toUR();
+      answerExport(adapter, exported);
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: true,
+        payload: [{ success: true, payload: { accountExport: true } }, {}, {}],
+      });
+      await adapter.dispose();
+    });
+
+    it('creates the available accounts from the actual firmware BTC export', async () => {
+      const adapter = newTestAdapter();
+      answerExport(
+        adapter,
+        new UR(Buffer.from(KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR, 'hex'), 'crypto-account')
+      );
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: true,
+        payload: [
+          { success: true, payload: { accountExport: true } },
+          { success: true, payload: { accountExport: true } },
+          { success: false, payload: { params: { reason: 'account-not-exported' } } },
+        ],
+      });
+      await adapter.dispose();
+    });
+
+    it('checks normal bundle items against the current QR response firmware', async () => {
+      const adapter = newTestAdapter();
+      const current = attachFakeDevice(adapter, { deviceVersion: '3.1.4-C' });
+      try {
+        expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+          success: true,
+          payload: [
+            { success: true },
+            { success: true },
+            { success: false, payload: { code: HardwareErrorCode.ChainNotSupported } },
+          ],
+        });
+        expect(current.requests).toHaveLength(1);
+      } finally {
+        current.detach();
+        await adapter.dispose();
+      }
+    });
+
+    it.each(['single', 'bundle'] as const)(
+      'does not let a previous QR firmware block a new EVM %s request',
+      async mode => {
+        const adapter = newTestAdapter();
+        const initial = answerExport(adapter);
+        expect(await adapter.importFromQr({ mode: 'scan' })).toMatchObject({ success: true });
+        initial.detach();
+
+        const current = attachFakeDevice(adapter);
+        try {
+          const result =
+            mode === 'single'
+              ? await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
+              : await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+                  bundle: [{ methodName: 'evmGetAddress', network: 'evm', path: EVM_PATH }],
+                });
+          expect(result).toMatchObject({
+            success: true,
+            ...(mode === 'bundle' ? { payload: [{ success: true }] } : {}),
+          });
+          expect(current.requests).toHaveLength(1);
+        } finally {
+          current.detach();
+          await adapter.dispose();
+        }
+      }
+    );
+
+    it('does not inherit physical-device metadata when the next QR export omits it', async () => {
+      const adapter = newTestAdapter();
+      const initial = answerExport(
+        adapter,
+        new CryptoMultiAccounts(
+          Buffer.from(FIXTURE_MFP, 'hex'),
+          [fixtureHdKey(BTC_PATH, FIXTURE_MFP)],
+          'Keystone 3 Pro',
+          'fixture-device',
+          '3.1.4-C'
+        ).toUR()
+      );
+      const imported = await adapter.importFromQr({ mode: 'scan' });
+      expect(imported).toMatchObject({ success: true });
+      if (imported.success) {
+        expect(imported.payload.capabilities?.supportedChains).toBeUndefined();
+      }
+      initial.detach();
+
+      const current = answerExport(
+        adapter,
+        new CryptoAccount(Buffer.from(FIXTURE_MFP, 'hex'), [
+          new CryptoOutput(
+            [ScriptExpressions.WITNESS_PUBLIC_KEY_HASH],
+            fixtureHdKey(BTC_PATH, FIXTURE_MFP)
+          ),
+        ]).toUR()
+      );
+      try {
+        const result = await adapter.importFromQr({ mode: 'scan' });
+        expect(result).toMatchObject({
+          success: true,
+          payload: { model: 'unknown', firmwareVersion: '0.0.0' },
+        });
+        if (!result.success) return;
+        expect(result.payload.raw?.hardwareDeviceId).toBeUndefined();
+        expect(result.payload.capabilities?.supportedChains).toBeUndefined();
+      } finally {
+        current.detach();
+        await adapter.dispose();
+      }
+    });
+
+    it.each(['single', 'bundle'] as const)(
+      'shows a new QR request for an EVM %s call after a manual Bitcoin export',
+      async mode => {
+        const adapter = newTestAdapter();
+        const btcExport = new CryptoAccount(Buffer.from(FIXTURE_MFP, 'hex'), [
+          new CryptoOutput(
+            [ScriptExpressions.WITNESS_PUBLIC_KEY_HASH],
+            fixtureHdKey(BTC_PATH, FIXTURE_MFP)
+          ),
+        ]).toUR();
+        const initial = answerExport(adapter, btcExport);
+        expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+          success: true,
+          payload: [{ success: true, payload: { accountExport: true } }, {}, {}],
+        });
+        initial.detach();
+
+        const normal = attachFakeDevice(adapter);
+        const unexpectedScan = jest.fn(() => {
+          adapter.uiResponse({
+            type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+            payload: urJson(exportedAccount(["m/44'/60'/0'"], FIXTURE_MFP, '3.1.4')),
+          });
+        });
+        adapter.on(UI_REQUEST.REQUEST_QR_SCAN, unexpectedScan);
+        try {
+          const result =
+            mode === 'single'
+              ? await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
+              : await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+                  bundle: [{ methodName: 'evmGetAddress', network: 'evm', path: EVM_PATH }],
+                });
+          expect(result).toMatchObject({ success: true });
+          expect(unexpectedScan).not.toHaveBeenCalled();
+          expect(normal.requests).toHaveLength(1);
+          expect(normal.requests[0].data).toMatchObject({
+            urType: 'qr-hardware-call',
+            allowAccountExport: true,
+          });
+        } finally {
+          normal.detach();
+          adapter.off(UI_REQUEST.REQUEST_QR_SCAN, unexpectedScan);
+          await adapter.dispose();
+        }
+      }
+    );
+
+    it('refuses another wallet even when the user selects a device export', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exportedAccount([BTC_PATH], mfpOf(OTHER_ROOT)));
+      expect(
+        await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { bundle })
+      ).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.DeviceMismatch },
+      });
+      await adapter.dispose();
+    });
+
+    it.each([
+      { type: 'crypto-psbt', cbor: Buffer.from(UNSIGNED_PSBT_HEX, 'hex') },
+      { type: 'crypto-multi-accounts', cbor: Buffer.from('00', 'hex') },
+    ])('refuses an unrelated or malformed $type without registering a wallet', async exported => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exported);
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.InvalidParams },
+      });
+      expect(await adapter.searchDevices()).toEqual([]);
+      await adapter.dispose();
+    });
+  });
+
+  describe('USB firmware chain support', () => {
+    it.each(['3.1.4-C', '3.1.4-CYPHERPUNK', '3.1.4-B', '3.1.4-BTC'])(
+      'keeps a successful %s USB connection usable for Bitcoin',
+      async firmwareVersion => {
+        const usb = fakeUsbConnector({ firmwareVersion });
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        const onConnected = jest.fn();
+        adapter.on('device-connect', onConnected);
+        const connected = await connectOperation(adapter);
+        try {
+          expect(onConnected).toHaveBeenCalledWith({
+            type: DEVICE.CONNECT,
+            payload: expect.objectContaining({
+              firmwareVersion,
+              capabilities: { persistentDeviceIdentity: true, supportedChains: ['btc'] },
+            }),
+          });
+          const info = await adapter.getDeviceInfo(connected, FIXTURE_MFP);
+          expect(info).toMatchObject({
+            success: true,
+            payload: { firmwareVersion, capabilities: { supportedChains: ['btc'] } },
+          });
+          const result = await adapter.btcGetPublicKey(connected, FIXTURE_MFP, {
+            path: "m/84'/0'/0'",
+          });
+          expect(result.success).toBe(true);
+          const signed = await adapter.btcSignPsbt(connected, FIXTURE_MFP, {
+            path: "m/84'/0'/0'",
+            psbt: UNSIGNED_PSBT_HEX,
+          });
+          expect(signed).toMatchObject({
+            success: true,
+            payload: { signedPsbt: SIGNED_PSBT_HEX },
+          });
+          expect(usb.calls).toHaveLength(2);
+          expect(adapter.activeTransport).toBe('usb');
+          expect(qrFake.requests).toHaveLength(0);
+        } finally {
+          await adapter.dispose();
+        }
+      }
+    );
+
+    it('refuses unsupported addresses and signing before sending to Cypherpunk firmware', async () => {
+      const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
+      const adapter = newTestAdapter(usb.connector);
+      const connected = await connectOperation(adapter);
+      try {
+        const results = await Promise.all([
+          adapter.evmGetAddress(connected, FIXTURE_MFP, { path: EVM_PATH }),
+          adapter.solGetAddress(connected, FIXTURE_MFP, { path: "m/44'/501'/0'/0'" }),
+          adapter.tronGetAddress(connected, FIXTURE_MFP, { path: "m/44'/195'/0'/0/0" }),
+          adapter.evmSignTransaction(connected, FIXTURE_MFP, EVM_TX),
+        ]);
+        for (const result of results) {
+          expect(result).toMatchObject({
+            success: false,
+            payload: { code: HardwareErrorCode.ChainNotSupported },
+          });
+        }
+        expect(usb.calls).toHaveLength(0);
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('keeps the supported Bitcoin item in a mixed Cypherpunk USB bundle', async () => {
+      const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
+      const adapter = newTestAdapter(usb.connector);
+      const connected = await connectOperation(adapter);
+      try {
+        const result = await adapter.allNetworkGetAddress(connected, FIXTURE_MFP, {
+          bundle: [
+            { methodName: 'btcGetPublicKey', network: 'btc', path: "m/84'/0'/0'" },
+            { methodName: 'evmGetAddress', network: 'evm', path: EVM_PATH },
+          ],
+        });
+        expect(result).toMatchObject({
+          success: true,
+          payload: [
+            { success: true, network: 'btc' },
+            {
+              success: false,
+              network: 'evm',
+              payload: { code: HardwareErrorCode.ChainNotSupported },
+            },
+          ],
+        });
+        expect(usb.calls).toHaveLength(1);
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it.each([
+      { usbVersion: '3.1.4-C', qrVersion: '3.1.4', usbEvm: false, qrEvm: true },
+      { usbVersion: '3.1.4', qrVersion: '3.1.4-C', usbEvm: true, qrEvm: false },
+    ])('keeps USB $usbVersion and QR $qrVersion metadata separate', async options => {
+      const usb = fakeUsbConnector({ firmwareVersion: options.usbVersion });
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter, { deviceVersion: options.qrVersion });
+      try {
+        const usbOperation = await connectOperation(adapter);
+        await importQrWallet(adapter);
+        expect(await adapter.getDeviceInfo(usbOperation, FIXTURE_MFP)).toMatchObject({
+          success: true,
+          payload: { connectionType: 'usb', firmwareVersion: options.usbVersion },
+        });
+        const usbResult = await adapter.evmGetAddress(usbOperation, FIXTURE_MFP, {
+          path: EVM_PATH,
+        });
+        expect(usbResult.success).toBe(options.usbEvm);
+        expect(usb.calls).toHaveLength(options.usbEvm ? 1 : 0);
+
+        const qrOperation = await connectOperation(adapter, connectQrDevice);
+        expect(await adapter.getDeviceInfo(qrOperation, FIXTURE_MFP)).toMatchObject({
+          success: true,
+          payload: { connectionType: 'qr', firmwareVersion: options.qrVersion },
+        });
+        const qrResult = await adapter.evmGetAddress(qrOperation, FIXTURE_MFP, { path: EVM_PATH });
+        expect(qrResult.success).toBe(options.qrEvm);
+        expect(usb.calls).toHaveLength(options.usbEvm ? 1 : 0);
+        usb.emitDisconnect();
+        expect(await adapter.getDeviceInfo(FIXTURE_WALLET, FIXTURE_MFP)).toMatchObject({
+          success: true,
+          payload: { connectionType: 'qr', firmwareVersion: options.qrVersion },
+        });
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('checks the USB firmware after reattaching a QR-known wallet', async () => {
+      const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
+      const adapter = newTestAdapter(usb.connector);
+      attachFakeDevice(adapter, { deviceVersion: '3.1.4' });
+      try {
+        await importQrWallet(adapter);
+        expect(
+          await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
+        ).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.ChainNotSupported },
+        });
+        expect(usb.connectArgs).toHaveLength(1);
+        expect(usb.calls).toHaveLength(0);
+      } finally {
+        await adapter.dispose();
+      }
     });
   });
 
@@ -3347,18 +3919,29 @@ describe('KeystoneAdapter', () => {
     it("switchTransport('qr') pins a USB-merged wallet back to QR", async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
-      const qrFake = attachFakeDevice(adapter);
+      const qrFake = attachFakeDevice(adapter, { deviceVersion: '3.1.4' });
 
       await connectUsbDevice(adapter);
       await adapter.switchTransport('qr');
 
+      expect(
+        await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
+      ).toMatchObject({ success: true });
       const result = await adapter.evmSignTransaction(null, FIXTURE_MFP, EVM_TX);
 
       expect(result.success).toBe(true);
       // Connect sent nothing over USB. The explicit pin sends the sign request
       // through QR.
       expect(usb.calls).toHaveLength(0);
-      expect(qrFake.requests.map(r => r.data.urType)).toEqual(['eth-sign-request']);
+      expect(qrFake.requests.map(r => r.data.urType)).toEqual([
+        'qr-hardware-call',
+        'eth-sign-request',
+      ]);
+      usb.emitDisconnect();
+      expect(await adapter.getDeviceInfo(FIXTURE_WALLET, FIXTURE_MFP)).toMatchObject({
+        success: true,
+        payload: { connectionType: 'qr', firmwareVersion: '3.1.4' },
+      });
     });
 
     it("switchTransport('usb') preserves an availability scan error", async () => {
