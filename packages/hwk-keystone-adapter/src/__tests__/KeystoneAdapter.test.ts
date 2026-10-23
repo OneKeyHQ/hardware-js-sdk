@@ -236,6 +236,19 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
   return { requests, detach: () => adapter.off(UI_REQUEST.REQUEST_QR_DISPLAY, handler) };
 }
 
+/** Answers every "show the oversized request as a QR?" prompt; the mock counts the prompts. */
+function answerQrFallback(adapter: KeystoneAdapter, confirmed: boolean): jest.Mock {
+  const asked = jest.fn();
+  adapter.on(UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM, event => {
+    asked(event.payload);
+    adapter.uiResponse({
+      type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
+      payload: { confirmed },
+    });
+  });
+  return asked;
+}
+
 /**
  * Fake USB `IConnector` answering with real registry URs, so these tests cover USB routing and
  * merge logic; wire encoding is tested in `KeystoneUsbConnectorBase.test.ts`.
@@ -2526,6 +2539,7 @@ describe('KeystoneAdapter', () => {
         if (route !== 'operation') await adapter.releaseOperation(connected);
         if (route === 'forced') await adapter.switchTransport('usb');
         const target = route === 'operation' ? connected : FIXTURE_WALLET;
+        const askedQrFallback = answerQrFallback(adapter, true);
         usb.failUrType({
           urType: 'eth-sign-request',
           error: {
@@ -2537,6 +2551,7 @@ describe('KeystoneAdapter', () => {
         try {
           const signed = await adapter.evmSignTransaction(target, FIXTURE_MFP, EVM_TX);
           const shouldUseQr = route === 'auto' && origin === 'transport';
+          expect(askedQrFallback).toHaveBeenCalledTimes(shouldUseQr ? 1 : 0);
           expect(signed.success).toBe(shouldUseQr);
           if (!signed.success) {
             expect(signed.payload.code).toBe(HardwareErrorCode.PayloadTooLarge);
@@ -2558,6 +2573,69 @@ describe('KeystoneAdapter', () => {
         }
       }
     );
+
+    it('fails as a user cancel without a QR when the user declines the QR for an oversized request', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      await adapter.releaseOperation(await connectOperation(adapter));
+      const askedQrFallback = answerQrFallback(adapter, false);
+      usb.failUrType({
+        urType: 'eth-sign-request',
+        error: {
+          code: HardwareErrorCode.PayloadTooLarge,
+          message: 'USB size limit',
+          params: { origin: 'transport' },
+        },
+      });
+      try {
+        const signed = await adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
+
+        expect(askedQrFallback).toHaveBeenCalledTimes(1);
+        expect(askedQrFallback).toHaveBeenCalledWith(
+          expect.objectContaining({ vendor: 'keystone' })
+        );
+        expect(signed).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        expect(qrFake.requests).toHaveLength(0);
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('asks once per USB bundle before showing its oversized items as QR codes', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      await adapter.releaseOperation(await connectOperation(adapter));
+      const askedQrFallback = answerQrFallback(adapter, true);
+      usb.failUrType({
+        urType: 'qr-hardware-call',
+        error: {
+          code: HardwareErrorCode.PayloadTooLarge,
+          message: 'USB size limit',
+          params: { origin: 'transport' },
+        },
+      });
+      try {
+        const result = await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+          bundle: [
+            { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/0'/0/0" },
+            { methodName: 'evmGetAddress', network: 'evm', path: "m/44'/60'/1'/0/0" },
+          ],
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.payload.map(item => item.success)).toEqual([true, true]);
+        expect(askedQrFallback).toHaveBeenCalledTimes(1);
+        expect(qrFake.requests).toHaveLength(2);
+      } finally {
+        await adapter.dispose();
+      }
+    });
 
     it('keeps the USB session and warns of a possible signature when the signed reply is unreadable', async () => {
       const usb = fakeUsbConnector();
@@ -3475,6 +3553,81 @@ describe('KeystoneAdapter', () => {
         payload: { code: HardwareErrorCode.InvalidParams },
       });
       expect(qrFake.requests).toHaveLength(0);
+    });
+
+    describe('QR key request size', () => {
+      const ledgerLiveEvm = (count: number) =>
+        Array.from({ length: count }, (_, index) => ({
+          methodName: 'evmGetAddress' as const,
+          network: 'evm' as const,
+          path: `m/44'/60'/${index}'/0/0`,
+        }));
+
+      it('refuses a QR bundle needing more account paths than Keystone accepts, before asking', async () => {
+        const adapter = newTestAdapter();
+        const qrFake = attachFakeDevice(adapter);
+
+        const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: ledgerLiveEvm(25),
+        });
+
+        expect(result).toMatchObject({
+          success: false,
+          payload: {
+            code: HardwareErrorCode.QrRequestTooLarge,
+            params: { limit: 24, requested: 25 },
+          },
+        });
+        expect(qrFake.requests).toHaveLength(0);
+      });
+
+      it('asks once for a QR bundle right at the limit', async () => {
+        const adapter = newTestAdapter();
+        const qrFake = attachFakeDevice(adapter);
+
+        const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: ledgerLiveEvm(24),
+        });
+
+        expect(result.success).toBe(true);
+        expect(qrFake.requests).toHaveLength(1);
+        expect(requestedPathsOf(qrFake.requests[0])).toHaveLength(24);
+      });
+
+      it('leaves the same bundle alone over USB, which asks per key', async () => {
+        const usb = fakeUsbConnector();
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        await adapter.releaseOperation(await connectOperation(adapter));
+        try {
+          const result = await adapter.allNetworkGetAddress(FIXTURE_WALLET, FIXTURE_MFP, {
+            bundle: ledgerLiveEvm(25),
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.payload.every(item => item.success)).toBe(true);
+          expect(qrFake.requests).toHaveLength(0);
+        } finally {
+          await adapter.dispose();
+        }
+      });
+
+      it('counts addresses under one account path once', async () => {
+        const adapter = newTestAdapter();
+        const qrFake = attachFakeDevice(adapter);
+
+        const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+          bundle: Array.from({ length: 30 }, (_, index) => ({
+            methodName: 'evmGetAddress' as const,
+            network: 'evm' as const,
+            path: `m/44'/60'/0'/0/${index}`,
+          })),
+        });
+
+        expect(result.success).toBe(true);
+        expect(requestedPathsOf(qrFake.requests[0])).toEqual(["m/44'/60'/0'"]);
+      });
     });
 
     it('keeps a SOL key apart from another chain exported at the same path in a USB bundle', async () => {
