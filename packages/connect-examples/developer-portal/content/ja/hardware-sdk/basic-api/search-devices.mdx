@@ -48,6 +48,7 @@ WebUSB の許可要求はユーザー操作を起点とするフローで行い�
 | `deviceType` | `IDeviceType` | 検出されたモデル。初期化前は不明の場合があります。 |
 | `name` | `string` | 表示名。一意の識別子ではありません。 |
 | `commType` | `OneKeyDeviceCommType` | トランスポートが報告する通信の種類。 |
+| `bleColorCode` | `string \| undefined` | React Native BLE とデスクトップ（Electron）BLE の検出時のみ。Pro 2 / Neo がアドバタイズするシリアル番号の色文字（`A`–`Z`）で、以前に受信したアドバタイズの値の場合があります。不明な場合は含まれません。`deviceType` と組み合わせて解釈してください。 |
 
 正確な公開形式は [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts) を参照してください。`path` などの追加の内部フィールドに依存しないでください。
 

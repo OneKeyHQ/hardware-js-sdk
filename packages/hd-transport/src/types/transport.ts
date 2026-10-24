@@ -34,6 +34,12 @@ export type OneKeyDeviceInfoWithSession = OneKeyUsbDeviceInfo & {
 export type OneKeyMobileDeviceInfo = {
   id: string;
   name: string | null;
+  /**
+   * Color letter of the serial number ('A'-'Z') from the Pro2 / Neo BLE advertisement,
+   * possibly seen in an earlier scan. Set by the React Native and Electron BLE
+   * transports; absent when unknown.
+   */
+  bleColorCode?: string;
 };
 
 export type OneKeyDeviceInfoBase = {

@@ -19,6 +19,7 @@ import {
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
+  parseOnekeyBleColorCode,
   wait,
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
@@ -1012,6 +1013,22 @@ function rememberBleName(deviceId: string, name?: string | null): void {
   }
 }
 
+// Noble reuses one Peripheral per id, and on macOS/Windows an event without 0xFF data
+// replaces manufacturerData with an empty buffer. Snapshot the color when the OneKey
+// advertisement is seen; it is kept like the name because a linked device stops advertising.
+const bleColorCodesById = new Map<string, string>();
+
+function rememberBleColorCode(peripheral: Peripheral): void {
+  const colorCode = parseOnekeyBleColorCode(peripheral.advertisement?.manufacturerData);
+  if (colorCode && bleColorCodesById.get(peripheral.id) !== colorCode) {
+    bleColorCodesById.set(peripheral.id, colorCode);
+    logger?.debug('[NobleBLE] BLE color code', {
+      deviceId: peripheral.id,
+      bleColorCode: colorCode,
+    });
+  }
+}
+
 function resolveBleName(deviceId: string): string | undefined {
   const live =
     connectedDevices.get(deviceId)?.advertisement?.localName?.trim() ||
@@ -1031,6 +1048,12 @@ function shouldConnectByIdFirst(deviceId: string): boolean {
 }
 
 function handleDeviceDiscovered(peripheral: Peripheral): void {
+  // The color rides in the primary advertisement while the name may only come
+  // in a later scan response, so record it before the name-dependent filter.
+  if (hasOnekeyCommunicationService(peripheral.advertisement?.serviceUuids)) {
+    rememberBleColorCode(peripheral);
+  }
+
   // Only process OneKey candidates for general discovery. Avoid logging every
   // ambient BLE peripheral; it makes Pro2 debugging hard to read.
   if (!isOneKeyPeripheral(peripheral)) {
@@ -1045,6 +1068,9 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
       deviceId: peripheral.id,
       name: peripheral.advertisement?.localName || 'Unknown Device',
       serviceUUIDs: peripheral.advertisement?.serviceUuids || [],
+      // 5 = advertises a color slot; 4 = BLE firmware before 1.0.23.
+      manufacturerDataLength: peripheral.advertisement?.manufacturerData?.length ?? 0,
+      bleColorCode: bleColorCodesById.get(peripheral.id),
     });
   }
 }
@@ -1200,6 +1226,12 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
         state: peripheral.state || 'disconnected',
       });
     };
+    // A device kept from an earlier round is pushed before this round's
+    // advertisements arrive, so apply colors when the scan resolves.
+    const withBleColorCode = (device: DeviceInfo): DeviceInfo => {
+      const bleColorCode = bleColorCodesById.get(device.id);
+      return bleColorCode ? { ...device, bleColorCode } : device;
+    };
     const checkDevices = () => {
       discoveredDevices.forEach(pushDevice);
       // A linked device stops advertising, so the scan never rediscovers it.
@@ -1213,7 +1245,7 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
       checkDevices();
       await cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
-      resolve(devices);
+      resolve(devices.map(withBleColorCode));
     }, DEVICE_SCAN_TIMEOUT);
 
     const cancel = () => cleanup().then(() => resolve([]), reject);

@@ -249,6 +249,24 @@ endpoint is still based on `0001`; it must not be filtered because `fffd` is als
 Latest firmware-pro2 may also advertise compact names without spaces (such as `Pro2A1B2`, `Neo22D8`). Search must recognize them
 as OneKey, but must not infer a protocol conclusion from the name.
 
+### Pro2 / Neo Advertisement Color
+
+Since BLE firmware 1.0.23, the Pro2 / Neo primary advertisement carries a manufacturer-specific (`0xFF`) section with no Bluetooth
+SIG company ID. Its 5-byte payload is `[color, nonce × 4]`. The color byte is `serial_number[10]`, the 11th serial-number character
+(an ASCII letter); `0x00` means the BLE chip had no serial number when advertising started. The nonce is not an identity and is
+ignored. The local name is only in the scan response.
+
+- Read the raw `0xFF` payload (ble-plx `manufacturerData`, Noble `advertisement.manufacturerData`); the color is byte 0.
+  A company-ID-keyed API would read the color and the first nonce byte as a company ID.
+- Accept exactly 5 bytes with byte 0 in `A`–`Z`; anything else is unknown. Older Pro2 / Neo BLE firmware sends 4 zero bytes and
+  Classic sends `FE 00` followed by the MAC.
+- The color and the name arrive in different packets, and Noble on macOS and Windows replaces stored manufacturer data with
+  the latest event. Transports keep the last valid color per peripheral id and never clear it with an invalid payload. A connected
+  device stops this advertisement, so a connected entry reports the color seen earlier, if any.
+- React Native BLE and Electron BLE `searchDevices` results report the letter as `bleColorCode`; the lowlevel plugin contract
+  does not carry it. A letter's color depends on the model, so the SDK does not map it to a color name and does not use it to
+  infer the model or protocol.
+
 Latest firmware-pro2 shares USB VID/PID `1209:4f4c` across application, bootloader, and romloader; Pro2
 and Neo are the same. USB first-probe order only uses this VID/PID as a V2 hint, not product name or BLE name. `4f4a` /
 `4f4b` are still shared with Pro/Touch and must not be treated as a V2 hint. Protocol is still confirmed by the live response after connection.
