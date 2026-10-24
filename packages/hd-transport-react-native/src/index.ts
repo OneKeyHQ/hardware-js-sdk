@@ -195,6 +195,11 @@ export type ProtocolV2BleTuning = {
    * BLE module supports it. Defaults to true; false keeps the per-packet JS write loop.
    */
   nativeFrameWrite?: boolean;
+  /**
+   * Android CONNECTION_PRIORITY_HIGH around Protocol V2 high-throughput calls. 'auto' (the
+   * default) requests it below Android 17 only; true or false forces it on every version.
+   */
+  androidHighConnectionPriority?: boolean | 'auto';
 };
 
 type ResolvedProtocolV2BleTuning = Required<ProtocolV2BleTuning>;
@@ -203,6 +208,7 @@ const DEFAULT_PROTOCOL_V2_BLE_TUNING: ResolvedProtocolV2BleTuning = {
   iosPacketLength: IOS_PROTOCOL_V2_PACKET_LENGTH,
   androidPacketLength: ANDROID_PROTOCOL_V2_PACKET_LENGTH,
   nativeFrameWrite: true,
+  androidHighConnectionPriority: 'auto',
 };
 
 let protocolV2BleTuning: ResolvedProtocolV2BleTuning = { ...DEFAULT_PROTOCOL_V2_BLE_TUNING };
@@ -227,6 +233,11 @@ export function configureProtocolV2BleTuning(tuning: ProtocolV2BleTuning = {}) {
       typeof tuning.nativeFrameWrite === 'boolean'
         ? tuning.nativeFrameWrite
         : protocolV2BleTuning.nativeFrameWrite,
+    androidHighConnectionPriority:
+      typeof tuning.androidHighConnectionPriority === 'boolean' ||
+      tuning.androidHighConnectionPriority === 'auto'
+        ? tuning.androidHighConnectionPriority
+        : protocolV2BleTuning.androidHighConnectionPriority,
   };
   Log?.debug('[ReactNativeBleTransport] BLE tuning configured', protocolV2BleTuning);
 }
@@ -379,6 +390,24 @@ function getDeviceDisplayName(device?: Device | null) {
 const IOS_REQUEST_MTU = 247;
 const ANDROID_REQUEST_MTU = 517;
 const ANDROID_HIGH_PRIORITY_IDLE_MS = 1000;
+/**
+ * Android 17 maps CONNECTION_PRIORITY_HIGH to 11.25-15 ms with peripheral latency 1. OneKey BLE
+ * firmware accepts any latency at its 15 ms interval, and latency 1 roughly halves Protocol V2
+ * FileWrite throughput. BLE 1.0.23 requests 15 ms with latency 0 by itself; older BLE firmware
+ * asks for 15-30 ms or nothing and has not been measured on Android 17 without HIGH.
+ */
+const ANDROID_HIGH_PRIORITY_PERIPHERAL_LATENCY_API_LEVEL = 37;
+
+const shouldRequestAndroidHighConnectionPriority = () => {
+  if (Platform.OS !== 'android') return false;
+  const { androidHighConnectionPriority } = protocolV2BleTuning;
+  if (typeof androidHighConnectionPriority === 'boolean') return androidHighConnectionPriority;
+  const apiLevel = Number(Platform.Version);
+  // Unknown versions keep the long-standing HIGH request.
+  return !(
+    Number.isFinite(apiLevel) && apiLevel >= ANDROID_HIGH_PRIORITY_PERIPHERAL_LATENCY_API_LEVEL
+  );
+};
 
 const getRequestedBleMtu = () =>
   Platform.OS === 'android' ? ANDROID_REQUEST_MTU : IOS_REQUEST_MTU;
@@ -2105,6 +2134,10 @@ export default class ReactNativeBleTransport {
   }
 
   private async disconnectUnlocked(session: string) {
+    // The next link starts at the stack's default priority; a cached HIGH or a pending
+    // Balanced restore from this link must not carry over to it.
+    this.clearAndroidPriorityResetTimer(session);
+    this.androidHighPriorityDevices.delete(session);
     this.cancelProtocolV2FrameWrite(session, new Error('React Native BLE transport disconnected'));
     await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
     const transport = transportCache[session];
@@ -3453,6 +3486,19 @@ export default class ReactNativeBleTransport {
 
     this.clearAndroidPriorityResetTimer(uuid);
     if (this.androidHighPriorityDevices.has(uuid)) return;
+    if (!shouldRequestAndroidHighConnectionPriority()) {
+      const loggedSignatures =
+        this.protocolV2HighVolumeLogSignatures.get(uuid) ?? new Set<string>();
+      if (!loggedSignatures.has('androidPriority:peripheral')) {
+        loggedSignatures.add('androidPriority:peripheral');
+        this.protocolV2HighVolumeLogSignatures.set(uuid, loggedSignatures);
+        Log?.debug('[ReactNativeBleTransport] Android BLE connection priority left to peripheral', {
+          apiLevel: Platform.Version,
+          setting: protocolV2BleTuning.androidHighConnectionPriority,
+        });
+      }
+      return;
+    }
 
     const transport = transportCache[uuid];
     if (!transport) return;

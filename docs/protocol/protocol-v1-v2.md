@@ -213,6 +213,12 @@ BLE platform implementations include Electron, React Native, and the lowlevel pl
   unique transaction id and a `BLE_WRITE_PACKET_TIMEOUT_MS` watchdog; abort, watchdog expiry, generation change, release,
   disconnect and manager reset cancel it. A failed frame is never retried and is link-fatal. Otherwise the per-packet path
   above is used unchanged; Protocol V1 never uses the frame call.
+- React Native on Android requests `CONNECTION_PRIORITY_HIGH` once per link before Protocol V2 high-throughput calls and
+  restores Balanced 1 s after the last one, except on API 37+ by default: Android 17 maps HIGH to peripheral latency 1,
+  which OneKey BLE firmware accepts and which halves FileWrite throughput. BLE 1.0.23 requests 15 ms / latency 0 itself;
+  older BLE firmware (15-30 ms or no request) is unmeasured on Android 17 without HIGH.
+  `ProtocolV2BleTuning.androidHighConnectionPriority` (`'auto'`, `true`, `false`) overrides this. A manual disconnect
+  clears the cached priority so the next link starts clean.
 - Notification data uniformly enters `ProtocolV2FrameAssembler`; a single notification must not be assumed to be one frame.
 - On V1/V2 probe fallback, Electron BLE only rotates the renderer notification token and protocol buffers; it does not disconnect or
   resubscribe GATT. Unpaired devices therefore trigger the system pairing flow only once.
