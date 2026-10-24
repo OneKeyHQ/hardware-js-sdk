@@ -8884,6 +8884,154 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
 
+  describe('RESC header check link recovery', () => {
+    const currentHeader = {
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    };
+    const linkLost = () =>
+      ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Device protocol has not been detected for E2:92:2E:16:47:B9'
+      );
+    const createResource = (name: string) => ({
+      name,
+      source: { size: 3, readAt: jest.fn(), close: jest.fn() },
+      devicePath: `vol0:/bundles/${name}`,
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    });
+    const createMethod = () => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      method.postTipMessage = jest.fn();
+      method.postProgressMessage = jest.fn();
+      (method as any).protocolV2SourceUpdateProcess = jest.fn(
+        ({ processedSize }: { processedSize: number }) => Promise.resolve(processedSize + 3)
+      );
+      (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+      (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+      return method;
+    };
+
+    test('reconnects and asks again when the link drops during a header check', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest
+        .fn()
+        .mockRejectedValueOnce(linkLost())
+        .mockResolvedValue(currentHeader);
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: [createResource('images.okpkg'), createResource('fonts.okpkg')],
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      expect((method as any).readProtocolV2DeviceFileHeader).toHaveBeenCalledTimes(3);
+      expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['BLE disconnect', () => ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected)],
+      ['BLE timeout', () => ERRORS.TypedError(HardwareErrorCode.BleTimeoutError)],
+      [
+        'invalidated Protocol V2 link',
+        () =>
+          Object.assign(new Error('Protocol V2 link generation changed'), {
+            name: 'ProtocolV2LinkError',
+            code: 'generation',
+          }),
+      ],
+      ['released transport', () => new Error('React Native BLE transport released')],
+      ['cleaned Electron BLE state', () => new Error('Electron BLE device state cleaned')],
+      [
+        'Electron BLE device that is no longer connected',
+        () => ERRORS.TypedError(HardwareErrorCode.TransportNotFound, 'Device AA:BB not connected'),
+      ],
+    ])('rethrows a %s from the header check for recovery', async (_label, createError) => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(createError());
+
+      await expect(
+        (method as any).isProtocolV2ResourceBundleUpToDate(createResource('images.okpkg'))
+      ).rejects.toBeDefined();
+    });
+
+    test('treats a device-side header read failure as stale without reconnecting', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest
+        .fn()
+        .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Failure: busy'));
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: [createResource('images.okpkg')],
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+      expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(1);
+    });
+
+    test('limits header-check reconnects per transfer phase', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: ['a.okpkg', 'b.okpkg', 'c.okpkg'].map(createResource),
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(2);
+      expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(3);
+    });
+
+    test('resends without further reconnects when the header-check reconnect fails', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+      (method as any).recoverProtocolV2FileTransfer = jest
+        .fn()
+        .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: [createResource('images.okpkg'), createResource('fonts.okpkg')],
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(2);
+    });
+
+    test.each(['mismatch: expected A, received B', 'unavailable: expected path A'])(
+      'aborts instead of resending when the reconnected device identity is %s',
+      async identityFailure => {
+        const method = createMethod();
+        (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+        (method as any).recoverProtocolV2FileTransfer = jest
+          .fn()
+          .mockRejectedValue(
+            ERRORS.TypedError(
+              HardwareErrorCode.DeviceNotFound,
+              `Protocol V2 reconnect physical identity ${identityFailure}`
+            )
+          );
+
+        await expect(
+          (method as any).executeProtocolV2TransferPhase({
+            installSources: [],
+            resourceSources: [createResource('images.okpkg')],
+          })
+        ).rejects.toMatchObject({ errorCode: HardwareErrorCode.DeviceNotFound });
+        expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   test.each([
     ['1.0.3', '1.0.3', true],
     ['1.0.10', '1.0.3', true],

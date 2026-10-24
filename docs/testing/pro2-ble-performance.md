@@ -264,7 +264,7 @@ firmware 解压后的 RGB565 bytes 与压缩前逐字节一致。
 | -------------------- | ----------------------------------------------------------------------------------- | --------------------------------------- | ---------------- |
 | macOS CLI LowLevel   | `244B`、`1960B` 固定 wallpaper path、V2-first、无损 LZ4                             | 已覆盖 packet/fallback 与 Core 文件写入 | 已完成，本节结果 |
 | React Native iOS     | MTU refresh、`244B` ceiling、默认 `withoutResponse`、共享 Core 优化                 | RN strategy/link tests 已通过           | 本轮未执行       |
-| React Native Android | MTU `517` request、`244B` ceiling、High connection priority、默认 `withoutResponse` | RN strategy/link tests 已通过           | 本轮未执行       |
+| React Native Android | MTU `517` request、`244B` ceiling、HIGH 连接优先级（API 37+ 默认不请求）、默认 `withoutResponse` | RN strategy/link tests 已通过           | 本轮未执行       |
 | Electron macOS       | Noble payload 到 ATT MTU 归一化、`244B`、零 high-throughput pacing                  | platform normalization test 已通过      | 本轮未执行       |
 | Electron Windows     | MaxPduSize 到 ATT MTU 归一化、已配对后 `withoutResponse`                            | platform normalization test 已通过      | 本轮未执行       |
 | Electron Linux       | ATT MTU 保持原值                                                                    | platform normalization test 已通过      | 本轮未执行       |
@@ -457,6 +457,36 @@ app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/
 - 刷了开发版测试 bootloader（`__DEV__DEBUG`，包头 production flag 为 `0`）的设备只接受开发签名的包。
   App 预览环境下发的 `prod_release` 包（production flag `0xA55A5AA5`）能传完，但安装时每个目标都以
   `FAILED_VERIFY`（`6`）失败，什么都不会装上。测完整升级要给这类设备配开发签名的包。
+
+### Android 17 连接优先级：peripheral latency 1 让吞吐减半
+
+2026-10-24 用 Pixel 9a（Android 17）+ Neo（bootloader 1.0.2 测试版、BLE 1.0.23）抓 HCI snoop 测得。同一个 App 包
+（alpha.116、native-frame、窗口 2 / 1800）前后两次整包升级：
+
+| 场景                                         | 连接参数（HCI）         | 结果                                       |
+| -------------------------------------------- | ----------------------- | ------------------------------------------ |
+| 工具连上后立即上传，同一条连接内对比         | `15ms`，latency `1`     | `33.9 KiB/s`，每帧 8 包全部被确认中位 `84.5ms` |
+| 同上，设备把参数改回后                       | `15ms`，latency `0`     | `56.7 KiB/s`，中位 `43.3ms`                |
+| App 升级，HIGH 在连接建立 `104s` 后才请求    | 推断 latency `1`        | 6 个文件全部 `27.6–29.2 KiB/s`，每帧 `66.1ms` |
+| App 升级，latency `0` 阶段                   | `15ms`，latency `0`     | 单文件约 `55 KiB/s`，每帧 `33.1ms`         |
+
+- Android 17（Bluetooth 模块开启 `le_subrate_manager`）把 `CONNECTION_PRIORITY_HIGH` 映射成 `11.25–15ms`、
+  peripheral latency `1`（AOSP `CompanionManager` 默认值，不是 Pixel 定制），BALANCED 是 `30–50ms`、latency `5`。
+  Android 16 及更早的 HIGH 仍是 latency `0`。
+- BLE 1.0.23 连接时自己请求 `15/15ms`、latency `0`，但接受检查只看连接间隔（latency 允许偏差 `499`），所以会接受
+  latency `1`；`15ms` latency `1` 下设备时有时无地错过连接事件，吞吐降到 latency `0` 时的 `0.5–0.6` 倍。
+- 固件只靠一个重试定时器把参数改回 `15/0`：手机连接后先改成 `48.75ms` 会启动它，约 `30s` 后触发。HIGH 在这之前请求，
+  前约 `30s` 慢、之后恢复；在这之后请求（升级时主芯片重启进 bootloader 不断开 BLE，第一次大流量调用总在这之后），
+  latency `1` 会留到连接结束。
+- 在建立已久的连接上请求 HIGH，4 次里有 3 次约 `5s` 后监督超时断开（reason `0x08`），原因未查清，和第一次读 RESC 文件头
+  同时发生。断开后 RESC 头检查全部失败，原本已是最新的资源包全部重传（多传约 `22 MB`）。
+- SDK 因此在 Android API `37` 及以上默认不请求 HIGH，交给设备自己的 `15/0`；`ProtocolV2BleTuning.androidHighConnectionPriority`
+  可设为 `true`/`false` 强制开关，默认 `'auto'`。RESC 头检查遇到断链时，Core 重连后重试（每个传输阶段共享最多 `2` 次重连）；
+  重连失败，或本阶段 `2` 次已用完后再次断链，该资源包按旧逻辑直接重传；重连后设备身份校验失败则中止升级。更早的 BLE 固件（1.0.21/1.0.22 请求 `15–30ms`，更早的不请求）在 Android 17 上不请求 HIGH 时的
+  速度尚未实测。
+- 验证方法：开发者选项里把“蓝牙 HCI 信息收集日志”设为“已启用”并重启蓝牙，传输后尽快 `adb bugreport` 取
+  `FS/data/misc/bluetooth/logs/btsnoop_hci.log*`（每 `65536` 条记录滚动一次，只保留两份）。看 LE Connection Update
+  Complete 的 interval/latency 与 L2CAP Connection Parameter Update Request 的时间点。
 
 ## SDK 可靠性与事件开销
 

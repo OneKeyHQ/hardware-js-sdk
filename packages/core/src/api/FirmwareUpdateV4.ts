@@ -103,6 +103,7 @@ const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
+const PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT = 2;
 // Bootloaders with the 2048-byte BLE UART FIFO have no room beside one waiting FileWrite
 // frame, so a second in-flight write can overflow it and lose a chunk. Firmware has not yet
 // confirmed which bootloader version ships the 4096-byte FIFO, nor that the BLE coprocessor
@@ -402,6 +403,23 @@ const getProtocolV2ErrorCode = (error: unknown): number | string | undefined => 
   const { errorCode, code } = error as { errorCode?: unknown; code?: unknown };
   const causeCode = errorCode ?? code;
   return typeof causeCode === 'number' || typeof causeCode === 'string' ? causeCode : undefined;
+};
+
+/** Errors that mean the link is gone, so the read says nothing about the installed bundle. */
+const isProtocolV2ResourceHeaderLinkError = (error: unknown) => {
+  if (isProtocolV2DeviceDisconnectedError(error)) return true;
+  const errorCode = getProtocolV2ErrorCode(error);
+  if (errorCode === HardwareErrorCode.BleTimeoutError) return true;
+  const message = getProtocolV2UnknownErrorText(error);
+  if (errorCode === HardwareErrorCode.TransportNotFound && /not connected/i.test(message)) {
+    return true;
+  }
+  return (
+    message.includes('ProtocolV2LinkError') ||
+    message.includes('Device protocol has not been detected') ||
+    message.includes('Electron BLE device state cleaned') ||
+    message.includes('Electron BLE transport released')
+  );
 };
 
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
@@ -1900,8 +1918,54 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (!expectedHeaderHash || header.headerHash !== expectedHeaderHash) return false;
       return true;
     } catch (error) {
+      if (isProtocolV2ResourceHeaderLinkError(error)) throw error;
       Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
       return false;
+    }
+  }
+
+  /**
+   * A lost link would fail every remaining header check and resend bundles that are already
+   * installed, so reconnect (a bounded number of times per transfer phase) and ask again.
+   * Header reads have no side effects. If reconnecting fails or the budget is used up, the bundle
+   * is resent as before; a failed identity check after reconnecting aborts the update.
+   */
+  private async isProtocolV2ResourceBundleUpToDateWithRecovery(
+    bundle: ProtocolV2ResourceBundleSource,
+    recovery: { remaining: number }
+  ): Promise<boolean> {
+    for (;;) {
+      try {
+        return await this.isProtocolV2ResourceBundleUpToDate(bundle);
+      } catch (error) {
+        this.throwIfAborted();
+        if (recovery.remaining <= 0) {
+          Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
+          return false;
+        }
+        recovery.remaining -= 1;
+        Log.log(
+          `[FirmwareUpdateV4] RESC bundle ${bundle.name} header check lost the link; reconnecting: `,
+          getProtocolV2UnknownErrorText(error)
+        );
+        try {
+          await this.recoverProtocolV2FileTransfer();
+        } catch (recoverError) {
+          this.throwIfAborted();
+          // Mismatch or unavailable: never keep writing to a device that was not re-verified.
+          if (
+            this.normalizeErrorMessage(recoverError).includes(
+              'Protocol V2 reconnect physical identity'
+            )
+          ) {
+            throw recoverError;
+          }
+          recovery.remaining = 0;
+          Log.log('[FirmwareUpdateV4] RESC header check reconnect failed: ', recoverError);
+          return false;
+        }
+        this.throwIfAborted();
+      }
     }
   }
 
@@ -2143,8 +2207,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }: ProtocolV2TransferBatch) {
     let totalSize = installSources.reduce((total, item) => total + item.source.size, 0);
     const resourcesToSync: ProtocolV2ResourceBundleSource[] = [];
+    const headerRecovery = { remaining: PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT };
     for (const resource of resourceSources) {
-      if (await this.isProtocolV2ResourceBundleUpToDate(resource)) {
+      if (await this.isProtocolV2ResourceBundleUpToDateWithRecovery(resource, headerRecovery)) {
         Log.log(`[FirmwareUpdateV4] skip RESC bundle ${resource.name}; already up to date`);
       } else {
         resourcesToSync.push(resource);
