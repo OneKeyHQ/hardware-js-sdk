@@ -4,7 +4,7 @@
 > 适用读者：Hardware SDK、App Hardware、Firmware 与 QA 工程师
 > 内容状态：当前实现 + 分日期历史基线
 > 代码范围：`hd-transport`、`hd-transport-*`、Core Protocol V2 文件写入与 Pro2 host-asset package
-> 最后代码核验：2026-08-26
+> 最后代码核验：2026-10-24
 > 前置阅读：[Protocol V1/V2 传输协议](../protocol/protocol-v1-v2.md)、[Pro2 设备管理](../business/pro2-device-management.md)
 
 ## 本页解决什么问题
@@ -17,16 +17,16 @@
 
 Protocol V2 BLE 的生产默认值如下：
 
-| 范围                                          | 当前行为                                                     | 边界                                                                                       |
-| --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Protocol 选择                                 | method 明确只支持 V2 时直接按 `expected V2` 探测             | 双协议与 V1-only method 不改变原顺序；不根据名称/PID 推导 BLE 协议                         |
-| 普通 `FilesystemFileWrite`                    | `1800B`                                                      | 保留最长 127-byte filesystem path 的 frame 空间                                            |
-| firmware 固定 staging path                    | 串行 `1960B`，窗口模式 `1800B`                               | 最长当前路径的完整 frame 低于 `2048B`；窗口模式要让 2 帧放进 `4096B` FIFO                  |
-| firmware `1.0.1+` 固定 `wallpaper.okpkg` path | `1960B`                                                      | 仅通过内部 BLE-only override 放宽；WebUSB 和 legacy wallpaper path 不受影响                |
-| Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                     |
-| Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外 |
-| Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限       |
-| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；已确认的 bootloader 上，V4 同一调用内最多 2 块在途（见下文）                 |
+| 范围                                          | 当前行为                                                     | 边界                                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Protocol 选择                                 | method 明确只支持 V2 时直接按 `expected V2` 探测             | 双协议与 V1-only method 不改变原顺序；不根据名称/PID 推导 BLE 协议                                           |
+| 普通 `FilesystemFileWrite`                    | `1800B`                                                      | 保留最长 127-byte filesystem path 的 frame 空间                                                              |
+| firmware 固定 staging path                    | 串行 `1960B`，窗口模式 `1800B`                               | 最长当前路径的完整 frame 低于 `2048B`；窗口模式要让 2 帧放进 `4096B` FIFO                                    |
+| firmware `1.0.1+` 固定 `wallpaper.okpkg` path | `1960B`                                                      | 仅通过内部 BLE-only override 放宽；WebUSB 和 legacy wallpaper path 不受影响                                  |
+| Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                                       |
+| Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外                   |
+| Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限                         |
+| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 TEST ONLY 的 `1.0.2`）时，V4 同一调用内最多 2 块在途（见下文） |
 
 ### 为什么不能把所有 BLE file chunk 统一为 1960B
 
@@ -260,14 +260,14 @@ firmware 解压后的 RGB565 bytes 与压缩前逐字节一致。
 
 ### 平台验证矩阵
 
-| 平台                 | 当前代码覆盖                                                                        | 自动化验证                              | 物理验证         |
-| -------------------- | ----------------------------------------------------------------------------------- | --------------------------------------- | ---------------- |
-| macOS CLI LowLevel   | `244B`、`1960B` 固定 wallpaper path、V2-first、无损 LZ4                             | 已覆盖 packet/fallback 与 Core 文件写入 | 已完成，本节结果 |
-| React Native iOS     | MTU refresh、`244B` ceiling、默认 `withoutResponse`、共享 Core 优化                 | RN strategy/link tests 已通过           | 本轮未执行       |
+| 平台                 | 当前代码覆盖                                                                                     | 自动化验证                              | 物理验证         |
+| -------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------- | ---------------- |
+| macOS CLI LowLevel   | `244B`、`1960B` 固定 wallpaper path、V2-first、无损 LZ4                                          | 已覆盖 packet/fallback 与 Core 文件写入 | 已完成，本节结果 |
+| React Native iOS     | MTU refresh、`244B` ceiling、默认 `withoutResponse`、共享 Core 优化                              | RN strategy/link tests 已通过           | 本轮未执行       |
 | React Native Android | MTU `517` request、`244B` ceiling、HIGH 连接优先级（API 37+ 默认不请求）、默认 `withoutResponse` | RN strategy/link tests 已通过           | 本轮未执行       |
-| Electron macOS       | Noble payload 到 ATT MTU 归一化、`244B`、零 high-throughput pacing                  | platform normalization test 已通过      | 本轮未执行       |
-| Electron Windows     | MaxPduSize 到 ATT MTU 归一化、已配对后 `withoutResponse`                            | platform normalization test 已通过      | 本轮未执行       |
-| Electron Linux       | ATT MTU 保持原值                                                                    | platform normalization test 已通过      | 本轮未执行       |
+| Electron macOS       | Noble payload 到 ATT MTU 归一化、`244B`、零 high-throughput pacing                               | platform normalization test 已通过      | 本轮未执行       |
+| Electron Windows     | MaxPduSize 到 ATT MTU 归一化、已配对后 `withoutResponse`                                         | platform normalization test 已通过      | 本轮未执行       |
+| Electron Linux       | ATT MTU 保持原值                                                                                 | platform normalization test 已通过      | 本轮未执行       |
 
 当前自动化记录：传输/RN/CLI 聚焦集合 `6 suites / 158 tests` 全通过；Core host package、Protocol V2
 frame/file-write 与 Electron MTU 集合 `6 suites / 384 passed / 4 skipped`。`hd-transport`、LowLevel、Core、
@@ -394,37 +394,35 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
 一问一答时，设备处理当前块、回包的这段时间里 BLE 链路是空闲的。`FirmwareUpdateV4` 可以在
 同一次 `FilesystemFileWrite` 调用内提前发出下一块，最多 `2` 块在途（`PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW`）：
 
-- 设备仍按顺序处理并逐块回包；SDK 按顺序把回包对应到在途块，要求回包回显该块的 path、offset、
-  total size，且 `processed_byte` 等于该块结束偏移。上游 bootloader 不检查请求里的 offset，只在自己的
-  写入位置追加；丢了一块时，是下一块回包里回显的 offset 暴露出来。进度只按已确认的块累计。
+- 回包按顺序匹配在途块并回显 path/offset/total size、`Failure` 排空后返回且 Link 可用、
+  用户取消或读源失败不使 Link 失效、Transport 不重发而由 Core 从偏移 `0` 重写整个文件，这些规则见
+  [Protocol V1/V2](../protocol/protocol-v1-v2.md#link-sequence-and-call-queue) 和
+  [架构决策](../architecture/decisions.md#ordered-filewrite-pipeline-for-ble-firmware-transfer)。进度只按已确认的块累计。
 - 主控先把整帧从 UART FIFO 拷出再处理（firmware-pro2 `proto_link.c`），但“等着被解析的一帧”和
   “正在接收的下一帧”可能同时在 FIFO 里，蓝牙芯片自己的命令帧也走同一个 FIFO。所以窗口模式下所有文件
   统一用 `1800B` 块，两帧约 `3.75KB`；串行时 staging 路径用的 `1960B` 块单帧最多 `2020B`，两帧只剩不到
   `60B` 余量。旧 bootloader 的 `2048B` FIFO 只放得下一帧。
 - 蓝牙芯片同样限制窗口：1.0.23 把每个收到的 BLE 包放进 10 个事件的调度队列，满了直接丢弃不报错，
-  转发到主控的 UART 也没有流控。2 块在途时 BLE 芯片里可能同时有约 18 个 `244B` 包，一问一答时约 9 个，
+  转发到主控的 UART 也没有流控。2 块在途时（窗口模式每块 `1800B`、每帧 8 包）BLE 芯片里可能同时有约 16 个
+  `244B` 包，一问一答时 8–9 个（串行 staging `1960B` 块每帧 9 包），
   主循环卡顿时更容易丢包。开启前需要固件确认余量，并在真机上做长时间传输验证。
 - `2048B` BLE 帧上限保持不变：蓝牙 1.0.23 只对不超过 `2048B` 的帧做 passthrough
   session 保护，帧更大时，蓝牙自身的命令可能插进一帧中间。
-- 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个。SDK 只在 React Native 与 Electron BLE、
-  bootloader 模式、且运行中的 bootloader 版本不低于固件确认的最低版本时才开启。线上 bootloader 已经是
-  `1.0.2`、FIFO 仍为 `2048B`，所以最低版本必须是只有 `4096B` FIFO 的 bootloader 才会报告的版本。固件尚未
-  确认该版本；测速分支临时填了 `1.0.2`，这会连线上 bootloader 一起打开，只能用来升级刷了 `4096B` FIFO
-  bootloader 的测试机，不能发布。装上新 bootloader 的那一次升级仍是一问一答。LowLevel（包括 CLI）
-  暂不开启：插件接口不要求在两次 `receive()` 之间保留通知。
+- 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个，所以装上新 bootloader 的那一次升级仍是一问一答。
+  SDK 只在 React Native 与 Electron BLE、bootloader 模式、且运行中的 bootloader 版本不低于最低版本时开启；
+  LowLevel（包括 CLI）不开启。代码中 `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION` 暂为 TEST ONLY 的
+  `1.0.2`。线上 bootloader 也报告 `1.0.2`（FIFO 仍为 `2048B`），所以这会连线上 bootloader 一起打开，
+  只能用来升级刷了 `4096B` FIFO bootloader 的测试机，不能发布。原因见
+  [架构决策](../architecture/decisions.md#ordered-filewrite-pipeline-for-ble-firmware-transfer)。
 - 测速时按 `[FirmwareUpdateV4]` 过滤 SDK debug 日志：`BLE FileWrite window` 记录是否开启及 bootloader
   版本/build ID；`Protocol V2 file transferred` 记录每个文件的字节数、耗时、第几次尝试和窗口大小；
   `file transfer attempt failed` 记录文件内重传；`transfer completed` 与 `install completed` 分别给出传输
   阶段与安装阶段（含设备上确认）的总耗时。
 - 每一步等待（写一帧、等一块的回包）最长 `10s`，React Native 与 Electron BLE 相同；超时后 Link 失效，
   Core 重连并重写该文件。串行路径的超时不变（桌面仍为默认 5 分钟）。
-- 设备返回 `Failure` 时停止发送，排空已在途块的回包后返回该 `Failure`，Link 保持可用。
-  回包与在途块不匹配属于 frame error，按 link-fatal 处理。用户取消或读取文件失败时也只是停止发送、
-  排空在途块，由 Core 在调用返回后报错，不会断开 BLE。Transport 不重发；Core 重连后从偏移 `0` 重写整个文件。
 
-#961 的历史数据（`2560B` 块、带 credit 的实验固件）不再代表当前实现。下面是不加 credit 的实测：除标注
-app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/s（单文件有效字节 ÷ 首帧到最后一个确认的
-时间），标注百分比的是传输中途的实时值：
+下面是不加 credit 的实测：除标注 app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；
+单位 KiB/s（单文件有效字节 ÷ 首帧到最后一个确认的时间），标注百分比的是传输中途的实时值：
 
 | 主机 / 工具                                        | 设备与模式           | 文件               | 窗口 / 块                   | 结果                     | RTT       |
 | -------------------------------------------------- | -------------------- | ------------------ | --------------------------- | ------------------------ | --------- |
@@ -438,37 +436,41 @@ app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/
 | Windows 同事的 `ble_tool.py`                       | Pro2，app 模式       | 5 MB 随机文件      | 2 / 1800                    | `62.6`（第 1 次 96% 时） | `55ms`    |
 
 - 同一台 Mac、同一台设备上，SDK alpha.113（staging 文件 `1960B` 块）与 demo 速度一致，SDK 每块带
-  `ui_percentage` 和 Electron 进程间转发都看不出开销。窗口模式全部改为 `1800B` 块后尚未做端到端实测；同机
-  demo 的 2/1800 比 2/1960 低约 1.4%（`42.4` 对 `43.0`），在测量波动内。
+  `ui_percentage` 和 Electron 进程间转发都看不出开销。窗口模式全部改为 `1800B` 块后 macOS 上尚未做端到端实测
+  （Android App 的 alpha.115/116 实测见下文）；同机 demo 的 2/1800 比 2/1960 低约 1.4%（`42.4` 对 `43.0`），
+  在测量波动内。
 - macOS 上窗口 1 到 2 只提升约 34%，RTT 从 `55ms` 涨到 `83ms`；Neo 窗口 3 每块约 `37.9ms`，帧字节约
   `48.6 kB/s`（约 `47.4 KiB/s`）。Pro2 在窗口 2 时（`43.8`，RTT `77–84ms`）与 Neo 一致。Android 与 Windows
   在窗口 2 时 RTT 仍约 `55–58ms`，说明上限在 macOS
   主机链路（连接间隔由系统决定，之前测得 `15ms`），不在设备或 SDK。iOS 同样由 CoreBluetooth 决定连接
   参数，需要单独实测。
-- 同事的 Android 工具与 SDK 在 Android 上的写法一致：请求 MTU `517`（实际 `247`）、HIGH 连接优先级、
+- alpha.115 时（逐包模式），同事的 Android 工具与 SDK 在 Android 上的写法一致：请求 MTU `517`（实际 `247`）、HIGH 连接优先级、
   `244B` write-without-response、每包等 `onCharacteristicWrite` 再发下一包。区别在等待发生的位置：工具在 Java
   线程里等，SDK 每个包都要从后台 JS 线程到原生再回来一次。OneKey App（Pixel 9a、alpha.115、窗口 2）整包传输
   `41,082 B/s`（约 `40.1 KiB/s`，无重传），同机工具 `55–60 KiB/s`。Android 一次只允许一个 GATT 写在途，所以
-  这段往返夹在每两个包之间；iOS 会先排队多个无回复写，往返多半和空中时间重叠，可能仍受链路限制。
-- 因此 React Native 加了整帧原生写入（见 Protocol V1/V2 文档的 BLE 一节），`ProtocolV2BleTuning.nativeFrameWrite`
-  可关闭用于同包 A/B。每次带窗口的 FileWrite 结束时，`[ReactNativeBleTransport] FileWrite perf` 记录
-  `mode`（`native-frame` / `per-packet`）、帧数、包数、`writeMs`、`readWaitMs`，逐包模式还有每包耗时分布；
-  `Protocol V2 frame write mode` 记录当前链路用哪种模式。App 会保存这两条日志，按文件比较两种模式即可。
+  这段往返夹在每两个包之间；iOS 会先排队多个无回复写，往返多半和空中时间重叠，可能仍受链路限制。这次没有抓 HCI，
+  而 alpha.115 到第一次 FileWrite 才请求 HIGH（连接已建立很久）；如果当时已是 Android 17，链路可能停在 latency `1`
+  （见下一节），所以这段差距不能全部归因于 JS 往返。现在默认改为整帧原生写入，Android API `37` 及以上也默认不再请求 HIGH。
+- 因此 React Native 加了整帧原生写入（见 [Protocol V1/V2 · BLE Transport](../protocol/protocol-v1-v2.md#ble-transport)），
+  `ProtocolV2BleTuning.nativeFrameWrite` 可关闭用于同包 A/B。每次带窗口的 FileWrite 结束时，
+  `[ReactNativeBleTransport] FileWrite perf` 记录 `mode`（`native-frame` / `per-packet`）、帧数、包数、`writeMs`、
+  `readWaitMs`，逐包模式还有每包耗时分布；`Protocol V2 frame write mode` 记录当前链路用哪种模式。App 会保存这两条
+  日志，按文件比较两种模式即可。
 - 刷了开发版测试 bootloader（`__DEV__DEBUG`，包头 production flag 为 `0`）的设备只接受开发签名的包。
   App 预览环境下发的 `prod_release` 包（production flag `0xA55A5AA5`）能传完，但安装时每个目标都以
   `FAILED_VERIFY`（`6`）失败，什么都不会装上。测完整升级要给这类设备配开发签名的包。
 
 ### Android 17 连接优先级：peripheral latency 1 让吞吐减半
 
-2026-10-24 用 Pixel 9a（Android 17）+ Neo（bootloader 1.0.2 测试版、BLE 1.0.23）抓 HCI snoop 测得。同一个 App 包
-（alpha.116、native-frame、窗口 2 / 1800）前后两次整包升级：
+2026-10-24 用 Pixel 9a（Android 17）+ Neo（bootloader 1.0.2 测试版、BLE 1.0.23）抓 HCI snoop 测得。前两行是同事的工具 APK，
+后两行是同一个 App 包（alpha.116、native-frame、窗口 2 / 1800）前后两次整包升级：
 
-| 场景                                         | 连接参数（HCI）         | 结果                                       |
-| -------------------------------------------- | ----------------------- | ------------------------------------------ |
-| 工具连上后立即上传，同一条连接内对比         | `15ms`，latency `1`     | `33.9 KiB/s`，每帧 8 包全部被确认中位 `84.5ms` |
-| 同上，设备把参数改回后                       | `15ms`，latency `0`     | `56.7 KiB/s`，中位 `43.3ms`                |
-| App 升级，HIGH 在连接建立 `104s` 后才请求    | 推断 latency `1`        | 6 个文件全部 `27.6–29.2 KiB/s`，每帧 `66.1ms` |
-| App 升级，latency `0` 阶段                   | `15ms`，latency `0`     | 单文件约 `55 KiB/s`，每帧 `33.1ms`         |
+| 场景                                      | 连接参数（HCI）     | 结果                                                 |
+| ----------------------------------------- | ------------------- | ---------------------------------------------------- |
+| 工具连上后立即上传，同一条连接内对比      | `15ms`，latency `1` | `33.9 KiB/s`，每帧 8 包全部被确认的耗时中位 `84.5ms` |
+| 同上，设备把参数改回后                    | `15ms`，latency `0` | `56.7 KiB/s`，同口径中位 `43.3ms`                    |
+| App 升级，HIGH 在连接建立 `104s` 后才请求 | 推断 latency `1`    | 6 个文件全部 `27.6–29.2 KiB/s`，每帧 `66.1ms`        |
+| App 升级，latency `0` 阶段                | `15ms`，latency `0` | 单文件约 `55 KiB/s`，每帧 `33.1ms`                   |
 
 - Android 17（Bluetooth 模块开启 `le_subrate_manager`）把 `CONNECTION_PRIORITY_HIGH` 映射成 `11.25–15ms`、
   peripheral latency `1`（AOSP `CompanionManager` 默认值，不是 Pixel 定制），BALANCED 是 `30–50ms`、latency `5`。
@@ -480,13 +482,31 @@ app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/
   latency `1` 会留到连接结束。
 - 在建立已久的连接上请求 HIGH，4 次里有 3 次约 `5s` 后监督超时断开（reason `0x08`），原因未查清，和第一次读 RESC 文件头
   同时发生。断开后 RESC 头检查全部失败，原本已是最新的资源包全部重传（多传约 `22 MB`）。
-- SDK 因此在 Android API `37` 及以上默认不请求 HIGH，交给设备自己的 `15/0`；`ProtocolV2BleTuning.androidHighConnectionPriority`
-  可设为 `true`/`false` 强制开关，默认 `'auto'`。RESC 头检查遇到断链时，Core 重连后重试（每个传输阶段共享最多 `2` 次重连）；
-  重连失败，或本阶段 `2` 次已用完后再次断链，该资源包按旧逻辑直接重传；重连后设备身份校验失败则中止升级。更早的 BLE 固件（1.0.21/1.0.22 请求 `15–30ms`，更早的不请求）在 Android 17 上不请求 HIGH 时的
-  速度尚未实测。
+- SDK 因此在 Android API `37` 及以上默认不请求 HIGH，交给设备自己的 `15/0`；
+  `ProtocolV2BleTuning.androidHighConnectionPriority` 可设为 `true`/`false` 强制开关，默认 `'auto'`。更早的 BLE 固件
+  （1.0.21/1.0.22 请求 `15–30ms`，更早的不请求）在 Android 17 上不请求 HIGH 时的速度尚未实测。
 - 验证方法：开发者选项里把“蓝牙 HCI 信息收集日志”设为“已启用”并重启蓝牙，传输后尽快 `adb bugreport` 取
   `FS/data/misc/bluetooth/logs/btsnoop_hci.log*`（每 `65536` 条记录滚动一次，只保留两份）。看 LE Connection Update
   Complete 的 interval/latency 与 L2CAP Connection Parameter Update Request 的时间点。
+
+### alpha.117 端到端结果
+
+2026-10-24，Neo（bootloader 1.0.2 测试版、BLE 1.0.23），App 整包升级（native-frame、窗口 2 / 1800），资源包已是最新、
+只传 6–7 个固件文件。单位 KiB/s 按帧字节计：
+
+| 平台                            | 环境                | 单文件      | 每帧周期  | 说明                                         |
+| ------------------------------- | ------------------- | ----------- | --------- | -------------------------------------------- |
+| Android（Pixel 9a，Android 17） | 家中 5 GHz Wi-Fi    | `53.4–55.1` | `33ms`    | 连接后 `1.4s` 即为 `15ms` latency `0`        |
+| 同上                            | iPhone 2.4 GHz 热点 | `28.5–39.7` | `54–63ms` | 参数同为 `15ms` latency `0`，见下            |
+| iOS                             | 家中                | `73.2–75.5` | `24ms`    | 整帧写 `2.7ms`，排队的无回复写与空中时间重叠 |
+
+- 2.4 GHz 那次 BQR（vendor event `0xFF`）显示 AFH 弃用 `22/37` 个信道、上行重传约 `38%`，家中为 `10/37`、约
+  `11%`，RSSI 都约 `-51`–`-52dBm`。Pixel 的 Wi-Fi 与蓝牙共用射频，2.4 GHz Wi-Fi 会挤占连接事件：每个事件只能发约 2 包
+  （家中 3–4 包）。比较速度时要固定射频环境。
+- Android 连接后系统自己的 GATT 发现（`dumpsys bluetooth_manager` 里 `ACL holders: bta_dm_disc_gatt`）正常 1–3 s
+  释放。2.4 GHz 环境下它曾在设备装完重启后一直占住链路、不超时也不断开，SDK 的重连无法恢复，只能关开蓝牙；这不是
+  吞吐问题，单独跟进。
+- 尚未覆盖：Pro2 的 App 实测、BLE 1.0.22 及更早固件在 Android 17 上不请求 HIGH 时的速度、Electron 桌面端。
 
 ## SDK 可靠性与事件开销
 
@@ -494,6 +514,10 @@ app 模式的一行外都在 `4096B` FIFO 测试 bootloader 下测；单位 KiB/
 覆盖重写整个文件，单个文件最多尝试 `3` 次。SDK 目前没有按已确认偏移续传。副作用命令的重试由
 Core 决定，不下沉到 Transport。CLI 输出的 `attempt`、`retried` 只描述外层 CLI 重试，看不出这种
 文件内的重写，判断有无重传需要按文件核对实际写入字节。
+
+RESC 头检查遇到断链时（如上面 Android 17 一节的监督超时），Core 重连后重新检查（读头没有副作用）。
+每个传输阶段共享最多 `2` 次重连。重连失败时，该资源包按旧逻辑直接重传，本阶段也不再重连。
+次数用完后，再次断链的资源包同样直接重传。重连后设备身份校验失败则中止升级。
 
 文件写入的内部确认回调在每个确认后触发，用于记录真实吞吐；App 可见的
 `FIRMWARE_PROGRESS` 则只在整数百分比变化、超过 `1s` 心跳间隔或单文件完成时发送。这样可减少

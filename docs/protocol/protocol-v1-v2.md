@@ -208,17 +208,19 @@ BLE platform implementations include Electron, React Native, and the lowlevel pl
   exposes `writeCharacteristicWithoutResponseFrame`. The SDK uses it only for high-throughput, without-response frames that
   need more than one packet, when `ProtocolV2BleTuning.nativeFrameWrite` is not `false` and the native module reports
   support (`isWriteCharacteristicWithoutResponseFrameSupported()`, which checks the native module so a newer JS bundle on an
-  older native binary falls back). Native code still writes packets in order with one write outstanding: Android uses one
-  RxAndroidBle long-write operation, iOS a sequential loop that waits for `canSendWriteWithoutResponse`. Each frame has a
-  unique transaction id and a `BLE_WRITE_PACKET_TIMEOUT_MS` watchdog; abort, watchdog expiry, generation change, release,
-  disconnect and manager reset cancel it. A failed frame is never retried and is link-fatal. Otherwise the per-packet path
-  above is used unchanged; Protocol V1 never uses the frame call.
-- React Native on Android requests `CONNECTION_PRIORITY_HIGH` once per link before Protocol V2 high-throughput calls and
-  restores Balanced 1 s after the last one, except on API 37+ by default: Android 17 maps HIGH to peripheral latency 1,
-  which OneKey BLE firmware accepts and which halves FileWrite throughput. BLE 1.0.23 requests 15 ms / latency 0 itself;
-  older BLE firmware (15-30 ms or no request) is unmeasured on Android 17 without HIGH.
-  `ProtocolV2BleTuning.androidHighConnectionPriority` (`'auto'`, `true`, `false`) overrides this. A manual disconnect
-  clears the cached priority so the next link starts clean.
+  older native binary falls back). Native code still writes packets in order: Android uses one RxAndroidBle long-write
+  operation with one GATT write outstanding, iOS a sequential loop that waits for `canSendWriteWithoutResponse`, so
+  CoreBluetooth may queue several packets. Each frame has a unique transaction id and a `BLE_WRITE_PACKET_TIMEOUT_MS`
+  watchdog; abort, watchdog expiry, generation change, release, disconnect and manager reset cancel it. A failed frame is
+  never retried and is link-fatal. Otherwise the per-packet path above is used unchanged; Protocol V1 never uses the frame
+  call.
+- React Native on Android requests `CONNECTION_PRIORITY_HIGH` before a Protocol V2 high-throughput call unless the link
+  already holds it, and restores Balanced after 1 s without such a call or on release, except on API 37+ by default:
+  Android 17 maps HIGH to peripheral latency 1, which OneKey BLE firmware accepts and which halves FileWrite throughput.
+  Measurements and BLE firmware details are in
+  [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md#android-17-连接优先级peripheral-latency-1-让吞吐减半).
+  `ProtocolV2BleTuning.androidHighConnectionPriority` (`'auto'`, `true`, `false`) overrides this. A disconnect, including
+  the automatic one after a BLE timeout, clears the cached priority and any pending restore so the next link starts clean.
 - Notification data uniformly enters `ProtocolV2FrameAssembler`; a single notification must not be assumed to be one frame.
 - On V1/V2 probe fallback, Electron BLE only rotates the renderer notification token and protocol buffers; it does not disconnect or
   resubscribe GATT. Unpaired devices therefore trigger the system pairing flow only once.
