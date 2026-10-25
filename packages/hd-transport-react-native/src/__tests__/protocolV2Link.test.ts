@@ -2107,11 +2107,16 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       await harness.transport.call(harness.uuid, 'FileWrite', {});
     };
 
-    test('leaves the priority to the peripheral on Android 17 by default', async () => {
+    const createAndroidHarness = (apiLevel: number) => {
       setPlatformOS('android');
-      setPlatformVersion(37);
+      setPlatformVersion(apiLevel);
       const harness = createHarness();
       harness.device.mtu = 517;
+      return harness;
+    };
+
+    test('leaves the priority to the peripheral on Android 17 by default', async () => {
+      const harness = createAndroidHarness(37);
 
       await runHighVolumeCalls(harness);
       await harness.transport.release(harness.uuid, true);
@@ -2127,10 +2132,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
 
     test('keeps requesting HIGH below Android 17 by default', async () => {
-      setPlatformOS('android');
-      setPlatformVersion(36);
-      const harness = createHarness();
-      harness.device.mtu = 517;
+      const harness = createAndroidHarness(36);
 
       await runHighVolumeCalls(harness);
       expect(harness.device.requestConnectionPriority).toHaveBeenCalledTimes(1);
@@ -2141,27 +2143,21 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
 
     test.each([
-      [37, true, true],
-      [36, false, false],
-    ] as const)(
-      'applies the tuning switch on API %s when set to %s',
-      async (apiLevel, setting, expectHigh) => {
-        setPlatformOS('android');
-        setPlatformVersion(apiLevel);
-        configureProtocolV2BleTuning({ androidHighConnectionPriority: setting });
-        const harness = createHarness();
-        harness.device.mtu = 517;
+      [37, true],
+      [36, false],
+    ] as const)('applies the tuning switch on API %s when set to %s', async (apiLevel, setting) => {
+      configureProtocolV2BleTuning({ androidHighConnectionPriority: setting });
+      const harness = createAndroidHarness(apiLevel);
 
-        await runHighVolumeCalls(harness);
+      await runHighVolumeCalls(harness);
 
-        if (expectHigh) {
-          expect(harness.device.requestConnectionPriority).toHaveBeenCalledWith(1);
-        } else {
-          expect(harness.device.requestConnectionPriority).not.toHaveBeenCalled();
-        }
-        await harness.transport.release(harness.uuid, true);
+      if (setting) {
+        expect(harness.device.requestConnectionPriority).toHaveBeenCalledWith(1);
+      } else {
+        expect(harness.device.requestConnectionPriority).not.toHaveBeenCalled();
       }
-    );
+      await harness.transport.release(harness.uuid, true);
+    });
 
     test('keeps the switch across unrelated tuning and ignores invalid values', () => {
       expect(getProtocolV2BleTuning().androidHighConnectionPriority).toBe('auto');
@@ -2175,10 +2171,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
 
     test('requests HIGH again on the next link after a manual disconnect', async () => {
-      setPlatformOS('android');
-      setPlatformVersion(36);
-      const harness = createHarness();
-      harness.device.mtu = 517;
+      const harness = createAndroidHarness(36);
 
       await runHighVolumeCalls(harness);
       expect(harness.device.requestConnectionPriority).toHaveBeenCalledTimes(1);

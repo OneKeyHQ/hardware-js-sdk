@@ -168,6 +168,11 @@ const isWedgedWriteError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleWriteCharacteristicError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(WEDGED_WRITE_MESSAGE);
+const createWedgedWriteError = () =>
+  ERRORS.TypedError(
+    HardwareErrorCode.BleWriteCharacteristicError,
+    `${WEDGED_WRITE_MESSAGE} ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
+  );
 const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   // Bonding and GATT failures are not evidence of a protocol mismatch. Preserve
@@ -270,7 +275,6 @@ type ProtocolV2NativeFrameWriteExtension = {
 type ProtocolV2NativeFrameWriter = BlePlxManager & Required<ProtocolV2NativeFrameWriteExtension>;
 
 type ActiveProtocolV2FrameWrite = {
-  transactionId: string;
   generation: number;
   cancel: (error: Error) => void;
 };
@@ -341,7 +345,10 @@ const createProtocolV2FileWritePerf = () => {
   const write = createDurationStats();
   const readWait = createDurationStats();
   const packet = createDurationStats();
-  const packetHistogram = FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS.map(() => 0).concat(0);
+  const packetHistogram = Array.from(
+    { length: FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS.length + 1 },
+    () => 0
+  );
 
   return {
     /** Called before each frame write so a frame that fails still reports its mode. */
@@ -357,7 +364,7 @@ const createProtocolV2FileWritePerf = () => {
     recordPacket(elapsedMs: number) {
       packet.add(elapsedMs);
       const bucket = FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS.findIndex(bound => elapsedMs < bound);
-      packetHistogram[bucket < 0 ? FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS.length : bucket] += 1;
+      packetHistogram[bucket < 0 ? packetHistogram.length - 1 : bucket] += 1;
     },
     recordReadWait(elapsedMs: number) {
       readWait.add(elapsedMs);
@@ -434,8 +441,8 @@ const shouldRequestAndroidHighConnectionPriority = () => {
   if (typeof androidHighConnectionPriority === 'boolean') return androidHighConnectionPriority;
   const apiLevel = Number(Platform.Version);
   // Unknown versions keep the long-standing HIGH request.
-  return !(
-    Number.isFinite(apiLevel) && apiLevel >= ANDROID_HIGH_PRIORITY_PERIPHERAL_LATENCY_API_LEVEL
+  return (
+    !Number.isFinite(apiLevel) || apiLevel < ANDROID_HIGH_PRIORITY_PERIPHERAL_LATENCY_API_LEVEL
   );
 };
 
@@ -1745,8 +1752,9 @@ export default class ReactNativeBleTransport {
   }
 
   private async releaseUnlocked(uuid: string, onclose = false) {
-    this.cancelProtocolV2FrameWrite(uuid, new Error('React Native BLE transport released'));
-    await this.protocolV2Links.invalidateLink(uuid, 'React Native BLE transport released');
+    const reason = 'React Native BLE transport released';
+    this.cancelProtocolV2FrameWrite(uuid, new Error(reason));
+    await this.protocolV2Links.invalidateLink(uuid, reason);
     return this.releaseNative(uuid, onclose);
   }
 
@@ -2176,8 +2184,9 @@ export default class ReactNativeBleTransport {
     // Balanced restore from this link must not carry over to it.
     this.clearAndroidPriorityResetTimer(session);
     this.androidHighPriorityDevices.delete(session);
-    this.cancelProtocolV2FrameWrite(session, new Error('React Native BLE transport disconnected'));
-    await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
+    const reason = 'React Native BLE transport disconnected';
+    this.cancelProtocolV2FrameWrite(session, new Error(reason));
+    await this.protocolV2Links.invalidateLink(session, reason);
     const transport = transportCache[session];
     const manager = this.blePlxManager;
     const monitorToken = transport?.monitorToken ?? this.monitorTokens.get(session);
@@ -2615,12 +2624,7 @@ export default class ReactNativeBleTransport {
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             timedOut = true;
-            reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.BleWriteCharacteristicError,
-                `BLE write timeout after ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
-              )
-            );
+            reject(createWedgedWriteError());
           }, BLE_WRITE_PACKET_TIMEOUT_MS);
         }),
       ]);
@@ -2654,13 +2658,7 @@ export default class ReactNativeBleTransport {
       consecutiveWriteTimeouts: timeouts,
     });
 
-    this.cancelProtocolV2FrameWrite(
-      uuid,
-      ERRORS.TypedError(
-        HardwareErrorCode.BleWriteCharacteristicError,
-        `BLE write timeout after ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
-      )
-    );
+    this.cancelProtocolV2FrameWrite(uuid, createWedgedWriteError());
     const wedged = transportCache[uuid];
     this.disconnect(uuid).catch(error => {
       Log?.debug('[ReactNativeBleTransport] wedged link teardown failed (ignored):', error);
@@ -2689,9 +2687,7 @@ export default class ReactNativeBleTransport {
     this.blePlxManager = undefined;
     const reason = 'React Native BLE manager reset';
     // Cancel through the manager that started each frame before destroy() drops its queue.
-    Array.from(this.protocolV2FrameWrites.keys()).forEach(uuid =>
-      this.cancelProtocolV2FrameWrite(uuid, new Error(reason))
-    );
+    this.protocolV2FrameWrites.forEach(active => active.cancel(new Error(reason)));
     // Destroying the shared manager invalidates every peripheral it owns. Notify
     // each cached session before clearing generations so Core cannot retain a
     // silently stale connection for an unrelated device.
@@ -3163,10 +3159,7 @@ export default class ReactNativeBleTransport {
       androidPacketLength: tuning.androidPacketLength,
       mtu: transport.mtuSize,
     });
-    const perf =
-      context.messageName === 'FilesystemFileWrite'
-        ? this.protocolV2FileWritePerfs.get(uuid)
-        : undefined;
+    const perf = this.getProtocolV2FileWritePerf(uuid, context);
     const startedAt = perf ? nowMs() : 0;
     const nativeFrameWriter =
       frame.length > packetCapacity
@@ -3216,7 +3209,7 @@ export default class ReactNativeBleTransport {
     context: Pick<ProtocolV2CallContext, 'highThroughput' | 'writeWithResponse'>,
     nativeFrameWrite: boolean
   ): ProtocolV2NativeFrameWriter | undefined {
-    if (!context.highThroughput || nativeFrameWrite === false) return undefined;
+    if (!context.highThroughput || !nativeFrameWrite) return undefined;
     if (
       shouldWriteProtocolV2WithResponse({
         platform: Platform.OS,
@@ -3234,8 +3227,9 @@ export default class ReactNativeBleTransport {
   /**
    * Writes one frame with a single native call that sends its packets in order without response.
    * Nothing here retries it: a resend could duplicate bytes the device already received. The
-   * native transaction is cancelled on abort, watchdog expiry, generation change and link
-   * teardown so the native side stops writing a frame nobody waits for any more.
+   * native transaction is cancelled on abort, watchdog expiry and link teardown so the native
+   * side stops writing a frame nobody waits for any more; a generation change detected after
+   * the frame completes still fails the write.
    */
   private async writeProtocolV2NativeFrame(
     uuid: string,
@@ -3260,7 +3254,6 @@ export default class ReactNativeBleTransport {
       rejectCancelled = reject;
     });
     const active: ActiveProtocolV2FrameWrite = {
-      transactionId,
       generation: context.generation,
       cancel: error => {
         if (cancelError) return;
@@ -3283,8 +3276,6 @@ export default class ReactNativeBleTransport {
     };
     const onAbort = () => active.cancel(new Error(abortMessage));
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let completed = false;
-    let nativeError: unknown;
     try {
       const nativeWrite = Promise.resolve(
         manager.writeCharacteristicWithoutResponseFrame(
@@ -3298,54 +3289,40 @@ export default class ReactNativeBleTransport {
       nativeWrite.catch(() => undefined);
       this.protocolV2FrameWrites.set(uuid, active);
       context.signal.addEventListener('abort', onAbort);
-      await Promise.race([
-        nativeWrite,
-        cancelled,
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
-            const owner = isCurrentOwner();
-            const error = ERRORS.TypedError(
-              HardwareErrorCode.BleWriteCharacteristicError,
-              `BLE write timeout after ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
-            );
-            active.cancel(error);
-            reject(error);
-            if (owner) {
-              this.tearDownWedgedLink(uuid);
-            } else {
-              Log?.debug('[ReactNativeBleTransport] stale BLE frame write timed out, link kept');
-            }
-          }, BLE_WRITE_PACKET_TIMEOUT_MS);
-        }),
-      ]);
-      completed = true;
+      timer = setTimeout(() => {
+        const owner = isCurrentOwner();
+        active.cancel(createWedgedWriteError());
+        if (owner) {
+          this.tearDownWedgedLink(uuid);
+        } else {
+          Log?.debug('[ReactNativeBleTransport] stale BLE frame write timed out, link kept');
+        }
+      }, BLE_WRITE_PACKET_TIMEOUT_MS);
+      await Promise.race([nativeWrite, cancelled]);
     } catch (error) {
-      nativeError = error;
+      if (cancelError) throw cancelError;
+      if (isNativeBleDisconnectError(error)) {
+        throw toBleDisconnectHardwareError(error);
+      }
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleWriteCharacteristicError,
+        getNativeBleErrorReason(error)
+      );
     } finally {
       if (timer) clearTimeout(timer);
       context.signal.removeEventListener('abort', onAbort);
-    }
-
-    if (completed) {
-      this.writeTimeoutCounts.delete(uuid);
-      try {
-        assertCurrentGeneration();
-      } catch (error) {
-        active.cancel(error instanceof Error ? error : new Error(String(error)));
+      if (this.protocolV2FrameWrites.get(uuid) === active) {
+        this.protocolV2FrameWrites.delete(uuid);
       }
     }
-    if (this.protocolV2FrameWrites.get(uuid) === active) {
-      this.protocolV2FrameWrites.delete(uuid);
+
+    this.writeTimeoutCounts.delete(uuid);
+    try {
+      assertCurrentGeneration();
+    } catch (error) {
+      active.cancel(error instanceof Error ? error : new Error(String(error)));
     }
     if (cancelError) throw cancelError;
-    if (completed) return;
-    if (isNativeBleDisconnectError(nativeError)) {
-      throw toBleDisconnectHardwareError(nativeError);
-    }
-    throw ERRORS.TypedError(
-      HardwareErrorCode.BleWriteCharacteristicError,
-      getNativeBleErrorReason(nativeError)
-    );
   }
 
   /** Stops the native frame write in flight on `uuid`, optionally only one of `generation`. */
@@ -3365,6 +3342,21 @@ export default class ReactNativeBleTransport {
     } catch (error) {
       logFailure(error);
     }
+  }
+
+  private getProtocolV2FileWritePerf(uuid: string, context: ProtocolV2CallContext) {
+    return context.messageName === 'FilesystemFileWrite'
+      ? this.protocolV2FileWritePerfs.get(uuid)
+      : undefined;
+  }
+
+  /** Returns true the first time `signature` is seen for `uuid` on this link. */
+  private markProtocolV2LogSignature(uuid: string, signature: string): boolean {
+    const signatures = this.protocolV2HighVolumeLogSignatures.get(uuid) ?? new Set<string>();
+    if (signatures.has(signature)) return false;
+    signatures.add(signature);
+    this.protocolV2HighVolumeLogSignatures.set(uuid, signatures);
+    return true;
   }
 
   private async callProtocolV2(
@@ -3401,11 +3393,7 @@ export default class ReactNativeBleTransport {
       const logSignature = `${name}:${writeMode}:${String(
         currentTransport.mtuSize
       )}:${packetCapacity}`;
-      const loggedSignatures =
-        this.protocolV2HighVolumeLogSignatures.get(uuid) ?? new Set<string>();
-      if (!loggedSignatures.has(logSignature)) {
-        loggedSignatures.add(logSignature);
-        this.protocolV2HighVolumeLogSignatures.set(uuid, loggedSignatures);
+      if (this.markProtocolV2LogSignature(uuid, logSignature)) {
         Log?.debug('[ReactNativeBleTransport] Protocol V2 high-volume write configured', {
           name,
           writeMode,
@@ -3420,10 +3408,7 @@ export default class ReactNativeBleTransport {
       )
         ? 'native-frame'
         : 'per-packet';
-      const frameWriteModeSignature = `frameWriteMode:${frameWriteMode}`;
-      if (!loggedSignatures.has(frameWriteModeSignature)) {
-        loggedSignatures.add(frameWriteModeSignature);
-        this.protocolV2HighVolumeLogSignatures.set(uuid, loggedSignatures);
+      if (this.markProtocolV2LogSignature(uuid, `frameWriteMode:${frameWriteMode}`)) {
         Log?.debug('[ReactNativeBleTransport] Protocol V2 frame write mode', {
           platform: Platform.OS,
           mode: frameWriteMode,
@@ -3525,11 +3510,7 @@ export default class ReactNativeBleTransport {
     this.clearAndroidPriorityResetTimer(uuid);
     if (this.androidHighPriorityDevices.has(uuid)) return;
     if (!shouldRequestAndroidHighConnectionPriority()) {
-      const loggedSignatures =
-        this.protocolV2HighVolumeLogSignatures.get(uuid) ?? new Set<string>();
-      if (!loggedSignatures.has('androidPriority:peripheral')) {
-        loggedSignatures.add('androidPriority:peripheral');
-        this.protocolV2HighVolumeLogSignatures.set(uuid, loggedSignatures);
+      if (this.markProtocolV2LogSignature(uuid, 'androidPriority:peripheral')) {
         Log?.debug('[ReactNativeBleTransport] Android BLE connection priority left to peripheral', {
           apiLevel: Platform.Version,
           setting: protocolV2BleTuning.androidHighConnectionPriority,
@@ -3615,12 +3596,9 @@ export default class ReactNativeBleTransport {
           assertCurrentGeneration
         );
       },
-      readFrame: async (context?: ProtocolV2CallContext) => {
+      readFrame: async (context: ProtocolV2CallContext) => {
         assertCurrentGeneration();
-        const perf =
-          context?.messageName === 'FilesystemFileWrite'
-            ? this.protocolV2FileWritePerfs.get(uuid)
-            : undefined;
+        const perf = this.getProtocolV2FileWritePerf(uuid, context);
         const startedAt = perf ? nowMs() : 0;
         const rxFrame = await this.readProtocolV2Frame(uuid);
         perf?.recordReadWait(nowMs() - startedAt);

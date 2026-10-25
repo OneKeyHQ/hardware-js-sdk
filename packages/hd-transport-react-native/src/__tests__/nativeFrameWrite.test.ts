@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import transportPackage, {
+  PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2,
@@ -242,10 +243,16 @@ describe('Protocol V2 native frame write selection', () => {
     expect(manager.writeCharacteristicWithoutResponseFrame ?? jest.fn()).not.toHaveBeenCalled();
   });
 
-  test('keeps the per-packet path when the native frame write tuning is off', async () => {
-    configureProtocolV2BleTuning({ nativeFrameWrite: false });
+  test.each([
+    ['the native frame write tuning is off', { nativeFrameWrite: false }, 42],
+    ['the characteristic has no native identifier', {}, null],
+  ] as const)('keeps the per-packet path when %s', async (_label, tuning, characteristicId) => {
+    configureProtocolV2BleTuning(tuning);
     const manager = createFrameManager();
-    const { transport, bleTransport, writeWithoutResponse } = createUnit({ manager });
+    const { transport, bleTransport, writeWithoutResponse } = createUnit({
+      manager,
+      characteristicId,
+    });
     const { context } = createContext();
 
     await transport.writeProtocolV2Frame('dev', bleTransport, createFrame(600), context, jest.fn());
@@ -277,20 +284,6 @@ describe('Protocol V2 native frame write selection', () => {
       expect(manager.writeCharacteristicWithoutResponseFrame).not.toHaveBeenCalled();
     }
   );
-
-  test('keeps the per-packet path when the characteristic has no native identifier', async () => {
-    const manager = createFrameManager();
-    const { transport, bleTransport, writeWithoutResponse } = createUnit({
-      manager,
-      characteristicId: null,
-    });
-    const { context } = createContext();
-
-    await transport.writeProtocolV2Frame('dev', bleTransport, createFrame(600), context, jest.fn());
-
-    expect(writeWithoutResponse).toHaveBeenCalledTimes(3);
-    expect(manager.writeCharacteristicWithoutResponseFrame).not.toHaveBeenCalled();
-  });
 });
 
 describe('Protocol V2 native frame write failures', () => {
@@ -627,7 +620,7 @@ const schemas = {
 };
 
 const FILE_PATH = 'vol0:/test-app.bin';
-const CHUNK_BYTES = 1800;
+const CHUNK_BYTES = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
 
 const fileChunks = (totalSize: number) => {
   const chunks: Record<string, unknown>[] = [];
