@@ -104,13 +104,13 @@ const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
 const PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT = 2;
-// Bootloaders with the 2048-byte BLE UART FIFO have no room beside one waiting FileWrite
-// frame, so a second in-flight write can overflow it and lose a chunk. Firmware has not yet
-// confirmed which bootloader version ships the 4096-byte FIFO, nor that the BLE coprocessor
-// queues absorb two back-to-back frames.
-// TEST ONLY: 1.0.2 also matches released bootloaders with the 2048-byte FIFO, so this build
-// must only update test devices flashed with the 4096-byte FIFO bootloader. Replace it with
-// the first released version that ships the 4096-byte FIFO before any release.
+// Minimum running bootloader that receives two in-flight BLE FilesystemFileWrite frames.
+// Bootloaders with the 2048-byte BLE UART FIFO have no room beside one waiting FileWrite frame,
+// so a second frame can overflow it: the lost chunk is detected (no response or a mismatched
+// confirmation) and Core rewrites the file, which slows the transfer or fails it after the
+// retries. 1.0.2 also matches released 2048-byte FIFO bootloaders. Raise it to the first
+// release that ships the 4096-byte FIFO once firmware confirms that version and the BLE
+// coprocessor margin, or set it to undefined to keep every transfer serial.
 const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.2';
 const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';

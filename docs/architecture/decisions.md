@@ -35,12 +35,14 @@ BLE firmware and resource transfer may overlap the next `FilesystemFileWrite` wi
   to the main MCU has no flow control, so each extra in-flight frame lowers the margin for a coprocessor stall. Byte and packet
   budgets are in [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md#filewrite-窗口同一次调用内-2-块在途).
 - Transfers run under the device's current bootloader. Core enables the pipeline only for React Native and Electron BLE in
-  bootloader mode when the running bootloader is at or above a confirmed minimum version. Until firmware confirms that version,
-  and devices confirm the coprocessor margin, the minimum must stay unset in released builds. Released bootloaders already
-  report 1.0.2 with the 2048-byte FIFO, so the minimum must be a version that only 4096-byte FIFO bootloaders report.
-  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION` is temporarily the TEST-ONLY 1.0.2, so builds must only update
-  test devices flashed with the 4096-byte FIFO. The decision uses the version the running bootloader reports, never PID,
-  name, or descriptor. LowLevel stays serial because plugins are not required to keep notifications that arrive between
+  bootloader mode when the running bootloader is at or above the minimum version in
+  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION`. Released bootloaders already report 1.0.2 with the
+  2048-byte FIFO, so the final minimum must be a version that only 4096-byte FIFO bootloaders report, set once firmware
+  confirms that version and devices confirm the coprocessor margin; `undefined` keeps every transfer serial. The current
+  1.0.2 also enables the window on released 2048-byte FIFO bootloaders. There a FIFO overflow loses a chunk: the Session
+  detects it as a missing response or a mismatched confirmation, and Core rewrites the file, so the transfer slows down or
+  fails after its retries instead of accepting the gap. The decision uses the version the running bootloader reports, never
+  PID, name, or descriptor. LowLevel stays serial because plugins are not required to keep notifications that arrive between
   `receive()` calls.
 - The Transport never replays chunks. After any failure, Core's existing recovery reconnects and rewrites the whole file from
   offset 0. Cancellation and source read errors stop the pipeline and are raised by Core after the call returns, so they do not

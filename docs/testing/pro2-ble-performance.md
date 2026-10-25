@@ -17,16 +17,16 @@
 
 Protocol V2 BLE 的生产默认值如下：
 
-| 范围                                          | 当前行为                                                     | 边界                                                                                                         |
-| --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Protocol 选择                                 | method 明确只支持 V2 时直接按 `expected V2` 探测             | 双协议与 V1-only method 不改变原顺序；不根据名称/PID 推导 BLE 协议                                           |
-| 普通 `FilesystemFileWrite`                    | `1800B`                                                      | 保留最长 127-byte filesystem path 的 frame 空间                                                              |
-| firmware 固定 staging path                    | 串行 `1960B`，窗口模式 `1800B`                               | 最长当前路径的完整 frame 低于 `2048B`；窗口模式要让 2 帧放进 `4096B` FIFO                                    |
-| firmware `1.0.1+` 固定 `wallpaper.okpkg` path | `1960B`                                                      | 仅通过内部 BLE-only override 放宽；WebUSB 和 legacy wallpaper path 不受影响                                  |
-| Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                                       |
-| Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外                   |
-| Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限                         |
-| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 TEST ONLY 的 `1.0.2`）时，V4 同一调用内最多 2 块在途（见下文） |
+| 范围                                          | 当前行为                                                     | 边界                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Protocol 选择                                 | method 明确只支持 V2 时直接按 `expected V2` 探测             | 双协议与 V1-only method 不改变原顺序；不根据名称/PID 推导 BLE 协议                              |
+| 普通 `FilesystemFileWrite`                    | `1800B`                                                      | 保留最长 127-byte filesystem path 的 frame 空间                                                 |
+| firmware 固定 staging path                    | 串行 `1960B`，窗口模式 `1800B`                               | 最长当前路径的完整 frame 低于 `2048B`；窗口模式要让 2 帧放进 `4096B` FIFO                       |
+| firmware `1.0.1+` 固定 `wallpaper.okpkg` path | `1960B`                                                      | 仅通过内部 BLE-only override 放宽；WebUSB 和 legacy wallpaper path 不受影响                     |
+| Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                          |
+| Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外      |
+| Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限            |
+| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 `1.0.2`）时，V4 同一调用内最多 2 块在途（见下文） |
 
 ### 为什么不能把所有 BLE file chunk 统一为 1960B
 
@@ -408,12 +408,17 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
   主循环卡顿时更容易丢包。开启前需要固件确认余量，并在真机上做长时间传输验证。
 - `2048B` BLE 帧上限保持不变：蓝牙 1.0.23 只对不超过 `2048B` 的帧做 passthrough
   session 保护，帧更大时，蓝牙自身的命令可能插进一帧中间。
-- 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个，所以装上新 bootloader 的那一次升级仍是一问一答。
-  SDK 只在 React Native 与 Electron BLE、bootloader 模式、且运行中的 bootloader 版本不低于最低版本时开启；
-  LowLevel（包括 CLI）不开启。代码中 `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION` 暂为 TEST ONLY 的
-  `1.0.2`。线上 bootloader 也报告 `1.0.2`（FIFO 仍为 `2048B`），所以这会连线上 bootloader 一起打开，
-  只能用来升级刷了 `4096B` FIFO bootloader 的测试机，不能发布。原因见
+- 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个。SDK 只在 React Native 与 Electron BLE、
+  bootloader 模式、且运行中的 bootloader 版本不低于 `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION` 时开启；
+  LowLevel（包括 CLI）不开启。这个常量当前为 `1.0.2`，线上 bootloader 也报告 `1.0.2`（FIFO 仍为 `2048B`），
+  所以线上设备第一次升级（从旧 bootloader 装上 `4096B` FIFO bootloader 的那一次）也会开窗口。最终应改成只有 `4096B`
+  FIFO bootloader 才报告的版本，那时这一次升级才是一问一答；设为 `undefined` 则全部一问一答。原因见
   [架构决策](../architecture/decisions.md#ordered-filewrite-pipeline-for-ble-firmware-transfer)。
+- `2048B` FIFO 上开窗口：设备还没把等着解析的一帧拷出去时下一帧就到了，放不下的字节被直接丢掉（固件只打印
+  `fifo overflow`，不回错误）。残帧过不了 CRC 被丢弃，这一块收不到回包或后续块的确认对不上，SDK 在 `10s` 内判链路失效，
+  Core 重连后从偏移 `0` 重写整个文件，每个文件最多 `3` 次，用完报 `EmmcFileWriteFirmwareError`。所以表现是变慢或
+  升级失败（设备留在 bootloader，可重试），不会把缺块的文件当成传完。这是按固件 `proto_link.c` 与 SDK 逻辑推出的，
+  尚未在 `2048B` FIFO 的线上 bootloader 上实测。
 - 测速时按 `[FirmwareUpdateV4]` 过滤 SDK debug 日志：`BLE FileWrite window` 记录是否开启及 bootloader
   版本/build ID；`Protocol V2 file transferred` 记录每个文件的字节数、耗时、第几次尝试和窗口大小；
   `file transfer attempt failed` 记录文件内重传；`transfer completed` 与 `install completed` 分别给出传输

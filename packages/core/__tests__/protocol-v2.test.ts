@@ -9050,7 +9050,7 @@ describe('Protocol V2 firmware update targets', () => {
     }
   );
 
-  test('defaults the BLE file write window to the TEST-ONLY 1.0.2 bootloader minimum', () => {
+  test('defaults the BLE file write window to the 1.0.2 bootloader minimum', () => {
     expect(supportsProtocolV2BleFileWriteWindow('1.0.2')).toBe(true);
     expect(supportsProtocolV2BleFileWriteWindow('1.0.1')).toBe(false);
   });
