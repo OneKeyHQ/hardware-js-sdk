@@ -299,6 +299,73 @@ describe('Protocol V2 file write pipeline', () => {
     expect(device.requests).toHaveLength(1);
   });
 
+  test.each([
+    ['path', { path: 'vol0:/application_p2.bin' }],
+    ['total size', { total_size: 9 }],
+  ])('rejects a source chunk with another %s before writing it', async (_field, file) => {
+    const device = createDevice();
+    const session = createSession(device);
+    const second = chunk(2, 2, 8);
+    const { result } = runPipeline(session, [
+      chunk(0, 2, 8),
+      { ...second, file: { ...second.file, ...file } },
+    ]);
+
+    await expect(result).rejects.toThrow('chunk belongs to a different file');
+    await expect(result).rejects.toEqual(
+      expect.objectContaining({ name: 'ProtocolV2LinkError', code: 'frame' })
+    );
+    expect(device.requests).toHaveLength(1);
+  });
+
+  test.each([
+    ['path', { path: 'vol0:/application_p2.bin' }],
+    ['total size', { total_size: 8 }],
+  ])('invalidates the link when a confirmation echoes another %s', async (_field, echo) => {
+    const device = createDevice({
+      reply: ({ index, confirmation, encode }) =>
+        index === 0
+          ? [
+              encode('FilesystemFile', {
+                path: PATH,
+                offset: 0,
+                total_size: 6,
+                processed_byte: 2,
+                ...echo,
+              }),
+            ]
+          : [confirmation],
+    });
+    const { adapter, result } = runManagedPipeline(device, chunksOf(6, 2));
+
+    await expect(result).rejects.toEqual(
+      expect.objectContaining({ name: 'ProtocolV2LinkError', code: 'frame' })
+    );
+    expect(adapter.reset).toHaveBeenCalled();
+  });
+
+  test.each(['readFrame', 'writeFrame'])(
+    'passes a %s transport error through unchanged with chunks in flight',
+    async method => {
+      const device = createDevice();
+      const linkLost = new Error('BLE device disconnected');
+      const original = device[method].getMockImplementation();
+      let calls = 0;
+      device[method].mockImplementation((...args) => {
+        calls += 1;
+        // The second write, or the first read, happens with chunk 0 still in flight.
+        return calls === (method === 'writeFrame' ? 2 : 1)
+          ? Promise.reject(linkLost)
+          : original(...args);
+      });
+      const session = createSession(device);
+      const { result } = runPipeline(session, chunksOf(6, 2));
+
+      await expect(result).rejects.toBe(linkLost);
+      expect(device.requests.length).toBeGreaterThan(0);
+    }
+  );
+
   test('drains the in-flight chunk and returns the last confirmation when the source stops', async () => {
     const device = createDevice();
     const session = createSession(device);
