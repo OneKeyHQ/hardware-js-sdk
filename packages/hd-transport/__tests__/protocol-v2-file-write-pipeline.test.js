@@ -110,7 +110,7 @@ const createDevice = ({ reply } = {}) => {
     const request = requests[index];
     const { offset, total_size: totalSize, data } = request.message.file;
     // Decoded protobuf bytes are hex strings.
-    const length = Number(typeof data === 'string' ? data.length / 2 : data.length);
+    const length = data.length / 2;
     const confirmation = encode('FilesystemFile', {
       path: PATH,
       offset,
@@ -154,16 +154,37 @@ const createSession = (device, options = {}) =>
     ...options,
   });
 
-const runPipeline = (session, chunks, callOptions = {}) => {
+const runPipeline = (session, chunks, callOptions = {}, onResponse = jest.fn()) => {
   const [first, ...rest] = chunks;
   const next = jest.fn(() => Promise.resolve(rest.shift()));
-  const onResponse = jest.fn();
   return {
     next,
     onResponse,
     result: session.call('FilesystemFileWrite', first, {
       ...callOptions,
       fileWritePipeline: { next, onResponse },
+    }),
+  };
+};
+
+const runManagedPipeline = (device, chunks) => {
+  const adapter = {
+    router: 1,
+    generation: 1,
+    prepareCall: jest.fn(),
+    writeFrame: device.writeFrame,
+    readFrame: device.readFrame,
+    reset: jest.fn(),
+  };
+  const manager = new ProtocolV2LinkManager({
+    getSchemas: () => schemas,
+    classifyError: () => 'link-fatal',
+  });
+  const [first, ...rest] = chunks;
+  return {
+    adapter,
+    result: manager.call('device-a', () => adapter, 'FilesystemFileWrite', first, {
+      fileWritePipeline: { next: () => Promise.resolve(rest.shift()), onResponse: jest.fn() },
     }),
   };
 };
@@ -232,25 +253,9 @@ describe('Protocol V2 file write pipeline', () => {
     const device = createDevice({
       reply: ({ encode }) => [encode('Failure', { code: 9, message: 'Write offset mismatch' })],
     });
-    const adapter = {
-      router: 1,
-      generation: 1,
-      prepareCall: jest.fn(),
-      writeFrame: device.writeFrame,
-      readFrame: device.readFrame,
-      reset: jest.fn(),
-    };
-    const manager = new ProtocolV2LinkManager({
-      getSchemas: () => schemas,
-      classifyError: () => 'link-fatal',
-    });
-    const [first, ...rest] = chunksOf(6, 2);
+    const { adapter, result } = runManagedPipeline(device, chunksOf(6, 2));
 
-    await expect(
-      manager.call('device-a', () => adapter, 'FilesystemFileWrite', first, {
-        fileWritePipeline: { next: () => Promise.resolve(rest.shift()), onResponse: jest.fn() },
-      })
-    ).resolves.toMatchObject({ type: 'Failure' });
+    await expect(result).resolves.toMatchObject({ type: 'Failure' });
     expect(adapter.reset).not.toHaveBeenCalled();
     expect(adapter.prepareCall).toHaveBeenCalledTimes(1);
   });
@@ -262,25 +267,11 @@ describe('Protocol V2 file write pipeline', () => {
           ? [encode('FilesystemFile', { path: PATH, offset: 4, total_size: 6, processed_byte: 6 })]
           : [confirmation],
     });
-    const adapter = {
-      router: 1,
-      generation: 1,
-      prepareCall: jest.fn(),
-      writeFrame: device.writeFrame,
-      readFrame: device.readFrame,
-      reset: jest.fn(() => Promise.resolve()),
-    };
-    const manager = new ProtocolV2LinkManager({
-      getSchemas: () => schemas,
-      classifyError: () => 'link-fatal',
-    });
-    const [first, ...rest] = chunksOf(6, 2);
+    const { adapter, result } = runManagedPipeline(device, chunksOf(6, 2));
 
-    await expect(
-      manager.call('device-a', () => adapter, 'FilesystemFileWrite', first, {
-        fileWritePipeline: { next: () => Promise.resolve(rest.shift()), onResponse: jest.fn() },
-      })
-    ).rejects.toEqual(expect.objectContaining({ name: 'ProtocolV2LinkError', code: 'frame' }));
+    await expect(result).rejects.toEqual(
+      expect.objectContaining({ name: 'ProtocolV2LinkError', code: 'frame' })
+    );
     expect(adapter.reset).toHaveBeenCalled();
   });
 
@@ -302,6 +293,9 @@ describe('Protocol V2 file write pipeline', () => {
     const { result } = runPipeline(session, [chunk(0, 2, 8), chunk(4, 2, 8)]);
 
     await expect(result).rejects.toThrow('chunk out of order: expected offset 2, got 4');
+    await expect(result).rejects.toEqual(
+      expect.objectContaining({ name: 'ProtocolV2LinkError', code: 'frame' })
+    );
     expect(device.requests).toHaveLength(1);
   });
 
@@ -317,7 +311,7 @@ describe('Protocol V2 file write pipeline', () => {
     expect(onResponse).toHaveBeenCalledTimes(2);
   });
 
-  test('detects a chunk lost before a bootloader that appends at its own cursor', async () => {
+  test('detects a lost chunk when the bootloader appends at its own cursor', async () => {
     let cursor = 0;
     const device = createDevice({
       reply: ({ index, request, encode }) => {
@@ -366,6 +360,9 @@ describe('Protocol V2 file write pipeline', () => {
     const { result } = runPipeline(session, [chunk(0, 128, 128)]);
 
     await expect(result).rejects.toThrow('Protocol V2 frame too large for transport');
+    await expect(result).rejects.not.toEqual(
+      expect.objectContaining({ name: 'ProtocolV2LinkError' })
+    );
     expect(device.requests).toHaveLength(0);
   });
 
@@ -401,17 +398,14 @@ describe('Protocol V2 file write pipeline', () => {
   test('stops when the caller rejects a confirmed chunk', async () => {
     const device = createDevice();
     const session = createSession(device);
-    const [first, ...rest] = chunksOf(10, 2);
-    const result = session.call('FilesystemFileWrite', first, {
-      fileWritePipeline: {
-        next: () => Promise.resolve(rest.shift()),
-        onResponse: () => {
-          throw new Error('cancelled');
-        },
-      },
+    const { result } = runPipeline(session, chunksOf(10, 2), {}, () => {
+      throw new Error('cancelled');
     });
 
     await expect(result).rejects.toThrow('cancelled');
+    await expect(result).rejects.toEqual(
+      expect.objectContaining({ name: 'ProtocolV2LinkError', code: 'frame' })
+    );
     expect(device.requests).toHaveLength(2);
   });
 });

@@ -10,6 +10,7 @@ import {
   createProtocolV2LinkDisabledError,
   isProtocolV2LinkDisabledError,
   isProtocolV2LinkDisabledFailure,
+  isProtocolV2LinkError,
 } from './errors';
 import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
@@ -220,7 +221,10 @@ export async function withProtocolTimeout<T>(
   }
 }
 
-function readFileWriteChunk(request: Record<string, unknown>) {
+const resolveProtocolV2CallTimeoutMs = (timeoutMs?: number) =>
+  timeoutMs && timeoutMs > 0 ? timeoutMs : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
+
+function parseFileWriteChunk(request: Record<string, unknown>) {
   const file = request.file as
     | { path?: unknown; offset?: unknown; total_size?: unknown; data?: { byteLength?: unknown } }
     | undefined;
@@ -320,6 +324,29 @@ export class ProtocolV2Session {
     return result;
   }
 
+  private reportWriteCompleted(
+    callOptions: ProtocolV2CallOptions,
+    writeStartedAt: number,
+    frameBytes: number
+  ) {
+    try {
+      callOptions.onWriteCompleted?.({
+        elapsedMs: Math.max(Date.now() - writeStartedAt, 0),
+        frameBytes,
+      });
+    } catch (error) {
+      const { logger, logPrefix = 'ProtocolV2' } = this.options;
+      logger?.error?.(`${logPrefix} write metrics callback failed: ${String(error)}`);
+    }
+  }
+
+  private createCallTimeoutError(name: string, timeoutMs: number): Error {
+    const { createTimeoutError } = this.options;
+    return createTimeoutError
+      ? createTimeoutError(name, timeoutMs)
+      : new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`);
+  }
+
   private executeCall(
     name: string,
     data: Record<string, unknown>,
@@ -329,22 +356,14 @@ export class ProtocolV2Session {
       return this.executeFileWritePipeline(name, data, callOptions, callOptions.fileWritePipeline);
     }
     const {
-      schemas,
-      router,
-      packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
-      maxFrameBytes,
       prepareCall,
       writeFrame,
       readFrame,
       logger,
       logPrefix = 'ProtocolV2',
-      createTimeoutError,
       generation = 0,
     } = this.options;
-    const timeoutMs =
-      callOptions.timeoutMs && callOptions.timeoutMs > 0
-        ? callOptions.timeoutMs
-        : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
+    const timeoutMs = resolveProtocolV2CallTimeoutMs(callOptions.timeoutMs);
     const abortController = new AbortController();
 
     const shouldReduceDebug = shouldReduceProtocolV2Debug(name);
@@ -365,29 +384,11 @@ export class ProtocolV2Session {
       if (!this.pendingResponseAfterWrite) {
         await prepareCall?.(baseCallContext);
       }
-      const protoSeq = this.sequenceCursor.next();
-      const frame = ProtocolV2.encodeFrame(schemas, name, data, {
-        packetSrc,
-        router,
-        seq: protoSeq,
-      });
-
-      if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
-        throw new Error(
-          `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
-        );
-      }
+      const { seq: protoSeq, frame } = this.encodeRequestFrame(name, data);
 
       const writeStartedAt = Date.now();
       await this.serializeWrite(() => writeFrame(frame, baseCallContext));
-      try {
-        callOptions.onWriteCompleted?.({
-          elapsedMs: Math.max(Date.now() - writeStartedAt, 0),
-          frameBytes: frame.byteLength,
-        });
-      } catch (error) {
-        logger?.error?.(`${logPrefix} write metrics callback failed: ${String(error)}`);
-      }
+      this.reportWriteCompleted(callOptions, writeStartedAt, frame.byteLength);
 
       if (callOptions.returnAfterWrite) {
         if (callOptions.expectedTypes?.length) {
@@ -447,14 +448,28 @@ export class ProtocolV2Session {
     return withProtocolTimeout(
       runCall(),
       timeoutMs,
-      () =>
-        createTimeoutError
-          ? createTimeoutError(name, timeoutMs)
-          : new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
+      () => this.createCallTimeoutError(name, timeoutMs),
       () => {
         abortController.abort();
       }
     );
+  }
+
+  private encodeRequestFrame(name: string, data: Record<string, unknown>) {
+    const {
+      schemas,
+      router,
+      packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
+      maxFrameBytes,
+    } = this.options;
+    const seq = this.sequenceCursor.next();
+    const frame = ProtocolV2.encodeFrame(schemas, name, data, { packetSrc, router, seq });
+    if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
+      throw new Error(
+        `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
+      );
+    }
+    return { seq, frame };
   }
 
   /**
@@ -537,9 +552,7 @@ export class ProtocolV2Session {
    * answers every chunk in order, so responses are matched to chunks by position. Upstream
    * bootloaders append at their own cursor without checking the request offset, so the echoed
    * offset is what exposes a lost chunk. A device Failure, or `next` returning undefined, stops
-   * sending; the remaining in-flight responses are drained so the link stays usable. The call
-   * then returns the Failure like a serial call, or the last confirmation, which the caller
-   * checks for completeness.
+   * sending; the remaining in-flight responses are drained so the link stays usable.
    */
   private async executeFileWritePipeline(
     name: string,
@@ -553,23 +566,8 @@ export class ProtocolV2Session {
     if (this.pendingResponseAfterWrite) {
       throw new Error('Protocol V2 file write pipeline cannot start while a response is pending');
     }
-    const {
-      schemas,
-      router,
-      packetSrc = PROTOCOL_V2_PACKET_SRC_COMMAND,
-      maxFrameBytes,
-      prepareCall,
-      writeFrame,
-      readFrame,
-      logger,
-      logPrefix = 'ProtocolV2',
-      createTimeoutError,
-      generation = 0,
-    } = this.options;
-    const timeoutMs =
-      callOptions.timeoutMs && callOptions.timeoutMs > 0
-        ? callOptions.timeoutMs
-        : PROTOCOL_V2_DEFAULT_RESPONSE_TIMEOUT_MS;
+    const { prepareCall, writeFrame, readFrame, generation = 0 } = this.options;
+    const timeoutMs = resolveProtocolV2CallTimeoutMs(callOptions.timeoutMs);
     const abortController = new AbortController();
     const context: ProtocolV2CallContext = {
       messageName: name,
@@ -581,27 +579,28 @@ export class ProtocolV2Session {
       generation,
       signal: abortController.signal,
     };
+    // Transport errors and timeouts propagate unchanged: each transport classifies its own.
+    let transportFailure: unknown;
     // One file can take far longer than one chunk, so the watchdog bounds each step instead.
     const withStepTimeout = <T>(promise: Promise<T>, stepTimeoutMs = timeoutMs) =>
       withProtocolTimeout(
         promise,
         stepTimeoutMs,
-        () =>
-          createTimeoutError
-            ? createTimeoutError(name, timeoutMs)
-            : new Error(`Protocol V2 response timeout after ${timeoutMs}ms for ${name}`),
+        () => this.createCallTimeoutError(name, timeoutMs),
         () => {
           abortController.abort();
         }
-      );
+      ).catch((error: unknown) => {
+        transportFailure = error;
+        throw error;
+      });
     // ACKs and skipped frames must not extend the wait for an in-flight chunk's response.
     let progressDeadline = 0;
     const markProgress = () => {
       progressDeadline = Date.now() + timeoutMs;
     };
 
-    const inFlight: Array<{ seq: number; path: string; offset: number; end: number }> = [];
-    let firstRequest: Record<string, unknown> | undefined = data;
+    const inFlight: Array<{ seq: number; offset: number; end: number }> = [];
     let path: string | undefined;
     let totalSize: number | undefined;
     let nextOffset: number | undefined;
@@ -609,112 +608,106 @@ export class ProtocolV2Session {
     let failure: MessageFromOneKey | undefined;
     let lastConfirmed: MessageFromOneKey | undefined;
 
-    const sendNextChunk = async () => {
-      const request = firstRequest ?? (await pipeline.next());
-      firstRequest = undefined;
-      if (!request) {
-        sourceDone = true;
-        return;
+    const sendChunk = async (request: Record<string, unknown>) => {
+      const chunk = parseFileWriteChunk(request);
+      if (path !== undefined && (chunk.path !== path || chunk.totalSize !== totalSize)) {
+        throw new Error('Protocol V2 file write pipeline chunk belongs to a different file');
       }
-      const chunk = readFileWriteChunk(request);
-      if (
-        (path !== undefined && chunk.path !== path) ||
-        (totalSize !== undefined && chunk.totalSize !== totalSize) ||
-        (nextOffset !== undefined && chunk.offset !== nextOffset)
-      ) {
+      if (nextOffset !== undefined && chunk.offset !== nextOffset) {
         throw new Error(
-          `Protocol V2 file write pipeline chunk out of order: expected offset ${String(
-            nextOffset
-          )}, got ${chunk.offset}`
+          `Protocol V2 file write pipeline chunk out of order: expected offset ${nextOffset}, got ${chunk.offset}`
         );
       }
       path = chunk.path;
       totalSize = chunk.totalSize;
       nextOffset = chunk.end;
 
-      const seq = this.sequenceCursor.next();
-      const frame = ProtocolV2.encodeFrame(schemas, name, request, {
-        packetSrc,
-        router,
-        seq,
-      });
-      if (maxFrameBytes !== undefined && frame.length > maxFrameBytes) {
-        throw new Error(
-          `Protocol V2 frame too large for transport: ${frame.length} > ${maxFrameBytes}`
-        );
-      }
+      const { seq, frame } = this.encodeRequestFrame(name, request);
       const writeStartedAt = Date.now();
       await withStepTimeout(this.serializeWrite(() => writeFrame(frame, context)));
-      inFlight.push({ seq, path: chunk.path, offset: chunk.offset, end: chunk.end });
+      inFlight.push({ seq, offset: chunk.offset, end: chunk.end });
       markProgress();
-      try {
-        callOptions.onWriteCompleted?.({
-          elapsedMs: Math.max(Date.now() - writeStartedAt, 0),
-          frameBytes: frame.byteLength,
-        });
-      } catch (error) {
-        logger?.error?.(`${logPrefix} write metrics callback failed: ${String(error)}`);
+      this.reportWriteCompleted(callOptions, writeStartedAt, frame.byteLength);
+    };
+    const sendNextChunk = async () => {
+      const request = await pipeline.next();
+      if (!request) {
+        sourceDone = true;
+        return;
       }
+      await sendChunk(request);
     };
 
     await withStepTimeout(Promise.resolve().then(() => prepareCall?.(context)));
-    while (!sourceDone && inFlight.length < PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW) {
-      await sendNextChunk();
-    }
+    try {
+      await sendChunk(data);
+      while (!sourceDone && inFlight.length < PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW) {
+        await sendNextChunk();
+      }
 
-    while (inFlight.length > 0) {
-      const rxFrame = await withStepTimeout(
-        readFrame(context),
-        Math.max(progressDeadline - Date.now(), 1)
-      );
-      const response = this.parseResponseFrame(
-        rxFrame,
-        inFlight.map(item => item.seq)
-      );
-      if (!response) {
-        // ACK of an in-flight chunk; its FilesystemFile response follows.
-      } else if (response.type === 'FilesystemFile') {
-        const [expected] = inFlight;
-        const { message } = response;
-        if (
-          Number(message.processed_byte) !== expected.end ||
-          message.path !== expected.path ||
-          Number(message.offset) !== expected.offset ||
-          Number(message.total_size) !== totalSize
-        ) {
+      while (inFlight.length > 0) {
+        // Floor at 1 ms: withProtocolTimeout treats 0 as "no timeout", so an expired deadline
+        // must still time out.
+        const rxFrame = await withStepTimeout(
+          readFrame(context),
+          Math.max(progressDeadline - Date.now(), 1)
+        );
+        const response = this.parseResponseFrame(
+          rxFrame,
+          inFlight.map(item => item.seq)
+        );
+        if (!response) {
+          // ACK of an in-flight chunk; its FilesystemFile response follows.
+        } else if (response.type === 'FilesystemFile') {
+          const [expected] = inFlight;
+          const { message } = response;
+          if (
+            Number(message.processed_byte) !== expected.end ||
+            message.path !== path ||
+            Number(message.offset) !== expected.offset ||
+            Number(message.total_size) !== totalSize
+          ) {
+            throw new ProtocolV2LinkError(
+              'frame',
+              `Protocol V2 file write response does not match chunk ${expected.offset}-${
+                expected.end
+              }: got offset ${String(message.offset)} processed_byte ${String(
+                message.processed_byte
+              )}`
+            );
+          }
+          inFlight.shift();
+          markProgress();
+          if (!failure) {
+            lastConfirmed = response;
+            pipeline.onResponse(response);
+            if (!sourceDone) {
+              await sendNextChunk();
+            }
+          }
+        } else if (response.type === 'Failure') {
+          inFlight.shift();
+          markProgress();
+          failure = failure ?? response;
+          sourceDone = true;
+        } else if (COMMON_TERMINAL_RESPONSE_TYPES.has(response.type)) {
           throw new ProtocolV2LinkError(
             'frame',
-            `Protocol V2 file write response does not match chunk ${expected.offset}-${
-              expected.end
-            }: got offset ${String(message.offset)} processed_byte ${String(
-              message.processed_byte
-            )}`
+            `Protocol V2 file write pipeline received unexpected ${response.type}`
           );
         }
-        inFlight.shift();
-        markProgress();
-        if (!failure) {
-          lastConfirmed = response;
-          pipeline.onResponse(response);
-          if (!sourceDone) {
-            await sendNextChunk();
-          }
-        }
-      } else if (response.type === 'Failure') {
-        inFlight.shift();
-        markProgress();
-        failure = failure ?? response;
-        sourceDone = true;
-      } else if (COMMON_TERMINAL_RESPONSE_TYPES.has(response.type)) {
-        throw new ProtocolV2LinkError(
-          'frame',
-          `Protocol V2 file write pipeline received unexpected ${response.type}`
-        );
-      } else {
-        logger?.debug?.(
-          `[${logPrefix}] skip unexpected response for ${name}: expected=FilesystemFile got=${response.type}`
-        );
       }
+    } catch (error) {
+      // Unread responses of in-flight chunks would answer the next call on this link, so a
+      // session or caller error raised with chunks in flight must invalidate it.
+      if (inFlight.length === 0 || error === transportFailure || isProtocolV2LinkError(error)) {
+        throw error;
+      }
+      throw new ProtocolV2LinkError(
+        'frame',
+        `Protocol V2 file write pipeline aborted with chunks in flight: ${getErrorMessage(error)}`,
+        error
+      );
     }
 
     const terminal = failure ?? lastConfirmed;
