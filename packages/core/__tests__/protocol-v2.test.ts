@@ -9080,11 +9080,11 @@ describe('Protocol V2 firmware update targets', () => {
   });
 
   test.each([
-    ['1.0.3', '1.0.3', true],
-    ['1.0.10', '1.0.3', true],
-    ['1.0.2', '1.0.3', false],
-    ['0.0.0.1', '1.0.3', false],
-    ['1.0.3', '', false],
+    ['1.0.4', '1.0.4', true],
+    ['1.0.10', '1.0.4', true],
+    ['1.0.3', '1.0.4', false],
+    ['0.0.0.1', '1.0.4', false],
+    ['1.0.4', '', false],
   ] as const)(
     'gates the BLE file write window on bootloader %s with minimum %s',
     (bootloaderVersion, minBootloaderVersion, expected) => {
@@ -9094,8 +9094,9 @@ describe('Protocol V2 firmware update targets', () => {
     }
   );
 
-  test('keeps released 1.0.2 bootloaders serial by default', () => {
-    expect(supportsProtocolV2BleFileWriteWindow('1.0.3')).toBe(true);
+  test('keeps released 1.0.2 and 1.0.3 bootloaders serial by default', () => {
+    expect(supportsProtocolV2BleFileWriteWindow('1.0.4')).toBe(true);
+    expect(supportsProtocolV2BleFileWriteWindow('1.0.3')).toBe(false);
     expect(supportsProtocolV2BleFileWriteWindow('1.0.2')).toBe(false);
   });
 
@@ -9116,12 +9117,12 @@ describe('Protocol V2 firmware update targets', () => {
         },
       });
       (method as any).device = stubDevice({
-        features: { mode, bootloaderMode: mode === 'bootloader', bootloaderVersion: '1.0.3' },
+        features: { mode, bootloaderMode: mode === 'bootloader', bootloaderVersion: '1.0.4' },
       });
 
       try {
-        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.3')).toBe(expected);
-        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.4')).toBe(false);
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.4')).toBe(expected);
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.5')).toBe(false);
       } finally {
         getSettingsSpy.mockRestore();
       }
@@ -9130,9 +9131,10 @@ describe('Protocol V2 firmware update targets', () => {
 
   test.each([
     ['1.0.2', false],
-    ['1.0.3', true],
+    ['1.0.3', false],
+    ['1.0.4', true],
     // The parsed bootloader version drops prerelease tags.
-    ['1.0.3-rc.1', true],
+    ['1.0.4-rc.1', true],
   ] as const)(
     'gates the default minimum on a running %s bootloader in React Native',
     (bootloaderVersion, expected) => {

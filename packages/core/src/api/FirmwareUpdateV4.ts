@@ -106,11 +106,11 @@ const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
 const PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT = 2;
 // Minimum running bootloader that receives two in-flight BLE FilesystemFileWrite frames.
 // Bootloaders with the 2048-byte BLE UART FIFO have no room beside one waiting FileWrite frame,
-// so a second frame can overflow it. Released bootloaders report 1.0.2 with that FIFO and stay
-// serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.3 but has not confirmed it,
-// nor the BLE coprocessor margin for two frames; any bootloader reporting 1.0.3 or later gets the
+// so a second frame can overflow it. Released bootloaders (1.0.2 with that FIFO, and 1.0.3) stay
+// serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.4 but has not confirmed it,
+// nor the BLE coprocessor margin for two frames; any bootloader reporting 1.0.4 or later gets the
 // window. Set it to undefined to keep every transfer serial.
-const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.3';
+const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.4';
 const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
 const PROTOCOL_V2_INSTALL_FAILED_CODE = 'FirmwareInstallFailed';
@@ -3343,7 +3343,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       return false;
     }
     // The transfer runs in the device's current bootloader, not the one being installed. The
-    // parsed version keeps major.minor.patch only, so a 1.0.3 prerelease counts as 1.0.3.
+    // parsed version keeps major.minor.patch only, so a 1.0.4 prerelease counts as 1.0.4.
     const bootloaderVersion = getDeviceBootloaderVersion(this.device.features).join('.');
     const enabled = supportsProtocolV2BleFileWriteWindow(bootloaderVersion, minBootloaderVersion);
     Log.debug('[FirmwareUpdateV4] BLE FileWrite window', {

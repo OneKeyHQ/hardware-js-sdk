@@ -36,9 +36,9 @@ BLE firmware and resource transfer may overlap the next `FilesystemFileWrite` wi
   budgets are in [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md#filewrite-窗口同一次调用内-2-块在途).
 - Transfers run under the device's current bootloader. Core enables the pipeline only for React Native and Electron BLE in
   bootloader mode when the running bootloader is at or above the minimum version in
-  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION`, currently 1.0.3. Released bootloaders report 1.0.2 with the
-  2048-byte FIFO and stay serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.3 but has not confirmed it, nor
-  the coprocessor margin; any bootloader reporting 1.0.3 or later gets the window. `undefined` keeps every transfer serial. On a 2048-byte FIFO a second frame would overflow it and lose a chunk,
+  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION`, currently 1.0.4. Released bootloaders (1.0.2 with the
+  2048-byte FIFO, and 1.0.3) stay serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.4 but has not confirmed
+  it, nor the coprocessor margin; any bootloader reporting 1.0.4 or later gets the window. `undefined` keeps every transfer serial. On a 2048-byte FIFO a second frame would overflow it and lose a chunk,
   which the Session detects as a missing response or a mismatched confirmation. The decision uses the version the running
   bootloader reports, never PID, name, or descriptor. LowLevel stays serial because plugins are not required to keep
   notifications that arrive between `receive()` calls.
