@@ -207,6 +207,12 @@ const getProtocolV2DeviceTransferProgress = (
   return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
 };
 
+const getProtocolV2TransferRate = (bytes: number, elapsedMs: number) =>
+  elapsedMs > 0 ? Math.round((bytes / elapsedMs) * 1000) : undefined;
+
+const getProtocolV2ElapsedMs = (startedAt: number, now = Date.now()) =>
+  Math.max(now - startedAt, 0);
+
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number | string;
   status?: number | string;
@@ -575,6 +581,10 @@ export const assertProtocolV2ReconnectIdentity = (
   );
 };
 
+/** Mismatch or unavailable: the reconnected device could not be re-verified. */
+const isProtocolV2ReconnectIdentityUnverified = (error: unknown) =>
+  getProtocolV2UnknownErrorText(error).includes('Protocol V2 reconnect physical identity');
+
 /**
  * FirmwareUpdateV4 is the complete Protocol V2 firmware update flow.
  *
@@ -828,9 +838,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (direction === 'read') {
         maxChunkSize = PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
       } else if (fileWriteWindow) {
-        // Pipelined frames share the main MCU's 4096-byte UART FIFO. Two 1800-byte chunks
-        // (about 3.75 KB of frames) leave room to spare; two 1960-byte staging chunks would
-        // leave under 60 bytes.
+        // Skip the larger staging chunk so two in-flight frames fit the UART FIFO; see
+        // PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW.
         maxChunkSize = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
       } else {
         // Firmware staging writes tolerate a larger BLE chunk than generic filesystem writes.
@@ -1940,7 +1949,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       } catch (error) {
         this.throwIfAborted();
         if (recovery.remaining <= 0) {
-          Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
+          Log.log(
+            `[FirmwareUpdateV4] RESC bundle ${bundle.name} header check lost the link; reconnect budget used up: `,
+            getProtocolV2UnknownErrorText(error)
+          );
           return false;
         }
         recovery.remaining -= 1;
@@ -1948,24 +1960,21 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           `[FirmwareUpdateV4] RESC bundle ${bundle.name} header check lost the link; reconnecting: `,
           getProtocolV2UnknownErrorText(error)
         );
-        try {
-          await this.recoverProtocolV2FileTransfer();
-        } catch (recoverError) {
-          this.throwIfAborted();
-          // Mismatch or unavailable: never keep writing to a device that was not re-verified.
-          if (
-            this.normalizeErrorMessage(recoverError).includes(
-              'Protocol V2 reconnect physical identity'
-            )
-          ) {
-            throw recoverError;
-          }
-          recovery.remaining = 0;
-          Log.log('[FirmwareUpdateV4] RESC header check reconnect failed: ', recoverError);
-          return false;
-        }
-        this.throwIfAborted();
       }
+      try {
+        await this.recoverProtocolV2FileTransfer();
+      } catch (recoverError) {
+        this.throwIfAborted();
+        // Never keep writing to a device that was not re-verified.
+        if (isProtocolV2ReconnectIdentityUnverified(recoverError)) throw recoverError;
+        recovery.remaining = 0;
+        Log.log(
+          '[FirmwareUpdateV4] RESC header check reconnect failed: ',
+          getProtocolV2UnknownErrorText(recoverError)
+        );
+        return false;
+      }
+      this.throwIfAborted();
     }
   }
 
@@ -2258,9 +2267,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (totalSize > 0) {
-      const elapsedMs = Math.max(Date.now() - transferStartedAt, 0);
-      const rateBytesPerSecond =
-        elapsedMs > 0 ? Math.round((totalSize / elapsedMs) * 1000) : undefined;
+      const elapsedMs = getProtocolV2ElapsedMs(transferStartedAt);
+      const rateBytesPerSecond = getProtocolV2TransferRate(totalSize, elapsedMs);
       this.postProgressMessage(100, 'transferData', {
         transferredBytes: totalSize,
         totalBytes: totalSize,
@@ -2291,7 +2299,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       await this.waitForProtocolV2FirmwareUpdateComplete(targets, true);
       Log.debug('[FirmwareUpdateV4] Protocol V2 install completed', {
         targets: targets.length,
-        elapsedMs: Math.max(Date.now() - installStartedAt, 0),
+        elapsedMs: getProtocolV2ElapsedMs(installStartedAt),
       });
     } finally {
       this.device?.clearCancelableAction();
@@ -2314,7 +2322,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const reportConfirmedChunk = (chunkEnd: number) => {
       const transferredBytes = processedSize + chunkEnd;
       const now = Date.now();
-      const elapsedMs = Math.max(now - transferStartedAt, 0);
+      const elapsedMs = getProtocolV2ElapsedMs(transferStartedAt, now);
       const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
       const shouldPostProgress =
         transferredBytes >= this.protocolV2LastTransferredBytes &&
@@ -2329,8 +2337,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         this.postProgressMessage(progress, 'transferData', {
           transferredBytes,
           totalBytes: totalSize,
-          rateBytesPerSecond:
-            elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
+          rateBytesPerSecond: getProtocolV2TransferRate(transferredBytes, elapsedMs),
           elapsedMs,
         });
       }
@@ -2388,7 +2395,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         Log.debug('[FirmwareUpdateV4] Protocol V2 file transferred', {
           path: filePath,
           bytes: source.size,
-          elapsedMs: Math.max(Date.now() - attemptStartedAt, 0),
+          elapsedMs: getProtocolV2ElapsedMs(attemptStartedAt),
           attempt,
           fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
         });

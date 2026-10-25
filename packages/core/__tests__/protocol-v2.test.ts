@@ -8893,15 +8893,13 @@ describe('Protocol V2 firmware update targets', () => {
     const linkLost = () =>
       ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
-        'Device protocol has not been detected for E2:92:2E:16:47:B9'
+        'Device protocol has not been detected for AA:BB'
       );
     const createResource = (name: string) => ({
       name,
       source: { size: 3, readAt: jest.fn(), close: jest.fn() },
       devicePath: `vol0:/bundles/${name}`,
-      version: [1, 0, 0],
-      payloadHash: '11'.repeat(64),
-      headerHash: '22'.repeat(64),
+      ...currentHeader,
     });
     const createMethod = () => {
       const method = new FirmwareUpdateV4({
@@ -8948,7 +8946,11 @@ describe('Protocol V2 firmware update targets', () => {
             code: 'generation',
           }),
       ],
-      ['released transport', () => new Error('React Native BLE transport released')],
+      [
+        'released React Native BLE transport',
+        () => new Error('React Native BLE transport released'),
+      ],
+      ['released Electron BLE transport', () => new Error('Electron BLE transport released')],
       ['cleaned Electron BLE state', () => new Error('Electron BLE device state cleaned')],
       [
         'Electron BLE device that is no longer connected',
@@ -8956,11 +8958,12 @@ describe('Protocol V2 firmware update targets', () => {
       ],
     ])('rethrows a %s from the header check for recovery', async (_label, createError) => {
       const method = createMethod();
-      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(createError());
+      const error = createError();
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(error);
 
       await expect(
         (method as any).isProtocolV2ResourceBundleUpToDate(createResource('images.okpkg'))
-      ).rejects.toBeDefined();
+      ).rejects.toBe(error);
     });
 
     test('treats a device-side header read failure as stale without reconnecting', async () => {
@@ -9037,8 +9040,7 @@ describe('Protocol V2 firmware update targets', () => {
     ['1.0.10', '1.0.3', true],
     ['1.0.2', '1.0.3', false],
     ['0.0.0.1', '1.0.3', false],
-    ['1.0.2', undefined, true],
-    ['1.0.1', undefined, false],
+    ['1.0.3', '', false],
   ] as const)(
     'gates the BLE file write window on bootloader %s with minimum %s',
     (bootloaderVersion, minBootloaderVersion, expected) => {
@@ -9047,6 +9049,11 @@ describe('Protocol V2 firmware update targets', () => {
       );
     }
   );
+
+  test('defaults the BLE file write window to the TEST-ONLY 1.0.2 bootloader minimum', () => {
+    expect(supportsProtocolV2BleFileWriteWindow('1.0.2')).toBe(true);
+    expect(supportsProtocolV2BleFileWriteWindow('1.0.1')).toBe(false);
+  });
 
   test.each([
     ['react-native', 'bootloader', true],
@@ -9148,14 +9155,12 @@ describe('Protocol V2 firmware update targets', () => {
       expect(requests.map(request => request.file.data.byteLength)).toEqual([1000, 1000, 500]);
       expect(requests.map(request => request.overwrite)).toEqual([true, false, false]);
       expect(requests.map(request => request.ui_percentage)).toEqual([50, 84, 99]);
-      expect(
-        requests.every(
-          request =>
-            request.append === false &&
-            request.file.total_size === 2500 &&
-            request.file.path === 'vol0:/application_p1.bin'
-        )
-      ).toBe(true);
+      requests.forEach(request =>
+        expect(request).toMatchObject({
+          append: false,
+          file: { total_size: 2500, path: 'vol0:/application_p1.bin' },
+        })
+      );
       const transferredBytes = (method.postProgressMessage as jest.Mock).mock.calls.map(
         ([, , metrics]) => metrics.transferredBytes
       );
@@ -9174,21 +9179,21 @@ describe('Protocol V2 firmware update targets', () => {
       expect(requests.map(request => request.file.data.byteLength)).toEqual([1800, 700]);
     });
 
-    test.each([
-      ['react-native', 10_000],
-      ['desktop-web-ble', 10_000],
-    ] as const)('bounds each windowed response wait in %s', async (env, timeoutMs) => {
-      const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
-      const typedCall = streamAll([]);
+    test.each(['react-native', 'desktop-web-ble'] as const)(
+      'bounds each windowed response wait in %s',
+      async env => {
+        const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+        const typedCall = streamAll([]);
 
-      try {
-        await transfer(createMethod(typedCall));
-      } finally {
-        getSettingsSpy.mockRestore();
+        try {
+          await transfer(createMethod(typedCall));
+        } finally {
+          getSettingsSpy.mockRestore();
+        }
+
+        expect(typedCall.mock.calls[0][3]).toEqual(expect.objectContaining({ timeoutMs: 10_000 }));
       }
-
-      expect(typedCall.mock.calls[0][3]).toEqual(expect.objectContaining({ timeoutMs }));
-    });
+    );
 
     test('restarts the whole file after a failed windowed write', async () => {
       const requests: any[] = [];
