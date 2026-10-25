@@ -106,12 +106,11 @@ const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
 const PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT = 2;
 // Minimum running bootloader that receives two in-flight BLE FilesystemFileWrite frames.
 // Bootloaders with the 2048-byte BLE UART FIFO have no room beside one waiting FileWrite frame,
-// so a second frame can overflow it: the lost chunk is detected (no response or a mismatched
-// confirmation) and Core rewrites the file, which slows the transfer or fails it after the
-// retries. 1.0.2 also matches released 2048-byte FIFO bootloaders. Raise it to the first
-// release that ships the 4096-byte FIFO once firmware confirms that version and the BLE
-// coprocessor margin, or set it to undefined to keep every transfer serial.
-const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.2';
+// so a second frame can overflow it. Released bootloaders report 1.0.2 with that FIFO and stay
+// serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.3 but has not confirmed it,
+// nor the BLE coprocessor margin for two frames; any bootloader reporting 1.0.3 or later gets the
+// window. Set it to undefined to keep every transfer serial.
+const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.3';
 const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
 const PROTOCOL_V2_INSTALL_FAILED_CODE = 'FirmwareInstallFailed';
@@ -581,10 +580,6 @@ export const assertProtocolV2ReconnectIdentity = (
   );
 };
 
-/** Mismatch or unavailable: the reconnected device could not be re-verified. */
-const isProtocolV2ReconnectIdentityUnverified = (error: unknown) =>
-  getProtocolV2UnknownErrorText(error).includes('Protocol V2 reconnect physical identity');
-
 /**
  * FirmwareUpdateV4 is the complete Protocol V2 firmware update flow.
  *
@@ -635,6 +630,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2LastTransferProgressAt = 0;
 
   private protocolV2LastTransferredBytes = 0;
+
+  /** Set when a windowed FileWrite attempt fails: the rest of this update writes serially. */
+  private protocolV2FileWriteWindowDisabled = false;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -1936,8 +1934,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   /**
    * A lost link would fail every remaining header check and resend bundles that are already
    * installed, so reconnect (a bounded number of times per transfer phase) and ask again.
-   * Header reads have no side effects. If reconnecting fails or the budget is used up, the bundle
-   * is resent as before; a failed identity check after reconnecting aborts the update.
+   * Header reads have no side effects. Once the budget is used up the bundle is resent as before.
+   * A failed reconnect aborts the update like a failed file-transfer recovery: reconnecting
+   * replaces the session, and nothing may be written to a device whose identity was not
+   * re-verified.
    */
   private async isProtocolV2ResourceBundleUpToDateWithRecovery(
     bundle: ProtocolV2ResourceBundleSource,
@@ -1961,19 +1961,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
           getProtocolV2UnknownErrorText(error)
         );
       }
-      try {
-        await this.recoverProtocolV2FileTransfer();
-      } catch (recoverError) {
-        this.throwIfAborted();
-        // Never keep writing to a device that was not re-verified.
-        if (isProtocolV2ReconnectIdentityUnverified(recoverError)) throw recoverError;
-        recovery.remaining = 0;
-        Log.log(
-          '[FirmwareUpdateV4] RESC header check reconnect failed: ',
-          getProtocolV2UnknownErrorText(recoverError)
-        );
-        return false;
-      }
+      await this.recoverProtocolV2FileTransfer();
       this.throwIfAborted();
     }
   }
@@ -2346,8 +2334,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       this.throwIfAborted();
       const attemptStartedAt = Date.now();
+      let windowed = false;
       try {
-        const windowed = this.shouldUseProtocolV2BleFileWriteWindow();
+        windowed =
+          !this.protocolV2FileWriteWindowDisabled && this.shouldUseProtocolV2BleFileWriteWindow();
         const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath, windowed);
         if (windowed) {
           await this.writeProtocolV2SourceWindowed({
@@ -2406,6 +2396,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         Log.debug('[FirmwareUpdateV4] Protocol V2 file transfer attempt failed', {
           path: filePath,
           attempt,
+          fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
           error: getProtocolV2UnknownErrorText(error),
         });
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
@@ -3351,7 +3342,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     ) {
       return false;
     }
-    // The transfer runs in the device's current bootloader, not the one being installed.
+    // The transfer runs in the device's current bootloader, not the one being installed. The
+    // parsed version keeps major.minor.patch only, so a 1.0.3 prerelease counts as 1.0.3.
     const bootloaderVersion = getDeviceBootloaderVersion(this.device.features).join('.');
     const enabled = supportsProtocolV2BleFileWriteWindow(bootloaderVersion, minBootloaderVersion);
     Log.debug('[FirmwareUpdateV4] BLE FileWrite window', {
@@ -3414,6 +3406,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (source.size === 0) return;
     const firstRequest = await readRequest();
 
+    // A failed exchange may mean the running bootloader cannot hold two in-flight frames, so the
+    // retry and every later file of this update are written serially. Source read errors say
+    // nothing about the bootloader and keep the window.
     const response = await this.device
       .getCommands()
       .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
@@ -3427,11 +3422,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             onChunkConfirmed(Number(confirmed.message.processed_byte));
           },
         },
+      })
+      .catch((error: unknown) => {
+        this.protocolV2FileWriteWindowDisabled = true;
+        throw error;
       });
     this.throwIfAborted();
     if (sourceError) throw sourceError;
     const rawProcessedByte = response.message.processed_byte;
     if (Number(rawProcessedByte) !== source.size) {
+      this.protocolV2FileWriteWindowDisabled = true;
       throw ERRORS.TypedError(
         HardwareErrorCode.EmmcFileWriteFirmwareError,
         `invalid processed_byte ${rawProcessedByte} for file size ${source.size}`
@@ -3440,14 +3440,20 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async recoverProtocolV2FileTransfer() {
-    const env = DataManager.getSettings('env');
-    if (DataManager.isBleConnect(env)) {
-      await wait(3000);
+    try {
+      const env = DataManager.getSettings('env');
+      if (DataManager.isBleConnect(env)) {
+        await wait(3000);
+      }
+      await this.reconnectProtocolV2Device();
+      await this.verifyProtocolV2ReconnectIdentity();
+      await this.device.initialize();
+      await wait(2000);
+    } catch (error) {
+      // A cancel disposes the link mid-recovery; report the cancel rather than its side effect.
+      this.throwIfAborted();
+      throw error;
     }
-    await this.reconnectProtocolV2Device();
-    await this.verifyProtocolV2ReconnectIdentity();
-    await this.device.initialize();
-    await wait(2000);
   }
 
   private async acquireProtocolV2BleDevice(skipProtocolProbe = false) {

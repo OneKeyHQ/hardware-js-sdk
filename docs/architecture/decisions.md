@@ -36,17 +36,18 @@ BLE firmware and resource transfer may overlap the next `FilesystemFileWrite` wi
   budgets are in [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md#filewrite-窗口同一次调用内-2-块在途).
 - Transfers run under the device's current bootloader. Core enables the pipeline only for React Native and Electron BLE in
   bootloader mode when the running bootloader is at or above the minimum version in
-  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION`. Released bootloaders already report 1.0.2 with the
-  2048-byte FIFO, so the final minimum must be a version that only 4096-byte FIFO bootloaders report, set once firmware
-  confirms that version and devices confirm the coprocessor margin; `undefined` keeps every transfer serial. The current
-  1.0.2 also enables the window on released 2048-byte FIFO bootloaders. There a FIFO overflow loses a chunk: the Session
-  detects it as a missing response or a mismatched confirmation, and Core rewrites the file, so the transfer slows down or
-  fails after its retries instead of accepting the gap. The decision uses the version the running bootloader reports, never
-  PID, name, or descriptor. LowLevel stays serial because plugins are not required to keep notifications that arrive between
-  `receive()` calls.
+  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION`, currently 1.0.3. Released bootloaders report 1.0.2 with the
+  2048-byte FIFO and stay serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.3 but has not confirmed it, nor
+  the coprocessor margin; any bootloader reporting 1.0.3 or later gets the window. `undefined` keeps every transfer serial. On a 2048-byte FIFO a second frame would overflow it and lose a chunk,
+  which the Session detects as a missing response or a mismatched confirmation. The decision uses the version the running
+  bootloader reports, never PID, name, or descriptor. LowLevel stays serial because plugins are not required to keep
+  notifications that arrive between `receive()` calls.
 - The Transport never replays chunks. After any failure, Core's existing recovery reconnects and rewrites the whole file from
-  offset 0. Cancellation and source read errors stop the pipeline and are raised by Core after the call returns, so they do not
-  invalidate the Link.
+  offset 0. A failed windowed exchange (the transport call, or a final confirmation that does not cover the file) also turns
+  the window off for the rest of that update, so the retry and every later file are written serially. A bootloader that
+  cannot hold two frames then normally costs one of the file's three attempts and one reconnect; the update still fails if
+  that reconnect or the remaining serial attempts fail. Cancellation and source read errors stop the pipeline and are raised
+  by Core after the call returns, so they do not invalidate the Link, and a source read error keeps the window.
 
 Primary implementation:
 

@@ -26,7 +26,7 @@ Protocol V2 BLE 的生产默认值如下：
 | Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                          |
 | Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外      |
 | Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限            |
-| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 `1.0.2`）时，V4 同一调用内最多 2 块在途（见下文） |
+| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 `1.0.3`）时，V4 同一调用内最多 2 块在途（见下文） |
 
 ### 为什么不能把所有 BLE file chunk 统一为 1960B
 
@@ -410,15 +410,18 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
   session 保护，帧更大时，蓝牙自身的命令可能插进一帧中间。
 - 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个。SDK 只在 React Native 与 Electron BLE、
   bootloader 模式、且运行中的 bootloader 版本不低于 `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION` 时开启；
-  LowLevel（包括 CLI）不开启。这个常量当前为 `1.0.2`，线上 bootloader 也报告 `1.0.2`（FIFO 仍为 `2048B`），
-  所以线上设备第一次升级（从旧 bootloader 装上 `4096B` FIFO bootloader 的那一次）也会开窗口。最终应改成只有 `4096B`
-  FIFO bootloader 才报告的版本，那时这一次升级才是一问一答；设为 `undefined` 则全部一问一答。原因见
+  LowLevel（包括 CLI）不开启。这个常量当前为 `1.0.3`：线上 bootloader 报告 `1.0.2`（FIFO 为 `2048B`），保持一问一答，
+  所以线上设备第一次升级（从旧 bootloader 装上新 bootloader 的那一次）也是一问一答。SDK 要求固件从 `1.0.3` 起带 `4096B`
+  FIFO，固件尚未确认；任何报告 `1.0.3` 及以上的 bootloader 都会开窗口。之前刷了 `4096B` FIFO、但仍报告 `1.0.2` 的测试
+  bootloader 现在也走一问一答，要换成报告 `1.0.3` 的测试包才开窗口。
+  设为 `undefined` 则全部一问一答。原因见
   [架构决策](../architecture/decisions.md#ordered-filewrite-pipeline-for-ble-firmware-transfer)。
-- `2048B` FIFO 上开窗口：设备还没把等着解析的一帧拷出去时下一帧就到了，放不下的字节被直接丢掉（固件只打印
-  `fifo overflow`，不回错误）。残帧过不了 CRC 被丢弃，这一块收不到回包或后续块的确认对不上，SDK 在 `10s` 内判链路失效，
-  Core 重连后从偏移 `0` 重写整个文件，每个文件最多 `3` 次，用完报 `EmmcFileWriteFirmwareError`。所以表现是变慢或
-  升级失败（设备留在 bootloader，可重试），不会把缺块的文件当成传完。这是按固件 `proto_link.c` 与 SDK 逻辑推出的，
-  尚未在 `2048B` FIFO 的线上 bootloader 上实测。
+- `2048B` FIFO 上若开窗口：设备还没把等着解析的一帧拷出去时下一帧就到了，放不下的字节被直接丢掉（固件只打印
+  `fifo overflow`，不回错误）。残帧过不了 CRC 被丢弃，这一块收不到回包或后续块的确认对不上，SDK 在 `10s` 内判链路失效。
+  按固件 `proto_link.c` 与 SDK 逻辑推出，未在 `2048B` FIFO 的线上 bootloader 上实测。
+- 窗口模式与设备的交互失败后（传输调用失败，或最后的确认没有覆盖整个文件），Core 重连并从偏移 `0` 重写该文件，且本次升级
+  剩下的写入（这个文件的重试和之后所有文件）都改为一问一答；读取固件源失败与 bootloader 无关，保留窗口。门控误开在放不下
+  两帧的 bootloader 上时，通常只占用这个文件 `3` 次尝试中的一次和一次重连；如果这次重连或剩下的串行尝试也失败，升级仍会失败。
 - 测速时按 `[FirmwareUpdateV4]` 过滤 SDK debug 日志：`BLE FileWrite window` 记录是否开启及 bootloader
   版本/build ID；`Protocol V2 file transferred` 记录每个文件的字节数、耗时、第几次尝试和窗口大小；
   `file transfer attempt failed` 记录文件内重传；`transfer completed` 与 `install completed` 分别给出传输
@@ -521,8 +524,9 @@ Core 决定，不下沉到 Transport。CLI 输出的 `attempt`、`retried` 只�
 文件内的重写，判断有无重传需要按文件核对实际写入字节。
 
 RESC 头检查遇到断链时（如上面 Android 17 一节的监督超时），Core 重连后重新检查（读头没有副作用）。
-每个传输阶段共享最多 `2` 次重连。重连失败时，该资源包按旧逻辑直接重传，本阶段也不再重连。
-次数用完后，再次断链的资源包同样直接重传。重连后设备身份校验失败则中止升级。
+每个传输阶段共享最多 `2` 次重连，次数用完后，再次断链的资源包按旧逻辑直接重传。重连本身失败（连不上、
+身份校验不一致，或者查询身份的 `DeviceInfoGet` 失败）则中止升级，与文件传输重试的恢复一致：重连会替换会话，
+没有重新确认身份的设备不能再写入。
 
 文件写入的内部确认回调在每个确认后触发，用于记录真实吞吐；App 可见的
 `FIRMWARE_PROGRESS` 则只在整数百分比变化、超过 `1s` 心跳间隔或单文件完成时发送。这样可减少
