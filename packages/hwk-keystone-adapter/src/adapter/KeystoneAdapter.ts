@@ -2469,8 +2469,8 @@ export class KeystoneAdapter implements IHardwareWallet {
   }
 
   /**
-   * Resolves which wallet is attached, without a per-path account. `CHAIN_FINGERPRINT_PATHS.evm` is
-   * a leaf path, so it is cut to the account path Keystone expects.
+   * Resolves wallet identity without a per-path account. A caller-supplied fingerprint needs no
+   * device round trip; otherwise request the account path from the device.
    */
   private async _ensureWalletKnown(
     connectId: string | undefined,
@@ -2481,12 +2481,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     const target = this._resolveTarget(connectId, deviceId);
     if (target.record) return { record: target.record };
 
-    const attached = await this._tryUsbAttach(signal, target.expectedMasterFingerprint);
-    KeystoneAdapter._throwIfAborted(signal);
-    if (attached) return { record: attached };
-
     // The caller named the wallet: its mfp is all a signing request needs, and a wrong wallet is
-    // refused by the device itself. No identity round trip first.
+    // refused by the device itself. The request route owns the single USB connection attempt.
     if (target.expectedMasterFingerprint) {
       return { record: createDeviceRecord(target.expectedMasterFingerprint) };
     }

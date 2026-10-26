@@ -2615,6 +2615,50 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('USB-first with silent QR fallback', () => {
+    it.each([false, true])(
+      'falls back after one 15-second USB connection attempt with cached QR metadata: %s',
+      async cached => {
+        const usb = fakeUsbConnector();
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        const confirm = answerQrFallback(adapter, true);
+        if (cached) await importQrWallet(adapter);
+        const before = qrFake.requests.length;
+        const connect = jest.spyOn(usb.connector, 'connect').mockImplementation(
+          () =>
+            new Promise((_, reject) => {
+              setTimeout(
+                () =>
+                  reject(
+                    Object.assign(new Error('USB device did not respond'), {
+                      code: HardwareErrorCode.OperationTimeout,
+                    })
+                  ),
+                15_000
+              );
+            })
+        );
+        jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
+        try {
+          const pending = adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
+          await nextImmediate();
+          expect(connect).toHaveBeenCalledTimes(1);
+          jest.advanceTimersByTime(15_000);
+          await nextImmediate();
+          expect(connect).toHaveBeenCalledTimes(1);
+          expect(qrFake.requests).toHaveLength(before + 1);
+          expect(confirm).not.toHaveBeenCalled();
+          await expect(pending).resolves.toMatchObject({ success: true });
+        } finally {
+          adapter.cancel();
+          jest.runOnlyPendingTimers();
+          await nextImmediate();
+          await adapter.dispose();
+          jest.useRealTimers();
+        }
+      }
+    );
+
     it.each(['cancelled', 'timed out'])(
       'ignores answers from a QR fallback prompt that was %s',
       async endedBy => {
