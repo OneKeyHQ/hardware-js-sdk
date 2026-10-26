@@ -49,6 +49,14 @@ export function getSafeLogPayload(value: unknown, blockLabel?: string): unknown 
   return value;
 }
 
+// A queued task holds its method's raw payload; redact it like the call.
+export function getSafeLogTask<T extends { id?: number; method?: { payload?: unknown } }>(
+  task: T | undefined
+): T | { id?: number; method: string; payload: string } | undefined {
+  const blockLabel = getLogBlockLabel(task?.method?.payload);
+  return blockLabel ? { id: task?.id, method: blockLabel, payload: '[REDACTED]' } : task;
+}
+
 export function formatLogMethodLabel(label: string, methodName?: string): string {
   return methodName ? `${label} [${methodName}]` : label;
 }

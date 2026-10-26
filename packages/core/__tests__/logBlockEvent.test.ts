@@ -4,6 +4,7 @@ import {
   formatLogMethodLabel,
   getLogBlockLabel,
   getSafeLogPayload,
+  getSafeLogTask,
 } from '../src/events';
 import { getLog, initLog, setLoggerPostMessage } from '../src/utils/logger';
 
@@ -139,4 +140,37 @@ describe('getLogBlockLabel', () => {
       expect(response.payload[0].ufvk).toBe('synthetic-viewing-key-marker');
     }
   );
+
+  // Cancel logs the queued task, which holds the method's raw payload.
+  it('redacts a queued Zcash task the same way, keeping its id', () => {
+    const postMessage = jest.fn();
+    const prefix = 'sensitive-zcash-cancel';
+    const logger = initLog(prefix, false);
+    setLoggerPostMessage(postMessage);
+    const task = {
+      id: 7,
+      method: {
+        name: 'zcashSignPczt',
+        payload: { method: 'zcashSignPczt', pczt: 'synthetic-pczt-marker' },
+        pczt: 'synthetic-pczt-marker',
+      },
+    };
+
+    logger.debug('Cancel Api connect task: ', getSafeLogTask(task));
+
+    const cached = getLog().filter(entry => entry.prefix === prefix);
+    expect(cached.map(entry => entry.message[1])).toEqual([
+      { id: 7, method: 'zcashSignPczt', payload: '[REDACTED]' },
+    ]);
+    expect(JSON.stringify([cached, postMessage.mock.calls])).not.toContain('synthetic-');
+  });
+
+  it('logs other queued tasks as before', () => {
+    const task = {
+      id: 8,
+      method: { name: 'btcSignMessage', payload: { method: 'btcSignMessage' } },
+    };
+    expect(getSafeLogTask(task)).toBe(task);
+    expect(getSafeLogTask(undefined)).toBeUndefined();
+  });
 });

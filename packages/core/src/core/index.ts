@@ -61,6 +61,7 @@ import {
   formatLogMethodLabel,
   getLogBlockLabel,
   getSafeLogPayload,
+  getSafeLogTask,
 } from '../events';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
@@ -1451,7 +1452,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       };
       for (const requestId of requestIds) {
         const task = requestQueue.getTask(requestId);
-        Log.debug('Cancel Api connect task: ', task);
+        Log.debug('Cancel Api connect task: ', getSafeLogTask(task));
         if (task) {
           // During ensureConnected the method has a connectId but device is
           // assigned only after the poll succeeds. Interrupt the cached BLE
@@ -1486,7 +1487,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       };
       for (const requestId of requestQueue.getRequestTasksId()) {
         const task = requestQueue.getTask(requestId);
-        Log.debug('Cancel Api connect task: ', task);
+        Log.debug('Cancel Api connect task: ', getSafeLogTask(task));
         if (task) {
           interruptDevice(task.method?.device);
           if (task.method.connectId) {
