@@ -4992,6 +4992,76 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceInfoGet']);
   });
 
+  test.each([undefined, 1500])(
+    'uses short BLE readiness attempts and reconnects after a lost response (override %s)',
+    async protocolV2DeviceInfoTimeoutMs => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4', protocolV2DeviceInfoTimeoutMs },
+      });
+      const typedCall = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('BLE response timeout'))
+        .mockResolvedValue({ type: 'DeviceInfo', message: protocolV2BootloaderDeviceInfo });
+      method.device = stubDevice({
+        originalDescriptor: { id: 'ble-id', protocolType: 'V2' },
+        getCommands: () => ({ typedCall }),
+        probeProtocolV2RuntimeState: jest.fn().mockResolvedValue({ mode: 'bootloader' }),
+      }) as unknown as Device;
+      jest.spyOn(method, 'isBleReconnect').mockReturnValue(true);
+      const update = method as unknown as {
+        reconnectProtocolV2Device: jest.Mock;
+        waitForProtocolV2BootloaderMode: (timeout: number, interval: number) => Promise<unknown>;
+        protocolV2ExpectedSerialNumber: string;
+        getProtocolV2DeviceInfoTimeout: () => number;
+      };
+      update.protocolV2ExpectedSerialNumber = 'PR9999999999';
+      update.reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+
+      await update.waitForProtocolV2BootloaderMode(60_000, 0);
+
+      expect(typedCall).toHaveBeenCalledTimes(2);
+      expect(typedCall).toHaveBeenNthCalledWith(
+        1,
+        'DeviceInfoGet',
+        'DeviceInfo',
+        expect.anything(),
+        { timeoutMs: protocolV2DeviceInfoTimeoutMs ?? 5000 }
+      );
+      expect(update.reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
+      expect(update.reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
+      expect(update.getProtocolV2DeviceInfoTimeout()).toBe(protocolV2DeviceInfoTimeoutMs ?? 30_000);
+    }
+  );
+
+  test('disconnects the pre-reboot BLE connection before waiting for bootloader readiness', async () => {
+    const method = new FirmwareUpdateV4({ id: 1, payload: { method: 'firmwareUpdateV4' } });
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    method.device = stubDevice({
+      originalDescriptor: { id: 'ble-id', protocolType: 'V2' },
+      deviceConnector: { disconnect },
+    }) as unknown as Device;
+    jest.spyOn(method, 'isBleReconnect').mockReturnValue(true);
+    method.postTipMessage = jest.fn();
+    const update = method as unknown as {
+      protocolV2Reboot: jest.Mock;
+      waitForProtocolV2BootloaderMode: jest.Mock;
+      rebootProtocolV2ToBootloader: () => Promise<boolean>;
+    };
+    update.protocolV2Reboot = jest.fn().mockResolvedValue(undefined);
+    update.waitForProtocolV2BootloaderMode = jest.fn().mockResolvedValue({ mode: 'bootloader' });
+
+    await expect(update.rebootProtocolV2ToBootloader()).resolves.toBe(true);
+
+    expect(disconnect).toHaveBeenCalledWith('ble-id');
+    expect(disconnect.mock.invocationCallOrder[0]).toBeGreaterThan(
+      update.protocolV2Reboot.mock.invocationCallOrder[0]
+    );
+    expect(disconnect.mock.invocationCallOrder[0]).toBeLessThan(
+      update.waitForProtocolV2BootloaderMode.mock.invocationCallOrder[0]
+    );
+  });
+
   test('polls again when Protocol V2 bootloader serial is temporarily unavailable', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -10690,8 +10760,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     });
 
     await expect((method as any).readProtocolV2DeviceFileHeader('bundle.okpp')).resolves.toBeNull();
-    expect(readChunkLengths.length).toBeGreaterThan(1);
-    expect(Math.max(...readChunkLengths)).toBe(900);
+    expect(readChunkLengths).toEqual([640]);
   });
 
   test('skips resource transfer when installed okpkg hashes match the downloaded package', async () => {
@@ -10747,6 +10816,12 @@ describe('Protocol V2 firmware reconnect identity', () => {
       path: 'vol0:/bundles/images/images.okpkg',
     });
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledWith('FilesystemFileRead', 'FilesystemFile', {
+      file: { path: 'vol0:/bundles/images/images.okpkg', offset: 0, total_size: 0 },
+      chunk_len: 640,
+      ui_percentage: undefined,
+    });
   });
 
   test('updates a resource when the installed file size differs despite matching headers', async () => {

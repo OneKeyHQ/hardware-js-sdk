@@ -212,17 +212,26 @@ export const readVerifiedFirmwareArtifact = async ({
 }): Promise<ArrayBuffer> => {
   assertFirmwareArtifactReference(artifact);
   const source = await ReaderFirmwareByteSource.open(artifact, reader);
+  const hasher = sha256.create();
   try {
-    const binary = await readFirmwareByteSourceFully(source);
-    const actualSha256 = bytesToHex(sha256(new Uint8Array(binary)));
+    const bytes = new Uint8Array(source.size);
+    let offset = 0;
+    while (offset < source.size) {
+      const length = Math.min(MAX_FIRMWARE_ARTIFACT_READ_BYTES, source.size - offset);
+      bytes.set(new Uint8Array(await source.readAt(offset, length)), offset);
+      hasher.update(bytes.subarray(offset, offset + length));
+      offset += length;
+    }
+    const actualSha256 = bytesToHex(hasher.digest());
     if (actualSha256 !== artifact.sha256.toLowerCase()) {
       return artifactError(
         'FirmwareArtifactReceiptMismatch',
         'Firmware artifact bytes do not match the approved SHA-256 receipt'
       );
     }
-    return binary;
+    return bytes.buffer;
   } finally {
+    hasher.destroy();
     await source.close().catch(() => undefined);
   }
 };

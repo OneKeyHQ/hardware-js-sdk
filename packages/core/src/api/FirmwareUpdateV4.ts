@@ -36,6 +36,7 @@ import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH,
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
+  PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE,
   PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
   type ProtocolV2ResourcePackageHeader,
   isProtocolV2ResourceArchiveEntryName,
@@ -1868,8 +1869,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const chunkSize = this.getProtocolV2FirmwareChunkSize('read');
     const chunks: Uint8Array[] = [];
     let offset = 0;
-    while (offset < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE) {
-      const readLen = Math.min(chunkSize, PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE - offset);
+    while (offset < PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE) {
+      const readLen = Math.min(chunkSize, PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE - offset);
       const res = await typedCall('FilesystemFileRead', 'FilesystemFile', {
         file: {
           path: filePath,
@@ -1880,7 +1881,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ui_percentage: undefined,
       });
       const data = toProtocolV2Bytes(res.message?.data);
-      if (data.byteLength === 0) return null;
+      if (data.byteLength === 0 || data.byteLength > readLen) return null;
       chunks.push(data);
       offset += data.byteLength;
     }
@@ -1995,6 +1996,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
       await this.protocolV2Reboot(DeviceRebootType.Bootloader);
       await wait(1000);
+      if (this.isBleReconnect()) {
+        await this.device.deviceConnector?.disconnect(this.device.originalDescriptor.id);
+      }
       await this.waitForProtocolV2BootloaderMode();
       this.protocolV2ExecutionInLoader = true;
       this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
@@ -2037,12 +2041,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     while (Date.now() - startTime < timeout) {
       try {
         if (shouldReconnect) {
-          await this.reconnectProtocolV2Device();
+          if (this.isBleReconnect()) {
+            await this.reconnectProtocolV2Device({ skipProtocolProbe: true });
+          } else {
+            await this.reconnectProtocolV2Device();
+          }
           shouldReconnect = false;
         }
         const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.device.getCommands(),
-          timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
+          timeoutMs: Math.min(
+            this.getProtocolV2DeviceInfoTimeout(),
+            PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+          ),
         });
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
