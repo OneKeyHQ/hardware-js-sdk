@@ -250,7 +250,7 @@ function answerQrFallback(adapter: KeystoneAdapter, confirmed: boolean): jest.Mo
     asked(event.payload);
     adapter.uiResponse({
       type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
-      payload: { confirmed },
+      payload: { confirmed, requestId: event.payload.requestId },
     });
   });
   return asked;
@@ -2574,6 +2574,27 @@ describe('KeystoneAdapter', () => {
       }
     });
 
+    it.each(['3.1.4-CYPHERPUNK-B', '3.1.4-BTC-ONLY'])(
+      'checks the firmware from a parsed QR response with version %s',
+      async deviceVersion => {
+        const adapter = newTestAdapter();
+        attachFakeDevice(adapter, { deviceVersion });
+        try {
+          const wallet = await importQrWallet(adapter);
+          expect(wallet.firmwareVersion).toBe(deviceVersion);
+          const result = await adapter.evmGetAddress(wallet.connectId, wallet.deviceId, {
+            path: EVM_PATH,
+          });
+          expect(result).toMatchObject({
+            success: false,
+            payload: { code: HardwareErrorCode.ChainNotSupported },
+          });
+        } finally {
+          await adapter.dispose();
+        }
+      }
+    );
+
     it('checks the USB firmware after reattaching a QR-known wallet', async () => {
       const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
       const adapter = newTestAdapter(usb.connector);
@@ -2725,6 +2746,68 @@ describe('KeystoneAdapter', () => {
   });
 
   describe('USB-first with silent QR fallback', () => {
+    it.each(['cancelled', 'timed out'])(
+      'ignores answers from a QR fallback prompt that was %s',
+      async endedBy => {
+        const usb = fakeUsbConnector();
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        await adapter.releaseOperation(await connectOperation(adapter));
+        const prompts: Array<{ requestId?: string }> = [];
+        adapter.on(UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM, event => {
+          prompts.push(event.payload);
+        });
+        usb.failUrType({
+          urType: 'eth-sign-request',
+          error: { code: HardwareErrorCode.PayloadTooLarge, message: 'USB size limit' },
+        });
+        jest.useFakeTimers({ doNotFake: ['setImmediate', 'performance'] });
+        try {
+          const first = adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
+          await nextImmediate();
+          expect(prompts).toHaveLength(1);
+          if (endedBy === 'cancelled') adapter.cancel();
+          else jest.advanceTimersByTime(600_000);
+          await expect(first).resolves.toMatchObject({ success: false });
+
+          const [second, settled] = track(
+            adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX)
+          );
+          await nextImmediate();
+          expect(prompts).toHaveLength(2);
+          adapter.uiResponse({
+            type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
+            payload: { confirmed: true, requestId: prompts[0].requestId },
+          });
+          await nextImmediate();
+          expect(settled()).toBe(false);
+          expect(qrFake.requests).toHaveLength(0);
+
+          adapter.uiResponse({
+            type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
+            payload: { confirmed: true },
+          });
+          await nextImmediate();
+          expect(settled()).toBe(false);
+          expect(qrFake.requests).toHaveLength(0);
+          expect(typeof prompts[1].requestId).toBe('string');
+          expect(prompts[1].requestId).not.toBe(prompts[0].requestId);
+
+          adapter.uiResponse({
+            type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
+            payload: { confirmed: false, requestId: prompts[1].requestId },
+          });
+          await expect(second).resolves.toMatchObject({
+            success: false,
+            payload: { code: HardwareErrorCode.UserAborted },
+          });
+        } finally {
+          await adapter.dispose();
+          jest.useRealTimers();
+        }
+      }
+    );
+
     it('does not attach USB for an empty or unsupported bundle', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);

@@ -336,6 +336,10 @@ export type UiRequestEvent =
       payload: { vendor: string; appName: string } & UiRequestOperationAttribution;
     }
   | {
+      type: typeof UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
+      payload: { vendor: string; requestId: string } & UiRequestOperationAttribution;
+    }
+  | {
       type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
       payload: {
         connectId: string;
@@ -473,7 +477,7 @@ export interface HardwareEventMap {
   };
   [UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM]: {
     type: typeof UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
-    payload: { vendor: string } & UiRequestOperationAttribution;
+    payload: { vendor: string; requestId: string } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_TREZOR_THP_PAIRING]: {
     type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;

@@ -133,7 +133,7 @@ function relativeHdPath(relativeDerivePath: string): string {
 }
 
 // Text a scanned export carries reaches the host UI and version gates; keep only what fits.
-const FIRMWARE_VERSION = /^\d{1,4}(\.\d{1,4}){1,3}(-[0-9A-Za-z.]{1,20})?$/;
+const FIRMWARE_VERSION = /^\d{1,4}(\.\d{1,4}){1,3}(-[0-9A-Za-z.-]{1,20})?$/;
 const DEVICE_TEXT = /^[^\p{Cc}\p{Cf}]{1,64}$/u;
 
 function deviceText(value: unknown, pattern: RegExp): string | undefined {
@@ -269,7 +269,11 @@ export class KeystoneUrEngine {
           account.path
             .slice(2)
             .split('/')
-            .some(segment => Number(segment.replace("'", '')) >= BIP32_HARDENED_OFFSET)
+            .some(
+              segment =>
+                Number(segment.endsWith("'") ? segment.slice(0, -1) : segment) >=
+                BIP32_HARDENED_OFFSET
+            )
         ) {
           throw new Error('Account export has an unsupported derivation path');
         }

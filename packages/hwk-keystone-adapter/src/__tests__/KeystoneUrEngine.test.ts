@@ -90,6 +90,14 @@ describe('KeystoneUrEngine', () => {
   });
 
   describe('parseMultiAccounts', () => {
+    it.each(['3.1.4-CYPHERPUNK-B', '3.1.4-BTC-ONLY'])(
+      'preserves a multi-segment firmware suffix (%s)',
+      version => {
+        const parsed = engine.parseAccountResponse(buildMultiAccountsUr('Keystone 3 Pro', version));
+        expect(parsed.deviceVersion).toBe(version);
+      }
+    );
+
     it.each([
       ['a name longer than any model name', 'K'.repeat(65), '1.7.0', undefined, '1.7.0'],
       ['a name with a control character', 'Keystone\u0000 3 Pro', '1.7.0', undefined, '1.7.0'],

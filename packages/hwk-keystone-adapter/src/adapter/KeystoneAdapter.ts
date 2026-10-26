@@ -2587,15 +2587,17 @@ export class KeystoneAdapter implements IHardwareWallet {
   ): Promise<boolean> {
     if (choice?.confirmed !== undefined) return choice.confirmed;
     const requestType = UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
+    const requestId = this._uiRegistry.createRequestId();
     const operationId = this._activeOperationId();
     const release = operationId ? this._operations.retain(operationId) : undefined;
     try {
       const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(requestType, {
+        requestId,
         operationId,
       });
       this.emitter.emit(requestType, {
         type: requestType,
-        payload: { vendor: 'keystone', operationId },
+        payload: { vendor: 'keystone', requestId, operationId },
       });
       let confirmed = false;
       try {

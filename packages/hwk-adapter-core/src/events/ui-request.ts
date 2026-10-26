@@ -141,7 +141,8 @@ export type UiResponseEvent =
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM;
-      payload: { confirmed: boolean };
+      /** Echo the prompt's requestId; missing or stale IDs are ignored. */
+      payload: { confirmed: boolean; requestId?: string };
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PREEMPTION;
