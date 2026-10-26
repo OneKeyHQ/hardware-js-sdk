@@ -12,6 +12,7 @@ import ReactNativeBleTransport, {
   BLE_WRITE_PACKET_TIMEOUT_MS,
   configureProtocolV2BleTuning,
   getFirmwareUploadWriteRetryType,
+  getProtocolV2BleTuning,
   resetProtocolV2BleTuning,
 } from '../index';
 
@@ -2088,6 +2089,101 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await transport.release(uuid, true);
     expect(device.requestConnectionPriority).toHaveBeenLastCalledWith(0);
+  });
+
+  describe('Android connection priority by API level', () => {
+    const setPlatformVersion = (version: number | undefined) => {
+      const reactNative: { Platform: { Version?: number } } = jest.requireMock('react-native');
+      reactNative.Platform.Version = version;
+    };
+
+    afterEach(() => {
+      setPlatformVersion(undefined);
+    });
+
+    const runHighVolumeCalls = async (harness: ReturnType<typeof createHarness>) => {
+      await harness.transport.acquire({ uuid: harness.uuid, expectedProtocol: 'V2' });
+      await harness.transport.call(harness.uuid, 'FileWrite', {});
+      await harness.transport.call(harness.uuid, 'FileWrite', {});
+    };
+
+    const createAndroidHarness = (apiLevel: number) => {
+      setPlatformOS('android');
+      setPlatformVersion(apiLevel);
+      const harness = createHarness();
+      harness.device.mtu = 517;
+      return harness;
+    };
+
+    test('leaves the priority to the peripheral on Android 17 by default', async () => {
+      const harness = createAndroidHarness(37);
+
+      await runHighVolumeCalls(harness);
+      await harness.transport.release(harness.uuid, true);
+
+      expect(harness.device.requestConnectionPriority).not.toHaveBeenCalled();
+      expect(
+        harness.logger.debug.mock.calls.filter(
+          ([message]) =>
+            message ===
+            '[ReactNativeBleTransport] Android BLE connection priority left to peripheral'
+        )
+      ).toHaveLength(1);
+    });
+
+    test('keeps requesting HIGH below Android 17 by default', async () => {
+      const harness = createAndroidHarness(36);
+
+      await runHighVolumeCalls(harness);
+      expect(harness.device.requestConnectionPriority).toHaveBeenCalledTimes(1);
+      expect(harness.device.requestConnectionPriority).toHaveBeenCalledWith(1);
+
+      await harness.transport.release(harness.uuid, true);
+      expect(harness.device.requestConnectionPriority).toHaveBeenLastCalledWith(0);
+    });
+
+    test.each([
+      [37, true],
+      [36, false],
+    ] as const)('applies the tuning switch on API %s when set to %s', async (apiLevel, setting) => {
+      configureProtocolV2BleTuning({ androidHighConnectionPriority: setting });
+      const harness = createAndroidHarness(apiLevel);
+
+      await runHighVolumeCalls(harness);
+
+      if (setting) {
+        expect(harness.device.requestConnectionPriority).toHaveBeenCalledWith(1);
+      } else {
+        expect(harness.device.requestConnectionPriority).not.toHaveBeenCalled();
+      }
+      await harness.transport.release(harness.uuid, true);
+    });
+
+    test('keeps the switch across unrelated tuning and ignores invalid values', () => {
+      expect(getProtocolV2BleTuning().androidHighConnectionPriority).toBe('auto');
+      configureProtocolV2BleTuning({ androidHighConnectionPriority: false });
+      configureProtocolV2BleTuning({ androidPacketLength: 200 });
+      expect(getProtocolV2BleTuning().androidHighConnectionPriority).toBe(false);
+      configureProtocolV2BleTuning({ androidHighConnectionPriority: 'on' as never });
+      expect(getProtocolV2BleTuning().androidHighConnectionPriority).toBe(false);
+      configureProtocolV2BleTuning({ androidHighConnectionPriority: 'auto' });
+      expect(getProtocolV2BleTuning().androidHighConnectionPriority).toBe('auto');
+    });
+
+    test('requests HIGH again on the next link after a manual disconnect', async () => {
+      const harness = createAndroidHarness(36);
+
+      await runHighVolumeCalls(harness);
+      expect(harness.device.requestConnectionPriority).toHaveBeenCalledTimes(1);
+
+      await harness.transport.disconnect(harness.uuid);
+      await runHighVolumeCalls(harness);
+
+      expect(
+        harness.device.requestConnectionPriority.mock.calls.filter(([priority]) => priority === 1)
+      ).toHaveLength(2);
+      await harness.transport.release(harness.uuid, true);
+    });
   });
 
   test('uses withResponse for an iOS Protocol V2 firmware file write when requested', async () => {

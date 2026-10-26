@@ -141,6 +141,13 @@ Each Transport instance holds one `ProtocolV2LinkManager`:
   the shared 5-minute default is used. The timeout signal must be passed to the platform adapter so work of the current generation can be cancelled.
 - ACK and business response share the same call timeout; there is no separate delivery watchdog. Not receiving an ACK within 5 seconds
   must not be treated as link failure, because the device may be waiting for user input normally.
+- A `FilesystemFileWrite` call with `fileWritePipeline` writes one file as ordered chunks with up to
+  `PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW` (2) chunks in flight. It is still one call in the device queue. Its timeout bounds
+  `prepareCall`, each frame write, and the wait for each chunk's response separately, because one file outlasts one chunk; ACKs
+  and skipped frames do not extend that wait. Responses are matched to chunks in order and must echo the chunk's path, offset,
+  and total size and confirm its end in `processed_byte`. Upstream bootloaders do not check the request offset, so the echoed
+  offset is what exposes a lost chunk. An ACK may echo any in-flight chunk's sequence. When the caller's `next` returns
+  undefined, the Session stops sending, drains the in-flight chunks, and returns the last confirmation.
 - Session does not automatically resend requests. Retries of side-effecting requests such as file write, settings, and firmware install can only be decided by Core flows
   that understand business idempotency.
 
@@ -149,6 +156,10 @@ then cancel reads, clear the assembler, close the platform connection, and clean
 
 protobuf `Failure` is a device business response and does not invalidate the Link by default. Transport also must not automatically resend business
 commands, because file write, settings, and firmware install may already have produced side effects on the device.
+
+Inside a file write pipeline, a `Failure` stops further chunks. The Session drains the responses of chunks already in flight and then
+returns the `Failure`, so the Link stays usable. A confirmation that does not match the oldest in-flight chunk, or an interactive
+response such as `ButtonRequest`, is a frame error and is link-fatal.
 
 ## Generation and Isolation of Stale Async Results
 
@@ -193,6 +204,23 @@ BLE platform implementations include Electron, React Native, and the lowlevel pl
 - React Native Protocol V2 large-frame writes rely on the native BLE stack's write-without-response backpressure and do not add a fixed
   burst or flush pause. Bounded backoff retry is used only for explicit `GATT_CONGESTED`; disconnect or generation
   change aborts immediately, and writes must not continue across connections.
+- React Native can hand a whole Protocol V2 frame to native code in one call when the App's patched react-native-ble-plx
+  exposes `writeCharacteristicWithoutResponseFrame`. The SDK uses it only for high-throughput, without-response frames that
+  need more than one packet, when `ProtocolV2BleTuning.nativeFrameWrite` is not `false` and the native module reports
+  support (`isWriteCharacteristicWithoutResponseFrameSupported()`, which checks the native module so a newer JS bundle on an
+  older native binary falls back). Native code still writes packets in order: Android uses one RxAndroidBle long-write
+  operation with one GATT write outstanding, iOS a sequential loop that waits for `canSendWriteWithoutResponse`, so
+  CoreBluetooth may queue several packets. Each frame has a unique transaction id and a `BLE_WRITE_PACKET_TIMEOUT_MS`
+  watchdog; abort, watchdog expiry, generation change, release, disconnect and manager reset cancel it. A failed frame is
+  never retried and is link-fatal. Otherwise the per-packet path above is used unchanged; Protocol V1 never uses the frame
+  call.
+- React Native on Android requests `CONNECTION_PRIORITY_HIGH` before a Protocol V2 high-throughput call unless the link
+  already holds it, and restores Balanced after 1 s without such a call or on release, except on API 37+ by default:
+  Android 17 maps HIGH to peripheral latency 1, which OneKey BLE firmware accepts and which halves FileWrite throughput.
+  Measurements and BLE firmware details are in
+  [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md#android-17-连接优先级peripheral-latency-1-让吞吐减半).
+  `ProtocolV2BleTuning.androidHighConnectionPriority` (`'auto'`, `true`, `false`) overrides this. A disconnect, including
+  the automatic one after a BLE timeout, clears the cached priority and any pending restore so the next link starts clean.
 - Notification data uniformly enters `ProtocolV2FrameAssembler`; a single notification must not be assumed to be one frame.
 - On V1/V2 probe fallback, Electron BLE only rotates the renderer notification token and protocol buffers; it does not disconnect or
   resubscribe GATT. Unpaired devices therefore trigger the system pairing flow only once.

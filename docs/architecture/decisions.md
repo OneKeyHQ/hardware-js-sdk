@@ -20,6 +20,41 @@ Primary implementation:
 - `packages/hd-transport/src/protocols/v2/session.ts`
 - `packages/hd-transport/src/protocols/v2/sequence-cursor.ts`
 
+## Ordered FileWrite Pipeline for BLE Firmware Transfer
+
+BLE firmware and resource transfer may overlap the next `FilesystemFileWrite` with the device's handling of the previous one. The rules are:
+
+- The pipeline lives inside one Session call. Calls for the same device stay serialized, and no other request interleaves with it.
+- At most `PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW` (2) chunks of one file are in flight, at contiguous offsets. Firmware still
+  handles chunks in order and answers every chunk. Core counts progress only from confirmed chunks.
+- The main-MCU BLE UART FIFO bounds the window: the frame waiting to be parsed, the next frame being received, and the BLE
+  coprocessor's own command frames can all be resident. Pipelined writes therefore use 1800-byte chunks for every file,
+  including the fixed staging paths that use 1960 bytes when serial, because two staging-size frames would leave under 60
+  bytes of a 4096-byte FIFO. A 2048-byte FIFO holds only one frame. The 2048-byte BLE frame limit is unchanged.
+- The BLE coprocessor also bounds the window. BLE 1.0.23 drops packets silently when its scheduler queue is full, and its UART
+  to the main MCU has no flow control, so each extra in-flight frame lowers the margin for a coprocessor stall. Byte and packet
+  budgets are in [Pro2 BLE Transport Performance Record](../testing/pro2-ble-performance.md#filewrite-窗口同一次调用内-2-块在途).
+- Transfers run under the device's current bootloader. Core enables the pipeline only for React Native and Electron BLE in
+  bootloader mode when the running bootloader is at or above the minimum version in
+  `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION`, currently 1.0.4. Released bootloaders (1.0.2 with the
+  2048-byte FIFO, and 1.0.3) stay serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.4 but has not confirmed
+  it, nor the coprocessor margin; any bootloader reporting 1.0.4 or later gets the window. `undefined` keeps every transfer serial. On a 2048-byte FIFO a second frame would overflow it and lose a chunk,
+  which the Session detects as a missing response or a mismatched confirmation. The decision uses the version the running
+  bootloader reports, never PID, name, or descriptor. LowLevel stays serial because plugins are not required to keep
+  notifications that arrive between `receive()` calls.
+- The Transport never replays chunks. After any failure, Core's existing recovery reconnects and rewrites the whole file from
+  offset 0. A failed windowed exchange (the transport call, or a final confirmation that does not cover the file) also turns
+  the window off for the rest of that update, so the retry and every later file are written serially. A bootloader that
+  cannot hold two frames then normally costs one of the file's three attempts and one reconnect; the update still fails if
+  that reconnect or the remaining serial attempts fail. Cancellation and source read errors stop the pipeline and are raised
+  by Core after the call returns, so they do not invalidate the Link, and a source read error keeps the window.
+
+Primary implementation:
+
+- `packages/hd-transport/src/protocols/v2/session.ts`
+- `packages/hd-transport/src/constants.ts`
+- `packages/core/src/api/FirmwareUpdateV4.ts`
+
 ## Ownership of User Cancel
 
 Only SDK Core decides whether to send a protocol `Cancel`. The App may call `sdk.cancel()` at any time when closing UI, but must not decide on its own—based on device model, pairing stage, or permission dialogs—whether to send `Cancel` this time.

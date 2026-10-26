@@ -1,11 +1,13 @@
 import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import JSZip from 'jszip';
+import semver from 'semver';
 import {
   DeviceRebootType,
   DeviceSessionPinType,
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE,
   PROTOCOL_V2_BLE_FIRMWARE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
 import { sha256 } from '@noble/hashes/sha256';
@@ -101,6 +103,14 @@ const PROTOCOL_V2_CONNECT_POLL_INTERVAL = 500;
 const PROTOCOL_V2_CONNECT_SINGLE_TIMEOUT = 75 * 1000;
 const PROTOCOL_V2_DEVICE_INFO_READY_TIMEOUT = 30 * 1000;
 const PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT = 3;
+const PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT = 2;
+// Minimum running bootloader that receives two in-flight BLE FilesystemFileWrite frames.
+// Bootloaders with the 2048-byte BLE UART FIFO have no room beside one waiting FileWrite frame,
+// so a second frame can overflow it. Released bootloaders (1.0.2 with that FIFO, and 1.0.3) stay
+// serial. Firmware has been asked to ship the 4096-byte FIFO from 1.0.4 but has not confirmed it,
+// nor the BLE coprocessor margin for two frames; any bootloader reporting 1.0.4 or later gets the
+// window. Set it to undefined to keep every transfer serial.
+const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.4';
 const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
 const PROTOCOL_V2_INSTALL_FAILED_CODE = 'FirmwareInstallFailed';
@@ -170,6 +180,18 @@ export function assertProtocolV2FirmwareTargetsSupported(
   throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod, message);
 }
 
+/** Whether the running bootloader accepts a second in-flight BLE FilesystemFileWrite. */
+export function supportsProtocolV2BleFileWriteWindow(
+  bootloaderVersion: string,
+  minBootloaderVersion = PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION
+) {
+  return (
+    !!minBootloaderVersion &&
+    !!semver.valid(bootloaderVersion) &&
+    semver.gte(bootloaderVersion, minBootloaderVersion)
+  );
+}
+
 const getProtocolV2DeviceTransferProgress = (
   bytesBeforeChunk: number,
   bytesAfterChunk: number,
@@ -183,6 +205,12 @@ const getProtocolV2DeviceTransferProgress = (
   }
   return Math.min(Math.max(Math.ceil((bytesAfterChunk / totalBytes) * 100), 1), 99);
 };
+
+const getProtocolV2TransferRate = (bytes: number, elapsedMs: number) =>
+  elapsedMs > 0 ? Math.round((bytes / elapsedMs) * 1000) : undefined;
+
+const getProtocolV2ElapsedMs = (startedAt: number, now = Date.now()) =>
+  Math.max(now - startedAt, 0);
 
 type ProtocolV2FirmwareUpdateStatusTarget = {
   target_id: number | string;
@@ -380,6 +408,23 @@ const getProtocolV2ErrorCode = (error: unknown): number | string | undefined => 
   const { errorCode, code } = error as { errorCode?: unknown; code?: unknown };
   const causeCode = errorCode ?? code;
   return typeof causeCode === 'number' || typeof causeCode === 'string' ? causeCode : undefined;
+};
+
+/** Errors that mean the link is gone, so the read says nothing about the installed bundle. */
+const isProtocolV2ResourceHeaderLinkError = (error: unknown) => {
+  if (isProtocolV2DeviceDisconnectedError(error)) return true;
+  const errorCode = getProtocolV2ErrorCode(error);
+  if (errorCode === HardwareErrorCode.BleTimeoutError) return true;
+  const message = getProtocolV2UnknownErrorText(error);
+  if (errorCode === HardwareErrorCode.TransportNotFound && /not connected/i.test(message)) {
+    return true;
+  }
+  return (
+    message.includes('ProtocolV2LinkError') ||
+    message.includes('Device protocol has not been detected') ||
+    message.includes('Electron BLE device state cleaned') ||
+    message.includes('Electron BLE transport released')
+  );
 };
 
 const isProtocolV2TerminalInstallStatusError = (error: unknown) =>
@@ -586,6 +631,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2LastTransferredBytes = 0;
 
+  /** Set when a windowed FileWrite attempt fails: the rest of this update writes serially. */
+  private protocolV2FileWriteWindowDisabled = false;
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -775,7 +823,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     };
   }
 
-  private getProtocolV2FirmwareChunkSize(direction: 'read' | 'write', filePath?: string) {
+  private getProtocolV2FirmwareChunkSize(
+    direction: 'read' | 'write',
+    filePath?: string,
+    fileWriteWindow = false
+  ) {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
     const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
@@ -783,6 +835,10 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (isBle) {
       if (direction === 'read') {
         maxChunkSize = PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
+      } else if (fileWriteWindow) {
+        // Skip the larger staging chunk so two in-flight frames fit the UART FIFO; see
+        // PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW.
+        maxChunkSize = PROTOCOL_V2_BLE_FILE_CHUNK_SIZE;
       } else {
         // Firmware staging writes tolerate a larger BLE chunk than generic filesystem writes.
         maxChunkSize = PROTOCOL_V2_FIRMWARE_STAGING_PATHS.has(filePath ?? '')
@@ -1869,8 +1925,44 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       if (!expectedHeaderHash || header.headerHash !== expectedHeaderHash) return false;
       return true;
     } catch (error) {
+      if (isProtocolV2ResourceHeaderLinkError(error)) throw error;
       Log.log(`[FirmwareUpdateV4] RESC bundle ${bundle.name} header check failed: `, error);
       return false;
+    }
+  }
+
+  /**
+   * A lost link would fail every remaining header check and resend bundles that are already
+   * installed, so reconnect (a bounded number of times per transfer phase) and ask again.
+   * Header reads have no side effects. Once the budget is used up the bundle is resent as before.
+   * A failed reconnect aborts the update like a failed file-transfer recovery: reconnecting
+   * replaces the session, and nothing may be written to a device whose identity was not
+   * re-verified.
+   */
+  private async isProtocolV2ResourceBundleUpToDateWithRecovery(
+    bundle: ProtocolV2ResourceBundleSource,
+    recovery: { remaining: number }
+  ): Promise<boolean> {
+    for (;;) {
+      try {
+        return await this.isProtocolV2ResourceBundleUpToDate(bundle);
+      } catch (error) {
+        this.throwIfAborted();
+        if (recovery.remaining <= 0) {
+          Log.log(
+            `[FirmwareUpdateV4] RESC bundle ${bundle.name} header check lost the link; reconnect budget used up: `,
+            getProtocolV2UnknownErrorText(error)
+          );
+          return false;
+        }
+        recovery.remaining -= 1;
+        Log.log(
+          `[FirmwareUpdateV4] RESC bundle ${bundle.name} header check lost the link; reconnecting: `,
+          getProtocolV2UnknownErrorText(error)
+        );
+      }
+      await this.recoverProtocolV2FileTransfer();
+      this.throwIfAborted();
     }
   }
 
@@ -2112,8 +2204,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   }: ProtocolV2TransferBatch) {
     let totalSize = installSources.reduce((total, item) => total + item.source.size, 0);
     const resourcesToSync: ProtocolV2ResourceBundleSource[] = [];
+    const headerRecovery = { remaining: PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT };
     for (const resource of resourceSources) {
-      if (await this.isProtocolV2ResourceBundleUpToDate(resource)) {
+      if (await this.isProtocolV2ResourceBundleUpToDateWithRecovery(resource, headerRecovery)) {
         Log.log(`[FirmwareUpdateV4] skip RESC bundle ${resource.name}; already up to date`);
       } else {
         resourcesToSync.push(resource);
@@ -2162,12 +2255,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (totalSize > 0) {
-      const elapsedMs = Math.max(Date.now() - transferStartedAt, 0);
+      const elapsedMs = getProtocolV2ElapsedMs(transferStartedAt);
+      const rateBytesPerSecond = getProtocolV2TransferRate(totalSize, elapsedMs);
       this.postProgressMessage(100, 'transferData', {
         transferredBytes: totalSize,
         totalBytes: totalSize,
-        rateBytesPerSecond: elapsedMs > 0 ? Math.round((totalSize / elapsedMs) * 1000) : undefined,
+        rateBytesPerSecond,
         elapsedMs,
+      });
+      Log.debug('[FirmwareUpdateV4] Protocol V2 transfer completed', {
+        files: resourcesToSync.length + installSources.length,
+        totalBytes: totalSize,
+        elapsedMs,
+        rateBytesPerSecond,
       });
     }
     if (stagedInstallTargets.length === 0) {
@@ -2179,10 +2279,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       target_id: item.targetId,
       path: item.path,
     }));
+    // Includes the wait for on-device confirmation.
+    const installStartedAt = Date.now();
     try {
       await this.protocolV2StartFirmwareUpdate({ targets });
       await wait(PROTOCOL_V2_INSTALL_STATUS_INITIAL_DELAY);
       await this.waitForProtocolV2FirmwareUpdateComplete(targets, true);
+      Log.debug('[FirmwareUpdateV4] Protocol V2 install completed', {
+        targets: targets.length,
+        elapsedMs: getProtocolV2ElapsedMs(installStartedAt),
+      });
     } finally {
       this.device?.clearCancelableAction();
     }
@@ -2201,66 +2307,98 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     totalSize: number;
     transferStartedAt?: number;
   }) {
+    const reportConfirmedChunk = (chunkEnd: number) => {
+      const transferredBytes = processedSize + chunkEnd;
+      const now = Date.now();
+      const elapsedMs = getProtocolV2ElapsedMs(transferStartedAt, now);
+      const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
+      const shouldPostProgress =
+        transferredBytes >= this.protocolV2LastTransferredBytes &&
+        (progress !== this.protocolV2LastTransferProgress ||
+          now - this.protocolV2LastTransferProgressAt >=
+            PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
+          chunkEnd === source.size);
+      if (shouldPostProgress) {
+        this.protocolV2LastTransferProgress = progress;
+        this.protocolV2LastTransferProgressAt = now;
+        this.protocolV2LastTransferredBytes = transferredBytes;
+        this.postProgressMessage(progress, 'transferData', {
+          transferredBytes,
+          totalBytes: totalSize,
+          rateBytesPerSecond: getProtocolV2TransferRate(transferredBytes, elapsedMs),
+          elapsedMs,
+        });
+      }
+    };
     let lastError: unknown;
     for (let attempt = 1; attempt <= PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT; attempt += 1) {
       this.throwIfAborted();
+      const attemptStartedAt = Date.now();
+      let windowed = false;
       try {
-        await writeFirmwareByteSource({
-          source,
-          chunkSize: this.getProtocolV2FirmwareChunkSize('write', filePath),
-          write: async ({ data, sourceOffset, length, first }) => {
-            this.throwIfAborted();
-            const chunkEnd = sourceOffset + length;
-            const deviceProgress = getProtocolV2DeviceTransferProgress(
-              processedSize + sourceOffset,
-              processedSize + chunkEnd,
-              totalSize
-            );
-            const response = await this.fileWriteChunk(
-              filePath,
-              source.size,
-              sourceOffset,
-              data,
-              first,
-              deviceProgress
-            );
-            const rawProcessedByte = response.message.processed_byte;
-            const nextOffset = rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
-            if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
-              throw ERRORS.TypedError(
-                HardwareErrorCode.EmmcFileWriteFirmwareError,
-                `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
+        windowed =
+          !this.protocolV2FileWriteWindowDisabled && this.shouldUseProtocolV2BleFileWriteWindow();
+        const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath, windowed);
+        if (windowed) {
+          await this.writeProtocolV2SourceWindowed({
+            source,
+            filePath,
+            chunkSize,
+            processedSize,
+            totalSize,
+            onChunkConfirmed: reportConfirmedChunk,
+          });
+        } else {
+          await writeFirmwareByteSource({
+            source,
+            chunkSize,
+            write: async ({ data, sourceOffset, length, first }) => {
+              this.throwIfAborted();
+              const chunkEnd = sourceOffset + length;
+              const deviceProgress = getProtocolV2DeviceTransferProgress(
+                processedSize + sourceOffset,
+                processedSize + chunkEnd,
+                totalSize
               );
-            }
-            const transferredBytes = processedSize + chunkEnd;
-            const now = Date.now();
-            const elapsedMs = Math.max(now - transferStartedAt, 0);
-            const progress = Math.min(Math.ceil((transferredBytes / totalSize) * 100), 99);
-            const shouldPostProgress =
-              transferredBytes >= this.protocolV2LastTransferredBytes &&
-              (progress !== this.protocolV2LastTransferProgress ||
-                now - this.protocolV2LastTransferProgressAt >=
-                  PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS ||
-                chunkEnd === source.size);
-            if (shouldPostProgress) {
-              this.protocolV2LastTransferProgress = progress;
-              this.protocolV2LastTransferProgressAt = now;
-              this.protocolV2LastTransferredBytes = transferredBytes;
-              this.postProgressMessage(progress, 'transferData', {
-                transferredBytes,
-                totalBytes: totalSize,
-                rateBytesPerSecond:
-                  elapsedMs > 0 ? Math.round((transferredBytes / elapsedMs) * 1000) : undefined,
-                elapsedMs,
-              });
-            }
-            return length;
-          },
+              const response = await this.fileWriteChunk(
+                filePath,
+                source.size,
+                sourceOffset,
+                data,
+                first,
+                deviceProgress
+              );
+              const rawProcessedByte = response.message.processed_byte;
+              const nextOffset =
+                rawProcessedByte === undefined ? chunkEnd : Number(rawProcessedByte);
+              if (!Number.isFinite(nextOffset) || nextOffset !== chunkEnd) {
+                throw ERRORS.TypedError(
+                  HardwareErrorCode.EmmcFileWriteFirmwareError,
+                  `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
+                );
+              }
+              reportConfirmedChunk(chunkEnd);
+              return length;
+            },
+          });
+        }
+        Log.debug('[FirmwareUpdateV4] Protocol V2 file transferred', {
+          path: filePath,
+          bytes: source.size,
+          elapsedMs: getProtocolV2ElapsedMs(attemptStartedAt),
+          attempt,
+          fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
         });
         return processedSize + source.size;
       } catch (error) {
         this.throwIfAborted();
         lastError = error;
+        Log.debug('[FirmwareUpdateV4] Protocol V2 file transfer attempt failed', {
+          path: filePath,
+          attempt,
+          fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
+          error: getProtocolV2UnknownErrorText(error),
+        });
         if (attempt < PROTOCOL_V2_FILE_TRANSFER_RETRY_COUNT) {
           await this.recoverProtocolV2FileTransfer();
           this.throwIfAborted();
@@ -3192,15 +3330,130 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     return writeRes;
   }
 
-  private async recoverProtocolV2FileTransfer() {
+  private shouldUseProtocolV2BleFileWriteWindow(
+    minBootloaderVersion = PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION
+  ) {
     const env = DataManager.getSettings('env');
-    if (DataManager.isBleConnect(env)) {
-      await wait(3000);
+    // These adapters queue frames that arrive while no read is pending. LowLevel plugins are not
+    // required to keep notifications between receive() calls, so they stay serial.
+    if (
+      (env !== 'react-native' && env !== 'desktop-web-ble') ||
+      !this.isProtocolV2BootloaderMode()
+    ) {
+      return false;
     }
-    await this.reconnectProtocolV2Device();
-    await this.verifyProtocolV2ReconnectIdentity();
-    await this.device.initialize();
-    await wait(2000);
+    // The transfer runs in the device's current bootloader, not the one being installed. The
+    // parsed version keeps major.minor.patch only, so a 1.0.4 prerelease counts as 1.0.4.
+    const bootloaderVersion = getDeviceBootloaderVersion(this.device.features).join('.');
+    const enabled = supportsProtocolV2BleFileWriteWindow(bootloaderVersion, minBootloaderVersion);
+    Log.debug('[FirmwareUpdateV4] BLE FileWrite window', {
+      enabled,
+      bootloaderVersion,
+      bootloaderBuildId: this.device.features?.verify?.bootloaderBuildId,
+    });
+    return enabled;
+  }
+
+  /**
+   * Streams one staged file as a single ordered FilesystemFileWrite pipeline. Every chunk is
+   * still confirmed by the device; a failure restarts the whole file like the serial path.
+   * Cancellation and source errors only stop the pipeline and are raised after the transport
+   * call returns: an error thrown inside it would invalidate the BLE link.
+   */
+  private async writeProtocolV2SourceWindowed({
+    source,
+    filePath,
+    chunkSize,
+    processedSize,
+    totalSize,
+    onChunkConfirmed,
+  }: {
+    source: FirmwareByteSource;
+    filePath: string;
+    chunkSize: number;
+    processedSize: number;
+    totalSize: number;
+    onChunkConfirmed: (chunkEnd: number) => void;
+  }) {
+    let sendOffset = 0;
+    let sourceError: Error | undefined;
+    const readRequest = async () => {
+      const offset = sendOffset;
+      const length = Math.min(chunkSize, source.size - offset);
+      const data = await source.readAt(offset, length);
+      sendOffset += length;
+      return {
+        file: { path: filePath, offset, total_size: source.size, data },
+        overwrite: offset === 0,
+        append: false,
+        ui_percentage: getProtocolV2DeviceTransferProgress(
+          processedSize + offset,
+          processedSize + sendOffset,
+          totalSize
+        ),
+      };
+    };
+    const nextRequest = async () => {
+      if (this.abortSignal?.aborted || sendOffset >= source.size) return undefined;
+      try {
+        return await readRequest();
+      } catch (error) {
+        sourceError = error;
+        return undefined;
+      }
+    };
+    this.throwIfAborted();
+    if (source.size === 0) return;
+    const firstRequest = await readRequest();
+
+    // A failed exchange may mean the running bootloader cannot hold two in-flight frames, so the
+    // retry and every later file of this update are written serially. Source read errors say
+    // nothing about the bootloader and keep the window.
+    const response = await this.device
+      .getCommands()
+      .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
+        // Both windowed transports (React Native and Electron BLE) invalidate a timed-out link,
+        // so a lost chunk is retried after 10 s instead of the 5-minute default.
+        timeoutMs: PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT,
+        writeWithResponse: false,
+        fileWritePipeline: {
+          next: nextRequest,
+          onResponse: confirmed => {
+            onChunkConfirmed(Number(confirmed.message.processed_byte));
+          },
+        },
+      })
+      .catch((error: unknown) => {
+        this.protocolV2FileWriteWindowDisabled = true;
+        throw error;
+      });
+    this.throwIfAborted();
+    if (sourceError) throw sourceError;
+    const rawProcessedByte = response.message.processed_byte;
+    if (Number(rawProcessedByte) !== source.size) {
+      this.protocolV2FileWriteWindowDisabled = true;
+      throw ERRORS.TypedError(
+        HardwareErrorCode.EmmcFileWriteFirmwareError,
+        `invalid processed_byte ${rawProcessedByte} for file size ${source.size}`
+      );
+    }
+  }
+
+  private async recoverProtocolV2FileTransfer() {
+    try {
+      const env = DataManager.getSettings('env');
+      if (DataManager.isBleConnect(env)) {
+        await wait(3000);
+      }
+      await this.reconnectProtocolV2Device();
+      await this.verifyProtocolV2ReconnectIdentity();
+      await this.device.initialize();
+      await wait(2000);
+    } catch (error) {
+      // A cancel disposes the link mid-recovery; report the cancel rather than its side effect.
+      this.throwIfAborted();
+      throw error;
+    }
   }
 
   private async acquireProtocolV2BleDevice(skipProtocolProbe = false) {
