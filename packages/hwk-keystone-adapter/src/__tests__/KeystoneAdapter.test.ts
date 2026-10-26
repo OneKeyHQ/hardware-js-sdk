@@ -3132,7 +3132,7 @@ describe('KeystoneAdapter', () => {
     it('asks once per USB bundle before showing its oversized items as QR codes', async () => {
       const usb = fakeUsbConnector();
       const adapter = newTestAdapter(usb.connector);
-      const qrFake = attachFakeDevice(adapter);
+      const qrFake = attachFakeDevice(adapter, { deviceVersion: '3.1.4' });
       await adapter.releaseOperation(await connectOperation(adapter));
       const askedQrFallback = answerQrFallback(adapter, true);
       usb.failUrType({
@@ -3156,6 +3156,39 @@ describe('KeystoneAdapter', () => {
         expect(result.payload.map(item => item.success)).toEqual([true, true]);
         expect(askedQrFallback).toHaveBeenCalledTimes(1);
         expect(qrFake.requests).toHaveLength(2);
+
+        usb.emitDisconnect();
+        expect(await adapter.getDeviceInfo(FIXTURE_WALLET, FIXTURE_MFP)).toMatchObject({
+          success: true,
+          payload: { connectionType: 'qr', firmwareVersion: '3.1.4' },
+        });
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('checks the actual QR response firmware after an oversized USB account request', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter, { deviceVersion: '3.1.4-C' });
+      answerQrFallback(adapter, true);
+      await adapter.releaseOperation(await connectOperation(adapter));
+      usb.failUrType({
+        urType: 'qr-hardware-call',
+        error: {
+          code: HardwareErrorCode.PayloadTooLarge,
+          message: 'USB size limit',
+          params: { origin: 'transport' },
+        },
+      });
+      try {
+        expect(
+          await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
+        ).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.ChainNotSupported },
+        });
+        expect(qrFake.requests).toHaveLength(1);
       } finally {
         await adapter.dispose();
       }

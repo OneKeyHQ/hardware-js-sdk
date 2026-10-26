@@ -172,6 +172,7 @@ type BundleAccess =
   | { channel: 'usb'; usbSessionId: string; qrFallback: QrFallbackChoice };
 
 type QrAccountResponse = KeystoneUr & { accountExport?: boolean };
+type ResolvedUrResponse = QrAccountResponse & { channel: 'usb' | 'qr' };
 
 /** The answer to "show it as a QR?" for a request USB cannot carry; a bundle asks only once. */
 type QrFallbackChoice = { confirmed?: boolean };
@@ -2181,7 +2182,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     signal: AbortSignal,
     operationName?: string,
     qrFallback?: QrFallbackChoice
-  ): Promise<QrAccountResponse> {
+  ): Promise<ResolvedUrResponse> {
     const releaseOperationRetention = isHardwareOperationId(operationId)
       ? this._operations.retain(operationId)
       : undefined;
@@ -2208,7 +2209,7 @@ export class KeystoneAdapter implements IHardwareWallet {
     signal: AbortSignal,
     operationName?: string,
     qrFallback?: QrFallbackChoice
-  ): Promise<QrAccountResponse> {
+  ): Promise<ResolvedUrResponse> {
     let record = callerRecord;
     let interactionRoute: OperationRoute | undefined;
     if (isHardwareOperationId(operationId)) {
@@ -2262,7 +2263,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
       if (result.success) {
         const ur = result.payload as KeystoneUr;
-        return { urType: ur.urType, urData: ur.urData };
+        return { urType: ur.urType, urData: ur.urData, channel: 'usb' };
       }
 
       const usbError = rehydrateConnectorError(result.error);
@@ -2279,7 +2280,7 @@ export class KeystoneAdapter implements IHardwareWallet {
             });
           }
           const displayDevice = toDeviceInfo(record);
-          return this._requestQrAndAwaitResponse(
+          const responseUr = await this._requestQrAndAwaitResponse(
             displayDevice,
             {
               ...requestUr,
@@ -2288,6 +2289,7 @@ export class KeystoneAdapter implements IHardwareWallet {
             },
             signal
           );
+          return { ...responseUr, channel: 'qr' };
         }
         // Rejected by the host before sending: keep the pinned session and report
         // the limit without implying the operation ran.
@@ -2348,11 +2350,12 @@ export class KeystoneAdapter implements IHardwareWallet {
 
     const displayDevice = record ? toDeviceInfo(record) : placeholderDeviceInfo();
     try {
-      return await this._requestQrAndAwaitResponse(
+      const responseUr = await this._requestQrAndAwaitResponse(
         displayDevice,
         { ...requestUr, animated, ...(!operationName ? { allowAccountExport: true } : {}) },
         signal
       );
+      return { ...responseUr, channel: 'qr' };
     } catch (error) {
       const { code, _tag: tag } = error as { code?: unknown; _tag?: unknown };
       if (
@@ -2424,9 +2427,6 @@ export class KeystoneAdapter implements IHardwareWallet {
         message: 'Keystone USB connection was lost during the bundle',
       });
     }
-    const operationConnectionType = isHardwareOperationId(connectId)
-      ? this._operations.resolve(connectId).connectionType
-      : undefined;
     let existingRecord = target.record;
     if (!existingRecord) {
       existingRecord = await this._tryUsbAttach(signal, target.expectedMasterFingerprint);
@@ -2450,13 +2450,8 @@ export class KeystoneAdapter implements IHardwareWallet {
       : this.urEngine.parseAccountResponse(responseUr);
     this._assertParsedIdentity(parsed, target);
     const account = requireExportedPath(parsed, syncPath, responseUr.accountExport);
-    // Read the session after resolveUr, which may reattach USB. An explicit QR route still wins.
-    const useSinglePathUsbExport =
-      !responseUr.accountExport &&
-      (operationConnectionType
-        ? operationConnectionType === 'usb'
-        : this._forcedTransport === 'usb' ||
-          (this._forcedTransport !== 'qr' && Boolean(existingRecord?.usbSessionId)));
+    // A live USB session can remain after QR fallback; classify the response by its actual channel.
+    const useSinglePathUsbExport = !responseUr.accountExport && responseUr.channel === 'usb';
     let record: KeystoneDeviceRecord;
     if (useSinglePathUsbExport && existingRecord) {
       if (parsed.masterFingerprint !== existingRecord.masterFingerprint) {
