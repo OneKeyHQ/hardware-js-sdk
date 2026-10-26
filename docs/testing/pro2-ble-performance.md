@@ -26,7 +26,7 @@ Protocol V2 BLE 的生产默认值如下：
 | Protocol V2 BLE packet                        | 协商值，生产上限 `244B`                                      | LowLevel 未报告能力时回退 `192B`；React Native 缺失 MTU 时不猜测高容量                          |
 | Write mode                                    | 支持时默认 `withoutResponse`                                 | characteristic 仅支持 acknowledged write 或调用方显式设置 `writeWithResponse: true` 时例外      |
 | Host-asset compression                        | dependency-free raw LZ4，优先 `16KiB` block、超限回退 `8KiB` | 解压后的 RGB565 bytes 不变，保留现有 dithering；兼容 firmware compressed-buffer 上限            |
-| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 `1.0.4`）时，V4 同一调用内最多 2 块在途（见下文） |
+| File response                                 | 每个 chunk 都等待 `FilesystemFile` 与 `processed_byte`       | 默认一问一答；bootloader 达到最低版本（当前为 `1.0.3`）时，V4 同一调用内最多 2 块在途（见下文） |
 
 ### 为什么不能把所有 BLE file chunk 统一为 1960B
 
@@ -410,10 +410,10 @@ path 使用 `1960B` 时完整 frame 为 `2028B`，保留 `20B`。普通 FileWrit
   session 保护，帧更大时，蓝牙自身的命令可能插进一帧中间。
 - 传输由设备**当前**运行的 bootloader 接收，不是这次要安装的那个。SDK 只在 React Native 与 Electron BLE、
   bootloader 模式、且运行中的 bootloader 版本不低于 `PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION` 时开启；
-  LowLevel（包括 CLI）不开启。这个常量当前为 `1.0.4`：线上 bootloader（`1.0.2`，FIFO 为 `2048B`；以及 `1.0.3`）保持
-  一问一答，所以线上设备第一次升级（从旧 bootloader 装上新 bootloader 的那一次）也是一问一答。SDK 要求固件从 `1.0.4` 起带
-  `4096B` FIFO，固件尚未确认；任何报告 `1.0.4` 及以上的 bootloader 都会开窗口。之前刷了 `4096B` FIFO、但仍报告 `1.0.2` 的
-  测试 bootloader 现在也走一问一答，要换成报告 `1.0.4` 的测试包才开窗口。
+  LowLevel（包括 CLI）不开启。这个常量当前为 `1.0.3`：线上 bootloader 报告 `1.0.2`（FIFO 为 `2048B`），保持一问一答，
+  所以线上设备第一次升级（从旧 bootloader 装上新 bootloader 的那一次）也是一问一答。SDK 要求固件从 `1.0.3` 起带 `4096B`
+  FIFO，固件尚未确认；任何报告 `1.0.3` 及以上的 bootloader 都会开窗口。之前刷了 `4096B` FIFO、但仍报告 `1.0.2` 的测试
+  bootloader 现在也走一问一答，要换成报告 `1.0.3` 的测试包才开窗口。
   设为 `undefined` 则全部一问一答。原因见
   [架构决策](../architecture/decisions.md#ordered-filewrite-pipeline-for-ble-firmware-transfer)。
 - `2048B` FIFO 上若开窗口：设备还没把等着解析的一帧拷出去时下一帧就到了，放不下的字节被直接丢掉（固件只打印
