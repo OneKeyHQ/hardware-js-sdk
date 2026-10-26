@@ -34,6 +34,7 @@ import DeviceSettings from '../src/api/device/DeviceSettings';
 import DeviceUnlock from '../src/api/device/DeviceUnlock';
 import DeviceWipe from '../src/api/device/DeviceWipe';
 import DeviceUploadWallpaper from '../src/api/protocol-v2/DeviceUploadWallpaper';
+import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
 import DeviceStatusGet from '../src/api/protocol-v2/DeviceStatusGet';
 import FilesystemFormat from '../src/api/protocol-v2/FilesystemFormat';
 import FilesystemPermissionFix from '../src/api/protocol-v2/FilesystemPermissionFix';
@@ -121,7 +122,13 @@ import {
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
 import type { Features } from '../src/types';
-import type { DeviceStatus, ProtocolInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceStatus,
+  FilesystemFileWrite,
+  MessageFromOneKey,
+  ProtocolInfo,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -652,6 +659,118 @@ describe('UploadPortfolio', () => {
 
     expect(() => method.init()).toThrow('canonical Base64');
   });
+});
+
+describe('Pro2 / Neo application asset pipelines', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test.each(
+    [EDeviceType.Pro2, EDeviceType.Neo].flatMap(deviceType =>
+      (['wallpaper', 'nft', 'portfolio'] as const).flatMap(asset =>
+        [false, true].map(fail => ({ deviceType, asset, fail }))
+      )
+    )
+  )(
+    '$deviceType $asset applies only a fully confirmed upload (fail=$fail)',
+    async ({ deviceType, asset, fail }) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
+      jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
+      const failure = new Error('BLE response timeout');
+      const applyMessage = {
+        wallpaper: 'DeviceSettingsSet',
+        nft: 'NftUpdate',
+        portfolio: 'PortfolioUpdate',
+      }[asset];
+      const typedCall = jest.fn(
+        async (
+          name: string,
+          _response: string,
+          first: FilesystemFileWrite,
+          options?: TransportCallOptions
+        ) => {
+          if (name !== 'FilesystemFileWrite') return { type: 'Success', message: {} };
+          const pipeline = options?.fileWritePipeline;
+          if (!pipeline) throw new Error('Expected an asset pipeline');
+          let request: FilesystemFileWrite | undefined = first;
+          let response: MessageFromOneKey = { type: 'FilesystemFile', message: {} };
+          while (request) {
+            const { data } = request.file;
+            if (!(data instanceof Uint8Array)) throw new Error('Expected Uint8Array file data');
+            expect(data.byteLength).toBeLessThanOrEqual(1800);
+            expect(typedCall.mock.calls.some(call => call[0] === applyMessage)).toBe(false);
+            response = {
+              type: 'FilesystemFile',
+              message: { ...request.file, processed_byte: request.file.offset + data.byteLength },
+            };
+            pipeline.onResponse(response);
+            if (fail) throw failure;
+            request = (await pipeline.next()) as FilesystemFileWrite | undefined;
+          }
+          return response;
+        }
+      );
+      let method: DeviceUploadWallpaper | DeviceUploadNft | UploadPortfolio;
+      if (asset === 'wallpaper') {
+        method = new DeviceUploadWallpaper({
+          id: 1,
+          payload: { method: 'deviceUploadWallpaper', jpegBase64: createJpegBase64(604, 1024) },
+        });
+      } else if (asset === 'nft') {
+        method = new DeviceUploadNft({
+          id: 1,
+          payload: {
+            method: 'deviceUploadNft',
+            imageJpegBase64: createJpegBase64(540, 540),
+            thumbnailJpegBase64: createJpegBase64(263, 263),
+            title: 'NFT',
+            subtitle: '',
+            timestampMs: 1_760_000_000_000,
+          },
+        });
+      } else {
+        method = new UploadPortfolio({
+          id: 1,
+          payload: {
+            method: 'uploadPortfolio',
+            packageBase64: Buffer.from(new Uint8Array(3601)).toString('base64'),
+            uiMode: 'progress',
+          },
+        });
+      }
+      const commands = { typedCall, device: undefined as Device | undefined };
+      method.device = stubDevice({
+        commands,
+        originalDescriptor: { protocolType: 'V2' },
+        features: { deviceType, mode: 'normal' },
+        state: { status: { mode: 'normal' }, versions: { firmware: '1.0.3', bootloader: '1.0.0' } },
+        ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue({
+          version: 2,
+          supported_messages: [60412, 60805, 60809, 61400, 61500],
+        }),
+        refreshProtocolV2SettingsAfterMutation: jest.fn().mockResolvedValue({}),
+      }) as unknown as Device;
+      commands.device = method.device;
+      method.postMessage = jest.fn();
+      method.init();
+
+      if (fail) {
+        await expect(method.run()).rejects.toBe(failure);
+        expect(typedCall.mock.calls.some(call => call[0] === applyMessage)).toBe(false);
+      } else {
+        await method.run();
+        expect(typedCall.mock.calls[typedCall.mock.calls.length - 1][0]).toBe(applyMessage);
+        expect(method.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: UI_REQUEST.DEVICE_PROGRESS,
+            payload: expect.objectContaining({ progress: 100 }),
+          })
+        );
+      }
+      expect(typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite')).toHaveLength(
+        1
+      );
+    }
+  );
 });
 
 const descriptor = {

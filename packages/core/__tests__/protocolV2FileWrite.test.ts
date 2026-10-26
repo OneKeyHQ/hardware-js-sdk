@@ -1,8 +1,14 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { writeProtocolV2File } from '../src/api/helpers/protocolV2FileWrite';
+import {
+  type ProtocolV2FileWriteOptions,
+  writeProtocolV2File,
+} from '../src/api/helpers/protocolV2FileWrite';
 import { DataManager } from '../src/data-manager';
 import { LoggerNames, getLogger } from '../src/utils/logger';
+
+import type { DeviceCommands } from '../src/device/DeviceCommands';
+import type { MessageFromOneKey, TransportCallOptions } from '@onekeyfe/hd-transport';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -10,6 +16,237 @@ jest.mock('../src/data/config', () => ({
 }));
 
 describe('writeProtocolV2File', () => {
+  describe('Pro2 / Neo asset pipelines', () => {
+    type Request = {
+      file: { path: string; offset: number; total_size: number; data: Uint8Array };
+      overwrite: boolean;
+      append: boolean;
+      ui_percentage: number;
+    };
+
+    const createCommands = (deviceType = EDeviceType.Pro2) => {
+      const requests: Request[] = [];
+      const device = {
+        isProtocolV2: () => true,
+        getCurrentDeviceType: () => deviceType,
+        state: { status: { mode: 'normal' }, versions: { firmware: '1.0.3', bootloader: '1.0.0' } },
+      };
+      const typedCall = jest.fn(
+        async (
+          _name: string,
+          _response: string,
+          first: Request,
+          options?: TransportCallOptions
+        ) => {
+          let request: Request | undefined = first;
+          let response: MessageFromOneKey = { type: 'FilesystemFile', message: {} };
+          while (request) {
+            requests.push(request);
+            response = {
+              type: 'FilesystemFile',
+              message: {
+                ...request.file,
+                processed_byte: request.file.offset + request.file.data.byteLength,
+              },
+            };
+            options?.fileWritePipeline?.onResponse(response);
+            request = (await options?.fileWritePipeline?.next()) as Request | undefined;
+          }
+          return response;
+        }
+      );
+      const commands = { device, typedCall } as unknown as DeviceCommands;
+      return { commands, device, typedCall, requests };
+    };
+
+    beforeEach(() => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
+      jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    test.each(
+      [EDeviceType.Pro2, EDeviceType.Neo].flatMap(deviceType =>
+        ['react-native', 'desktop-web-ble'].flatMap(env =>
+          [
+            'vol1:/wallpapers/wallpaper.okpkg',
+            'vol1:/nft/nft-deadbeef-1760000000000.okpkg',
+            'vol1:/portfolio/portfolio.okpkg.pending',
+          ].map(path => ({ deviceType, env, path }))
+        )
+      )
+    )(
+      'pipelines $deviceType $path on $env using application version',
+      async ({ deviceType, env, path }) => {
+        jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+        const { commands, typedCall, requests } = createCommands(deviceType);
+        const onProgress = jest.fn();
+
+        await expect(
+          writeProtocolV2File({
+            commands,
+            path,
+            data: new Uint8Array(3601),
+            overwrite: true,
+            bleChunkSizeLimit: 1960,
+            chunkSizeLimit: 4000,
+            onProgress,
+          })
+        ).resolves.toMatchObject({ processed_byte: 3601, chunks: 3 });
+
+        expect(typedCall).toHaveBeenCalledTimes(1);
+        expect(typedCall.mock.calls[0][3]).toMatchObject({
+          writeWithResponse: false,
+          fileWritePipeline: { next: expect.any(Function), onResponse: expect.any(Function) },
+        });
+        expect(requests.map(request => request.file.offset)).toEqual([0, 1800, 3600]);
+        expect(requests.map(request => request.file.data.byteLength)).toEqual([1800, 1800, 1]);
+        expect(requests.map(request => request.overwrite)).toEqual([true, false, false]);
+        expect(onProgress.mock.calls.map(([progress]) => progress.transferredBytes)).toEqual([
+          1800, 3600, 3601,
+        ]);
+      }
+    );
+
+    test('does not replay a failed pipeline on the invalidated link', async () => {
+      const { commands, typedCall } = createCommands();
+      const timeout = new Error('BLE response timeout');
+      typedCall.mockRejectedValueOnce(timeout);
+
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(3601),
+          maxChunkRetries: 3,
+        })
+      ).rejects.toBe(timeout);
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+
+    const serialCases: {
+      name: string;
+      firmware?: string;
+      protocol?: boolean;
+      mode?: string;
+      deviceType?: EDeviceType;
+      env?: string;
+      options?: Partial<ProtocolV2FileWriteOptions>;
+    }[] = [
+      { name: 'old application with a new bootloader', firmware: '1.0.2' },
+      { name: 'unknown application', firmware: '' },
+      { name: 'invalid application version', firmware: 'unknown' },
+      { name: 'application prerelease', firmware: '1.0.3-rc.1' },
+      { name: 'Protocol V1', protocol: false },
+      { name: 'bootloader runtime', mode: 'bootloader' },
+      { name: 'another model', deviceType: EDeviceType.Pro },
+      { name: 'WebUSB', env: 'web' },
+      { name: 'LowLevel transport', env: 'lowlevel' },
+      { name: 'a generic file', options: { path: 'vol1:/other.bin' } },
+      { name: 'a partial file', options: { totalSize: 7200 } },
+      { name: 'non-overwriting writes', options: { overwrite: false } },
+      { name: 'append', options: { append: true } },
+      { name: 'offset writes', options: { offset: 1 } },
+      { name: 'explicit pacing', options: { paceMs: 1 } },
+      { name: 'acknowledged characteristic writes', options: { writeWithResponse: true } },
+    ];
+
+    test.each(serialCases)('keeps $name serial', async testCase => {
+      const { commands, device, typedCall } = createCommands(testCase.deviceType);
+      device.isProtocolV2 = () => testCase.protocol ?? true;
+      device.state.versions.firmware = testCase.firmware ?? '1.0.3';
+      device.state.versions.bootloader = '9.0.0';
+      device.state.status.mode = testCase.mode ?? 'normal';
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(testCase.env ?? 'react-native');
+
+      await writeProtocolV2File({
+        commands,
+        overwrite: true,
+        path: 'vol1:/wallpapers/wallpaper.okpkg',
+        data: new Uint8Array(3601),
+        ...testCase.options,
+      });
+
+      expect(typedCall.mock.calls.every(call => !call[3]?.fileWritePipeline)).toBe(true);
+    });
+
+    test('drains an in-flight response on cancellation before rejecting', async () => {
+      const { commands, typedCall } = createCommands();
+      const aborted = new Error('upload cancelled');
+      let cancelled = false;
+      const drained = jest.fn();
+      const onProgress = jest.fn();
+      typedCall.mockImplementationOnce(async (_name, _response, first, options) => {
+        const pipeline = options?.fileWritePipeline;
+        if (!pipeline) throw new Error('Expected a file write pipeline');
+        const second = (await pipeline.next()) as Request;
+        cancelled = true;
+        expect(() =>
+          pipeline.onResponse({ type: 'FilesystemFile', message: { processed_byte: 1800 } })
+        ).not.toThrow();
+        await expect(pipeline.next()).resolves.toBeUndefined();
+        const response = { type: 'FilesystemFile', message: { processed_byte: 3600 } };
+        pipeline.onResponse(response);
+        drained(first, second);
+        return response;
+      });
+
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(5401),
+          throwIfAborted: () => {
+            if (cancelled) throw aborted;
+          },
+          onProgress,
+        })
+      ).rejects.toBe(aborted);
+      expect(drained).toHaveBeenCalledTimes(1);
+      expect(onProgress).not.toHaveBeenCalled();
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+
+    test('raises a progress callback error after stopping further chunks', async () => {
+      const { commands, typedCall, requests } = createCommands();
+      const callbackError = new Error('progress callback failed');
+
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/portfolio/portfolio.okpkg.pending',
+          data: new Uint8Array(3601),
+          onProgress: () => {
+            throw callbackError;
+          },
+        })
+      ).rejects.toBe(callbackError);
+      expect(requests).toHaveLength(1);
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+
+    test('rejects a pipeline that returns without confirming every chunk', async () => {
+      const { commands, typedCall } = createCommands();
+      typedCall.mockResolvedValueOnce({
+        type: 'FilesystemFile',
+        message: { processed_byte: 3601 },
+      });
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(3601),
+        })
+      ).rejects.toThrow('before the complete file was confirmed');
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+  });
+
   test('allows a verified caller-specific BLE chunk limit', async () => {
     const getSettingsSpy = jest
       .spyOn(DataManager, 'getSettings')
