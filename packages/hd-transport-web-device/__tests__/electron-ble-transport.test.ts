@@ -286,6 +286,24 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
   });
 
+  test.each([false, true])(
+    'forwards the existing keepSession=%s release intent to native',
+    async keepSession => {
+      const device = { id: 'release-intent-pro2-id', name: 'OneKey Pro 2' };
+      const release = jest.fn().mockResolvedValue(undefined);
+      const nobleBle = { ...createNobleBle(device), release };
+      echoProtocolV2(nobleBle, device.id);
+      const bleTransport = configureTransport(nobleBle);
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+
+      await bleTransport.release(device.id, false, keepSession);
+
+      expect(release).toHaveBeenCalledWith(device.id, keepSession);
+      expect(nobleBle.disconnect).not.toHaveBeenCalled();
+      expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+    }
+  );
+
   test('forceNative disconnects a device the renderer no longer tracks', async () => {
     const device = { id: 'presumed-dead-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
