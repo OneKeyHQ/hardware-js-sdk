@@ -1,5 +1,4 @@
 import { normalizePath } from './pathUtils';
-import { getKeystoneFirmwareProfile } from './firmwareCapabilities';
 
 import type { KeystoneParsedAccount } from '../urEngine/types';
 import type { ChainCapability, DeviceCapabilities, DeviceInfo } from '@onekeyfe/hwk-adapter-core';
@@ -62,9 +61,6 @@ export function toDeviceInfoForConnection(
 ): DeviceInfo {
   const firmwareVersion =
     connectionType === 'usb' ? record.usbFirmwareVersion : record.deviceVersion;
-  // A QR scan can come from another physical device with the same wallet.
-  const firmware =
-    connectionType === 'usb' ? getKeystoneFirmwareProfile(firmwareVersion) : undefined;
   // `connectionType` is the channel a call would use now; `raw.availableChannels`
   // lists both for a merged QR + USB wallet.
   let availableChannels: Array<'qr' | 'usb'> = ['qr'];
@@ -81,7 +77,6 @@ export function toDeviceInfoForConnection(
     connectionType,
     capabilities: {
       ...CAPABILITIES,
-      ...(firmware ? { supportedChains: [...firmware.supportedChains] } : {}),
     },
     raw: {
       availableChannels,

@@ -39,7 +39,6 @@ import {
 } from '@onekeyfe/hwk-adapter-core';
 
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
-import { getKeystoneFirmwareProfile } from './firmwareCapabilities';
 import { TronSignType } from '../urEngine/TronSignRequest';
 import {
   KEYSTONE_COLD_START_PATH,
@@ -50,6 +49,7 @@ import {
   toDeviceInfoForConnection,
   walletConnectId,
 } from './deviceTable';
+import { getKeystoneFirmwareProfile } from './firmwareCapabilities';
 import {
   KEYSTONE_BTC_ACCOUNT_FORBIDDEN_MESSAGE,
   btcScriptTypeFromPath,
@@ -1201,7 +1201,6 @@ export class KeystoneAdapter implements IHardwareWallet {
         true,
         connectId,
         signal,
-        'btc',
         'btcSignPsbt'
       );
       KeystoneAdapter._throwIfAborted(signal);
@@ -1679,7 +1678,6 @@ export class KeystoneAdapter implements IHardwareWallet {
         true,
         connectId,
         signal,
-        args.chain,
         args.operationName
       );
       KeystoneAdapter._throwIfAborted(signal);
@@ -2181,7 +2179,6 @@ export class KeystoneAdapter implements IHardwareWallet {
     animated: boolean,
     operationId: string | undefined,
     signal: AbortSignal,
-    chain: ChainCapability,
     operationName?: string,
     qrFallback?: QrFallbackChoice
   ): Promise<QrAccountResponse> {
@@ -2195,7 +2192,6 @@ export class KeystoneAdapter implements IHardwareWallet {
         animated,
         operationId,
         signal,
-        chain,
         operationName,
         qrFallback
       );
@@ -2210,7 +2206,6 @@ export class KeystoneAdapter implements IHardwareWallet {
     animated: boolean,
     operationId: string | undefined,
     signal: AbortSignal,
-    chain: ChainCapability,
     operationName?: string,
     qrFallback?: QrFallbackChoice
   ): Promise<QrAccountResponse> {
@@ -2259,7 +2254,6 @@ export class KeystoneAdapter implements IHardwareWallet {
           message: 'USB channel is not connected for this Keystone wallet',
         });
       }
-      this._assertChainSupported(record.usbFirmwareVersion, chain);
       const result = await this._callUsbResolveUr(
         this._usbConnector,
         record.usbSessionId,
@@ -2421,7 +2415,7 @@ export class KeystoneAdapter implements IHardwareWallet {
           message: `Keystone did not return the requested derivation path (${syncPath})`,
         });
       }
-      this._assertChainSupported(bundle.firmwareVersion, hwkChain);
+      this._assertQrChainSupported(bundle.firmwareVersion, hwkChain);
       return { record: target.record, account: scanned };
     }
     if (bundle?.channel === 'usb' && target.record?.usbSessionId !== bundle.usbSessionId) {
@@ -2446,7 +2440,6 @@ export class KeystoneAdapter implements IHardwareWallet {
       false,
       connectId,
       signal,
-      hwkChain,
       undefined,
       bundle?.channel === 'usb' ? bundle.qrFallback : undefined
     );
@@ -2474,7 +2467,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
       record = existingRecord;
     } else {
-      this._assertChainSupported(parsed.deviceVersion, hwkChain);
+      this._assertQrChainSupported(parsed.deviceVersion, hwkChain);
       record = this._upsertDeviceRecord(parsed);
     }
     return { record, account: { ...account, hwkChain } };
@@ -2509,19 +2502,22 @@ export class KeystoneAdapter implements IHardwareWallet {
       schemas: [keySchema(chain, accountPath)],
       origin: this._origin,
     });
-    const responseUr = await this._resolveUr(undefined, requestUr, false, connectId, signal, chain);
+    const responseUr = await this._resolveUr(undefined, requestUr, false, connectId, signal);
     KeystoneAdapter._throwIfAborted(signal);
 
     const parsed = responseUr.accountExport
       ? this.urEngine.parseAccountExport(responseUr)
       : this.urEngine.parseAccountResponse(responseUr);
     requireExportedPath(parsed, normalizePath(accountPath), responseUr.accountExport);
-    this._assertChainSupported(parsed.deviceVersion, chain);
+    this._assertQrChainSupported(parsed.deviceVersion, chain);
     const record = this._upsertDeviceRecord(parsed);
     return { record };
   }
 
-  private _assertChainSupported(firmwareVersion: string | undefined, chain: ChainCapability): void {
+  private _assertQrChainSupported(
+    firmwareVersion: string | undefined,
+    chain: ChainCapability
+  ): void {
     const firmware = getKeystoneFirmwareProfile(firmwareVersion);
     if (firmware && !firmware.supportedChains.includes(chain)) {
       throw createHwkError({

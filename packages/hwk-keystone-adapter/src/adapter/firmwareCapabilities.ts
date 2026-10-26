@@ -21,7 +21,7 @@ const CYPHERPUNK: KeystoneFirmwareProfile = {
   supportedChains: ['btc'],
 };
 
-/** Uses firmware metadata, never the USB descriptor or a successful public-key export. */
+/** Classifies firmware metadata from the current QR response, not USB transport capabilities. */
 export function getKeystoneFirmwareProfile(
   firmwareVersion: string | undefined
 ): KeystoneFirmwareProfile | undefined {

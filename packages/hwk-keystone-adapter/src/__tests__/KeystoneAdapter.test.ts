@@ -2277,24 +2277,27 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
-    it('checks normal bundle items against the current QR response firmware', async () => {
-      const adapter = newTestAdapter();
-      const current = attachFakeDevice(adapter, { deviceVersion: '3.1.4-C' });
-      try {
-        expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
-          success: true,
-          payload: [
-            { success: true },
-            { success: true },
-            { success: false, payload: { code: HardwareErrorCode.ChainNotSupported } },
-          ],
-        });
-        expect(current.requests).toHaveLength(1);
-      } finally {
-        current.detach();
-        await adapter.dispose();
+    it.each(['3.1.4-C', '3.1.4-CYPHERPUNK-B', '3.1.4-BTC-ONLY'])(
+      'checks normal bundle items against the current QR response firmware (%s)',
+      async deviceVersion => {
+        const adapter = newTestAdapter();
+        const current = attachFakeDevice(adapter, { deviceVersion });
+        try {
+          expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+            success: true,
+            payload: [
+              { success: true },
+              { success: true },
+              { success: false, payload: { code: HardwareErrorCode.ChainNotSupported } },
+            ],
+          });
+          expect(current.requests).toHaveLength(1);
+        } finally {
+          current.detach();
+          await adapter.dispose();
+        }
       }
-    });
+    );
 
     it.each(['single', 'bundle'] as const)(
       'does not let a previous QR firmware block a new EVM %s request',
@@ -2441,104 +2444,10 @@ describe('KeystoneAdapter', () => {
     });
   });
 
-  describe('USB firmware chain support', () => {
-    it.each(['3.1.4-C', '3.1.4-CYPHERPUNK', '3.1.4-B', '3.1.4-BTC'])(
-      'keeps a successful %s USB connection usable for Bitcoin',
-      async firmwareVersion => {
-        const usb = fakeUsbConnector({ firmwareVersion });
-        const adapter = newTestAdapter(usb.connector);
-        const qrFake = attachFakeDevice(adapter);
-        const onConnected = jest.fn();
-        adapter.on('device-connect', onConnected);
-        const connected = await connectOperation(adapter);
-        try {
-          expect(onConnected).toHaveBeenCalledWith({
-            type: DEVICE.CONNECT,
-            payload: expect.objectContaining({
-              firmwareVersion,
-              capabilities: { persistentDeviceIdentity: true, supportedChains: ['btc'] },
-            }),
-          });
-          const info = await adapter.getDeviceInfo(connected, FIXTURE_MFP);
-          expect(info).toMatchObject({
-            success: true,
-            payload: { firmwareVersion, capabilities: { supportedChains: ['btc'] } },
-          });
-          const result = await adapter.btcGetPublicKey(connected, FIXTURE_MFP, {
-            path: "m/84'/0'/0'",
-          });
-          expect(result.success).toBe(true);
-          const signed = await adapter.btcSignPsbt(connected, FIXTURE_MFP, {
-            path: "m/84'/0'/0'",
-            psbt: UNSIGNED_PSBT_HEX,
-          });
-          expect(signed).toMatchObject({
-            success: true,
-            payload: { signedPsbt: SIGNED_PSBT_HEX },
-          });
-          expect(usb.calls).toHaveLength(2);
-          expect(adapter.activeTransport).toBe('usb');
-          expect(qrFake.requests).toHaveLength(0);
-        } finally {
-          await adapter.dispose();
-        }
-      }
-    );
-
-    it('refuses unsupported addresses and signing before sending to Cypherpunk firmware', async () => {
-      const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
-      const adapter = newTestAdapter(usb.connector);
-      const connected = await connectOperation(adapter);
-      try {
-        const results = await Promise.all([
-          adapter.evmGetAddress(connected, FIXTURE_MFP, { path: EVM_PATH }),
-          adapter.solGetAddress(connected, FIXTURE_MFP, { path: "m/44'/501'/0'/0'" }),
-          adapter.tronGetAddress(connected, FIXTURE_MFP, { path: "m/44'/195'/0'/0/0" }),
-          adapter.evmSignTransaction(connected, FIXTURE_MFP, EVM_TX),
-        ]);
-        for (const result of results) {
-          expect(result).toMatchObject({
-            success: false,
-            payload: { code: HardwareErrorCode.ChainNotSupported },
-          });
-        }
-        expect(usb.calls).toHaveLength(0);
-      } finally {
-        await adapter.dispose();
-      }
-    });
-
-    it('keeps the supported Bitcoin item in a mixed Cypherpunk USB bundle', async () => {
-      const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
-      const adapter = newTestAdapter(usb.connector);
-      const connected = await connectOperation(adapter);
-      try {
-        const result = await adapter.allNetworkGetAddress(connected, FIXTURE_MFP, {
-          bundle: [
-            { methodName: 'btcGetPublicKey', network: 'btc', path: "m/84'/0'/0'" },
-            { methodName: 'evmGetAddress', network: 'evm', path: EVM_PATH },
-          ],
-        });
-        expect(result).toMatchObject({
-          success: true,
-          payload: [
-            { success: true, network: 'btc' },
-            {
-              success: false,
-              network: 'evm',
-              payload: { code: HardwareErrorCode.ChainNotSupported },
-            },
-          ],
-        });
-        expect(usb.calls).toHaveLength(1);
-      } finally {
-        await adapter.dispose();
-      }
-    });
-
+  describe('USB and QR firmware metadata', () => {
     it.each([
-      { usbVersion: '3.1.4-C', qrVersion: '3.1.4', usbEvm: false, qrEvm: true },
-      { usbVersion: '3.1.4', qrVersion: '3.1.4-C', usbEvm: true, qrEvm: false },
+      { usbVersion: '3.1.4', qrVersion: '3.2.0' },
+      { usbVersion: '3.2.0', qrVersion: '3.1.4' },
     ])('keeps USB $usbVersion and QR $qrVersion metadata separate', async options => {
       const usb = fakeUsbConnector({ firmwareVersion: options.usbVersion });
       const adapter = newTestAdapter(usb.connector);
@@ -2553,8 +2462,8 @@ describe('KeystoneAdapter', () => {
         const usbResult = await adapter.evmGetAddress(usbOperation, FIXTURE_MFP, {
           path: EVM_PATH,
         });
-        expect(usbResult.success).toBe(options.usbEvm);
-        expect(usb.calls).toHaveLength(options.usbEvm ? 1 : 0);
+        expect(usbResult.success).toBe(true);
+        expect(usb.calls).toHaveLength(1);
 
         const qrOperation = await connectOperation(adapter, connectQrDevice);
         expect(await adapter.getDeviceInfo(qrOperation, FIXTURE_MFP)).toMatchObject({
@@ -2562,53 +2471,13 @@ describe('KeystoneAdapter', () => {
           payload: { connectionType: 'qr', firmwareVersion: options.qrVersion },
         });
         const qrResult = await adapter.evmGetAddress(qrOperation, FIXTURE_MFP, { path: EVM_PATH });
-        expect(qrResult.success).toBe(options.qrEvm);
-        expect(usb.calls).toHaveLength(options.usbEvm ? 1 : 0);
+        expect(qrResult.success).toBe(true);
+        expect(usb.calls).toHaveLength(1);
         usb.emitDisconnect();
         expect(await adapter.getDeviceInfo(FIXTURE_WALLET, FIXTURE_MFP)).toMatchObject({
           success: true,
           payload: { connectionType: 'qr', firmwareVersion: options.qrVersion },
         });
-      } finally {
-        await adapter.dispose();
-      }
-    });
-
-    it.each(['3.1.4-CYPHERPUNK-B', '3.1.4-BTC-ONLY'])(
-      'checks the firmware from a parsed QR response with version %s',
-      async deviceVersion => {
-        const adapter = newTestAdapter();
-        attachFakeDevice(adapter, { deviceVersion });
-        try {
-          const wallet = await importQrWallet(adapter);
-          expect(wallet.firmwareVersion).toBe(deviceVersion);
-          const result = await adapter.evmGetAddress(wallet.connectId, wallet.deviceId, {
-            path: EVM_PATH,
-          });
-          expect(result).toMatchObject({
-            success: false,
-            payload: { code: HardwareErrorCode.ChainNotSupported },
-          });
-        } finally {
-          await adapter.dispose();
-        }
-      }
-    );
-
-    it('checks the USB firmware after reattaching a QR-known wallet', async () => {
-      const usb = fakeUsbConnector({ firmwareVersion: '3.1.4-C' });
-      const adapter = newTestAdapter(usb.connector);
-      attachFakeDevice(adapter, { deviceVersion: '3.1.4' });
-      try {
-        await importQrWallet(adapter);
-        expect(
-          await adapter.evmGetAddress(FIXTURE_WALLET, FIXTURE_MFP, { path: EVM_PATH })
-        ).toMatchObject({
-          success: false,
-          payload: { code: HardwareErrorCode.ChainNotSupported },
-        });
-        expect(usb.connectArgs).toHaveLength(1);
-        expect(usb.calls).toHaveLength(0);
       } finally {
         await adapter.dispose();
       }

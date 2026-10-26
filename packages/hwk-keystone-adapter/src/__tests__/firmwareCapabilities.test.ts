@@ -9,7 +9,7 @@ describe('Keystone firmware capabilities', () => {
   });
 
   it.each(['3.1.4-B', '3.1.4-BTC', '3.1.4-BTC-ONLY'])(
-    'recognizes Bitcoin-only %s without forbidding its USB transport',
+    'recognizes Bitcoin-only QR firmware %s',
     version => {
       expect(getKeystoneFirmwareProfile(version)).toEqual({
         variant: 'bitcoin-only',
