@@ -6,7 +6,7 @@ import { invalidParameter, validateParams, validateResult } from '../helpers/par
 import { UI_REQUEST } from '../../constants/ui-request';
 
 import type { ZcashGetAddress as HardwareZcashGetAddress } from '@onekeyfe/hd-transport';
-import type { ZcashGetAddressParams, ZcashAddress } from '../../types/api/zcashGetAddress';
+import type { ZcashAddress, ZcashGetAddressParams } from '../../types/api/zcashGetAddress';
 import type { DeviceFirmwareRange } from '../../types';
 
 export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[]> {
