@@ -115,6 +115,7 @@ import type {
   IHardwareWallet,
   NullableCallArg,
   QrDisplayData,
+  QrFallbackReason,
   Response,
   SearchDevicesOptions,
   SolAddress,
@@ -176,6 +177,15 @@ type ResolvedUrResponse = QrAccountResponse & { channel: 'usb' | 'qr' };
 
 /** The answer to "show it as a QR?" for a request USB cannot carry; a bundle asks only once. */
 type QrFallbackChoice = { confirmed?: boolean };
+
+type QrFallbackAnswer = 'qr' | 'retry' | 'cancel';
+
+/** Why a connected Keystone cannot serve the wallet; any other attach failure is 'usb-unavailable'. */
+const USB_ATTACH_FAILURE_REASONS: Partial<Record<number, QrFallbackReason>> = {
+  [HardwareErrorCode.DeviceMismatch]: 'wallet-mismatch',
+  [HardwareErrorCode.DeviceNotInitialized]: 'wallet-mismatch',
+  [HardwareErrorCode.DeviceLocked]: 'device-locked',
+};
 
 type OperationRoute = { operationId: string; connectionType: 'usb' | 'qr' };
 
@@ -2104,7 +2114,7 @@ export class KeystoneAdapter implements IHardwareWallet {
 
   /**
    * Probes already-authorized USB devices without a permission picker, then attaches and verifies
-   * the requested wallet if present.
+   * the requested wallet if present. Undefined means use QR: no device, or the user chose QR.
    */
   private async _tryUsbAttach(
     signal: AbortSignal,
@@ -2163,19 +2173,34 @@ export class KeystoneAdapter implements IHardwareWallet {
       signal
     );
     KeystoneAdapter._throwIfAborted(signal);
+    if (attached.success) return this._devices.get(expectedMasterFingerprint);
+    const { code } = attached.payload;
     // A cancelled transfer still draining is busy, not absent; don't fall back to QR. Two devices
     // claiming this wallet are not a missing device either: the user must see it and unplug one.
     if (
-      !attached.success &&
-      (attached.payload.code === HardwareErrorCode.DeviceBusyInternal ||
-        attached.payload.code === HardwareErrorCode.DeviceOneDeviceOnly)
+      code === HardwareErrorCode.DeviceBusyInternal ||
+      code === HardwareErrorCode.DeviceOneDeviceOnly
     ) {
       throw createHwkError({
         ...attached.payload,
         message: attached.payload.error,
       });
     }
-    return attached.success ? this._devices.get(expectedMasterFingerprint) : undefined;
+    // Gone since the probe is the same as never plugged in; a pinned transport keeps its own rule.
+    if (code === HardwareErrorCode.DeviceNotFound || this._forcedTransport) return undefined;
+    // A Keystone is plugged in but cannot serve this wallet: switching to QR is the user's call.
+    const answer = await this._askQrFallback(
+      signal,
+      USB_ATTACH_FAILURE_REASONS[code] ?? 'usb-unavailable'
+    );
+    if (answer === 'retry') return this._tryUsbAttach(signal, expectedMasterFingerprint);
+    if (answer === 'cancel') {
+      throw createHwkError({
+        code: HardwareErrorCode.UserAborted,
+        message: 'User declined to continue by QR while the connected Keystone was unusable',
+      });
+    }
+    return undefined;
   }
 
   /**
@@ -2582,29 +2607,38 @@ export class KeystoneAdapter implements IHardwareWallet {
     choice: QrFallbackChoice | undefined
   ): Promise<boolean> {
     if (choice?.confirmed !== undefined) return choice.confirmed;
+    const confirmed = (await this._askQrFallback(signal, 'payload-too-large')) === 'qr';
+    if (choice) choice.confirmed = confirmed;
+    return confirmed;
+  }
+
+  /** A timeout or an unanswered prompt reads as cancel; a cancelled call keeps its own error. */
+  private async _askQrFallback(
+    signal: AbortSignal,
+    reason: QrFallbackReason
+  ): Promise<QrFallbackAnswer> {
     const requestType = UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
     const requestId = this._uiRegistry.createRequestId();
     const operationId = this._activeOperationId();
     const release = operationId ? this._operations.retain(operationId) : undefined;
     try {
-      const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(requestType, {
-        requestId,
-        operationId,
-      });
+      const waitPromise = this._uiRegistry.wait<{ confirmed: boolean; retry?: boolean }>(
+        requestType,
+        { requestId, operationId }
+      );
       this.emitter.emit(requestType, {
         type: requestType,
-        payload: { vendor: 'keystone', requestId, operationId },
+        payload: { vendor: 'keystone', requestId, operationId, reason },
       });
-      let confirmed = false;
+      let answer: { confirmed: boolean; retry?: boolean } | undefined;
       try {
-        confirmed = Boolean(
-          (await this._awaitQrResponse(requestType, waitPromise, signal))?.confirmed
-        );
+        answer = await this._awaitQrResponse(requestType, waitPromise, signal);
       } catch (error) {
         if (signal.aborted) throw error;
       }
-      if (choice) choice.confirmed = confirmed;
-      return confirmed;
+      // An oversized request is the same size on a retry.
+      if (answer?.retry && reason !== 'payload-too-large') return 'retry';
+      return answer?.confirmed ? 'qr' : 'cancel';
     } finally {
       release?.();
     }

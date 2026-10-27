@@ -15,6 +15,7 @@ import type { ITronMethods } from './chain-tron';
 import type { QrDisplayData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
 import type {
+  QrFallbackReason,
   UI_REQUEST,
   UiRequestOperationAttribution,
   UiResponseEvent,
@@ -337,7 +338,11 @@ export type UiRequestEvent =
     }
   | {
       type: typeof UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
-      payload: { vendor: string; requestId: string } & UiRequestOperationAttribution;
+      payload: {
+        vendor: string;
+        requestId: string;
+        reason: QrFallbackReason;
+      } & UiRequestOperationAttribution;
     }
   | {
       type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
@@ -477,7 +482,11 @@ export interface HardwareEventMap {
   };
   [UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM]: {
     type: typeof UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM;
-    payload: { vendor: string; requestId: string } & UiRequestOperationAttribution;
+    payload: {
+      vendor: string;
+      requestId: string;
+      reason: QrFallbackReason;
+    } & UiRequestOperationAttribution;
   };
   [UI_REQUEST.REQUEST_TREZOR_THP_PAIRING]: {
     type: typeof UI_REQUEST.REQUEST_TREZOR_THP_PAIRING;
