@@ -3,9 +3,10 @@ import { bytesToHex } from '@noble/hashes/utils';
 
 import { BaseMethod } from '../BaseMethod';
 import { hexToBytes, stripHexPrefix } from '../helpers/hexUtils';
+import { validatePath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { getMoneroVersionRange, validateMoneroNetworkType, validateMoneroPath } from './helpers';
+import { getMoneroVersionRange, validateMoneroNetworkType } from './helpers';
 
 import type { MoneroTransferDetails } from '@onekeyfe/hd-transport';
 import type {
@@ -112,7 +113,7 @@ export default class MoneroKeyImageSync extends BaseMethod<KeyImageSyncParams> {
     }
 
     this.params = {
-      address_n: validateMoneroPath(payload.path),
+      address_n: validatePath(payload.path, 3),
       network_type: validateMoneroNetworkType(payload.networkType),
       tdis: payload.transfers.map(parseTransfer),
     };

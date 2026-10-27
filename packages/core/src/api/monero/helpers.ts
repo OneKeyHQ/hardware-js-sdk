@@ -1,24 +1,9 @@
 import { hexToBytes } from '../helpers/hexUtils';
 import { invalidParameter } from '../helpers/paramsValidator';
-import { toHardened, validatePath } from '../helpers/pathUtils';
 
 import type { DeviceFirmwareRange } from '../../types';
 
 const NETWORK_TYPES = [0, 1, 2];
-
-// SEP-5 account path, m/44'/128'/account', as the firmware's keychain requires.
-export function validateMoneroPath(path: string | number[]) {
-  const addressN = validatePath(path, 3);
-  if (
-    addressN.length !== 3 ||
-    addressN[0] !== toHardened(44) ||
-    addressN[1] !== toHardened(128) ||
-    addressN[2] < toHardened(0)
-  ) {
-    throw invalidParameter("Monero requires an account path m/44'/128'/account'");
-  }
-  return addressN;
-}
 
 export function validateMoneroNetworkType(networkType: number | undefined) {
   const value = networkType ?? 0;

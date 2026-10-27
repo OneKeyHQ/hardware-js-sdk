@@ -239,13 +239,6 @@ describe('MoneroKeyImageSync', () => {
     expect(() => createMethod({ path: "m/44'/128'/0'", ...params }).init()).toThrow(message);
   });
 
-  test.each([["m/44'/128'/0'/0/0"], ["m/44'/133'/0'"], ["m/44'/128'/0"]])(
-    'rejects the non-account path %s',
-    path => {
-      expect(() => createMethod({ path, transfers: [transferAt(0)] }).init()).toThrow();
-    }
-  );
-
   test('fails when a step returns fewer key images than transfers', async () => {
     const method = createMethod({ path: "m/44'/128'/0'", transfers: VECTOR_TRANSFERS });
     method.init();

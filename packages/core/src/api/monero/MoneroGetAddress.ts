@@ -1,13 +1,8 @@
 import { BaseMethod } from '../BaseMethod';
-import { serializedPath } from '../helpers/pathUtils';
+import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
-import {
-  decodeMoneroAddress,
-  getMoneroVersionRange,
-  validateMoneroNetworkType,
-  validateMoneroPath,
-} from './helpers';
+import { decodeMoneroAddress, getMoneroVersionRange, validateMoneroNetworkType } from './helpers';
 
 import type { MoneroGetAddress as HardwareMoneroGetAddress } from '@onekeyfe/hd-transport';
 import type { MoneroAddress, MoneroGetAddressParams } from '../../types/api/moneroGetAddress';
@@ -38,7 +33,7 @@ export default class MoneroGetAddress extends BaseMethod<HardwareMoneroGetAddres
       ]);
 
       this.params.push({
-        address_n: validateMoneroPath(batch.path),
+        address_n: validatePath(batch.path, 3),
         network_type: validateMoneroNetworkType(batch.networkType),
         show_display: batch.showOnOneKey ?? true,
       });

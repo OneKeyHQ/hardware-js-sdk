@@ -66,12 +66,11 @@ describe('MoneroGetAddress', () => {
     expect(typedCall.mock.calls[1][2]).toMatchObject({ show_display: false });
   });
 
-  test.each([["m/44'/128'/0'/0/0"], ["m/44'/133'/0'"], ["m/44'/128'/0"]])(
-    'rejects the non-account path %s',
-    path => {
-      expect(() => createAddressMethod({ path }).init()).toThrow();
-    }
-  );
+  test('leaves which paths are allowed to the device', () => {
+    const method = createAddressMethod({ path: "m/44'/128'/0'/0/0" });
+    method.init();
+    expect(method.params[0].address_n).toEqual([...ACCOUNT_0, 0, 0]);
+  });
 
   test('rejects an unknown network type', () => {
     expect(() => createAddressMethod({ path: "m/44'/128'/0'", networkType: 3 }).init()).toThrow();
