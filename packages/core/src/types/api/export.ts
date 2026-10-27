@@ -238,3 +238,7 @@ export type {
   MoneroKeyImageSyncResult,
   MoneroKeyImageTransfer,
 } from './moneroKeyImageSync';
+export type {
+  MoneroSignTransactionParams,
+  MoneroSignTransactionResult,
+} from './moneroSignTransaction';

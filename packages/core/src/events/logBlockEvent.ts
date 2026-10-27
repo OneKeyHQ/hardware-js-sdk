@@ -22,6 +22,7 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'moneroGetAddress',
   'moneroGetWatchKey',
   'moneroKeyImageSync',
+  'moneroSignTransaction',
 ]);
 
 export function getLogBlockLabel(message: unknown): string | undefined {

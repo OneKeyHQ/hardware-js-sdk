@@ -181,3 +181,4 @@ export { default as zcashSignPczt } from './zcash/ZcashSignPczt';
 export { default as moneroGetAddress } from './monero/MoneroGetAddress';
 export { default as moneroGetWatchKey } from './monero/MoneroGetWatchKey';
 export { default as moneroKeyImageSync } from './monero/MoneroKeyImageSync';
+export { default as moneroSignTransaction } from './monero/MoneroSignTransaction';

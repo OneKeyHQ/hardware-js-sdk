@@ -159,6 +159,7 @@ import type { zcashSignPczt } from './zcashSignPczt';
 import type { moneroGetAddress } from './moneroGetAddress';
 import type { moneroGetWatchKey } from './moneroGetWatchKey';
 import type { moneroKeyImageSync } from './moneroKeyImageSync';
+import type { moneroSignTransaction } from './moneroSignTransaction';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -490,4 +491,5 @@ export type CoreApi = {
   moneroGetAddress: typeof moneroGetAddress;
   moneroGetWatchKey: typeof moneroGetWatchKey;
   moneroKeyImageSync: typeof moneroKeyImageSync;
+  moneroSignTransaction: typeof moneroSignTransaction;
 };

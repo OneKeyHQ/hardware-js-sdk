@@ -197,6 +197,42 @@ describe('getLogBlockLabel', () => {
     expect(JSON.stringify(cached)).not.toContain('synthetic-');
   });
 
+  // The request reveals the real ring member, masks and amounts; the result
+  // carries the key that opens the signatures.
+  it('keeps moneroSignTransaction inputs and the opening key out of logger caches', () => {
+    const method = 'moneroSignTransaction';
+    const prefix = 'sensitive-monero-sign-transaction';
+    const logger = initLog(prefix, false);
+    setLoggerPostMessage(jest.fn());
+    const payload = {
+      method,
+      path: "m/44'/128'/0'",
+      tsxData: { fee: 'synthetic-fee-marker', outputs: [{ amount: 'synthetic-amount-marker' }] },
+      inputs: [{ real_output: 'synthetic-real-index-marker', mask: 'synthetic-mask-marker' }],
+    };
+    const response = {
+      success: true,
+      payload: {
+        signatures: ['synthetic-sealed-signature-marker'],
+        openingKey: 'synthetic-opening-key-marker',
+      },
+    };
+    const blockLabel = getLogBlockLabel({ event: 'iframe-call', payload });
+
+    expect(blockLabel).toBe(method);
+    logger.debug('request:', getSafeLogPayload(payload, blockLabel));
+    logger.debug('response:', getSafeLogPayload(response, blockLabel));
+    logger.debug('Cancel Api connect task: ', getSafeLogTask({ id: 9, method: { payload } }));
+
+    const cached = getLog().filter(entry => entry.prefix === prefix);
+    expect(cached.map(entry => entry.message[1])).toEqual([
+      { method, payload: '[REDACTED]' },
+      { method, payload: '[REDACTED]' },
+      { id: 9, method, payload: '[REDACTED]' },
+    ]);
+    expect(JSON.stringify(cached)).not.toContain('synthetic-');
+  });
+
   // Cancel logs the queued task, which holds the method's raw payload.
   it('redacts a queued Zcash task the same way, keeping its id', () => {
     const postMessage = jest.fn();

@@ -157,6 +157,29 @@ describe('transport log sanitization', () => {
   });
 
   test.each([
+    'MoneroTransactionInitRequest',
+    'MoneroTransactionInitAck',
+    'MoneroTransactionSetInputRequest',
+    'MoneroTransactionSetInputAck',
+    'MoneroTransactionInputViniRequest',
+    'MoneroTransactionInputViniAck',
+    'MoneroTransactionAllInputsSetRequest',
+    'MoneroTransactionAllInputsSetAck',
+    'MoneroTransactionSetOutputRequest',
+    'MoneroTransactionSetOutputAck',
+    'MoneroTransactionAllOutSetRequest',
+    'MoneroTransactionAllOutSetAck',
+    'MoneroTransactionSignInputRequest',
+    'MoneroTransactionSignInputAck',
+    'MoneroTransactionFinalRequest',
+    'MoneroTransactionFinalAck',
+  ])('redacts the complete Monero signing message %s', name => {
+    const payload = { src_entr: { mask: 'synthetic-mask-marker' }, opening_key: 'synthetic-key' };
+    expect(createTransportCallLog(name, 'V1', payload).request).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(payload, name)).toBe('[REDACTED]');
+  });
+
+  test.each([
     'ZcashSignPczt',
     'ZcashPcztChunkRequest',
     'ZcashPcztChunkAck',
