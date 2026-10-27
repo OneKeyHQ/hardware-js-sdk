@@ -4606,6 +4606,38 @@ describe('KeystoneAdapter', () => {
         expect(requestedPathsOf(qrFake.requests[0])).toHaveLength(24);
       });
 
+      it.each([
+        [10, 11, false],
+        [10, 10, true],
+        [30, 25, false],
+        [0, 24, true],
+      ])(
+        'holds a host limit of %s below the firmware limit (%s paths, asks: %s)',
+        async (qrKeyRequestLimit, count, asks) => {
+          const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, qrKeyRequestLimit });
+          const qrFake = attachFakeDevice(adapter);
+
+          const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+            bundle: ledgerLiveEvm(count),
+          });
+
+          if (asks) {
+            expect(result.success).toBe(true);
+            expect(qrFake.requests).toHaveLength(1);
+          } else {
+            expect(result).toMatchObject({
+              success: false,
+              payload: {
+                code: HardwareErrorCode.QrRequestTooLarge,
+                params: { limit: Math.min(qrKeyRequestLimit || 24, 24), requested: count },
+              },
+            });
+            expect(qrFake.requests).toHaveLength(0);
+          }
+          await adapter.dispose();
+        }
+      );
+
       it('leaves the same bundle alone over USB, which asks per key', async () => {
         const usb = fakeUsbConnector();
         const adapter = newTestAdapter(usb.connector);

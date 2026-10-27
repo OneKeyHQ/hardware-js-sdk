@@ -413,6 +413,9 @@ export class KeystoneAdapter implements IHardwareWallet {
   /** Host answer timeout for QR display/scan requests; undefined uses the registry default. */
   private readonly _qrTimeoutMs: number | undefined;
 
+  /** At most this many account paths per QR key request; see the constructor option. */
+  private readonly _qrKeyRequestLimit: number;
+
   /** Host-supplied USB connector; undefined means QR-only. */
   private readonly _usbConnector: IConnector | undefined;
 
@@ -455,9 +458,23 @@ export class KeystoneAdapter implements IHardwareWallet {
     this.emitter.emit('ui-event', operationId ? { ...event, operationId } : event);
   };
 
-  constructor(options?: { origin?: string; qrTimeoutMs?: number; usbConnector?: IConnector }) {
+  /**
+   * `qrKeyRequestLimit` caps the account paths one QR key request may ask for, below the firmware's
+   * own limit: a host with no USB to fall back on can refuse a large request before the device does.
+   */
+  constructor(options?: {
+    origin?: string;
+    qrTimeoutMs?: number;
+    usbConnector?: IConnector;
+    qrKeyRequestLimit?: number;
+  }) {
     this._origin = options?.origin ?? 'OneKey';
     this._qrTimeoutMs = options?.qrTimeoutMs;
+    const limit = options?.qrKeyRequestLimit;
+    this._qrKeyRequestLimit =
+      limit !== undefined && Number.isInteger(limit) && limit > 0
+        ? Math.min(limit, KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS)
+        : KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS;
     this.urEngine = new KeystoneUrEngine(this._origin);
     this._jobQueue = new DeviceJobQueue();
     this._usbConnector = options?.usbConnector;
@@ -1823,11 +1840,11 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
 
       const schemas = Array.from(requestedByKey.values());
-      if (schemas.length > KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS) {
+      if (schemas.length > this._qrKeyRequestLimit) {
         throw createHwkError({
           code: HardwareErrorCode.QrRequestTooLarge,
-          message: `Keystone accepts at most ${KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS} account paths per QR request; this one needs ${schemas.length}`,
-          params: { limit: KEYSTONE_MAX_KEY_DERIVATION_SCHEMAS, requested: schemas.length },
+          message: `Keystone QR requests take at most ${this._qrKeyRequestLimit} account paths here; this one needs ${schemas.length}`,
+          params: { limit: this._qrKeyRequestLimit, requested: schemas.length },
         });
       }
       const request = {
