@@ -141,6 +141,28 @@ describe('getLogBlockLabel', () => {
     }
   );
 
+  it.each(['moneroGetAddress', 'moneroGetWatchKey'])(
+    'keeps %s addresses and view keys out of logger caches',
+    method => {
+      const prefix = `sensitive-monero-${method}`;
+      const logger = initLog(prefix, false);
+      setLoggerPostMessage(jest.fn());
+      const request = { event: 'iframe-call', payload: { method, path: "m/44'/128'/0'" } };
+      const response = {
+        success: true,
+        payload: { address: 'synthetic-address-marker', watchKey: 'synthetic-view-key-marker' },
+      };
+      const blockLabel = getLogBlockLabel(request);
+
+      expect(blockLabel).toBe(method);
+      logger.debug('response:', getSafeLogPayload(response, blockLabel));
+
+      const cached = getLog().filter(entry => entry.prefix === prefix);
+      expect(cached.map(entry => entry.message[1])).toEqual([{ method, payload: '[REDACTED]' }]);
+      expect(JSON.stringify(cached)).not.toContain('synthetic-');
+    }
+  );
+
   // Cancel logs the queued task, which holds the method's raw payload.
   it('redacts a queued Zcash task the same way, keeping its id', () => {
     const postMessage = jest.fn();

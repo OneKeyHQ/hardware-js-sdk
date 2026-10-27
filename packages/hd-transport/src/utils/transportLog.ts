@@ -32,6 +32,7 @@ const SENSITIVE_LOG_KEYS = new Set([
   'ufvk',
   'uuid',
   'walletsessionid',
+  'watchkey',
   'xprv',
   'xpub',
 ]);

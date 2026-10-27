@@ -156,6 +156,8 @@ import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
 import type { zcashGetAddress } from './zcashGetAddress';
 import type { zcashSignPczt } from './zcashSignPczt';
+import type { moneroGetAddress } from './moneroGetAddress';
+import type { moneroGetWatchKey } from './moneroGetWatchKey';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -480,4 +482,10 @@ export type CoreApi = {
    */
   zcashGetAddress: typeof zcashGetAddress;
   zcashSignPczt: typeof zcashSignPczt;
+
+  /**
+   * Monero
+   */
+  moneroGetAddress: typeof moneroGetAddress;
+  moneroGetWatchKey: typeof moneroGetWatchKey;
 };

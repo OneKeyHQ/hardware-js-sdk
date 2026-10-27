@@ -99,6 +99,23 @@ describe('transport log sanitization', () => {
     expect(payload.ufvk).toBe('synthetic-viewing-key-marker');
   });
 
+  test('redacts Monero view keys in protocol and API field names', () => {
+    expect(
+      getSafeTransportLogPayload(
+        {
+          address: 'synthetic-address-marker',
+          watch_key: 'synthetic-view-key-marker',
+          nested: { watchKey: 'synthetic-view-key-marker' },
+        },
+        'MoneroWatchKey'
+      )
+    ).toEqual({
+      address: '[REDACTED]',
+      watch_key: '[REDACTED]',
+      nested: { watchKey: '[REDACTED]' },
+    });
+  });
+
   test.each([
     'ZcashSignPczt',
     'ZcashPcztChunkRequest',
