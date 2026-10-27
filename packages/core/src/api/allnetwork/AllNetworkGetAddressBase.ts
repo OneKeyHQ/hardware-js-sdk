@@ -246,6 +246,33 @@ const networkConfigMap: NetworkConfigMap = {
   stellar: {
     methodName: 'stellarGetAddress',
   },
+  xmr: {
+    methodName: 'moneroGetAddress',
+    getParams: (baseParams: AllNetworkAddressParams, chainName?: string) => {
+      const { path, showOnOneKey } = baseParams;
+      return {
+        path,
+        networkType: chainName === 'testnet' ? 1 : 0,
+        showOnOneKey,
+      };
+    },
+  },
+  zcash: {
+    methodName: 'zcashGetAddress',
+    // The account's unified address with the keys a wallet needs to watch it.
+    getParams: (baseParams: AllNetworkAddressParams) => {
+      const { path, showOnOneKey } = baseParams;
+      return {
+        path,
+        showOnOneKey,
+        addressType: PROTO.ZcashAddressType.UNIFIED_ORCHARD,
+        scope: PROTO.ZcashAddressScope.EXTERNAL,
+        diversifierIndex: 0,
+        includeUfvk: true,
+        includeSeedFingerprint: true,
+      };
+    },
+  },
 };
 
 type MethodParams = {
