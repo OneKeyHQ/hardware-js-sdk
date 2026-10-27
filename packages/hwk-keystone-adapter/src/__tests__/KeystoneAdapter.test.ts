@@ -2128,6 +2128,52 @@ describe('KeystoneAdapter', () => {
       await adapter.dispose();
     });
 
+    it('lets a normal response omit only the chains its firmware cannot use', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exportedAccount([BTC_PATH, "m/86'/0'/0'"]), false);
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: true,
+        payload: [
+          { success: true },
+          { success: true },
+          { success: false, payload: { code: HardwareErrorCode.ChainNotSupported } },
+        ],
+      });
+      await adapter.dispose();
+    });
+
+    it('does not take a cold-start wallet from a normal response that answers no usable chain', async () => {
+      const adapter = newTestAdapter();
+      answerExport(adapter, exportedAccount([BTC_PATH]), false);
+      expect(
+        await adapter.allNetworkGetAddress('', '', {
+          bundle: [{ methodName: 'evmGetAddress' as const, network: 'evm', path: EVM_PATH }],
+        })
+      ).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.ChainNotSupported },
+      });
+      expect(await adapter.searchDevices()).toEqual([]);
+      await adapter.dispose();
+    });
+
+    it.each(['3.1.4', '3.1.4-X'])(
+      'still requires every path in a normal response from %s firmware',
+      async deviceVersion => {
+        const adapter = newTestAdapter();
+        answerExport(
+          adapter,
+          exportedAccount([BTC_PATH, "m/86'/0'/0'"], FIXTURE_MFP, deviceVersion),
+          false
+        );
+        expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DeviceMismatch },
+        });
+        await adapter.dispose();
+      }
+    );
+
     it('keeps Bitcoin signing on its normal QR request after an export import', async () => {
       const adapter = newTestAdapter();
       const ui = answerExport(adapter);

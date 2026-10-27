@@ -1812,17 +1812,25 @@ export class KeystoneAdapter implements IHardwareWallet {
         });
       }
       // Only requested paths are taken from the scan, each under the chain that asked for it.
-      // Normal responses must contain every path; explicit device exports may contain a subset.
-      for (const schema of schemas) {
+      // Chains the response's firmware cannot use are never taken or required. Normal responses
+      // must contain every other path; explicit device exports may contain a subset.
+      const usableSchemas = schemas.filter(
+        schema => !firmware || firmware.supportedChains.includes(schema.hwkChain)
+      );
+      // On a cold start only a matched path ties a normal response to this request.
+      const isColdStart = !target.expectedMasterFingerprint;
+      if (firmware && isColdStart && !responseUr.accountExport && !usableSchemas.length) {
+        throw createHwkError({
+          code: HardwareErrorCode.ChainNotSupported,
+          message: `Keystone ${firmware.variant} firmware cannot use any requested chain`,
+          params: { firmwareVariant: firmware.variant },
+        });
+      }
+      for (const schema of usableSchemas) {
         const exported = responseUr.accountExport
           ? parsed.accounts.find(account => normalizePath(account.path) === schema.path)
           : requireExportedPath(parsed, schema.path);
-        if (
-          exported &&
-          (!responseUr.accountExport ||
-            !firmware ||
-            firmware.supportedChains.includes(schema.hwkChain))
-        ) {
+        if (exported) {
           scanned.set(accountKey(schema.hwkChain, schema.path), {
             ...exported,
             hwkChain: schema.hwkChain,
@@ -2412,13 +2420,13 @@ export class KeystoneAdapter implements IHardwareWallet {
           params: { reason: 'account-not-exported' },
         });
       }
+      this._assertQrChainSupported(bundle.firmwareVersion, hwkChain);
       if (!target.record || !scanned) {
         throw createHwkError({
           code: HardwareErrorCode.DeviceMismatch,
           message: `Keystone did not return the requested derivation path (${syncPath})`,
         });
       }
-      this._assertQrChainSupported(bundle.firmwareVersion, hwkChain);
       return { record: target.record, account: scanned };
     }
     if (bundle?.channel === 'usb' && target.record?.usbSessionId !== bundle.usbSessionId) {
