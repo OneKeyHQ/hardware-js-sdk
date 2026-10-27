@@ -2499,7 +2499,8 @@ export class KeystoneAdapter implements IHardwareWallet {
     const parsed = responseUr.accountExport
       ? this.urEngine.parseAccountExport(responseUr)
       : this.urEngine.parseAccountResponse(responseUr);
-    requireExportedPath(parsed, normalizePath(accountPath), responseUr.accountExport);
+    // Only the mfp is needed here, so an export need not contain the requested account.
+    if (!responseUr.accountExport) requireExportedPath(parsed, normalizePath(accountPath));
     this._assertQrChainSupported(parsed.deviceVersion, chain);
     const record = this._upsertDeviceRecord(parsed);
     return { record };

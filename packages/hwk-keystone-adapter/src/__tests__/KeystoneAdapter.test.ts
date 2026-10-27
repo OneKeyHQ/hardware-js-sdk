@@ -2218,6 +2218,47 @@ describe('KeystoneAdapter', () => {
       }
     );
 
+    it.each([
+      ['3.1.4', true, { success: true }],
+      ['3.1.4-C', true, { success: false, payload: { code: HardwareErrorCode.ChainNotSupported } }],
+      ['3.1.4', false, { success: false, payload: { code: HardwareErrorCode.DeviceMismatch } }],
+    ])(
+      'cold-start EVM sign from a Bitcoin-only answer (%s, accountExport=%s)',
+      async (deviceVersion, accountExport, expected) => {
+        const adapter = newTestAdapter();
+        const urTypes: string[] = [];
+        adapter.on(
+          UI_REQUEST.REQUEST_QR_DISPLAY,
+          (event: { payload: { device: DeviceInfo; data: QrDisplayData } }) => {
+            const { data } = event.payload;
+            urTypes.push(data.urType);
+            const reply =
+              data.urType === 'qr-hardware-call'
+                ? exportedAccount([BTC_PATH], FIXTURE_MFP, deviceVersion)
+                : deviceReply(data, { mfpHex: FIXTURE_MFP });
+            if (!reply) throw new Error(`unhandled urType ${data.urType}`);
+            adapter.uiResponse({
+              type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+              payload: {
+                ...urJson(reply),
+                ...(data.urType === 'qr-hardware-call' && accountExport
+                  ? { accountExport: true }
+                  : {}),
+              },
+            });
+          }
+        );
+        try {
+          expect(await adapter.evmSignTransaction(null, null, EVM_TX)).toMatchObject(expected);
+          expect(urTypes).toEqual(
+            expected.success ? ['qr-hardware-call', 'eth-sign-request'] : ['qr-hardware-call']
+          );
+        } finally {
+          await adapter.dispose();
+        }
+      }
+    );
+
     it('refuses conflicting public keys for one exported path', async () => {
       const adapter = newTestAdapter();
       answerExport(
