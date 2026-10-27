@@ -513,4 +513,6 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'moneroGetAddress' }),
   moneroGetWatchKey: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'moneroGetWatchKey' }),
+  moneroKeyImageSync: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroKeyImageSync' }),
 });

@@ -232,3 +232,9 @@ export type { ZcashSignedPczt, ZcashSignPcztParams } from './zcashSignPczt';
 
 export type { MoneroAddress, MoneroGetAddressParams } from './moneroGetAddress';
 export type { MoneroGetWatchKeyParams, MoneroWatchKey } from './moneroGetWatchKey';
+export type {
+  MoneroEncryptedKeyImage,
+  MoneroKeyImageSyncParams,
+  MoneroKeyImageSyncResult,
+  MoneroKeyImageTransfer,
+} from './moneroKeyImageSync';

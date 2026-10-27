@@ -21,6 +21,7 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'zcashSignPczt',
   'moneroGetAddress',
   'moneroGetWatchKey',
+  'moneroKeyImageSync',
 ]);
 
 export function getLogBlockLabel(message: unknown): string | undefined {

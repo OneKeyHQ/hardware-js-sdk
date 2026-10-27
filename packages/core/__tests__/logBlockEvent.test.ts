@@ -163,6 +163,40 @@ describe('getLogBlockLabel', () => {
     }
   );
 
+  it('keeps moneroKeyImageSync transfers and key images out of logger caches', () => {
+    const method = 'moneroKeyImageSync';
+    const prefix = 'sensitive-monero-key-image-sync';
+    const logger = initLog(prefix, false);
+    setLoggerPostMessage(jest.fn());
+    const request = {
+      event: 'iframe-call',
+      payload: {
+        method,
+        path: "m/44'/128'/0'",
+        transfers: [{ outKey: 'synthetic-out-key-marker', txPubKey: 'synthetic-tx-key-marker' }],
+      },
+    };
+    const response = {
+      success: true,
+      payload: {
+        encKey: 'synthetic-enc-key-marker',
+        keyImages: [{ iv: 'synthetic-iv-marker', blob: 'synthetic-key-image-marker' }],
+      },
+    };
+    const blockLabel = getLogBlockLabel(request);
+
+    expect(blockLabel).toBe(method);
+    logger.debug('request:', getSafeLogPayload(request, blockLabel));
+    logger.debug('response:', getSafeLogPayload(response, blockLabel));
+
+    const cached = getLog().filter(entry => entry.prefix === prefix);
+    expect(cached.map(entry => entry.message[1])).toEqual([
+      { method, payload: '[REDACTED]' },
+      { method, payload: '[REDACTED]' },
+    ]);
+    expect(JSON.stringify(cached)).not.toContain('synthetic-');
+  });
+
   // Cancel logs the queued task, which holds the method's raw payload.
   it('redacts a queued Zcash task the same way, keeping its id', () => {
     const postMessage = jest.fn();

@@ -116,6 +116,46 @@ describe('transport log sanitization', () => {
     });
   });
 
+  test('redacts Monero key image sync outputs and the key image encryption key', () => {
+    const transfer = {
+      out_key: 'synthetic-out-key-marker',
+      tx_pub_key: 'synthetic-tx-key-marker',
+      additional_tx_pub_keys: ['synthetic-additional-key-marker'],
+      internal_output_index: 1,
+      sub_addr_major: 0,
+      sub_addr_minor: 2,
+    };
+    expect(
+      createTransportCallLog('MoneroKeyImageSyncStepRequest', 'V1', { tdis: [transfer] }).request
+    ).toEqual({
+      tdis: [
+        {
+          out_key: '[REDACTED]',
+          tx_pub_key: '[REDACTED]',
+          additional_tx_pub_keys: '[REDACTED]',
+          internal_output_index: 1,
+          sub_addr_major: 0,
+          sub_addr_minor: 2,
+        },
+      ],
+    });
+    expect(
+      getSafeTransportLogPayload(
+        { enc_key: 'synthetic-enc-key-marker' },
+        'MoneroKeyImageSyncFinalAck'
+      )
+    ).toEqual({ enc_key: '[REDACTED]' });
+    expect(
+      getSafeTransportLogPayload({
+        encKey: 'synthetic-enc-key-marker',
+        transfers: [{ outKey: 'synthetic-out-key-marker', txPubKey: 'synthetic-tx-key-marker' }],
+      })
+    ).toEqual({
+      encKey: '[REDACTED]',
+      transfers: [{ outKey: '[REDACTED]', txPubKey: '[REDACTED]' }],
+    });
+  });
+
   test.each([
     'ZcashSignPczt',
     'ZcashPcztChunkRequest',
