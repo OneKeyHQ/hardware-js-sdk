@@ -667,12 +667,16 @@ describe('Pro2 / Neo application asset pipelines', () => {
   test.each(
     [EDeviceType.Pro2, EDeviceType.Neo].flatMap(deviceType =>
       (['wallpaper', 'nft', 'portfolio'] as const).flatMap(asset =>
-        [false, true].map(fail => ({ deviceType, asset, fail }))
+        [
+          { fail: false, recover: false },
+          { fail: true, recover: false },
+          { fail: true, recover: true },
+        ].map(outcome => ({ deviceType, asset, ...outcome }))
       )
     )
   )(
-    '$deviceType $asset applies only a fully confirmed upload (fail=$fail)',
-    async ({ deviceType, asset, fail }) => {
+    '$deviceType $asset applies only a fully confirmed upload (fail=$fail, recover=$recover)',
+    async ({ deviceType, asset, fail, recover }) => {
       jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
       jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
       const failure = new Error('BLE response timeout');
@@ -690,7 +694,15 @@ describe('Pro2 / Neo application asset pipelines', () => {
         ) => {
           if (name !== 'FilesystemFileWrite') return { type: 'Success', message: {} };
           const pipeline = options?.fileWritePipeline;
-          if (!pipeline) throw new Error('Expected an asset pipeline');
+          if (!pipeline) {
+            if (fail && !recover) throw failure;
+            const { data } = first.file;
+            if (!(data instanceof Uint8Array)) throw new Error('Expected Uint8Array file data');
+            return {
+              type: 'FilesystemFile',
+              message: { ...first.file, processed_byte: first.file.offset + data.byteLength },
+            };
+          }
           let request: FilesystemFileWrite | undefined = first;
           let response: MessageFromOneKey = { type: 'FilesystemFile', message: {} };
           while (request) {
@@ -738,11 +750,18 @@ describe('Pro2 / Neo application asset pipelines', () => {
         });
       }
       const commands = { typedCall, device: undefined as Device | undefined };
+      const acquire = jest.fn().mockResolvedValue(undefined);
       method.device = stubDevice({
         commands,
         originalDescriptor: { protocolType: 'V2' },
         features: { deviceType, mode: 'normal' },
-        state: { status: { mode: 'normal' }, versions: { firmware: '1.0.3', bootloader: '1.0.0' } },
+        state: {
+          identity: { serialNo: 'test-asset-device', deviceType },
+          status: { mode: 'normal', initialized: false },
+          versions: { firmware: '1.0.3', bootloader: '1.0.0' },
+        },
+        acquire,
+        initialize: jest.fn().mockResolvedValue(undefined),
         ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue({
           version: 2,
           supported_messages: [60412, 60805, 60809, 61400, 61500],
@@ -753,22 +772,43 @@ describe('Pro2 / Neo application asset pipelines', () => {
       method.postMessage = jest.fn();
       method.init();
 
-      if (fail) {
+      if (fail && !recover) {
         await expect(method.run()).rejects.toBe(failure);
         expect(typedCall.mock.calls.some(call => call[0] === applyMessage)).toBe(false);
+        expect(method.postMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ type: UI_REQUEST.REQUEST_BUTTON })
+        );
       } else {
         await method.run();
         expect(typedCall.mock.calls[typedCall.mock.calls.length - 1][0]).toBe(applyMessage);
+        expect(typedCall.mock.calls.filter(call => call[0] === applyMessage)).toHaveLength(1);
         expect(method.postMessage).toHaveBeenCalledWith(
           expect.objectContaining({
             type: UI_REQUEST.DEVICE_PROGRESS,
             payload: expect.objectContaining({ progress: 100 }),
           })
         );
+        if (asset === 'wallpaper') {
+          expect(method.postMessage).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              type: UI_REQUEST.REQUEST_BUTTON,
+              payload: expect.objectContaining({
+                deviceOnly: true,
+                completion: 'operation-completed',
+                operation: 'deviceUploadWallpaper',
+              }),
+            })
+          );
+          const postMessageMock = method.postMessage as jest.Mock;
+          const promptOrder =
+            postMessageMock.mock.invocationCallOrder[postMessageMock.mock.calls.length - 1];
+          const applyOrder = typedCall.mock.invocationCallOrder[typedCall.mock.calls.length - 1];
+          expect(promptOrder).toBeLessThan(applyOrder);
+        }
       }
-      expect(typedCall.mock.calls.filter(call => call[0] === 'FilesystemFileWrite')).toHaveLength(
-        1
-      );
+      expect(typedCall.mock.calls.filter(call => call[3]?.fileWritePipeline)).toHaveLength(1);
+      const recoveryAttempts = recover ? 1 : 3;
+      expect(acquire).toHaveBeenCalledTimes(fail ? recoveryAttempts : 0);
     }
   );
 });

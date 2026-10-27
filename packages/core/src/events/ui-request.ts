@@ -211,6 +211,7 @@ export interface DeviceProgress {
     totalBytes?: number;
     rateBytesPerSecond?: number;
     elapsedMs?: number;
+    retryCount?: number;
   };
 }
 

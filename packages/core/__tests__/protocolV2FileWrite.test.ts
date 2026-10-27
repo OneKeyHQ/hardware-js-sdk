@@ -1,6 +1,8 @@
 import { EDeviceType, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 
 import {
+  createProtocolV2AssetFileWriteRecovery,
   type ProtocolV2FileWriteOptions,
   writeProtocolV2File,
 } from '../src/api/helpers/protocolV2FileWrite';
@@ -8,6 +10,7 @@ import { DataManager } from '../src/data-manager';
 import { LoggerNames, getLogger } from '../src/utils/logger';
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
+import type { BaseMethod } from '../src/api/BaseMethod';
 import type { MessageFromOneKey, TransportCallOptions } from '@onekeyfe/hd-transport';
 
 jest.mock('../src/data/config', () => ({
@@ -124,6 +127,171 @@ describe('writeProtocolV2File', () => {
         })
       ).rejects.toBe(timeout);
       expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+
+    test('reconnects and restarts serially from zero after a partially confirmed pipeline', async () => {
+      const { commands, typedCall } = createCommands();
+      const fresh = createCommands();
+      const timeout = Object.assign(new Error('BLE response timeout'), {
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      });
+      typedCall.mockImplementationOnce((_name, _response, first, options) => {
+        options?.fileWritePipeline?.onResponse({
+          type: 'FilesystemFile',
+          message: { ...first.file, processed_byte: 1800 },
+        });
+        return Promise.reject(timeout);
+      });
+      const recoverConnection = jest.fn().mockResolvedValue(fresh.commands);
+      const onProgress = jest.fn();
+
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(3601),
+          maxChunkRetries: 3,
+          recoverConnection,
+          onProgress,
+        })
+      ).resolves.toMatchObject({ processed_byte: 3601, chunks: 3 });
+
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(recoverConnection).toHaveBeenCalledTimes(1);
+      expect(fresh.requests.map(request => request.file.offset)).toEqual([0, 1800, 3600]);
+      expect(fresh.requests.map(request => request.overwrite)).toEqual([true, false, false]);
+      expect(fresh.typedCall.mock.calls.every(call => !call[3]?.fileWritePipeline)).toBe(true);
+      expect(fresh.typedCall.mock.calls[0][3]?.timeoutMs).toBe(10_000);
+      expect(onProgress.mock.calls.map(([progress]) => progress.transferredBytes)).toEqual([
+        1800, 0, 1800, 3600, 3601,
+      ]);
+      expect(onProgress.mock.calls[onProgress.mock.calls.length - 1][0]).toMatchObject({
+        retryCount: 1,
+        progress: 100,
+      });
+    });
+
+    test('bounds whole-file recovery to three extra attempts, including serial failures', async () => {
+      const { commands, typedCall } = createCommands();
+      const timeout = Object.assign(new Error('BLE response timeout'), {
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      });
+      typedCall.mockRejectedValue(timeout);
+      const recoverConnection = jest.fn().mockResolvedValue(commands);
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(3601),
+          maxChunkRetries: 3,
+          recoverConnection,
+        })
+      ).rejects.toBe(timeout);
+      expect(typedCall).toHaveBeenCalledTimes(4);
+      expect(recoverConnection).toHaveBeenCalledTimes(3);
+      expect(typedCall.mock.calls.slice(1).every(call => !call[3]?.fileWritePipeline)).toBe(true);
+    });
+
+    test('does not start a retry when cancelled during reconnect', async () => {
+      const { commands, typedCall } = createCommands();
+      const aborted = new Error('cancelled');
+      let cancelled = false;
+      typedCall.mockRejectedValueOnce(new Error('BLE response timeout'));
+      const recoverConnection = jest.fn(() => {
+        cancelled = true;
+        return Promise.resolve(commands);
+      });
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(3601),
+          maxChunkRetries: 3,
+          recoverConnection,
+          throwIfAborted: () => {
+            if (cancelled) throw aborted;
+          },
+        })
+      ).rejects.toBe(aborted);
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not retry device rejections or callback failures', async () => {
+      const { commands, typedCall } = createCommands();
+      const failure = new Error('device rejected file');
+      typedCall.mockRejectedValueOnce(failure);
+      const recoverConnection = jest.fn();
+      await expect(
+        writeProtocolV2File({
+          commands,
+          overwrite: true,
+          path: 'vol1:/wallpapers/wallpaper.okpkg',
+          data: new Uint8Array(3601),
+          maxChunkRetries: 3,
+          recoverConnection,
+        })
+      ).rejects.toBe(failure);
+      expect(recoverConnection).not.toHaveBeenCalled();
+    });
+
+    test.each(['different-device', ''])(
+      'rejects reconnect identity %s before unlocking or writing',
+      async serialNo => {
+        const { commands, device, typedCall } = createCommands();
+        const state = {
+          ...device.state,
+          identity: { serialNo: 'test-device', deviceType: EDeviceType.Pro2 },
+        };
+        const acquire = jest.fn().mockResolvedValue(undefined);
+        const initialize = jest.fn(() => {
+          state.identity.serialNo = serialNo;
+          return Promise.resolve(undefined);
+        });
+        const method = {
+          device: { ...device, state, commands, acquire, initialize },
+        } as unknown as BaseMethod;
+        const recover = createProtocolV2AssetFileWriteRecovery(method);
+        await expect(recover()).rejects.toMatchObject({
+          errorCode: HardwareErrorCode.DeviceCheckDeviceIdError,
+        });
+        expect(acquire).toHaveBeenCalledWith('V2', { throwOnRunPromiseError: true });
+        expect(typedCall).not.toHaveBeenCalled();
+      }
+    );
+
+    test('refreshes unlock status after reconnect even when the original preflight completed', async () => {
+      const { commands, device, typedCall } = createCommands();
+      typedCall.mockResolvedValueOnce({ type: 'DeviceStatus', message: { unlocked: false } });
+      const unlockDevice = jest.fn().mockResolvedValue({ unlocked: true });
+      const method = {
+        name: 'deviceUploadWallpaper',
+        device: {
+          ...device,
+          state: {
+            ...device.state,
+            identity: { serialNo: 'test-device', deviceType: EDeviceType.Pro2 },
+            status: { mode: 'normal', initialized: true },
+          },
+          commands,
+          acquire: jest.fn().mockResolvedValue(undefined),
+          initialize: jest.fn().mockResolvedValue(undefined),
+          updateProtocolV2Status: (status: unknown) => status,
+          unlockDevice,
+          toMessageObject: () => ({}),
+        },
+        unlockPolicy: 'unlock-before-run',
+        useDevicePassphraseState: false,
+        protocolV2PreUnlockPinType: DeviceSessionPinType.Any,
+        protocolV2UnlockContext: { preflightCompleted: true },
+        postMessage: jest.fn(),
+        payload: {},
+      } as unknown as BaseMethod;
+      await expect(createProtocolV2AssetFileWriteRecovery(method)()).resolves.toBe(commands);
+      expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+      expect(unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
     });
 
     const serialCases: {
