@@ -61,6 +61,7 @@ import type {
   ConnectorEventMap,
   ConnectorEventType,
   ConnectorSession,
+  ConnectorUiEvent,
   DeviceDescriptor,
   IConnector,
   TronSignMsgParams,
@@ -121,6 +122,20 @@ const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
   tron: 'Tron',
   zcash: 'Zcash',
 };
+
+/** Names the app a ConfirmOpenApp from this call asks the person to open. */
+function withOpenAppName<K extends ConnectorEventType>(
+  event: K,
+  data: ConnectorEventMap[K],
+  appName: string
+): ConnectorEventMap[K] {
+  if (event !== 'ui-event') return data;
+  const uiEvent = data as ConnectorUiEvent;
+  if (uiEvent.type !== EConnectorInteraction.ConfirmOpenApp || uiEvent.payload.appName) {
+    return data;
+  }
+  return { ...uiEvent, payload: { ...uiEvent.payload, appName } } as ConnectorEventMap[K];
+}
 
 const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
   Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
@@ -1240,8 +1255,8 @@ export class LedgerConnectorBase implements IConnector {
 
   /**
    * Return a per-call ctx with the chain's Ledger app name pre-bound to
-   * wrapError, so chain handlers don't need to repeat `{ defaultAppName: 'X' }`
-   * at every catch site. Falls through unchanged for unknown methods.
+   * UI prompts and wrapError, so chain handlers don't need to repeat the name.
+   * Falls through unchanged for unknown methods.
    */
   private _ctxForMethod(method: string): ConnectorContext {
     const prefix = /^(evm|btc|sol|tron|zcash)/.exec(method)?.[1];
@@ -1250,6 +1265,7 @@ export class LedgerConnectorBase implements IConnector {
     return {
       ...this._ctx,
       wrapError: (err, opts) => this._wrapError(err, { defaultAppName, ...opts }),
+      emit: (event, data) => this._ctx.emit(event, withOpenAppName(event, data, defaultAppName)),
     };
   }
 

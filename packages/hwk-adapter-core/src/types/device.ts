@@ -1,4 +1,5 @@
 import type { ChainForFingerprint } from './fingerprint';
+import type { ChainCapability } from './wallet';
 
 export type VendorType = 'trezor' | 'ledger' | 'keystone';
 
@@ -15,6 +16,9 @@ export type TransportType = 'usb' | 'ble' | 'hid' | 'bridge' | 'qr';
  * vendor-specific conditions (e.g., `if (vendor === 'ledger')`).
  */
 export interface DeviceCapabilities {
+  /** Chains usable through this adapter on the connected firmware; absent means not advertised. */
+  supportedChains?: ChainCapability[];
+
   /**
    * Whether the discovery handle can be reused to reconnect; `false` requires rediscovery. Says
    * nothing about identity (Trezor BLE is false yet its device_id is stable); verify it separately.

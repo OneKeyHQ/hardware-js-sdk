@@ -28,8 +28,9 @@ export interface KeystoneDeviceRecord {
   hardwareDeviceId?: string;
   /** Model string from the device (e.g. "Keystone 3 Pro"); not unique per unit. */
   model?: string;
+  /** Last QR response's display metadata, not a capability check for the next QR request. */
   deviceVersion?: string;
-  importedAt: number;
+  usbFirmwareVersion?: string;
   /** Connector session id while a live USB session exists; its presence routes calls over USB. */
   usbSessionId?: string;
   /**
@@ -45,13 +46,21 @@ export function createDeviceRecord(masterFingerprint: string): KeystoneDeviceRec
   return {
     masterFingerprint,
     connectId: walletConnectId(masterFingerprint),
-    importedAt: Date.now(),
   };
 }
 
 const CAPABILITIES: DeviceCapabilities = { persistentDeviceIdentity: true };
 
 export function toDeviceInfo(record: KeystoneDeviceRecord): DeviceInfo {
+  return toDeviceInfoForConnection(record, record.usbSessionId ? 'usb' : 'qr');
+}
+
+export function toDeviceInfoForConnection(
+  record: KeystoneDeviceRecord,
+  connectionType: 'qr' | 'usb'
+): DeviceInfo {
+  const firmwareVersion =
+    connectionType === 'usb' ? record.usbFirmwareVersion : record.deviceVersion;
   // `connectionType` is the channel a call would use now; `raw.availableChannels`
   // lists both for a merged QR + USB wallet.
   let availableChannels: Array<'qr' | 'usb'> = ['qr'];
@@ -62,11 +71,13 @@ export function toDeviceInfo(record: KeystoneDeviceRecord): DeviceInfo {
     vendor: 'keystone',
     model: record.model ?? 'unknown',
     modelName: record.model,
-    firmwareVersion: record.deviceVersion ?? '0.0.0',
+    firmwareVersion: firmwareVersion ?? '0.0.0',
     deviceId: record.masterFingerprint,
     connectId: record.connectId,
-    connectionType: record.usbSessionId ? 'usb' : 'qr',
-    capabilities: CAPABILITIES,
+    connectionType,
+    capabilities: {
+      ...CAPABILITIES,
+    },
     raw: {
       availableChannels,
       masterFingerprint: record.masterFingerprint,

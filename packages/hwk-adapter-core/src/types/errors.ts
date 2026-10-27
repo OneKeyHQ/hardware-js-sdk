@@ -182,6 +182,11 @@ export enum HardwareErrorCode {
    * Retrying on the same transport fails the same way; switch channel or shrink the payload.
    */
   PayloadTooLarge = 10600,
+  /**
+   * One QR request would ask the device for more keys than it accepts (Keystone: 24 account
+   * paths). Nothing is sent; USB asks per key and is not limited this way.
+   */
+  QrRequestTooLarge = 10601,
 
   // --- 11000s EVM (Ledger Ethereum App) APDU-specific ---
   /** 0x6a80 Invalid data — observed on blindSignTransactionFallback when the
@@ -360,6 +365,7 @@ export function defaultRecoveryForCode(code: HardwareErrorCode): HwkRecoveryHint
     case HardwareErrorCode.TransportNotAvailable:
     case HardwareErrorCode.DevicePermissionDenied:
     case HardwareErrorCode.PayloadTooLarge:
+    case HardwareErrorCode.QrRequestTooLarge:
       return RECOVERY_TRANSPORT;
     case HardwareErrorCode.InvalidParams:
     case HardwareErrorCode.MethodNotSupported:
@@ -424,6 +430,7 @@ export function defaultOriginForCode(code: HardwareErrorCode): HwkErrorOrigin | 
     case HardwareErrorCode.PinCancelled:
     case HardwareErrorCode.BlePairingCancelled:
     case HardwareErrorCode.PayloadTooLarge:
+    case HardwareErrorCode.QrRequestTooLarge:
     case HardwareErrorCode.DeviceOneDeviceOnly:
       return 'host';
     default:

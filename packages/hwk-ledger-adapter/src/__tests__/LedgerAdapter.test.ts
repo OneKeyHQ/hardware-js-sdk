@@ -495,12 +495,16 @@ describe('LedgerAdapter', () => {
   }
 
   /** Start a BTC account-100 read and wait for its high-index prompt. */
-  async function openHighIndexPrompt() {
+  async function openHighIndexPrompt(params?: { operationId?: string }) {
     const prompts: { payload: { operationId?: string } }[] = [];
     adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
       prompts.push(event);
     });
-    const pending = adapter.btcGetPublicKey('dev-1', '', { path: "m/84'/0'/100'", coin: 'btc' });
+    const pending = adapter.btcGetPublicKey('dev-1', '', {
+      path: "m/84'/0'/100'",
+      coin: 'btc',
+      ...params,
+    });
     await waitForCondition(() => prompts.length === 1);
     return { prompts, pending };
   }
@@ -2275,27 +2279,39 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('names the connection live operation on a prompt from an unpinned call', async () => {
-      const operationId = await connectOperation();
-      connector.callImpl.mockImplementation(
-        () =>
-          new Promise(() => {
-            // Never settles: the prompt has to stay open.
-          })
-      );
-      const { prompts, pending } = await openHighIndexPrompt();
+    it.each([true, false])(
+      'attributes a prompt only to its supplied operation (supplied=%s)',
+      async supplied => {
+        const operationId = await connectOperation();
+        connector.callImpl.mockImplementation(
+          () =>
+            new Promise(() => {
+              // Never settles: the prompt has to stay open.
+            })
+        );
+        const { prompts, pending } = await openHighIndexPrompt(
+          supplied ? { operationId } : undefined
+        );
+        expect(prompts[0].payload.operationId).toBe(supplied ? operationId : undefined);
 
-      // The call carries no operationId, so it queues under the connectId; the
-      // live operation on that connection still owns the prompt.
-      expect(prompts[0].payload.operationId).toBe(operationId);
-
-      // Which is what lets a cancel naming that operation reach the prompt.
-      adapter.cancel(operationId);
-      expect((await pending).success).toBe(false);
-    });
+        let settled = false;
+        void pending.then(() => {
+          settled = true;
+        });
+        connector.cancel.mockClear();
+        adapter.cancel(operationId);
+        if (!supplied) {
+          await new Promise(resolve => setImmediate(resolve));
+          expect(settled).toBe(false);
+          expect(connector.cancel).not.toHaveBeenCalled();
+          adapter.cancel('dev-1');
+        }
+        expect((await pending).success).toBe(false);
+      }
+    );
 
     it('reaches nothing when the named connectId resolves to no operation', async () => {
-      const operationId = await connectOperation();
+      await connectOperation();
       connector.callImpl.mockImplementation(
         () =>
           new Promise(() => {
@@ -2316,7 +2332,7 @@ describe('LedgerAdapter', () => {
       });
       expect(settled).toBe(false);
 
-      adapter.cancel(operationId);
+      adapter.cancel('dev-1');
       expect((await pending).success).toBe(false);
     });
 

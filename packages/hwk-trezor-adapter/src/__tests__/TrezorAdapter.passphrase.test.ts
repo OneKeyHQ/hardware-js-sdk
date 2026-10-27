@@ -593,12 +593,14 @@ describe('TrezorAdapter passphrase sessions', () => {
       ],
     ],
     [
-      'names the connection live operation on a prompt from an unpinned call',
+      'does not attribute an independent PIN prompt to an earlier operation',
       'ui-request-pin',
       // The call never settles: the prompt has to stay open.
       false,
-      (operationId: string): unknown[] => [
-        expect.objectContaining({ payload: expect.objectContaining({ operationId }) }),
+      (_operationId: string): unknown[] => [
+        expect.objectContaining({
+          payload: expect.not.objectContaining({ operationId: expect.any(String) }),
+        }),
       ],
     ],
   ] as const)('%s', async (_title, promptType, settles, expectedEvents) => {
@@ -627,11 +629,10 @@ describe('TrezorAdapter passphrase sessions', () => {
     uiRequestHandler = connector.on.mock.calls.find(c => c[0] === 'ui-request')?.[1];
     expect(uiRequestHandler).toBeDefined();
 
-    // The call carries no operationId, so it queues under the connectId; the
-    // live operation on that connection still owns the prompt.
     const call = adapter.btcGetAddress('safe-7', 'safe-7', {
       path: 'p0',
       useEmptyPassphrase: true,
+      ...(settles ? { operationId: connected.payload } : {}),
     });
     if (settles) {
       await call;

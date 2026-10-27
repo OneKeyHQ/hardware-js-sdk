@@ -22,6 +22,8 @@ export const UI_REQUEST = {
   // Required app is not installed; with autoInstallApp on, ask the user
   // whether to install it before retrying the operation.
   REQUEST_INSTALL_APP: 'ui-request-install-app',
+  // The request is over the USB transport's size limit; ask whether to show it as a QR instead.
+  REQUEST_QR_FALLBACK_CONFIRM: 'ui-request-qr-fallback-confirm',
   REQUEST_PREEMPTION: 'ui-request-preemption',
   REQUEST_TREZOR_THP_PAIRING: 'ui-request-trezor-thp-pairing',
   CLOSE_UI_WINDOW: 'ui-close',
@@ -40,6 +42,7 @@ export const UI_RESPONSE = {
   RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
   RECEIVE_BTC_HIGH_INDEX_CONFIRM: 'receive-btc-high-index-confirm',
   RECEIVE_INSTALL_APP: 'receive-install-app',
+  RECEIVE_QR_FALLBACK_CONFIRM: 'receive-qr-fallback-confirm',
   RECEIVE_PREEMPTION: 'receive-preemption',
   RECEIVE_TREZOR_THP_PAIRING: 'receive-trezor-thp-pairing',
   CANCEL: 'cancel',
@@ -135,6 +138,11 @@ export type UiResponseEvent =
   | {
       type: typeof UI_RESPONSE.RECEIVE_INSTALL_APP;
       payload: { confirmed: boolean };
+    }
+  | {
+      type: typeof UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM;
+      /** Echo the prompt's requestId; missing or stale IDs are ignored. */
+      payload: { confirmed: boolean; requestId?: string };
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PREEMPTION;
