@@ -221,6 +221,68 @@ describe('getLogBlockLabel', () => {
     expect(JSON.stringify([cached, postMessage.mock.calls])).not.toContain('synthetic-');
   });
 
+  it('keeps Zcash and Monero results of an all-network call out of logs, others intact', () => {
+    const response = {
+      success: true,
+      payload: [
+        {
+          network: 'evm',
+          path: "m/44'/60'/0'/0/0",
+          success: true,
+          payload: { address: '0xabc', rootFingerprint: 1 },
+        },
+        {
+          network: 'zcash',
+          path: "m/32'/133'/0'",
+          success: true,
+          payload: {
+            address: 'u1-marker',
+            ufvk: 'synthetic-viewing-key-marker',
+            rootFingerprint: 1,
+          },
+        },
+        {
+          network: 'xmr',
+          path: "m/44'/128'/0'",
+          success: true,
+          payload: { address: 'synthetic-xmr-address-marker', rootFingerprint: 1 },
+        },
+        {
+          network: 'zcash',
+          path: "m/32'/133'/1'",
+          success: false,
+          payload: { error: 'Device not support', code: 416 },
+        },
+      ],
+    };
+
+    const safe = getSafeLogPayload(response) as typeof response;
+
+    expect(safe.payload[0]).toBe(response.payload[0]);
+    expect(safe.payload[1]).toEqual({ ...response.payload[1], payload: '[REDACTED]' });
+    expect(safe.payload[2]).toEqual({ ...response.payload[2], payload: '[REDACTED]' });
+    expect(safe.payload[3]).toBe(response.payload[3]);
+    expect(JSON.stringify(safe)).not.toContain('marker');
+    expect(response.payload[1].payload).toHaveProperty('ufvk');
+  });
+
+  it('redacts a privacy network result delivered one by one as a callback', () => {
+    const message = {
+      event: 'IFRAME_CALLBACK',
+      payload: {
+        callbackId: 'item',
+        data: {
+          network: 'zcash',
+          success: true,
+          payload: { ufvk: 'synthetic-viewing-key-marker' },
+          index: 0,
+        },
+      },
+    };
+
+    expect(JSON.stringify(getSafeLogPayload(message))).not.toContain('marker');
+  });
+
   it('logs other queued tasks as before', () => {
     const task = {
       id: 8,

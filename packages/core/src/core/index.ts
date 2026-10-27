@@ -1950,7 +1950,7 @@ export default class Core extends EventEmitter {
         break;
       }
       case IFRAME.CALLBACK: {
-        Log.log('callback message: ', message);
+        Log.log('callback message: ', getSafeLogPayload(message));
         postMessage(message);
         break;
       }

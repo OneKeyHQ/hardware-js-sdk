@@ -45,11 +45,49 @@ export function getLogBlockLabel(message: unknown): string | undefined {
   return undefined;
 }
 
+// All-network results of these networks carry what their own address methods
+// keep out of logs (viewing keys, private addresses).
+const LogPayloadBlockNetwork: Set<string> = new Set(['zcash', 'xmr']);
+
+type AllNetworkLogItem = { network?: string; success?: boolean; payload?: object | string } | null;
+
+// A call response lists the results in `payload`; a loop callback carries one
+// result, or all of them when finished, in `payload.data`.
+type AllNetworkLogMessage = {
+  payload?: AllNetworkLogItem[] | { data?: AllNetworkLogItem | AllNetworkLogItem[] };
+};
+
+function redactAllNetworkItem(item: AllNetworkLogItem): AllNetworkLogItem {
+  if (!item || item.success === false || item.payload === undefined) return item;
+  return item.network && LogPayloadBlockNetwork.has(item.network)
+    ? { ...item, payload: '[REDACTED]' }
+    : item;
+}
+
+function redactAllNetworkItems(items: AllNetworkLogItem[]) {
+  const redacted = items.map(redactAllNetworkItem);
+  return redacted.some((item, index) => item !== items[index]) ? redacted : items;
+}
+
+// Returns `message` itself when nothing needs redacting.
+function redactAllNetworkResults(message: AllNetworkLogMessage): AllNetworkLogMessage {
+  const { payload } = message;
+  if (Array.isArray(payload)) {
+    const items = redactAllNetworkItems(payload);
+    return items === payload ? message : { ...message, payload: items };
+  }
+  const data = payload?.data;
+  if (!data) return message;
+  const redacted = Array.isArray(data) ? redactAllNetworkItems(data) : redactAllNetworkItem(data);
+  return redacted === data ? message : { ...message, payload: { ...payload, data: redacted } };
+}
+
 export function getSafeLogPayload(value: unknown, blockLabel?: string): unknown {
   if (blockLabel) {
     return { method: blockLabel, payload: '[REDACTED]' };
   }
-  return value;
+  if (!value || typeof value !== 'object') return value;
+  return redactAllNetworkResults(value as AllNetworkLogMessage);
 }
 
 // A queued task holds its method's raw payload; redact it like the call.
