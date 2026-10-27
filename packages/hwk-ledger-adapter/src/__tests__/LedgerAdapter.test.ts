@@ -333,6 +333,9 @@ describe('LedgerAdapter', () => {
         expect(connector.call).toHaveBeenLastCalledWith('ble-session', 'installApp', {
           appName: 'Tron',
         });
+        expect((await adapter.listInstalledNames(bleOperation)).success).toBe(true);
+        expect(connector.searchDevices).toHaveBeenCalledTimes(previousScans);
+        expect(connector.call).toHaveBeenLastCalledWith('ble-session', 'listInstalledNames', {});
         expect(connector.connect).toHaveBeenCalledTimes(1);
 
         await adapter.releaseOperation(bleOperation);
@@ -828,6 +831,24 @@ describe('LedgerAdapter', () => {
       );
     }
   );
+
+  it('lists the apps on the plugged USB Ledger when the named Bluetooth one is not connected', async () => {
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+      options?.transportType === 'usb'
+        ? [{ connectId: 'usb-B', deviceId: 'usb-B', name: 'Ledger Stax', model: 'stax' }]
+        : []
+    );
+    connector.callImpl.mockResolvedValue(['Ethereum']);
+    const select = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
+
+    const result = await adapter.listInstalledNames('ble-A');
+
+    expect(result).toEqual({ success: true, payload: ['Ethereum'] });
+    expect(connector.connect).toHaveBeenCalledWith('usb-B', { transportType: 'usb' });
+    expect(select).not.toHaveBeenCalled();
+  });
 
   it('does not select BLE for a legacy target when the caller disallows selection', async () => {
     Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
