@@ -2162,9 +2162,17 @@ describe('KeystoneAdapter', () => {
     it('does not create an EVM account merely because Cypherpunk exports an EVM key', async () => {
       const adapter = newTestAdapter();
       answerExport(adapter, exportedAccount([BTC_PATH, "m/44'/60'/0'"]));
+      // Hosts skip only this reason when creating from an export; ChainNotSupported would abort it.
+      const notExported = {
+        success: false,
+        payload: {
+          code: HardwareErrorCode.DevicePathForbidden,
+          params: { reason: 'account-not-exported' },
+        },
+      };
       expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
         success: true,
-        payload: [{ success: true }, { success: false }, { success: false }],
+        payload: [{ success: true }, notExported, notExported],
       });
       await adapter.dispose();
     });
