@@ -304,6 +304,174 @@ describe('ElectronBleTransport protocol detection', () => {
     }
   );
 
+  test.each(['Pro 2', 'Neo'])(
+    'reuses the connection, subscription and V2 sequence for %s after release',
+    async name => {
+      const device = { id: 'retained-v2-id', name };
+      const release = jest.fn().mockResolvedValue(undefined);
+      const nobleBle = { ...createNobleBle(device), release };
+      echoProtocolV2(nobleBle, device.id);
+      const bleTransport = configureTransport(nobleBle);
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      await bleTransport.call(device.id, 'Ping', { message: 'before-release' });
+      const notifyCleanup = nobleBle.onNotification.mock.results[0].value;
+
+      try {
+        await bleTransport.release(device.id, false, true);
+        expect(bleTransport.getProtocolType(device.id)).toBe('V2');
+        expect(notifyCleanup).not.toHaveBeenCalled();
+        await expect(
+          bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' })
+        ).resolves.toMatchObject({ uuid: device.id, protocolType: 'V2' });
+        await expect(
+          bleTransport.call(device.id, 'Ping', { message: 'after-release' })
+        ).resolves.toMatchObject({ type: 'Success' });
+
+        expect(nobleBle.connect).toHaveBeenCalledTimes(1);
+        expect(nobleBle.subscribe).toHaveBeenCalledTimes(1);
+        expect(nobleBle.onNotification).toHaveBeenCalledTimes(1);
+        expect(nobleBle.onMtuChanged).toHaveBeenCalledTimes(1);
+        expect(release).toHaveBeenCalledWith(device.id, true);
+        expect(
+          nobleBle.write.mock.calls.map(([, hex]) => Number.parseInt(hex.slice(12, 14), 16))
+        ).toEqual([1, 2, 3]);
+      } finally {
+        await bleTransport.disconnect(device.id);
+      }
+      expect(notifyCleanup).toHaveBeenCalledTimes(1);
+      expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    }
+  );
+
+  test.each(['ordinary release', 'onclose', 'forced probe'])(
+    'does not retain renderer state for %s',
+    async mode => {
+      const device = { id: 'release-fallback-id', name: 'Pro 2' };
+      const nobleBle = createNobleBle(device);
+      echoProtocolV2(nobleBle, device.id);
+      const bleTransport = configureTransport(nobleBle);
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      const notifyCleanup = nobleBle.onNotification.mock.results[0].value;
+      await bleTransport.release(device.id, mode === 'onclose', mode !== 'ordinary release');
+
+      const input = {
+        uuid: device.id,
+        expectedProtocol: 'V2' as const,
+        forceProtocolDetection: mode === 'forced probe',
+      };
+      await bleTransport.acquire(input);
+
+      expect(notifyCleanup).toHaveBeenCalledTimes(1);
+      expect(nobleBle.connect).toHaveBeenCalledTimes(2);
+      expect(nobleBle.subscribe).toHaveBeenCalledTimes(2);
+      await bleTransport.disconnect(device.id);
+    }
+  );
+
+  test.each([false, true])(
+    'rebuilds a retained link after a disconnect, including during lookup: %s',
+    async duringLookup => {
+      const device = { id: 'retained-drop-id', name: 'Pro 2' };
+      const nobleBle = createNobleBle(device);
+      echoProtocolV2(nobleBle, device.id);
+      const bleTransport = configureTransport(nobleBle);
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      await bleTransport.release(device.id, false, true);
+      const disconnectHandler = nobleBle.onDeviceDisconnected.mock.calls[0][0];
+      const notifyCleanup = nobleBle.onNotification.mock.results[0].value;
+      const drop = () =>
+        disconnectHandler({ ...device, reason: EBleDisconnectReason.DeviceDisconnected });
+      if (duringLookup) {
+        nobleBle.getDevice.mockImplementationOnce(() => {
+          drop();
+          return Promise.resolve(device);
+        });
+      } else {
+        drop();
+      }
+
+      await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+      await expect(bleTransport.call(device.id, 'Ping', {})).resolves.toMatchObject({
+        type: 'Success',
+      });
+
+      expect(notifyCleanup).toHaveBeenCalledTimes(1);
+      expect(nobleBle.connect).toHaveBeenCalledTimes(2);
+      expect(nobleBle.subscribe).toHaveBeenCalledTimes(2);
+      await bleTransport.disconnect(device.id);
+    }
+  );
+
+  test('disconnects a reused link on timeout without replaying the call', async () => {
+    const device = { id: 'retained-timeout-id', name: 'Pro 2' };
+    const nobleBle = createNobleBle(device);
+    echoProtocolV2(nobleBle, device.id);
+    const bleTransport = configureTransport(nobleBle);
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    await bleTransport.release(device.id, false, true);
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    nobleBle.write.mockImplementationOnce(() => Promise.resolve());
+
+    await expect(bleTransport.call(device.id, 'Ping', {}, { timeoutMs: 10 })).rejects.toMatchObject(
+      {
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      }
+    );
+
+    expect(nobleBle.write).toHaveBeenCalledTimes(2);
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    expect(nobleBle.subscribe).toHaveBeenCalledTimes(2);
+    await bleTransport.disconnect(device.id);
+  });
+
+  test('invalidates a retained link when native release fails', async () => {
+    const device = { id: 'retained-release-failure-id', name: 'Pro 2' };
+    const release = jest.fn().mockRejectedValueOnce(new Error('IPC release failed'));
+    const nobleBle = { ...createNobleBle(device), release };
+    echoProtocolV2(nobleBle, device.id);
+    const bleTransport = configureTransport(nobleBle);
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    const notifyCleanup = nobleBle.onNotification.mock.results[0].value;
+
+    await bleTransport.release(device.id, false, true);
+
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+    expect(notifyCleanup).toHaveBeenCalledTimes(1);
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    expect(nobleBle.subscribe).toHaveBeenCalledTimes(2);
+    await bleTransport.disconnect(device.id);
+  });
+
+  test('still cancels an in-flight V2 write when release requests retention', async () => {
+    const device = { id: 'active-release-id', name: 'Pro 2' };
+    const nobleBle = createNobleBle(device);
+    echoProtocolV2(nobleBle, device.id);
+    const bleTransport = configureTransport(nobleBle);
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    const started = createDeferred<void>();
+    const write = createDeferred<void>();
+    nobleBle.write.mockImplementationOnce(() => {
+      started.resolve();
+      return write.promise;
+    });
+    const result = bleTransport.call(device.id, 'Ping', {}).catch(error => error);
+    await started.promise;
+
+    try {
+      const releasing = bleTransport.release(device.id, false, true);
+      write.resolve();
+      await releasing;
+      await expect(result).resolves.toMatchObject({ message: 'Electron BLE transport released' });
+      expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+    } finally {
+      write.resolve();
+      await bleTransport.disconnect(device.id);
+    }
+  });
+
   test('forceNative disconnects a device the renderer no longer tracks', async () => {
     const device = { id: 'presumed-dead-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);
@@ -506,6 +674,10 @@ describe('ElectronBleTransport protocol detection', () => {
         })
       );
       expect(transport.getProtocolType(device.id)).toBe('V1');
+      const notifyCleanup = nobleBle.onNotification.mock.results[0].value;
+      await transport.release(device.id, false, true);
+      expect(transport.getProtocolType(device.id)).toBeUndefined();
+      expect(notifyCleanup).toHaveBeenCalledTimes(1);
       await expect(transport.acquire({ uuid: device.id, expectedProtocol: 'V1' })).resolves.toEqual(
         expect.objectContaining({
           uuid: device.id,
