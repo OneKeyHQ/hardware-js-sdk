@@ -38,7 +38,7 @@ import {
   success,
 } from '@onekeyfe/hwk-adapter-core';
 
-import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
+import { KeystoneUrEngine, unexpectedQrCodeError } from '../urEngine/KeystoneUrEngine';
 import { TronSignType } from '../urEngine/TronSignRequest';
 import {
   KEYSTONE_COLD_START_PATH,
@@ -264,13 +264,46 @@ function invalidHexFailure(field: string): Response<never> {
   return failure(HardwareErrorCode.InvalidParams, `${field} must be an even-length hex string`);
 }
 
+/** The export's account at `path`; a key the export carried there but could not vouch for fails. */
+function exportedAccountAt(parsed: KeystoneParsedMultiAccounts, path: string) {
+  const rejected = parsed.rejectedPaths?.find(entry => normalizePath(entry.path) === path);
+  switch (rejected?.reason) {
+    case 'different-wallet':
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message: 'Account export contains a different wallet fingerprint',
+      });
+    case 'conflicting-keys':
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceMismatch,
+        message: 'Account export contains conflicting keys for the same path',
+      });
+    case 'unusable-key':
+      throw unexpectedQrCodeError(`Account export key at ${path} is not usable`);
+    default:
+      return parsed.accounts.find(returned => normalizePath(returned.path) === path);
+  }
+}
+
+/** A parser's own failure means the scanned code is not this request's kind of answer. */
+function parseScannedAnswer<T>(parse: () => T): T {
+  try {
+    return parse();
+  } catch (error) {
+    if (typeof (error as { code?: unknown } | undefined)?.code === 'number') throw error;
+    throw unexpectedQrCodeError(
+      `Scanned code is not this request's answer: ${error instanceof Error ? error.message : ''}`
+    );
+  }
+}
+
 /** An export must contain the path that was asked for; anything else is not this request's answer. */
 function requireExportedPath(
   parsed: KeystoneParsedMultiAccounts,
   path: string,
   accountExport = false
 ) {
-  const account = parsed.accounts.find(returned => normalizePath(returned.path) === path);
+  const account = exportedAccountAt(parsed, path);
   if (!account) {
     throw createHwkError({
       code: accountExport
@@ -1216,7 +1249,9 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
       KeystoneAdapter._throwIfAborted(signal);
 
-      const signedPsbt = this.urEngine.parseBtcPsbt(responseUr, requestPsbtHex);
+      const signedPsbt = parseScannedAnswer(() =>
+        this.urEngine.parseBtcPsbt(responseUr, requestPsbtHex)
+      );
       return success<BtcSignedPsbt>({ signedPsbt });
     });
   }
@@ -1693,7 +1728,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       );
       KeystoneAdapter._throwIfAborted(signal);
 
-      const signature = args.parseResponse(responseUr);
+      const signature = parseScannedAnswer(() => args.parseResponse(responseUr));
       KeystoneAdapter._assertRequestIdMatches(requestId, signature.requestId);
       return success(args.toPayload(signature));
     });
@@ -1815,12 +1850,6 @@ export class KeystoneAdapter implements IHardwareWallet {
         : this.urEngine.parseAccountResponse(responseUr);
       this._assertParsedIdentity(parsed, target);
       const firmware = getKeystoneFirmwareProfile(parsed.deviceVersion);
-      if (responseUr.accountExport && parsed.accounts.some(account => !isBip32Path(account.path))) {
-        throw createHwkError({
-          code: HardwareErrorCode.InvalidParams,
-          message: 'Account export contains an invalid derivation path',
-        });
-      }
       // Only requested paths are taken from the scan, each under the chain that asked for it.
       // Chains the response's firmware cannot use are never taken or required. Normal responses
       // must contain every other path; explicit device exports may contain a subset.
@@ -1838,7 +1867,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
       for (const schema of usableSchemas) {
         const exported = responseUr.accountExport
-          ? parsed.accounts.find(account => normalizePath(account.path) === schema.path)
+          ? exportedAccountAt(parsed, schema.path)
           : requireExportedPath(parsed, schema.path);
         if (exported) {
           scanned.set(accountKey(schema.hwkChain, schema.path), {
@@ -2672,10 +2701,7 @@ export class KeystoneAdapter implements IHardwareWallet {
       }
       const response = await this._awaitQrResponse(requestType, waitPromise, signal);
       if (response.accountExport && data && !data.allowAccountExport) {
-        throw createHwkError({
-          code: HardwareErrorCode.InvalidParams,
-          message: 'This request cannot be answered with an account export',
-        });
+        throw unexpectedQrCodeError('This request cannot be answered with an account export');
       }
       return {
         urType: response.urType,
@@ -2808,12 +2834,12 @@ export class KeystoneAdapter implements IHardwareWallet {
   /** A response without the request's id is as unrelated as one with another id. */
   private static _assertRequestIdMatches(expected: string, actual?: string): void {
     if (!actual || actual.toLowerCase() !== expected.toLowerCase()) {
-      throw createHwkError({
-        code: HardwareErrorCode.DeviceMismatch,
-        message: actual
+      throw unexpectedQrCodeError(
+        actual
           ? 'Keystone response requestId does not match the pending request — discarding a stale or unrelated scan'
           : 'Keystone response carries no requestId — discarding a stale or unrelated scan',
-      });
+        HardwareErrorCode.DeviceMismatch
+      );
     }
   }
 

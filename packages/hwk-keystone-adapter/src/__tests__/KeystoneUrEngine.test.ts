@@ -23,7 +23,13 @@ import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest } from '../urEngine/TronSignRequest';
 import { TronSignature as TronUrSignature } from '../urEngine/TronSignature';
-import { KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR, psbtFixtureHex, urJson } from './fixtures';
+import {
+  KEYSTONE_BITGET_EXPORT_CBOR,
+  KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR,
+  KEYSTONE_NEXUS_EXPORT_CBOR,
+  psbtFixtureHex,
+  urJson,
+} from './fixtures';
 
 import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type { KeystoneUr } from '../urEngine/types';
@@ -87,6 +93,40 @@ describe('KeystoneUrEngine', () => {
             .join('/')
         )
     ).toEqual(['wpkh', 'pkh', 'sh/wpkh', 'tr']);
+  });
+
+  it.each([
+    ['Keystone Nexus', KEYSTONE_NEXUS_EXPORT_CBOR, []],
+    ['Bitget', KEYSTONE_BITGET_EXPORT_CBOR, ["m/44'/607'/0'"]],
+  ])(
+    'reads the firmware %s export, setting aside the Ledger Live keys it cannot use',
+    (_, cbor, extraPaths) => {
+      const parsed = engine.parseAccountExport({ urType: 'crypto-multi-accounts', urData: cbor });
+      expect(parsed.accounts.map(account => account.path)).toEqual([
+        "m/44'/60'/0'",
+        "m/44'/0'/0'",
+        "m/49'/0'/0'",
+        "m/84'/0'/0'",
+        "m/86'/0'/0'",
+        ...extraPaths,
+      ]);
+      expect(parsed.rejectedPaths?.length).toBeGreaterThan(0);
+      for (const rejected of parsed.rejectedPaths ?? []) {
+        expect(rejected.reason).toBe('unusable-key');
+        expect(rejected.path).toMatch(/^m\/44'\/60'\/\d+'\/0(\/0)?$/);
+      }
+    }
+  );
+
+  it('reports an unreadable account code apart from a missing account', () => {
+    expect(() =>
+      engine.parseAccountExport({ urType: 'crypto-multi-accounts', urData: 'a0' })
+    ).toThrow(
+      expect.objectContaining({
+        code: HardwareErrorCode.InvalidParams,
+        params: { reason: 'unexpected-qr-code' },
+      })
+    );
   });
 
   describe('parseMultiAccounts', () => {

@@ -1,11 +1,11 @@
 import bs58 from 'bs58';
 import {
-  CryptoCoinInfo,
   CryptoAccount,
-  CryptoOutput,
+  CryptoCoinInfo,
   CryptoHDKey,
   CryptoKeypath,
   CryptoMultiAccounts,
+  CryptoOutput,
   CryptoPSBT,
   Curve,
   PathComponent,
@@ -35,7 +35,12 @@ import { normalizePath } from '../adapter/pathUtils';
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest, TronSignType } from '../urEngine/TronSignRequest';
 import { TronSignature as TronUrSignature } from '../urEngine/TronSignature';
-import { KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR, psbtFixtureHex, urJson } from './fixtures';
+import {
+  KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR,
+  KEYSTONE_NEXUS_EXPORT_CBOR,
+  psbtFixtureHex,
+  urJson,
+} from './fixtures';
 
 import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type {
@@ -1372,8 +1377,39 @@ describe('KeystoneAdapter', () => {
       attachFakeDevice(adapter, options);
       expect(await call(adapter)).toMatchObject({
         success: false,
-        payload: { code: HardwareErrorCode.DeviceMismatch },
+        payload: {
+          code: HardwareErrorCode.DeviceMismatch,
+          params: { reason: 'unexpected-qr-code' },
+        },
       });
+    });
+
+    it.each<[string, (adapter: KeystoneAdapter) => Promise<unknown>]>([
+      ['evmSignTransaction', a => a.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX)],
+      [
+        'btcSignPsbt',
+        a =>
+          a.btcSignPsbt(FIXTURE_WALLET, FIXTURE_MFP, {
+            path: "m/84'/0'/0'",
+            psbt: UNSIGNED_PSBT_HEX,
+          }),
+      ],
+    ])('%s calls a scanned account code the wrong code', async (_name, call) => {
+      const adapter = newTestAdapter();
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+          payload: { urType: 'crypto-multi-accounts', urData: KEYSTONE_NEXUS_EXPORT_CBOR },
+        });
+      });
+      expect(await call(adapter)).toMatchObject({
+        success: false,
+        payload: {
+          code: HardwareErrorCode.InvalidParams,
+          params: { reason: 'unexpected-qr-code' },
+        },
+      });
+      await adapter.dispose();
     });
 
     const originOf: Record<string, (cbor: Buffer) => string | undefined> = {
@@ -2120,6 +2156,86 @@ describe('KeystoneAdapter', () => {
       } finally {
         await adapter.dispose();
       }
+    });
+
+    it('ignores exported keys nobody asked for, even ones it cannot use', async () => {
+      const adapter = newTestAdapter();
+      // Keystone's own exports carry Ledger Live keys as bare 33-byte keys, and may carry keys of
+      // other wallets or chains this app never requests; only requested paths are checked.
+      const leaf = fixtureHdKey("m/44'/60'/0'/0/0", FIXTURE_MFP);
+      const bareLeaf = new CryptoHDKey({
+        isMaster: false,
+        key: leaf.getKey(),
+        useInfo: new CryptoCoinInfo(),
+        origin: leaf.getOrigin(),
+      });
+      const otherMfp = mfpOf(OTHER_ROOT);
+      answerExport(
+        adapter,
+        new CryptoMultiAccounts(
+          Buffer.from(FIXTURE_MFP, 'hex'),
+          [
+            fixtureHdKey(BTC_PATH, FIXTURE_MFP),
+            bareLeaf,
+            fixtureHdKey("m/44'/607'/0'", otherMfp, OTHER_ROOT),
+            fixtureHdKey("m/44'/195'/0'", FIXTURE_MFP),
+            fixtureHdKey("m/44'/195'/0'", FIXTURE_MFP, OTHER_ROOT),
+          ],
+          'Keystone 3 Pro',
+          undefined,
+          '3.1.4-C'
+        ).toUR()
+      );
+      try {
+        expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+          success: true,
+          payload: [
+            { success: true, payload: { accountExport: true, accountKey: { path: BTC_PATH } } },
+            { success: false, payload: { params: { reason: 'account-not-exported' } } },
+            { success: false, payload: { params: { reason: 'account-not-exported' } } },
+          ],
+        });
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it.each([
+      [
+        'from another wallet',
+        () => fixtureHdKey(BTC_PATH, mfpOf(OTHER_ROOT), OTHER_ROOT),
+        HardwareErrorCode.DeviceMismatch,
+      ],
+      [
+        'unusable',
+        () => {
+          const key = fixtureHdKey(BTC_PATH, FIXTURE_MFP);
+          return new CryptoHDKey({
+            isMaster: false,
+            key: key.getKey(),
+            useInfo: new CryptoCoinInfo(),
+            origin: key.getOrigin(),
+          });
+        },
+        HardwareErrorCode.InvalidParams,
+      ],
+    ] as const)('refuses a requested path whose exported key is %s', async (_, key, code) => {
+      const adapter = newTestAdapter();
+      answerExport(
+        adapter,
+        new CryptoMultiAccounts(
+          Buffer.from(FIXTURE_MFP, 'hex'),
+          [key()],
+          'Keystone 3 Pro',
+          undefined,
+          '3.1.4-C'
+        ).toUR()
+      );
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: { code },
+      });
+      await adapter.dispose();
     });
 
     it('retains full-path validation for a normal request response', async () => {
