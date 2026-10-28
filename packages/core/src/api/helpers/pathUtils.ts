@@ -144,8 +144,10 @@ export const validatePath = (
   return base ? valid.splice(0, 3) : valid;
 };
 
-const isTextIndex = (part: string) =>
-  /^\d+'?$/.test(part) && Number(part.replace("'", '')) < HD_HARDENED;
+const isTextIndex = (part: string) => {
+  const digits = /^(\d+)'?$/.exec(part)?.[1];
+  return digits !== undefined && Number(digits) < HD_HARDENED;
+};
 
 const isUint32 = (n: number) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff;
 
