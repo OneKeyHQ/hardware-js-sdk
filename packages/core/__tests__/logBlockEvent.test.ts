@@ -7,6 +7,15 @@ import {
   getSafeLogTask,
 } from '../src/events';
 import { getLog, initLog, setLoggerPostMessage } from '../src/utils/logger';
+import MoneroGetAddress from '../src/api/monero/MoneroGetAddress';
+import ZcashGetAddress from '../src/api/zcash/ZcashGetAddress';
+
+import type { Device } from '../src/device/Device';
+
+jest.mock('../src/data/config', () => ({
+  getSDKVersion: jest.fn(() => '1.0.0'),
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
+}));
 
 describe('getLogBlockLabel', () => {
   it('keeps existing sensitive UI response blocking', () => {
@@ -317,6 +326,58 @@ describe('getLogBlockLabel', () => {
     };
 
     expect(JSON.stringify(getSafeLogPayload(message))).not.toContain('marker');
+  });
+
+  it.each([
+    {
+      method: 'moneroGetAddress',
+      create: () =>
+        new MoneroGetAddress({
+          id: 1,
+          payload: { method: 'moneroGetAddress', path: "m/44'/128'/0'" },
+        }),
+      reply: { address: Buffer.from('synthetic-xmr-address-marker').toString('hex') },
+    },
+    {
+      method: 'zcashGetAddress',
+      create: () =>
+        new ZcashGetAddress({
+          id: 1,
+          payload: { method: 'zcashGetAddress', path: "m/32'/133'/0'" },
+        }),
+      reply: { address: 'synthetic-zcash-address-marker' },
+    },
+  ])('keeps the $method previous-address event out of logs', async ({ method, create, reply }) => {
+    const instance = create();
+    instance.init();
+    const commands = { typedCall: jest.fn().mockResolvedValue({ message: reply }) };
+    instance.device = {
+      commands,
+      getCommands: () => commands,
+      toMessageObject: () => ({}),
+    } as unknown as Device;
+    const postMessage = jest.fn();
+    instance.postMessage = postMessage;
+    await instance.run();
+
+    const [[event]] = postMessage.mock.calls;
+    expect(event).toMatchObject({
+      type: UI_REQUEST.PREVIOUS_ADDRESS_RESULT,
+      payload: { method, data: { address: expect.stringContaining('synthetic-') } },
+    });
+    const blockLabel = getLogBlockLabel(event);
+    expect(blockLabel).toBe(method);
+    expect(JSON.stringify(getSafeLogPayload(event, blockLabel))).not.toContain('synthetic-');
+  });
+
+  it('keeps previous-address events of other methods visible', () => {
+    const event = {
+      event: 'UI_EVENT',
+      type: UI_REQUEST.PREVIOUS_ADDRESS_RESULT,
+      payload: { device: {}, method: 'btcGetAddress', data: { address: 'bc1qexample' } },
+    };
+    expect(getLogBlockLabel(event)).toBeUndefined();
+    expect(getSafeLogPayload(event)).toBe(event);
   });
 
   it('logs other queued tasks as before', () => {
