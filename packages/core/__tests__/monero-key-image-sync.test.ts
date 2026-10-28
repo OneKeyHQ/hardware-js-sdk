@@ -235,6 +235,11 @@ describe('MoneroKeyImageSync', () => {
       /\.subAddrMajor must be/,
     ],
     ['an unknown network type', { transfers: [transferAt(0)], networkType: 3 }, /network type/],
+    [
+      'a fractional account',
+      { transfers: [transferAt(0)], path: "m/44'/128'/0.5'" },
+      /Not a valid path/,
+    ],
   ])('rejects %s', (_, params, message) => {
     expect(() => createMethod({ path: "m/44'/128'/0'", ...params }).init()).toThrow(message);
   });

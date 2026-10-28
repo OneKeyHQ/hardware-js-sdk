@@ -76,6 +76,34 @@ describe('MoneroGetAddress', () => {
     expect(() => createAddressMethod({ path: "m/44'/128'/0'", networkType: 3 }).init()).toThrow();
   });
 
+  // Each of these would otherwise be sent as account 0'.
+  test.each([
+    ["m/44'/128'/2147483648'"],
+    ["m/44'/128'/4294967296'"],
+    ["m/44'/128'/0.5'"],
+    ["m/44'/128'/0x0'"],
+    ["m/44'/128'/0h"],
+    ["m/44'/128'/2147483648"],
+    [[...ACCOUNT_0.slice(0, 2), 0x100000000 + toHardened(0)]],
+    [[...ACCOUNT_0.slice(0, 2), toHardened(0) + 0.5]],
+  ])('rejects the account path %j instead of aliasing it to another account', path => {
+    for (const method of [createAddressMethod({ path }), createWatchKeyMethod({ path })]) {
+      expect(() => method.init()).toThrow('Not a valid path');
+    }
+  });
+
+  test.each([
+    ["m/44'/128'/2147483647'", [...ACCOUNT_0.slice(0, 2), 0xffffffff]],
+    [
+      [...ACCOUNT_0.slice(0, 2), 0xffffffff],
+      [...ACCOUNT_0.slice(0, 2), 0xffffffff],
+    ],
+  ])('accepts the largest hardened account %j', (path, addressN) => {
+    const method = createWatchKeyMethod({ path });
+    method.init();
+    expect(method.params[0].address_n).toEqual(addressN);
+  });
+
   test('fails when the device omits the address', async () => {
     const method = createAddressMethod({ path: "m/44'/128'/0'" });
     method.init();

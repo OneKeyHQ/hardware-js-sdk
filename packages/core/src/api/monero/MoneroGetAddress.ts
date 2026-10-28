@@ -1,5 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
-import { serializedPath, validatePath } from '../helpers/pathUtils';
+import { serializedPath, validateStrictPath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { decodeMoneroAddress, getMoneroVersionRange, validateMoneroNetworkType } from './helpers';
@@ -33,7 +33,7 @@ export default class MoneroGetAddress extends BaseMethod<HardwareMoneroGetAddres
       ]);
 
       this.params.push({
-        address_n: validatePath(batch.path, 3),
+        address_n: validateStrictPath(batch.path, 3),
         network_type: validateMoneroNetworkType(batch.networkType),
         show_display: batch.showOnOneKey ?? true,
       });

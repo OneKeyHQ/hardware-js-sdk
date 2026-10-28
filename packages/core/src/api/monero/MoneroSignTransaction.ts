@@ -1,7 +1,7 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
-import { validatePath } from '../helpers/pathUtils';
+import { validateStrictPath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getMoneroVersionRange, validateMoneroNetworkType } from './helpers';
@@ -182,7 +182,7 @@ export default class MoneroSignTransaction extends BaseMethod<SignTransactionPar
     validateTsxData(tsxData, payload.inputs.length);
 
     this.params = {
-      address_n: validatePath(payload.path, 3),
+      address_n: validateStrictPath(payload.path, 3),
       network_type: validateMoneroNetworkType(payload.networkType),
       tsx_data: tsxData,
       inputs: payload.inputs.map(input => withoutNulls(input) as MoneroTransactionSourceEntry),

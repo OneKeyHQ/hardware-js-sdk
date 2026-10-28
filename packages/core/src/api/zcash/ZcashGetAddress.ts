@@ -1,7 +1,7 @@
 import { ZcashAddressScope, ZcashAddressType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
-import { serializedPath, toHardened, validatePath } from '../helpers/pathUtils';
+import { serializedPath, toHardened, validateStrictPath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
 
@@ -29,13 +29,12 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
     this.params = [];
     payload.bundle.forEach((batch: ZcashGetAddressParams) => {
       // ZIP-32 account path: m/32'/133'/account'
-      const addressN = validatePath(batch.path, 3);
+      const addressN = validateStrictPath(batch.path, 3);
       if (
         addressN.length !== 3 ||
         addressN[0] !== toHardened(32) ||
         addressN[1] !== toHardened(133) ||
-        addressN[2] < toHardened(0) ||
-        addressN[2] > 0xffffffff
+        addressN[2] < toHardened(0)
       ) {
         throw invalidParameter("Zcash requires a ZIP-32 account path m/32'/133'/account'");
       }
@@ -99,17 +98,16 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
       });
 
       const path = serializedPath(param.address_n);
+      // The V2 decoder returns null for absent optional fields; omit them instead.
+      const { address, ufvk, seed_fingerprint: seedFingerprint } = res.message;
       responses.push({
         path,
-        address: res.message.address,
-        ufvk: res.message.ufvk,
-        seedFingerprint: res.message.seed_fingerprint,
+        address,
+        ...(ufvk ? { ufvk } : {}),
+        ...(seedFingerprint ? { seedFingerprint } : {}),
       });
 
-      this.postPreviousAddressMessage({
-        address: res.message.address,
-        path,
-      });
+      this.postPreviousAddressMessage({ address, path });
     }
 
     validateResult(responses, ['address'], {

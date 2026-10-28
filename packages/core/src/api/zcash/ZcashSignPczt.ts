@@ -57,41 +57,38 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
   // the host must answer with exactly that many bytes.
   uploadPczt = async (
     typedCall: TypedCall,
-    res: TypedResponseMessage<'ZcashSignedPczt'> | TypedResponseMessage<'ZcashPcztChunkRequest'>,
-    offset: number
+    first: TypedResponseMessage<'ZcashSignedPczt'> | TypedResponseMessage<'ZcashPcztChunkRequest'>,
+    initialOffset: number
   ): Promise<TypedResponseMessage<'ZcashSignedPczt'>> => {
-    if (res.type === 'ZcashSignedPczt') {
-      if (offset !== this.pczt.length) {
+    let res = first;
+    let offset = initialOffset;
+    while (res.type === 'ZcashPcztChunkRequest') {
+      const { chunk_length: chunkLength } = res.message;
+      if (
+        !Number.isSafeInteger(chunkLength) ||
+        chunkLength <= 0 ||
+        offset + chunkLength > this.pczt.length
+      ) {
         throw ERRORS.TypedError(
           HardwareErrorCode.ResponseUnexpectTypeError,
-          'device completed signing before receiving the whole pczt'
+          `device requested ${chunkLength} bytes at offset ${offset} of ${this.pczt.length}`
         );
       }
-      return res;
+
+      const chunk = this.pczt.subarray(offset, offset + chunkLength);
+      res = await typedCall('ZcashPcztChunkAck', ['ZcashSignedPczt', 'ZcashPcztChunkRequest'], {
+        data_chunk: bytesToHex(chunk),
+      });
+      offset += chunkLength;
     }
 
-    const { chunk_length: chunkLength } = res.message;
-    if (
-      !Number.isSafeInteger(chunkLength) ||
-      chunkLength <= 0 ||
-      offset + chunkLength > this.pczt.length
-    ) {
+    if (offset !== this.pczt.length) {
       throw ERRORS.TypedError(
         HardwareErrorCode.ResponseUnexpectTypeError,
-        `device requested ${chunkLength} bytes at offset ${offset} of ${this.pczt.length}`
+        'device completed signing before receiving the whole pczt'
       );
     }
-
-    const chunk = this.pczt.subarray(offset, offset + chunkLength);
-    const next = await typedCall(
-      'ZcashPcztChunkAck',
-      ['ZcashSignedPczt', 'ZcashPcztChunkRequest'],
-      {
-        data_chunk: bytesToHex(chunk),
-      }
-    );
-
-    return this.uploadPczt(typedCall, next, offset + chunkLength);
+    return res;
   };
 
   // Download: the host decides chunk lengths via ZcashSignedPcztChunkRequest

@@ -284,6 +284,28 @@ describe('ZcashSignPczt protocol edge cases', () => {
     expect(typedCall).toHaveBeenCalledTimes(3);
   });
 
+  test('uploads with a flat loop when the device asks for one byte at a time', async () => {
+    const pczt = Buffer.from(Array.from({ length: 1024 + 20000 }, (_, i) => i % 251));
+    const signed = Buffer.alloc(80, 0xcd);
+    const uploaded: string[] = [];
+    let requested = 1024;
+    const typedCall = jest.fn(
+      (type: string, _response: unknown, message: { data_chunk?: string }) => {
+        if (type === 'ZcashPcztChunkAck') uploaded.push(message.data_chunk ?? '');
+        if (requested === pczt.length) return Promise.resolve(signedMessage(signed));
+        requested += 1;
+        return Promise.resolve({ type: 'ZcashPcztChunkRequest', message: { chunk_length: 1 } });
+      }
+    );
+
+    await expect(runWith(pczt.toString('hex'), typedCall)).resolves.toEqual({
+      pczt: signed.toString('hex'),
+    });
+    expect(uploaded).toHaveLength(20000);
+    expect(uploaded.join('')).toBe(pczt.subarray(1024).toString('hex'));
+    expect(typedCall).toHaveBeenCalledTimes(20001);
+  });
+
   test.each(['abc', '0xabc', 'a'])('rejects odd-length hex %s', pczt => {
     expect(() => createSignMethod(pczt).init()).toThrow('pczt hex must have an even length');
   });
@@ -333,6 +355,28 @@ describe('ZcashGetAddress', () => {
       include_seed_fingerprint: true,
     });
   });
+
+  test('omits the viewing key and fingerprint the V2 decoder returns as null', async () => {
+    const method = new ZcashGetAddress({
+      id: 1,
+      payload: { method: 'zcashGetAddress', path: "m/32'/133'/0'" },
+    });
+    method.init();
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'ZcashAddress',
+      message: { address: 'u1abc', ufvk: null, seed_fingerprint: null },
+    });
+    attachDevice(method, typedCall);
+
+    const result = await method.run();
+    expect(result).toEqual({ path: "m/32'/133'/0'", address: 'u1abc' });
+    expect(result).not.toHaveProperty('ufvk');
+    expect(result).not.toHaveProperty('seedFingerprint');
+    expect(typedCall.mock.calls[0][2]).toMatchObject({
+      include_ufvk: false,
+      include_seed_fingerprint: false,
+    });
+  });
 });
 
 describe('Zcash address protocol selection', () => {
@@ -378,6 +422,21 @@ describe('Zcash address protocol selection', () => {
     { path: "m/32'/133'/0'/0/0" },
   ])('rejects invalid address requests %j', params => {
     expect(() => createAddress(params).init()).toThrow();
+  });
+  // Each of these would otherwise be sent as account 0'.
+  test.each([
+    "m/32'/133'/2147483648'",
+    "m/32'/133'/4294967296'",
+    "m/32'/133'/0.5'",
+    [0x80000020, 0x80000085, 0x100000000 + 0x80000000],
+    [0x80000020, 0x80000085, 0x80000000 + 0.5],
+  ])('rejects the out-of-range account path %j before hardening', path => {
+    expect(() => createAddress({ path }).init()).toThrow('Not a valid path');
+  });
+  test('accepts the largest ZIP-32 account', () => {
+    const method = createAddress({ path: "m/32'/133'/2147483647'" });
+    method.init();
+    expect(method.params[0].address_n).toEqual([0x80000020, 0x80000085, 0xffffffff]);
   });
   test('accepts the uint32 limit only for an Orchard-only address', () => {
     expect(() =>

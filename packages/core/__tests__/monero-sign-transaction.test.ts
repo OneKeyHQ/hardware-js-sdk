@@ -404,6 +404,7 @@ describe('MoneroSignTransaction', () => {
       /inputs\[1\] must be an object/,
     ],
     ['a short path', { path: "m/44'/128'" }, /Not a valid path/],
+    ['an account past the hardened range', { path: "m/44'/128'/4294967296'" }, /Not a valid path/],
     ['an unknown network type', { networkType: 3 }, /network type/],
     ['num_inputs not matching the inputs', { tsxData: tsxData({ num_inputs: 2 }) }, /num_inputs/],
     ['a single output', { tsxData: tsxData({ outputs: [CHANGE] }) }, /at least 2 outputs/],
