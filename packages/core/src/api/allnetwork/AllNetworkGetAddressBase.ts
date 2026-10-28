@@ -9,7 +9,7 @@ import {
 
 import { serializedPath, toHardened } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { invalidParameter, validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
@@ -34,6 +34,12 @@ import type {
 } from '../../types/api/allNetworkGetAddress';
 
 const Mainnet = 'mainnet';
+
+const MoneroNetworkTypes = new Map<string, number>([
+  [Mainnet, PROTO.MoneroNetworkType.MAINNET],
+  ['testnet', PROTO.MoneroNetworkType.TESTNET],
+  ['stagenet', PROTO.MoneroNetworkType.STAGENET],
+]);
 
 export type NetworkConfig = {
   methodName: keyof CoreApi;
@@ -250,9 +256,13 @@ const networkConfigMap: NetworkConfigMap = {
     methodName: 'moneroGetAddress',
     getParams: (baseParams: AllNetworkAddressParams, chainName?: string) => {
       const { path, showOnOneKey } = baseParams;
+      const networkType = MoneroNetworkTypes.get(chainName ?? Mainnet);
+      if (networkType === undefined) {
+        throw invalidParameter(`Unsupported Monero chainName: ${chainName}`);
+      }
       return {
         path,
-        networkType: chainName === 'testnet' ? 1 : 0,
+        networkType,
         showOnOneKey,
       };
     },

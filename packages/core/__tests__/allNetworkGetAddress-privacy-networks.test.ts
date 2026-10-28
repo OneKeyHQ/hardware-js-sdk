@@ -25,6 +25,7 @@ describe('allNetworkGetAddress privacy networks', () => {
     [undefined, 0],
     ['mainnet', 0],
     ['testnet', 1],
+    ['stagenet', 2],
   ])('asks moneroGetAddress on the %s network type', (chainName, networkType) => {
     const payload = {
       network: 'xmr' as const,
@@ -45,6 +46,15 @@ describe('allNetworkGetAddress privacy networks', () => {
       })
     );
   });
+
+  test.each(['fakechain', 'constructor'])(
+    'rejects the unknown Monero chainName %s instead of using mainnet',
+    chainName => {
+      expect(() =>
+        mapItem({ network: 'xmr', path: "m/44'/128'/0'", chainName, showOnOneKey: false })
+      ).toThrow(`Unsupported Monero chainName: ${chainName}`);
+    }
+  );
 
   test('asks zcashGetAddress for the Orchard address with its viewing key', () => {
     const payload = { network: 'zcash' as const, path: "m/32'/133'/0'", showOnOneKey: false };
