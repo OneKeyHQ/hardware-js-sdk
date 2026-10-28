@@ -850,6 +850,93 @@ describe('LedgerAdapter', () => {
     expect(select).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [true, true],
+    [true, false],
+    [false, false],
+  ])(
+    'asks permission for the selected USB Ledger instead of the stale BLE target (USB granted=%s, device granted=%s)',
+    async (usbGranted, deviceGranted) => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+      connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+        options?.transportType === 'usb'
+          ? [{ connectId: 'usb-B', deviceId: 'usb-B', name: 'Ledger Stax', connectionType: 'usb' }]
+          : []
+      );
+      connector.connect.mockResolvedValue(ledgerSession('usb-session', { connectId: 'usb-B' }));
+      connector.callImpl.mockResolvedValue(['Ethereum']);
+      (
+        adapter as unknown as { emitter: { removeAllListeners(event: string): void } }
+      ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
+      const permissions: { transportType: string; connectId?: string }[] = [];
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+        permissions.push(event.payload);
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: {
+            granted:
+              event.payload.transportType !== 'ble' &&
+              usbGranted &&
+              (!event.payload.connectId || deviceGranted),
+          },
+        });
+      });
+
+      const result = await adapter.listInstalledNames('ble-A');
+
+      expect(permissions.every(permission => permission.transportType === 'hid')).toBe(true);
+      if (usbGranted && deviceGranted) {
+        expect(result).toEqual({ success: true, payload: ['Ethereum'] });
+        expect(permissions).toContainEqual(
+          expect.objectContaining({
+            transportType: 'hid',
+            connectId: 'usb-B',
+          })
+        );
+        expect(connector.connect).toHaveBeenCalledWith('usb-B', { transportType: 'usb' });
+        expect(connector.call).toHaveBeenCalledWith('usb-session', 'listInstalledNames', {});
+      } else {
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DevicePermissionDenied },
+        });
+        expect(connector.connect).not.toHaveBeenCalled();
+        expect(connector.call).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('still requires BLE permission when app management reuses an active BLE session', async () => {
+    Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.connect.mockResolvedValue(
+      ledgerSession('ble-session', { connectId: 'ble-A', connectionType: 'ble' })
+    );
+    await expect(adapter.connectDevice('ble-A')).resolves.toMatchObject({ success: true });
+    (
+      adapter as unknown as { emitter: { removeAllListeners(event: string): void } }
+    ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
+    const permissions: { transportType: string; connectId?: string }[] = [];
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+      permissions.push(event.payload);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: false },
+      });
+    });
+
+    await expect(adapter.listInstalledNames('ble-A')).resolves.toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DevicePermissionDenied },
+    });
+    expect(permissions).toEqual([
+      expect.objectContaining({ transportType: 'ble', connectId: 'ble-A' }),
+    ]);
+    expect(connector.searchDevices).not.toHaveBeenCalled();
+    expect(connector.call).not.toHaveBeenCalled();
+  });
+
   it('does not select BLE for a legacy target when the caller disallows selection', async () => {
     Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
     connector.searchDevices.mockResolvedValue([]);

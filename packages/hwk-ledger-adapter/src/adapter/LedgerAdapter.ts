@@ -2750,7 +2750,13 @@ export class LedgerAdapter implements IHardwareWallet {
     lockedRetryBudget = LedgerAdapter.MAX_BUSINESS_RETRY_BUDGET
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
-    if (!operationId) {
+    const resolvesAppManagementTransport =
+      APP_MANAGEMENT_METHODS.has(method) &&
+      this.connector.availableTransports?.includes('usb') &&
+      this.connector.availableTransports.includes('ble');
+    // A stale BLE endpoint may resolve to USB for app management. Discovery and connection
+    // request their own permissions; authorize the resolved session before the actual call.
+    if (!operationId && !resolvesAppManagementTransport) {
       await this._ensureDevicePermission(
         connectId,
         permissionDeviceId ?? fingerprint?.deviceId,
@@ -2850,6 +2856,17 @@ export class LedgerAdapter implements IHardwareWallet {
       throw Object.assign(new Error('Auto-connect succeeded but no session found'), {
         _tag: ERROR_TAG.DeviceSessionNotFound,
       });
+    }
+
+    if (!operationId && resolvesAppManagementTransport) {
+      const transport = this._sessionTransports.get(sessionId);
+      await this._ensureDevicePermission(
+        resolvedConnectId,
+        permissionDeviceId ?? fingerprint?.deviceId,
+        signal,
+        transport && (isLedgerBleConnectionType(transport) ? 'ble' : 'hid')
+      );
+      LedgerAdapter._throwIfAborted(signal);
     }
 
     // Fingerprint verification inside the session — atomic with the actual call
@@ -3157,12 +3174,13 @@ export class LedgerAdapter implements IHardwareWallet {
   private async _ensureDevicePermission(
     connectId?: string,
     deviceId?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    transportOverride?: TransportType
   ): Promise<void> {
     if (signal?.aborted) {
       LedgerAdapter._throwIfAborted(signal);
     }
-    const transportType: TransportType = this.activeTransport ?? 'hid';
+    const transportType: TransportType = transportOverride ?? this.activeTransport ?? 'hid';
 
     // Register the wait before emitting: a synchronous listener that replies
     // immediately (e.g. in tests or a same-process consumer) would otherwise
