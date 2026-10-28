@@ -22,3 +22,4 @@ packages/hwk-trezor-transport-common/
 packages/hwk-trezor-transport-web/
 packages/hwk-trezor-type-utils/
 packages/hwk-trezor-utils/
+packages/hd-transport/src/serialization/protobuf/generated/

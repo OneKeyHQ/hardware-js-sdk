@@ -1,11 +1,17 @@
 import * as protobuf from 'protobufjs/light';
+import Long from 'long';
 
-export function parseConfigure(data: protobuf.INamespace) {
-  // @ts-ignore [compatiblity]: connect is sending stringified json
-  if (typeof data === 'string') {
-    return protobuf.Root.fromJSON(JSON.parse(data));
-  }
-  return protobuf.Root.fromJSON(data);
+import { installStaticCodecs } from './generated/codecs';
+
+// protobufjs optional dependency discovery uses Function, which CSP can disable.
+protobuf.util.Long = Long;
+protobuf.configure();
+
+export function parseConfigure(data: protobuf.INamespace | string) {
+  const root = protobuf.Root.fromJSON(typeof data === 'string' ? JSON.parse(data) : data);
+  // Unrecognized custom schemas retain the existing reflection-based API.
+  installStaticCodecs(root);
+  return root;
 }
 
 export const createMessageFromName = (messages: protobuf.Root, name: string) => {
