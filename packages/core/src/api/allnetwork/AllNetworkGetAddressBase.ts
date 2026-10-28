@@ -9,7 +9,7 @@ import {
 
 import { serializedPath, toHardened } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { invalidParameter, validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
@@ -34,6 +34,12 @@ import type {
 } from '../../types/api/allNetworkGetAddress';
 
 const Mainnet = 'mainnet';
+
+const MoneroNetworkTypes = new Map<string, number>([
+  [Mainnet, PROTO.MoneroNetworkType.MAINNET],
+  ['testnet', PROTO.MoneroNetworkType.TESTNET],
+  ['stagenet', PROTO.MoneroNetworkType.STAGENET],
+]);
 
 export type NetworkConfig = {
   methodName: keyof CoreApi;
@@ -245,6 +251,37 @@ const networkConfigMap: NetworkConfigMap = {
   },
   stellar: {
     methodName: 'stellarGetAddress',
+  },
+  xmr: {
+    methodName: 'moneroGetAddress',
+    getParams: (baseParams: AllNetworkAddressParams, chainName?: string) => {
+      const { path, showOnOneKey } = baseParams;
+      const networkType = MoneroNetworkTypes.get(chainName ?? Mainnet);
+      if (networkType === undefined) {
+        throw invalidParameter(`Unsupported Monero chainName: ${chainName}`);
+      }
+      return {
+        path,
+        networkType,
+        showOnOneKey,
+      };
+    },
+  },
+  zcash: {
+    methodName: 'zcashGetAddress',
+    // The account's unified address with the keys a wallet needs to watch it.
+    getParams: (baseParams: AllNetworkAddressParams) => {
+      const { path, showOnOneKey } = baseParams;
+      return {
+        path,
+        showOnOneKey,
+        addressType: PROTO.ZcashAddressType.UNIFIED_ORCHARD,
+        scope: PROTO.ZcashAddressScope.EXTERNAL,
+        diversifierIndex: 0,
+        includeUfvk: true,
+        includeSeedFingerprint: true,
+      };
+    },
   },
 };
 

@@ -10,6 +10,7 @@ import {
   createIFrameMessage,
   getLogBlockLabel,
   getLogger,
+  getSafeLogPayload,
   initCore,
   parseConnectSettings,
   parseMessage,
@@ -90,7 +91,7 @@ export async function init(payload: IFrameInit['payload']) {
       if (blockLog) {
         Log.debug('Frame Bridge Receive message: ', blockLog);
       } else {
-        Log.debug('Frame Bridge Receive message: ', message);
+        Log.debug('Frame Bridge Receive message: ', getSafeLogPayload(message));
       }
 
       if (message.event === IFRAME.SWITCH_TRANSPORT) {

@@ -143,3 +143,26 @@ export const validatePath = (
   if (length > 0 && valid.length < length) throw PATH_NOT_VALID;
   return base ? valid.splice(0, 3) : valid;
 };
+
+const isTextIndex = (part: string) => {
+  const digits = /^(\d+)'?$/.exec(part)?.[1];
+  return digits !== undefined && Number(digits) < HD_HARDENED;
+};
+
+const isUint32 = (n: number) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff;
+
+// validatePath lets parseInt and 32-bit hardening alias fractional or oversized
+// components to another index: 0.5' and 4294967296' both become 0'.
+export const validateStrictPath = (path: string | Array<number>, length = 0): Array<number> => {
+  const addressN = validatePath(path, length);
+  const isStrict =
+    typeof path === 'string'
+      ? path
+          .toLowerCase()
+          .split('/')
+          .filter(p => p !== 'm' && p !== '')
+          .every(isTextIndex)
+      : path.every(isUint32);
+  if (!isStrict) throw PATH_NOT_VALID;
+  return addressN;
+};

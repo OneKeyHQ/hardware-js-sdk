@@ -392,6 +392,8 @@ export abstract class BaseMethod<Params = undefined> {
     this.postMessage(
       createUiMessage(UI_REQUEST.PREVIOUS_ADDRESS_RESULT, {
         device: this.device.toMessageObject() as KnownDevice,
+        // Lets log redaction recognize addresses of methods whose results stay out of logs.
+        method: this.name,
         data,
       })
     );
