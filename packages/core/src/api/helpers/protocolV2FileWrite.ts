@@ -186,6 +186,9 @@ function logFileTransferMetrics({
   hostWriteElapsedMs,
   responseWaitElapsedMs,
   measuredAttempts,
+  fileWriteWindow,
+  chunkSize,
+  retryCount,
 }: {
   transport: string;
   status: 'progress' | 'completed' | 'failed';
@@ -197,6 +200,9 @@ function logFileTransferMetrics({
   hostWriteElapsedMs: number;
   responseWaitElapsedMs: number;
   measuredAttempts: number;
+  fileWriteWindow: number;
+  chunkSize: number;
+  retryCount: number;
 }) {
   const segmentedMetrics =
     measuredAttempts > 0
@@ -207,7 +213,11 @@ function logFileTransferMetrics({
   Log.log(
     `[FileWrite] metrics transport=${transport} status=${status} path=${path} bytes=${transferredBytes}/${totalBytes} elapsed=${(
       elapsedMs / 1000
-    ).toFixed(2)}s speed=${formatFileTransferRate(rateBytesPerSecond)} KiB/s${segmentedMetrics}`
+    ).toFixed(2)}s speed=${formatFileTransferRate(
+      rateBytesPerSecond
+    )} KiB/s${segmentedMetrics} window=${fileWriteWindow} chunk=${chunkSize} retry=${retryCount} averageSpeed=${formatFileTransferRate(
+      getAverageFileTransferRate(transferredBytes, elapsedMs)
+    )} KiB/s`
   );
 }
 
@@ -301,6 +311,8 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     options.chunkSize ?? options.chunkLen,
     pipelineAsset ? Math.min(chunkSizeLimit, PROTOCOL_V2_BLE_FILE_CHUNK_SIZE) : chunkSizeLimit
   );
+  const fileWriteWindow =
+    pipelineAsset && dataLength > chunkSize ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1;
   let written = 0;
   let chunks = 0;
   let lastMessage: Record<string, unknown> | undefined;
@@ -405,6 +417,9 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
         hostWriteElapsedMs,
         responseWaitElapsedMs,
         measuredAttempts,
+        fileWriteWindow,
+        chunkSize,
+        retryCount,
       });
       logWindowStartedAt = now;
       logWindowStartedBytes = transferredBytes;
@@ -419,10 +434,13 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   const writeAttempt = async () => {
     options.throwIfAborted?.();
     const attemptRetryCount = retryCount;
-    if (pipelineAsset && dataLength > chunkSize && retryCount === 0) {
+    if (fileWriteWindow === PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW) {
       Log.debug('[FileWrite] BLE asset pipeline', {
-        window: PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW,
-        applicationVersion: options.commands.device?.state?.versions.firmware,
+        path: options.path,
+        window: fileWriteWindow,
+        chunkSize,
+        retryCount,
+        applicationVersion: commands.device?.state?.versions.firmware,
       });
       let sendOffset = chunkSize;
       let interrupted = false;
@@ -571,6 +589,9 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
         hostWriteElapsedMs,
         responseWaitElapsedMs,
         measuredAttempts,
+        fileWriteWindow,
+        chunkSize,
+        retryCount,
       });
       if (
         !canRecoverPipeline ||
@@ -582,7 +603,7 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
       options.throwIfAborted?.();
       retryCount += 1;
       Log.log(
-        `[FileWrite] retry=${retryCount}/${maxChunkRetries} restarting serially after reconnect`
+        `[FileWrite] retry=${retryCount}/${maxChunkRetries} restarting window=${fileWriteWindow} after reconnect path=${options.path}`
       );
       options.onProgress?.({
         progress: 0,
@@ -625,6 +646,9 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     hostWriteElapsedMs,
     responseWaitElapsedMs,
     measuredAttempts,
+    fileWriteWindow,
+    chunkSize,
+    retryCount,
   });
 
   return {

@@ -129,50 +129,72 @@ describe('writeProtocolV2File', () => {
       expect(typedCall).toHaveBeenCalledTimes(1);
     });
 
-    test('reconnects and restarts serially from zero after a partially confirmed pipeline', async () => {
-      const { commands, typedCall } = createCommands();
-      const fresh = createCommands();
-      const timeout = Object.assign(new Error('BLE response timeout'), {
-        errorCode: HardwareErrorCode.BleTimeoutError,
-      });
-      typedCall.mockImplementationOnce((_name, _response, first, options) => {
-        options?.fileWritePipeline?.onResponse({
-          type: 'FilesystemFile',
-          message: { ...first.file, processed_byte: 1800 },
+    test.each(
+      [EDeviceType.Pro2, EDeviceType.Neo].flatMap(deviceType =>
+        ['react-native', 'desktop-web-ble'].flatMap(env =>
+          [
+            'vol1:/wallpapers/wallpaper.okpkg',
+            'vol1:/nft/nft-deadbeef-1760000000000.okpkg',
+            'vol1:/portfolio/portfolio.okpkg.pending',
+          ].map(path => ({ deviceType, env, path }))
+        )
+      )
+    )(
+      'reconnects and restarts the dual-frame $deviceType $path upload on $env',
+      async ({ deviceType, env, path }) => {
+        jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+        const { commands, typedCall } = createCommands(deviceType);
+        const fresh = createCommands(deviceType);
+        const timeout = Object.assign(new Error('BLE response timeout'), {
+          errorCode: HardwareErrorCode.BleTimeoutError,
         });
-        return Promise.reject(timeout);
-      });
-      const recoverConnection = jest.fn().mockResolvedValue(fresh.commands);
-      const onProgress = jest.fn();
+        typedCall.mockImplementationOnce((_name, _response, first, options) => {
+          options?.fileWritePipeline?.onResponse({
+            type: 'FilesystemFile',
+            message: { ...first.file, processed_byte: 1800 },
+          });
+          return Promise.reject(timeout);
+        });
+        const recoverConnection = jest.fn().mockResolvedValue(fresh.commands);
+        const onProgress = jest.fn();
+        const metrics = jest.spyOn(getLogger(LoggerNames.Core), 'log');
 
-      await expect(
-        writeProtocolV2File({
-          commands,
-          overwrite: true,
-          path: 'vol1:/wallpapers/wallpaper.okpkg',
-          data: new Uint8Array(3601),
-          maxChunkRetries: 3,
-          recoverConnection,
-          onProgress,
-        })
-      ).resolves.toMatchObject({ processed_byte: 3601, chunks: 3 });
+        await expect(
+          writeProtocolV2File({
+            commands,
+            overwrite: true,
+            path,
+            data: new Uint8Array(3601),
+            maxChunkRetries: 3,
+            recoverConnection,
+            onProgress,
+          })
+        ).resolves.toMatchObject({ processed_byte: 3601, chunks: 3 });
 
-      expect(typedCall).toHaveBeenCalledTimes(1);
-      expect(recoverConnection).toHaveBeenCalledTimes(1);
-      expect(fresh.requests.map(request => request.file.offset)).toEqual([0, 1800, 3600]);
-      expect(fresh.requests.map(request => request.overwrite)).toEqual([true, false, false]);
-      expect(fresh.typedCall.mock.calls.every(call => !call[3]?.fileWritePipeline)).toBe(true);
-      expect(fresh.typedCall.mock.calls[0][3]?.timeoutMs).toBe(10_000);
-      expect(onProgress.mock.calls.map(([progress]) => progress.transferredBytes)).toEqual([
-        1800, 0, 1800, 3600, 3601,
-      ]);
-      expect(onProgress.mock.calls[onProgress.mock.calls.length - 1][0]).toMatchObject({
-        retryCount: 1,
-        progress: 100,
-      });
-    });
+        expect(typedCall).toHaveBeenCalledTimes(1);
+        expect(recoverConnection).toHaveBeenCalledTimes(1);
+        expect(metrics).toHaveBeenCalledWith(
+          expect.stringContaining(`status=failed path=${path} bytes=1800/3601`)
+        );
+        expect(metrics).toHaveBeenLastCalledWith(
+          expect.stringContaining('window=2 chunk=1800 retry=1 averageSpeed=')
+        );
+        expect(fresh.requests.map(request => request.file.offset)).toEqual([0, 1800, 3600]);
+        expect(fresh.requests.map(request => request.overwrite)).toEqual([true, false, false]);
+        expect(fresh.typedCall).toHaveBeenCalledTimes(1);
+        expect(fresh.typedCall.mock.calls[0][3]?.fileWritePipeline).toBeDefined();
+        expect(fresh.typedCall.mock.calls[0][3]?.timeoutMs).toBe(10_000);
+        expect(onProgress.mock.calls.map(([progress]) => progress.transferredBytes)).toEqual([
+          1800, 0, 1800, 3600, 3601,
+        ]);
+        expect(onProgress.mock.calls[onProgress.mock.calls.length - 1][0]).toMatchObject({
+          retryCount: 1,
+          progress: 100,
+        });
+      }
+    );
 
-    test('bounds whole-file recovery to three extra attempts, including serial failures', async () => {
+    test('bounds dual-frame whole-file recovery to three extra attempts', async () => {
       const { commands, typedCall } = createCommands();
       const timeout = Object.assign(new Error('BLE response timeout'), {
         errorCode: HardwareErrorCode.BleTimeoutError,
@@ -191,7 +213,7 @@ describe('writeProtocolV2File', () => {
       ).rejects.toBe(timeout);
       expect(typedCall).toHaveBeenCalledTimes(4);
       expect(recoverConnection).toHaveBeenCalledTimes(3);
-      expect(typedCall.mock.calls.slice(1).every(call => !call[3]?.fileWritePipeline)).toBe(true);
+      expect(typedCall.mock.calls.every(call => !!call[3]?.fileWritePipeline)).toBe(true);
     });
 
     test('does not start a retry when cancelled during reconnect', async () => {
@@ -605,7 +627,7 @@ describe('writeProtocolV2File', () => {
       });
 
       expect(logSpy).toHaveBeenLastCalledWith(
-        '[FileWrite] metrics transport=unknown status=completed path=vol0:/firmware.bin bytes=3/3 elapsed=0.05s speed=0.06 KiB/s hostWriteTotal=0.03s responseWaitTotal=0.03s measuredAttempts=1'
+        '[FileWrite] metrics transport=unknown status=completed path=vol0:/firmware.bin bytes=3/3 elapsed=0.05s speed=0.06 KiB/s hostWriteTotal=0.03s responseWaitTotal=0.03s measuredAttempts=1 window=1 chunk=4000 retry=0 averageSpeed=0.06 KiB/s'
       );
     } finally {
       dateNowSpy.mockRestore();
@@ -682,11 +704,11 @@ describe('writeProtocolV2File', () => {
       );
       expect(logSpy).toHaveBeenNthCalledWith(
         2,
-        '[FileWrite] metrics transport=BLE status=progress path=vol1:/wallpapers/test.bin bytes=3600/5400 elapsed=10.00s speed=0.35 KiB/s'
+        '[FileWrite] metrics transport=BLE status=progress path=vol1:/wallpapers/test.bin bytes=3600/5400 elapsed=10.00s speed=0.35 KiB/s window=1 chunk=1800 retry=0 averageSpeed=0.35 KiB/s'
       );
       expect(logSpy).toHaveBeenNthCalledWith(
         3,
-        '[FileWrite] metrics transport=BLE status=completed path=vol1:/wallpapers/test.bin bytes=5400/5400 elapsed=14.00s speed=0.44 KiB/s'
+        '[FileWrite] metrics transport=BLE status=completed path=vol1:/wallpapers/test.bin bytes=5400/5400 elapsed=14.00s speed=0.44 KiB/s window=1 chunk=1800 retry=0 averageSpeed=0.38 KiB/s'
       );
     } finally {
       dateNowSpy.mockRestore();
@@ -720,7 +742,7 @@ describe('writeProtocolV2File', () => {
       );
       expect(logSpy).toHaveBeenNthCalledWith(
         2,
-        '[FileWrite] metrics transport=unknown status=failed path=vol1:/wallpapers/test.bin bytes=0/4000 elapsed=1.00s speed=0.00 KiB/s'
+        '[FileWrite] metrics transport=unknown status=failed path=vol1:/wallpapers/test.bin bytes=0/4000 elapsed=1.00s speed=0.00 KiB/s window=1 chunk=4000 retry=0 averageSpeed=0.00 KiB/s'
       );
     } finally {
       dateNowSpy.mockRestore();
