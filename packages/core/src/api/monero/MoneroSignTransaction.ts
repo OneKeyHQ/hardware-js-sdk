@@ -311,6 +311,9 @@ export default class MoneroSignTransaction extends BaseMethod<SignTransactionPar
       rsig: rsigs[0],
       ...prefix,
       openingKey: requireBytes(final.message.opening_key, 'opening_key'),
+      salt: requireBytes(final.message.salt, 'salt'),
+      randMult: requireBytes(final.message.rand_mult, 'rand_mult'),
+      txEncKeys: requireBytes(final.message.tx_enc_keys, 'tx_enc_keys'),
     };
   }
 }

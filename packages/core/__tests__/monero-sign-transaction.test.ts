@@ -86,6 +86,7 @@ type FakeOptions = {
   keyImages?: string[];
   rsigOnOutputs?: number[];
   openingKey?: string | null;
+  finalAck?: Record<string, unknown>;
 };
 
 type FakeMessage = {
@@ -151,6 +152,7 @@ const createFakeDevice = (options: FakeOptions = {}) => {
           salt: key(0x11),
           rand_mult: key(0x12),
           tx_enc_keys: 'ab'.repeat(48),
+          ...options.finalAck,
         });
       default:
         return Promise.reject(new Error(`unexpected ${type}`));
@@ -255,6 +257,9 @@ describe('MoneroSignTransaction', () => {
       fullMessageHash: key(0x57),
       rv: { txnFee: '100000000', message: key(0x56), rvType: 6 },
       openingKey: OPENING_KEY,
+      salt: key(0x11),
+      randMult: key(0x12),
+      txEncKeys: 'ab'.repeat(48),
     });
   });
 
@@ -361,6 +366,9 @@ describe('MoneroSignTransaction', () => {
     ['no range proof', { rsigOnOutputs: [] }, /one aggregated range proof, got 0/],
     ['two range proofs', { rsigOnOutputs: [0, 1] }, /one aggregated range proof, got 2/],
     ['no opening key', { openingKey: null }, /opening_key/],
+    ['no salt', { finalAck: { salt: null } }, /missing salt/],
+    ['no rand_mult', { finalAck: { rand_mult: null } }, /missing rand_mult/],
+    ['no tx_enc_keys', { finalAck: { tx_enc_keys: '' } }, /missing tx_enc_keys/],
   ])('fails when the device returns %s', async (_, options, message) => {
     const { run } = runWith(options);
     await expect(run).rejects.toThrow(message);

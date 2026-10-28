@@ -40,6 +40,11 @@ export type MoneroSignTransactionResult = {
     rvType: number;
   };
   openingKey: string;
+  // Tx private keys sealed by the device for later proofs (MoneroGetTxKeyRequest), with the
+  // salts that rederive the sealing key; wallet2 keeps them as salt1, salt2, enc_keys
+  salt: string;
+  randMult: string;
+  txEncKeys: string;
 };
 
 export declare function moneroSignTransaction(
