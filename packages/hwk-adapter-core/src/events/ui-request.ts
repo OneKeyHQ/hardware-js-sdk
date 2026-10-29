@@ -22,7 +22,7 @@ export const UI_REQUEST = {
   // Required app is not installed; with autoInstallApp on, ask the user
   // whether to install it before retrying the operation.
   REQUEST_INSTALL_APP: 'ui-request-install-app',
-  // The request is over the USB transport's size limit; ask whether to show it as a QR instead.
+  // The request cannot go over USB (see QrFallbackReason); ask whether to show it as a QR instead.
   REQUEST_QR_FALLBACK_CONFIRM: 'ui-request-qr-fallback-confirm',
   REQUEST_PREEMPTION: 'ui-request-preemption',
   REQUEST_TREZOR_THP_PAIRING: 'ui-request-trezor-thp-pairing',
@@ -83,6 +83,16 @@ export type DevicePermissionResponse = {
  */
 export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
 
+/**
+ * Why the request cannot go over USB. Only `payload-too-large` comes after the request was built;
+ * the others mean a connected device cannot serve this wallet, so the host may offer a retry.
+ */
+export type QrFallbackReason =
+  | 'payload-too-large'
+  | 'wallet-mismatch'
+  | 'device-locked'
+  | 'usb-unavailable';
+
 export type UiResponseEvent =
   | {
       type: typeof UI_RESPONSE.RECEIVE_SAVE_DEVICE_BINDING;
@@ -141,8 +151,11 @@ export type UiResponseEvent =
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM;
-      /** Echo the prompt's requestId; missing or stale IDs are ignored. */
-      payload: { confirmed: boolean; requestId?: string };
+      /**
+       * Echo the prompt's requestId; missing or stale IDs are ignored. `retry` asks to look for
+       * the USB device again; it is ignored for `payload-too-large`.
+       */
+      payload: { confirmed: boolean; retry?: boolean; requestId?: string };
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PREEMPTION;

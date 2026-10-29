@@ -119,6 +119,8 @@ type LedgerConnectionAttempt = ICommonCallParams & {
   /** The caller checks the wallet first, so a BLE pick waits in `pendingBinding`. */
   deferBindingSave?: boolean;
   pendingBinding?: { connectId: string; requestId: string };
+  /** App management may use a Ledger already on USB in place of a named endpoint. */
+  takesPluggedUsb?: boolean;
 };
 
 /**
@@ -164,6 +166,17 @@ function isLostConnectionError(err: unknown): boolean {
  * `display=true`. See app-bitcoin-new src/handler/get_extended_pubkey.c.
  */
 const BTC_HIGH_INDEX_THRESHOLD = 100;
+
+/**
+ * App management works on the device OS, never on a wallet: when its named endpoint is not
+ * connected, it may use a Ledger already plugged in over USB (a BLE picker still never swaps one in).
+ */
+const APP_MANAGEMENT_METHODS = new Set([
+  'installApp',
+  'listInstalledApps',
+  'listInstalledNames',
+  'listAvailableApps',
+]);
 
 function btcAccountIndexFromPath(path: string): number | null {
   const segments = path.replace(/^m\//, '').split('/');
@@ -2122,7 +2135,11 @@ export class LedgerAdapter implements IHardwareWallet {
           : usbDevices.find(device => device.connectId === targetConnectId)?.connectId;
       // A named target that is not on USB may only fall back to another USB Ledger when the call
       // checks the wallet; an unchecked call would otherwise derive on whichever one is plugged in.
-      if (usbDevices.length > 0 && (usbTarget || !targetConnectId || allowUsbEphemeralFallback)) {
+      // App management derives nothing, so it may.
+      if (
+        usbDevices.length > 0 &&
+        (usbTarget || !targetConnectId || allowUsbEphemeralFallback || context?.takesPluggedUsb)
+      ) {
         return this._connectFirstOrSelect(
           usbDevices,
           usbTarget,
@@ -2733,7 +2750,13 @@ export class LedgerAdapter implements IHardwareWallet {
     lockedRetryBudget = LedgerAdapter.MAX_BUSINESS_RETRY_BUDGET
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
-    if (!operationId) {
+    const resolvesAppManagementTransport =
+      APP_MANAGEMENT_METHODS.has(method) &&
+      this.connector.availableTransports?.includes('usb') &&
+      this.connector.availableTransports.includes('ble');
+    // A stale BLE endpoint may resolve to USB for app management. Discovery and connection
+    // request their own permissions; authorize the resolved session before the actual call.
+    if (!operationId && !resolvesAppManagementTransport) {
       await this._ensureDevicePermission(
         connectId,
         permissionDeviceId ?? fingerprint?.deviceId,
@@ -2779,6 +2802,7 @@ export class LedgerAdapter implements IHardwareWallet {
     const connectionAttempt: LedgerConnectionAttempt = {
       ...commonParams,
       deferBindingSave: checksWallet,
+      ...(APP_MANAGEMENT_METHODS.has(method) ? { takesPluggedUsb: true } : {}),
     };
     const bundleConnection = installContext?.connection;
     if (
@@ -2832,6 +2856,17 @@ export class LedgerAdapter implements IHardwareWallet {
       throw Object.assign(new Error('Auto-connect succeeded but no session found'), {
         _tag: ERROR_TAG.DeviceSessionNotFound,
       });
+    }
+
+    if (!operationId && resolvesAppManagementTransport) {
+      const transport = this._sessionTransports.get(sessionId);
+      await this._ensureDevicePermission(
+        resolvedConnectId,
+        permissionDeviceId ?? fingerprint?.deviceId,
+        signal,
+        transport && (isLedgerBleConnectionType(transport) ? 'ble' : 'hid')
+      );
+      LedgerAdapter._throwIfAborted(signal);
     }
 
     // Fingerprint verification inside the session — atomic with the actual call
@@ -3139,12 +3174,13 @@ export class LedgerAdapter implements IHardwareWallet {
   private async _ensureDevicePermission(
     connectId?: string,
     deviceId?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    transportOverride?: TransportType
   ): Promise<void> {
     if (signal?.aborted) {
       LedgerAdapter._throwIfAborted(signal);
     }
-    const transportType: TransportType = this.activeTransport ?? 'hid';
+    const transportType: TransportType = transportOverride ?? this.activeTransport ?? 'hid';
 
     // Register the wait before emitting: a synchronous listener that replies
     // immediately (e.g. in tests or a same-process consumer) would otherwise

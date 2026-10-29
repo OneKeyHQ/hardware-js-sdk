@@ -1,11 +1,11 @@
 import bs58 from 'bs58';
 import {
-  CryptoCoinInfo,
   CryptoAccount,
-  CryptoOutput,
+  CryptoCoinInfo,
   CryptoHDKey,
   CryptoKeypath,
   CryptoMultiAccounts,
+  CryptoOutput,
   CryptoPSBT,
   Curve,
   PathComponent,
@@ -35,7 +35,12 @@ import { normalizePath } from '../adapter/pathUtils';
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest, TronSignType } from '../urEngine/TronSignRequest';
 import { TronSignature as TronUrSignature } from '../urEngine/TronSignature';
-import { KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR, psbtFixtureHex, urJson } from './fixtures';
+import {
+  KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR,
+  KEYSTONE_NEXUS_EXPORT_CBOR,
+  psbtFixtureHex,
+  urJson,
+} from './fixtures';
 
 import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type {
@@ -243,14 +248,18 @@ function attachFakeDevice(adapter: KeystoneAdapter, options: FakeDeviceOptions =
   return { requests, detach: () => adapter.off(UI_REQUEST.REQUEST_QR_DISPLAY, handler) };
 }
 
-/** Answers every "show the oversized request as a QR?" prompt; the mock counts the prompts. */
-function answerQrFallback(adapter: KeystoneAdapter, confirmed: boolean): jest.Mock {
+/** Answers every "show it as a QR?" prompt; the mock counts the prompts. */
+function answerQrFallback(adapter: KeystoneAdapter, answer: boolean | 'retry'): jest.Mock {
   const asked = jest.fn();
   adapter.on(UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM, event => {
     asked(event.payload);
     adapter.uiResponse({
       type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
-      payload: { confirmed, requestId: event.payload.requestId },
+      payload: {
+        confirmed: answer === true,
+        ...(answer === 'retry' ? { retry: true } : {}),
+        requestId: event.payload.requestId,
+      },
     });
   });
   return asked;
@@ -1368,8 +1377,39 @@ describe('KeystoneAdapter', () => {
       attachFakeDevice(adapter, options);
       expect(await call(adapter)).toMatchObject({
         success: false,
-        payload: { code: HardwareErrorCode.DeviceMismatch },
+        payload: {
+          code: HardwareErrorCode.DeviceMismatch,
+          params: { reason: 'unexpected-qr-code' },
+        },
       });
+    });
+
+    it.each<[string, (adapter: KeystoneAdapter) => Promise<unknown>]>([
+      ['evmSignTransaction', a => a.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX)],
+      [
+        'btcSignPsbt',
+        a =>
+          a.btcSignPsbt(FIXTURE_WALLET, FIXTURE_MFP, {
+            path: "m/84'/0'/0'",
+            psbt: UNSIGNED_PSBT_HEX,
+          }),
+      ],
+    ])('%s calls a scanned account code the wrong code', async (_name, call) => {
+      const adapter = newTestAdapter();
+      adapter.on(UI_REQUEST.REQUEST_QR_DISPLAY, () => {
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_QR_RESPONSE,
+          payload: { urType: 'crypto-multi-accounts', urData: KEYSTONE_NEXUS_EXPORT_CBOR },
+        });
+      });
+      expect(await call(adapter)).toMatchObject({
+        success: false,
+        payload: {
+          code: HardwareErrorCode.InvalidParams,
+          params: { reason: 'unexpected-qr-code' },
+        },
+      });
+      await adapter.dispose();
     });
 
     const originOf: Record<string, (cbor: Buffer) => string | undefined> = {
@@ -2118,6 +2158,86 @@ describe('KeystoneAdapter', () => {
       }
     });
 
+    it('ignores exported keys nobody asked for, even ones it cannot use', async () => {
+      const adapter = newTestAdapter();
+      // Keystone's own exports carry Ledger Live keys as bare 33-byte keys, and may carry keys of
+      // other wallets or chains this app never requests; only requested paths are checked.
+      const leaf = fixtureHdKey("m/44'/60'/0'/0/0", FIXTURE_MFP);
+      const bareLeaf = new CryptoHDKey({
+        isMaster: false,
+        key: leaf.getKey(),
+        useInfo: new CryptoCoinInfo(),
+        origin: leaf.getOrigin(),
+      });
+      const otherMfp = mfpOf(OTHER_ROOT);
+      answerExport(
+        adapter,
+        new CryptoMultiAccounts(
+          Buffer.from(FIXTURE_MFP, 'hex'),
+          [
+            fixtureHdKey(BTC_PATH, FIXTURE_MFP),
+            bareLeaf,
+            fixtureHdKey("m/44'/607'/0'", otherMfp, OTHER_ROOT),
+            fixtureHdKey("m/44'/195'/0'", FIXTURE_MFP),
+            fixtureHdKey("m/44'/195'/0'", FIXTURE_MFP, OTHER_ROOT),
+          ],
+          'Keystone 3 Pro',
+          undefined,
+          '3.1.4-C'
+        ).toUR()
+      );
+      try {
+        expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+          success: true,
+          payload: [
+            { success: true, payload: { accountExport: true, accountKey: { path: BTC_PATH } } },
+            { success: false, payload: { params: { reason: 'account-not-exported' } } },
+            { success: false, payload: { params: { reason: 'account-not-exported' } } },
+          ],
+        });
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it.each([
+      [
+        'from another wallet',
+        () => fixtureHdKey(BTC_PATH, mfpOf(OTHER_ROOT), OTHER_ROOT),
+        HardwareErrorCode.DeviceMismatch,
+      ],
+      [
+        'unusable',
+        () => {
+          const key = fixtureHdKey(BTC_PATH, FIXTURE_MFP);
+          return new CryptoHDKey({
+            isMaster: false,
+            key: key.getKey(),
+            useInfo: new CryptoCoinInfo(),
+            origin: key.getOrigin(),
+          });
+        },
+        HardwareErrorCode.InvalidParams,
+      ],
+    ] as const)('refuses a requested path whose exported key is %s', async (_, key, code) => {
+      const adapter = newTestAdapter();
+      answerExport(
+        adapter,
+        new CryptoMultiAccounts(
+          Buffer.from(FIXTURE_MFP, 'hex'),
+          [key()],
+          'Keystone 3 Pro',
+          undefined,
+          '3.1.4-C'
+        ).toUR()
+      );
+      expect(await adapter.allNetworkGetAddress('', '', { bundle })).toMatchObject({
+        success: false,
+        payload: { code },
+      });
+      await adapter.dispose();
+    });
+
     it('retains full-path validation for a normal request response', async () => {
       const adapter = newTestAdapter();
       answerExport(adapter, exportedAccount(), false);
@@ -2709,9 +2829,9 @@ describe('KeystoneAdapter', () => {
     });
   });
 
-  describe('USB-first with silent QR fallback', () => {
+  describe('USB-first with QR fallback', () => {
     it.each([false, true])(
-      'falls back after one 15-second USB connection attempt with cached QR metadata: %s',
+      'asks before QR after one 15-second USB connection attempt with cached QR metadata: %s',
       async cached => {
         const usb = fakeUsbConnector();
         const adapter = newTestAdapter(usb.connector);
@@ -2742,7 +2862,10 @@ describe('KeystoneAdapter', () => {
           await nextImmediate();
           expect(connect).toHaveBeenCalledTimes(1);
           expect(qrFake.requests).toHaveLength(before + 1);
-          expect(confirm).not.toHaveBeenCalled();
+          expect(confirm).toHaveBeenCalledTimes(1);
+          expect(confirm).toHaveBeenCalledWith(
+            expect.objectContaining({ reason: 'usb-unavailable' })
+          );
           await expect(pending).resolves.toMatchObject({ success: true });
         } finally {
           adapter.cancel();
@@ -2846,12 +2969,13 @@ describe('KeystoneAdapter', () => {
       expect(usb.calls).toHaveLength(0);
     });
 
-    it('falls back from one rejected USB attach to one QR scan for the complete account bundle', async () => {
+    it('asks once, then falls back from one rejected USB attach to one QR scan for the complete account bundle', async () => {
       // The USB device holds another wallet, so the targeted connect is refused.
       const usb = fakeUsbConnector({ mfpHex: mfpOf(OTHER_ROOT) });
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
       const imported = await importQrWallet(adapter);
+      const asked = answerQrFallback(adapter, true);
       expect(qrFake.requests).toHaveLength(1);
 
       const result = await adapter.allNetworkGetAddress(imported.connectId, imported.deviceId, {
@@ -2883,6 +3007,8 @@ describe('KeystoneAdapter', () => {
       expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
       expect(usb.calls).toHaveLength(0);
       expect(qrFake.requests).toHaveLength(2);
+      expect(asked).toHaveBeenCalledTimes(1);
+      expect(asked).toHaveBeenCalledWith(expect.objectContaining({ reason: 'wallet-mismatch' }));
 
       // Nothing is retained from importFromQr, so the one fallback scan
       // carries every bundled path (BTC is account 0 only).
@@ -3111,15 +3237,16 @@ describe('KeystoneAdapter', () => {
       expect(usb.connectArgs).toEqual([FIXTURE_MFP]);
     });
 
-    it('falls back to QR without surfacing an error when USB cannot attach', async () => {
-      // The wrong Keystone is on the bus. Per the fail-closed identity rule the USB attach is
-      // rejected, but the user must still just get the QR, not an error dialog with a retry button.
+    it('asks before falling back to QR when the connected Keystone holds another wallet', async () => {
+      // The wrong wallet is unlocked on the plugged-in Keystone. The fail-closed identity rule
+      // refuses the USB attach; the user is told why before the QR appears.
       const usb = fakeUsbConnector({ mfpHex: '11223344' });
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
 
       const imported = await importQrWallet(adapter);
       const qrRoundTripsAfterImport = qrFake.requests.length;
+      const asked = answerQrFallback(adapter, true);
 
       const signed = await adapter.evmSignTransaction(
         imported.connectId,
@@ -3128,8 +3255,156 @@ describe('KeystoneAdapter', () => {
       );
 
       expect(signed.success).toBe(true);
+      expect(asked).toHaveBeenCalledTimes(1);
+      expect(asked).toHaveBeenCalledWith(
+        expect.objectContaining({ vendor: 'keystone', reason: 'wallet-mismatch' })
+      );
       // The signature came over QR instead.
       expect(qrFake.requests.length).toBeGreaterThan(qrRoundTripsAfterImport);
+    });
+
+    it.each([
+      [HardwareErrorCode.DeviceMismatch, 'wallet-mismatch'],
+      [HardwareErrorCode.DeviceNotInitialized, 'wallet-mismatch'],
+      [HardwareErrorCode.DeviceLocked, 'device-locked'],
+      [HardwareErrorCode.DevicePermissionDenied, 'usb-unavailable'],
+      [HardwareErrorCode.TransportError, 'usb-unavailable'],
+    ])(
+      'asks with the reason before QR when a connected Keystone fails with %s',
+      async (code, reason) => {
+        const usb = fakeUsbConnector();
+        const adapter = newTestAdapter(usb.connector);
+        const qrFake = attachFakeDevice(adapter);
+        const imported = await importQrWallet(adapter);
+        const qrRequestsAfterImport = qrFake.requests.length;
+        const asked = answerQrFallback(adapter, true);
+        jest
+          .spyOn(usb.connector, 'connect')
+          .mockRejectedValue(Object.assign(new Error('USB attach failed'), { code }));
+
+        const signed = await adapter.evmSignTransaction(
+          imported.connectId,
+          imported.deviceId,
+          EVM_TX
+        );
+
+        expect(signed.success).toBe(true);
+        expect(asked).toHaveBeenCalledTimes(1);
+        expect(asked).toHaveBeenCalledWith(expect.objectContaining({ reason }));
+        expect(qrFake.requests).toHaveLength(qrRequestsAfterImport + 1);
+        await adapter.dispose();
+      }
+    );
+
+    it('looks for the USB device again when the user retries, and uses it once it matches', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const imported = await importQrWallet(adapter);
+      const qrRequestsAfterImport = qrFake.requests.length;
+      const asked = answerQrFallback(adapter, 'retry');
+      const connect = jest.spyOn(usb.connector, 'connect');
+      // The user switches to the right wallet on the device before retrying.
+      connect.mockRejectedValueOnce(
+        Object.assign(new Error('Connected Keystone wallet does not match'), {
+          code: HardwareErrorCode.DeviceMismatch,
+        })
+      );
+
+      const signed = await adapter.evmSignTransaction(
+        imported.connectId,
+        imported.deviceId,
+        EVM_TX
+      );
+
+      expect(signed.success).toBe(true);
+      expect(asked).toHaveBeenCalledTimes(1);
+      expect(connect).toHaveBeenCalledTimes(2);
+      expect(usb.calls.map(call => (call.params as { urType: string }).urType)).toEqual([
+        'eth-sign-request',
+      ]);
+      expect(qrFake.requests).toHaveLength(qrRequestsAfterImport);
+      await adapter.dispose();
+    });
+
+    it('fails as a user cancel without a QR when the user closes the wallet-mismatch prompt', async () => {
+      const usb = fakeUsbConnector({ mfpHex: mfpOf(OTHER_ROOT) });
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const imported = await importQrWallet(adapter);
+      const qrRequestsAfterImport = qrFake.requests.length;
+      const asked = answerQrFallback(adapter, false);
+
+      const signed = await adapter.evmSignTransaction(
+        imported.connectId,
+        imported.deviceId,
+        EVM_TX
+      );
+
+      expect(asked).toHaveBeenCalledTimes(1);
+      expect(signed).toMatchObject({
+        success: false,
+        payload: { code: HardwareErrorCode.UserAborted },
+      });
+      expect(qrFake.requests).toHaveLength(qrRequestsAfterImport);
+      await adapter.dispose();
+    });
+
+    it.each([
+      [
+        'no Keystone is plugged in',
+        (usb: ReturnType<typeof fakeUsbConnector>) => usb.setAvailable(false),
+      ],
+      [
+        'the Keystone is gone by the time USB connects',
+        (usb: ReturnType<typeof fakeUsbConnector>) => {
+          jest.spyOn(usb.connector, 'connect').mockRejectedValue(
+            Object.assign(new Error('No Keystone USB device is available'), {
+              code: HardwareErrorCode.DeviceNotFound,
+            })
+          );
+        },
+      ],
+    ])('goes to QR without asking when %s', async (_name, unplug) => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const imported = await importQrWallet(adapter);
+      const qrRequestsAfterImport = qrFake.requests.length;
+      const asked = answerQrFallback(adapter, true);
+      unplug(usb);
+
+      const signed = await adapter.evmSignTransaction(
+        imported.connectId,
+        imported.deviceId,
+        EVM_TX
+      );
+
+      expect(signed.success).toBe(true);
+      expect(asked).not.toHaveBeenCalled();
+      expect(qrFake.requests).toHaveLength(qrRequestsAfterImport + 1);
+      await adapter.dispose();
+    });
+
+    it("does not offer QR for a wallet pinned to USB with switchTransport('usb')", async () => {
+      const usb = fakeUsbConnector({ mfpHex: mfpOf(OTHER_ROOT) });
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      const imported = await importQrWallet(adapter);
+      const qrRequestsAfterImport = qrFake.requests.length;
+      await adapter.switchTransport('usb');
+      const asked = answerQrFallback(adapter, true);
+
+      const signed = await adapter.evmSignTransaction(
+        imported.connectId,
+        imported.deviceId,
+        EVM_TX
+      );
+
+      expect(signed.success).toBe(false);
+      expect(asked).not.toHaveBeenCalled();
+      expect(qrFake.requests).toHaveLength(qrRequestsAfterImport);
+      await adapter.dispose();
     });
 
     it.each<
@@ -3256,8 +3531,36 @@ describe('KeystoneAdapter', () => {
 
         expect(askedQrFallback).toHaveBeenCalledTimes(1);
         expect(askedQrFallback).toHaveBeenCalledWith(
-          expect.objectContaining({ vendor: 'keystone' })
+          expect.objectContaining({ vendor: 'keystone', reason: 'payload-too-large' })
         );
+        expect(signed).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.UserAborted },
+        });
+        expect(qrFake.requests).toHaveLength(0);
+      } finally {
+        await adapter.dispose();
+      }
+    });
+
+    it('treats a retry answer to an oversized request as a cancel', async () => {
+      const usb = fakeUsbConnector();
+      const adapter = newTestAdapter(usb.connector);
+      const qrFake = attachFakeDevice(adapter);
+      await adapter.releaseOperation(await connectOperation(adapter));
+      const askedQrFallback = answerQrFallback(adapter, 'retry');
+      usb.failUrType({
+        urType: 'eth-sign-request',
+        error: {
+          code: HardwareErrorCode.PayloadTooLarge,
+          message: 'USB size limit',
+          params: { origin: 'transport' },
+        },
+      });
+      try {
+        const signed = await adapter.evmSignTransaction(FIXTURE_WALLET, FIXTURE_MFP, EVM_TX);
+
+        expect(askedQrFallback).toHaveBeenCalledTimes(1);
         expect(signed).toMatchObject({
           success: false,
           payload: { code: HardwareErrorCode.UserAborted },
@@ -3867,6 +4170,7 @@ describe('KeystoneAdapter', () => {
       const usb = fakeUsbConnector({ root: OTHER_ROOT });
       const adapter = newTestAdapter(usb.connector);
       const qrFake = attachFakeDevice(adapter);
+      const asked = answerQrFallback(adapter, true);
 
       const first = await adapter.btcGetPublicKey(FIXTURE_WALLET, FIXTURE_MFP, {
         path: "m/84'/0'/0'",
@@ -3881,6 +4185,7 @@ describe('KeystoneAdapter', () => {
       expect(second.success).toBe(true);
       expect(usb.connectArgs).toHaveLength(2);
       expect(qrFake.requests).toHaveLength(2);
+      expect(asked).toHaveBeenCalledTimes(2);
     });
 
     it.each([
@@ -4300,6 +4605,38 @@ describe('KeystoneAdapter', () => {
         expect(qrFake.requests).toHaveLength(1);
         expect(requestedPathsOf(qrFake.requests[0])).toHaveLength(24);
       });
+
+      it.each([
+        [10, 11, false],
+        [10, 10, true],
+        [30, 25, false],
+        [0, 24, true],
+      ])(
+        'holds a host limit of %s below the firmware limit (%s paths, asks: %s)',
+        async (qrKeyRequestLimit, count, asks) => {
+          const adapter = new KeystoneAdapter({ qrTimeoutMs: 5000, qrKeyRequestLimit });
+          const qrFake = attachFakeDevice(adapter);
+
+          const result = await adapter.allNetworkGetAddress(null as unknown as string, '', {
+            bundle: ledgerLiveEvm(count),
+          });
+
+          if (asks) {
+            expect(result.success).toBe(true);
+            expect(qrFake.requests).toHaveLength(1);
+          } else {
+            expect(result).toMatchObject({
+              success: false,
+              payload: {
+                code: HardwareErrorCode.QrRequestTooLarge,
+                params: { limit: Math.min(qrKeyRequestLimit || 24, 24), requested: count },
+              },
+            });
+            expect(qrFake.requests).toHaveLength(0);
+          }
+          await adapter.dispose();
+        }
+      );
 
       it('leaves the same bundle alone over USB, which asks per key', async () => {
         const usb = fakeUsbConnector();
