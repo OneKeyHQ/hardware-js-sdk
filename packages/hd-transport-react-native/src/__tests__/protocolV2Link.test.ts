@@ -207,6 +207,7 @@ const createHarness = ({
     bleManager,
     sentSeqs,
     writeCharacteristic,
+    notifyCharacteristic,
     setShouldRespond(value: boolean) {
       shouldRespond = value;
     },
@@ -1886,6 +1887,80 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test.each(['ios', 'android'] as const)(
+    'reuses the connection, monitor and V2 sequence after a kept-alive release on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid, device, bleManager, notifyCharacteristic, sentSeqs } =
+        createHarness();
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      await transport.call(uuid, 'Ping', { message: 'before-release' });
+      const connectCount = device.connect.mock.calls.length;
+      const cancelTransactionCount = bleManager.cancelTransaction.mock.calls.length;
+      const subscription = notifyCharacteristic.monitor.mock.results[0].value;
+      const invalidateLink = jest.spyOn((transport as any).protocolV2Links, 'invalidateLink');
+
+      try {
+        await transport.release(uuid, false, true);
+        expect(transport.getProtocolType(uuid)).toBe('V2');
+        expect(subscription.remove).not.toHaveBeenCalled();
+        expect(invalidateLink).not.toHaveBeenCalled();
+        expect(bleManager.cancelTransaction).toHaveBeenCalledTimes(cancelTransactionCount);
+        expect(bleManager.cancelDeviceConnection).not.toHaveBeenCalled();
+
+        await transport.acquire({ uuid, expectedProtocol: 'V2' });
+        await expect(
+          transport.call(uuid, 'Ping', { message: 'after-release' })
+        ).resolves.toMatchObject({
+          type: 'Success',
+        });
+        expect(device.connect).toHaveBeenCalledTimes(connectCount);
+        expect(notifyCharacteristic.monitor).toHaveBeenCalledTimes(1);
+        expect(device.onDisconnected).toHaveBeenCalledTimes(1);
+        expect(sentSeqs).toEqual([1, 2, 3]);
+      } finally {
+        await transport.disconnect(uuid);
+      }
+    }
+  );
+
+  test.each(['ios', 'android'] as const)(
+    'keeps the legacy release path without retention and for V1 on %s',
+    async platform => {
+      setPlatformOS(platform);
+      for (const protocol of ['V1', 'V2'] as const) {
+        const { transport, uuid } = protocol === 'V1' ? createV1Harness() : createHarness();
+        await transport.acquire({ uuid, expectedProtocol: protocol });
+        const releaseNative = jest.spyOn(transport as any, 'releaseNative');
+        await transport.release(uuid, false, protocol === 'V1');
+        expect(releaseNative).toHaveBeenCalledWith(uuid, false);
+        await transport.release(uuid, true);
+      }
+    }
+  );
+
+  test.each([
+    ['ios', 'disconnect'],
+    ['android', 'disconnect'],
+    ['ios', 'stop'],
+    ['android', 'stop'],
+    ['ios', 'onclose'],
+    ['android', 'onclose'],
+  ] as const)('cleans up a retained link on %s / %s', async (platform, action) => {
+    setPlatformOS(platform);
+    const { transport, uuid, notifyCharacteristic } = createHarness();
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    await transport.release(uuid, false, true);
+    const subscription = notifyCharacteristic.monitor.mock.results[0].value;
+
+    if (action === 'onclose') await transport.release(uuid, true, true);
+    else if (action === 'stop') await transport.stop();
+    else await transport.disconnect(uuid);
+
+    expect(subscription.remove).toHaveBeenCalledTimes(1);
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
   test('rejects the active Protocol V2 reader when the current monitor errors', async () => {
     const harness = createHarness();
     const { transport, uuid, sentSeqs } = harness;
@@ -1929,6 +2004,8 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
         return Promise.resolve();
       });
 
+      await transport.acquire({ uuid, expectedProtocol: 'V2' });
+      await transport.release(uuid, false, true);
       await transport.acquire({ uuid, expectedProtocol: 'V2' });
       harness.setShouldRespond(false);
       await expect(transport.call(uuid, 'Ping', {}, { timeoutMs: 10 })).rejects.toMatchObject({

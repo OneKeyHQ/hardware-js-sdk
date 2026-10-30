@@ -1,13 +1,20 @@
 import {
   PROTOCOL_V2_BLE_FILE_CHUNK_SIZE,
+  PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW,
   PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE,
 } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import semver from 'semver';
 
 import { DataManager } from '../../data-manager';
 import { LoggerNames, getLogger } from '../../utils/logger';
+import { runMethodWithUnlockPolicy } from '../../protocols/protocol-v2/unlockPolicyRunner';
+import { ProtocolV2UiInteractionCoordinator } from '../../protocols/protocol-v2/uiInteraction';
+import { DevicePool } from '../../device/DevicePool';
+import { DEVICE } from '../../events';
 
 import type { DeviceCommands } from '../../device/DeviceCommands';
+import type { BaseMethod } from '../BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -19,6 +26,7 @@ export type ProtocolV2FileWriteProgress = {
   totalBytes: number;
   rateBytesPerSecond?: number;
   elapsedMs: number;
+  retryCount?: number;
 };
 
 export type ProtocolV2FileWriteChunkContext = {
@@ -28,7 +36,7 @@ export type ProtocolV2FileWriteChunkContext = {
 };
 
 export type ProtocolV2FileWriteOptions = {
-  commands: Pick<DeviceCommands, 'typedCall'>;
+  commands: Pick<DeviceCommands, 'typedCall'> & Partial<Pick<DeviceCommands, 'device'>>;
   path: string;
   data: ProtocolV2FileWriteData;
   offset?: number;
@@ -44,6 +52,8 @@ export type ProtocolV2FileWriteOptions = {
   timeoutMs?: number;
   writeWithResponse?: boolean;
   maxChunkRetries?: number;
+  /** Reacquire and verify the device before restarting an overwriting asset upload. */
+  recoverConnection?: () => Promise<ProtocolV2FileWriteOptions['commands']>;
   paceMs?: number;
   throwIfAborted?: () => void;
   getUiPercentage?: (context: ProtocolV2FileWriteChunkContext) => number | undefined;
@@ -54,6 +64,102 @@ const MIN_FILE_CHUNK_SIZE = 64;
 const FILE_TRANSFER_RATE_WINDOW_MS = 1000;
 const FILE_TRANSFER_LOG_INTERVAL_MS = 10_000;
 const SESSION_ERROR = 'session not found';
+// Application firmware from firmware-pro2 #239 has the 4096-byte UART FIFO required for
+// two 1800-byte chunks. Gate on the running application, not the installed bootloader.
+const ASSET_FILE_WRITE_MIN_APPLICATION_VERSION = '1.0.3';
+const ASSET_FILE_WRITE_RESPONSE_TIMEOUT = 10_000;
+
+export function createProtocolV2AssetFileWriteRecovery(
+  method: Pick<
+    BaseMethod,
+    | 'device'
+    | 'abortSignal'
+    | 'postMessage'
+    | 'name'
+    | 'unlockPolicy'
+    | 'useDevicePassphraseState'
+    | 'protocolV2PreUnlockPinType'
+    | 'protocolV2UiMode'
+    | 'payload'
+  >
+): () => Promise<ProtocolV2FileWriteOptions['commands']> {
+  const { device } = method;
+  const expectedSerialNo = device.state?.identity?.serialNo;
+  const expectedDeviceType = device.state?.identity?.deviceType;
+  return async () => {
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
+    if (!expectedSerialNo) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+    }
+    await device.acquire('V2', { throwOnRunPromiseError: true });
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
+    await device.initialize();
+    if (
+      !device.isProtocolV2() ||
+      device.state?.identity.serialNo !== expectedSerialNo ||
+      device.state?.identity.deviceType !== expectedDeviceType ||
+      !['normal', 'notInitialized'].includes(device.state?.status.mode ?? '')
+    ) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
+    }
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
+    // Re-run the existing unlock policy with a fresh preflight after reconnecting.
+    await runMethodWithUnlockPolicy(
+      {
+        name: method.name,
+        unlockPolicy: method.unlockPolicy,
+        useDevicePassphraseState: method.useDevicePassphraseState,
+        protocolV2PreUnlockPinType: method.protocolV2PreUnlockPinType,
+        protocolV2UiMode: method.protocolV2UiMode,
+        payload: method.payload,
+        params: undefined,
+        run: () => Promise.resolve(undefined),
+      },
+      device,
+      { uiCoordinator: new ProtocolV2UiInteractionCoordinator(device, method.postMessage) }
+    );
+    if (method.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+    }
+    DevicePool.emitter.emit(DEVICE.CONNECT, device);
+    return device.commands;
+  };
+}
+
+function shouldPipelineAssetFileWrite(options: ProtocolV2FileWriteOptions) {
+  const env = DataManager.getSettings('env');
+  if (env !== 'react-native' && env !== 'desktop-web-ble') return false;
+  if (
+    options.overwrite !== true ||
+    options.append ||
+    (options.offset ?? 0) !== 0 ||
+    (options.paceMs ?? 0) > 0 ||
+    options.writeWithResponse === true ||
+    !/^vol1:\/(?:wallpapers\/wallpaper\.okpkg|nft\/nft-[0-9a-f]{8}-[1-9][0-9]*\.okpkg|portfolio\/portfolio\.okpkg\.pending)$/.test(
+      options.path
+    )
+  ) {
+    return false;
+  }
+  const { device } = options.commands;
+  const deviceType = device?.getCurrentDeviceType();
+  const firmwareVersion = device?.state?.versions.firmware;
+  const mode = device?.state?.status.mode;
+  return Boolean(
+    device?.isProtocolV2() &&
+      (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) &&
+      (mode === 'normal' || mode === 'notInitialized') &&
+      firmwareVersion &&
+      semver.valid(firmwareVersion) &&
+      semver.gte(firmwareVersion, ASSET_FILE_WRITE_MIN_APPLICATION_VERSION)
+  );
+}
 
 function formatFileTransferRate(bytesPerSecond: number) {
   return (Math.max(bytesPerSecond, 0) / 1024).toFixed(2);
@@ -80,6 +186,9 @@ function logFileTransferMetrics({
   hostWriteElapsedMs,
   responseWaitElapsedMs,
   measuredAttempts,
+  fileWriteWindow,
+  chunkSize,
+  retryCount,
 }: {
   transport: string;
   status: 'progress' | 'completed' | 'failed';
@@ -91,6 +200,9 @@ function logFileTransferMetrics({
   hostWriteElapsedMs: number;
   responseWaitElapsedMs: number;
   measuredAttempts: number;
+  fileWriteWindow: number;
+  chunkSize: number;
+  retryCount: number;
 }) {
   const segmentedMetrics =
     measuredAttempts > 0
@@ -101,7 +213,11 @@ function logFileTransferMetrics({
   Log.log(
     `[FileWrite] metrics transport=${transport} status=${status} path=${path} bytes=${transferredBytes}/${totalBytes} elapsed=${(
       elapsedMs / 1000
-    ).toFixed(2)}s speed=${formatFileTransferRate(rateBytesPerSecond)} KiB/s${segmentedMetrics}`
+    ).toFixed(2)}s speed=${formatFileTransferRate(
+      rateBytesPerSecond
+    )} KiB/s${segmentedMetrics} window=${fileWriteWindow} chunk=${chunkSize} retry=${retryCount} averageSpeed=${formatFileTransferRate(
+      getAverageFileTransferRate(transferredBytes, elapsedMs)
+    )} KiB/s`
   );
 }
 
@@ -185,16 +301,26 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   }
 
   const defaultChunkSizeLimit = getProtocolV2FileChunkLimit(options.bleChunkSizeLimit);
+  const pipelineAsset = totalSize === dataLength && shouldPipelineAssetFileWrite(options);
   const configuredChunkSizeLimit = Number(options.chunkSizeLimit);
   const chunkSizeLimit =
     Number.isFinite(configuredChunkSizeLimit) && configuredChunkSizeLimit > 0
       ? Math.floor(configuredChunkSizeLimit)
       : defaultChunkSizeLimit;
-  const chunkSize = normalizeChunkSize(options.chunkSize ?? options.chunkLen, chunkSizeLimit);
+  const chunkSize = normalizeChunkSize(
+    options.chunkSize ?? options.chunkLen,
+    pipelineAsset ? Math.min(chunkSizeLimit, PROTOCOL_V2_BLE_FILE_CHUNK_SIZE) : chunkSizeLimit
+  );
+  const fileWriteWindow =
+    pipelineAsset && dataLength > chunkSize ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1;
   let written = 0;
   let chunks = 0;
   let lastMessage: Record<string, unknown> | undefined;
-  const startTime = Date.now();
+  let { commands } = options;
+  let retryCount = 0;
+  const maxChunkRetries = Math.max(Math.floor(options.maxChunkRetries ?? 0), 0);
+  const canRecoverPipeline = pipelineAsset && dataLength > chunkSize && options.recoverConnection;
+  let startTime = Date.now();
   let rateWindowStartedAt = startTime;
   let rateWindowStartedBytes = 0;
   let rateBytesPerSecond: number | undefined;
@@ -204,32 +330,182 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
   let hostWriteElapsedMs = 0;
   let responseWaitElapsedMs = 0;
   let measuredAttempts = 0;
+  const createRequest = (position: number) => {
+    const chunk = data.slice(position, Math.min(position + chunkSize, dataLength));
+    const offset = startOffset + position;
+    const progress =
+      options.uiPercentage ??
+      options.getUiPercentage?.({
+        offset,
+        chunkLength: chunk.byteLength,
+        totalSize,
+      }) ??
+      getDeviceTransferProgress(offset, offset + chunk.byteLength, totalSize);
+    return {
+      file: { path: options.path, offset, total_size: totalSize, data: chunk },
+      overwrite: position === 0 ? options.overwrite ?? false : false,
+      append: options.append ?? false,
+      ui_percentage: progress,
+    };
+  };
+
+  const confirmChunk = (
+    response: { type?: string; message?: Record<string, unknown> },
+    offset: number,
+    chunkLength: number
+  ) => {
+    const responseType = (response as { type?: string }).type;
+    if (responseType && responseType !== 'FilesystemFile') {
+      const responseError = (response as { message?: { error?: unknown } }).message?.error;
+      if (typeof responseError === 'string' && responseError.includes(SESSION_ERROR)) {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
+      }
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `FilesystemFileWrite received unexpected response ${responseType}`
+      );
+    }
+    options.throwIfAborted?.();
+    lastMessage = response.message;
+    const rawProcessedByte = response.message?.processed_byte;
+    const processedByte = Number(rawProcessedByte);
+    if (
+      rawProcessedByte !== undefined &&
+      (!Number.isFinite(processedByte) ||
+        processedByte <= offset ||
+        processedByte > offset + chunkLength)
+    ) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        `FilesystemFileWrite invalid processed_byte ${processedByte}`
+      );
+    }
+    written = rawProcessedByte === undefined ? written + chunkLength : processedByte - startOffset;
+    chunks += 1;
+    const now = Date.now();
+    lastConfirmedAt = now;
+    const elapsedMs = now - startTime;
+    const transferredBytes = Math.min(written, dataLength);
+    const rateWindowElapsedMs = now - rateWindowStartedAt;
+    if (rateWindowElapsedMs >= FILE_TRANSFER_RATE_WINDOW_MS) {
+      const rateWindowBytes = Math.max(transferredBytes - rateWindowStartedBytes, 0);
+      rateBytesPerSecond = Math.round((rateWindowBytes / rateWindowElapsedMs) * 1000);
+      rateWindowStartedAt = now;
+      rateWindowStartedBytes = transferredBytes;
+    } else if (rateBytesPerSecond === undefined && elapsedMs > 0) {
+      rateBytesPerSecond = Math.round((transferredBytes / elapsedMs) * 1000);
+    }
+    options.onProgress?.({
+      progress: getConfirmedProgress(startOffset + written, totalSize, written, dataLength),
+      transferredBytes,
+      totalBytes: dataLength,
+      rateBytesPerSecond,
+      elapsedMs,
+      ...(retryCount > 0 ? { retryCount } : {}),
+    });
+    const logWindowElapsedMs = now - logWindowStartedAt;
+    if (logWindowElapsedMs >= FILE_TRANSFER_LOG_INTERVAL_MS && transferredBytes < dataLength) {
+      const logWindowBytes = Math.max(transferredBytes - logWindowStartedBytes, 0);
+      logFileTransferMetrics({
+        transport,
+        status: 'progress',
+        path: options.path,
+        transferredBytes,
+        totalBytes: dataLength,
+        elapsedMs,
+        rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+        hostWriteElapsedMs,
+        responseWaitElapsedMs,
+        measuredAttempts,
+        fileWriteWindow,
+        chunkSize,
+        retryCount,
+      });
+      logWindowStartedAt = now;
+      logWindowStartedBytes = transferredBytes;
+    }
+  };
+
   const transport = getFileTransferTransport();
   Log.log(
     `[FileWrite] started transport=${transport} path=${options.path} bytes=${dataLength} offset=${startOffset} chunk=${chunkSize}`
   );
 
-  try {
+  const writeAttempt = async () => {
+    options.throwIfAborted?.();
+    const attemptRetryCount = retryCount;
+    if (fileWriteWindow === PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW) {
+      Log.debug('[FileWrite] BLE asset pipeline', {
+        path: options.path,
+        window: fileWriteWindow,
+        chunkSize,
+        retryCount,
+        applicationVersion: commands.device?.state?.versions.firmware,
+      });
+      let sendOffset = chunkSize;
+      let interrupted = false;
+      let interruption: unknown;
+      const response = await commands.typedCall(
+        'FilesystemFileWrite',
+        'FilesystemFile',
+        createRequest(0),
+        {
+          timeoutMs: options.timeoutMs ?? ASSET_FILE_WRITE_RESPONSE_TIMEOUT,
+          writeWithResponse: false,
+          fileWritePipeline: {
+            next: () => {
+              if (interrupted || attemptRetryCount !== retryCount || sendOffset >= dataLength)
+                return Promise.resolve(undefined);
+              try {
+                options.throwIfAborted?.();
+                const request = createRequest(sendOffset);
+                sendOffset += request.file.data.byteLength;
+                return Promise.resolve(request);
+              } catch (error) {
+                interrupted = true;
+                interruption = error;
+                return Promise.resolve(undefined);
+              }
+            },
+            onResponse: confirmed => {
+              if (interrupted || attemptRetryCount !== retryCount) return;
+              try {
+                const offset = startOffset + written;
+                const length = Math.min(chunkSize, dataLength - written);
+                if (Number(confirmed.message.processed_byte) !== offset + length) {
+                  throw ERRORS.TypedError(
+                    HardwareErrorCode.RuntimeError,
+                    'FilesystemFileWrite pipeline did not confirm the complete chunk'
+                  );
+                }
+                confirmChunk(confirmed, offset, length);
+              } catch (error) {
+                // Drain already-sent responses before raising callback errors or cancellation.
+                interrupted = true;
+                interruption = error;
+              }
+            },
+          },
+        }
+      );
+      options.throwIfAborted?.();
+      if (interrupted) throw interruption;
+      if (
+        response.type !== 'FilesystemFile' ||
+        Number(response.message.processed_byte) !== startOffset + dataLength ||
+        written !== dataLength
+      ) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'FilesystemFileWrite pipeline ended before the complete file was confirmed'
+        );
+      }
+    }
     while (written < dataLength) {
       options.throwIfAborted?.();
-      const chunk = data.slice(written, Math.min(written + chunkSize, dataLength));
-      const offset = startOffset + written;
-      const progress =
-        options.uiPercentage ??
-        options.getUiPercentage?.({
-          offset,
-          chunkLength: chunk.byteLength,
-          totalSize,
-        }) ??
-        getDeviceTransferProgress(offset, offset + chunk.byteLength, totalSize);
-      const request = {
-        file: { path: options.path, offset, total_size: totalSize, data: chunk },
-        overwrite: chunks === 0 ? options.overwrite ?? false : false,
-        append: options.append ?? false,
-        ui_percentage: progress,
-      };
-      const maxChunkRetries = Math.max(Math.floor(options.maxChunkRetries ?? 0), 0);
-      let retryCount = 0;
+      const request = createRequest(written);
+      const { offset, data: chunk } = request.file;
+      let chunkRetryCount = 0;
       let response;
       let isWritePending = true;
       while (isWritePending) {
@@ -239,7 +515,9 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
           const callOptions =
             options.writeWithResponse === undefined
               ? {
-                  timeoutMs: options.timeoutMs,
+                  timeoutMs:
+                    options.timeoutMs ??
+                    (canRecoverPipeline ? ASSET_FILE_WRITE_RESPONSE_TIMEOUT : undefined),
                   onWriteCompleted: ({ elapsedMs }: { elapsedMs: number }) => {
                     currentHostWriteElapsedMs = elapsedMs;
                     responseWaitStartedAt = Date.now();
@@ -253,7 +531,7 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
                     responseWaitStartedAt = Date.now();
                   },
                 };
-          response = await options.commands.typedCall(
+          response = await commands.typedCall(
             'FilesystemFileWrite',
             'FilesystemFile',
             request,
@@ -261,8 +539,13 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
           );
           isWritePending = false;
         } catch (error) {
-          if (retryCount >= maxChunkRetries || !isProtocolV2ResponseTimeout(error)) throw error;
-          retryCount += 1;
+          if (
+            canRecoverPipeline ||
+            chunkRetryCount >= maxChunkRetries ||
+            !isProtocolV2ResponseTimeout(error)
+          )
+            throw error;
+          chunkRetryCount += 1;
           options.throwIfAborted?.();
         } finally {
           if (currentHostWriteElapsedMs !== undefined && responseWaitStartedAt !== undefined) {
@@ -278,97 +561,75 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
           'FilesystemFileWrite completed without a response'
         );
       }
-      const responseType = (response as { type?: string }).type;
-      if (responseType && responseType !== 'FilesystemFile') {
-        const responseError = (response as { message?: { error?: unknown } }).message?.error;
-        if (typeof responseError === 'string' && responseError.includes(SESSION_ERROR)) {
-          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
-        }
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `FilesystemFileWrite received unexpected response ${responseType}`
-        );
-      }
-      options.throwIfAborted?.();
-      lastMessage = response.message;
-      const rawProcessedByte = response.message?.processed_byte;
-      const processedByte = Number(rawProcessedByte);
-      if (
-        rawProcessedByte !== undefined &&
-        (!Number.isFinite(processedByte) ||
-          processedByte <= offset ||
-          processedByte > offset + chunk.byteLength)
-      ) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.RuntimeError,
-          `FilesystemFileWrite invalid processed_byte ${processedByte}`
-        );
-      }
-      written =
-        rawProcessedByte === undefined ? written + chunk.byteLength : processedByte - startOffset;
-      chunks += 1;
-      const now = Date.now();
-      lastConfirmedAt = now;
-      const elapsedMs = now - startTime;
-      const transferredBytes = Math.min(written, dataLength);
-      const rateWindowElapsedMs = now - rateWindowStartedAt;
-      if (rateWindowElapsedMs >= FILE_TRANSFER_RATE_WINDOW_MS) {
-        const rateWindowBytes = Math.max(transferredBytes - rateWindowStartedBytes, 0);
-        rateBytesPerSecond = Math.round((rateWindowBytes / rateWindowElapsedMs) * 1000);
-        rateWindowStartedAt = now;
-        rateWindowStartedBytes = transferredBytes;
-      } else if (rateBytesPerSecond === undefined && elapsedMs > 0) {
-        rateBytesPerSecond = Math.round((transferredBytes / elapsedMs) * 1000);
-      }
-      options.onProgress?.({
-        progress: getConfirmedProgress(startOffset + written, totalSize, written, dataLength),
-        transferredBytes,
-        totalBytes: dataLength,
-        rateBytesPerSecond,
-        elapsedMs,
-      });
-      const logWindowElapsedMs = now - logWindowStartedAt;
-      if (logWindowElapsedMs >= FILE_TRANSFER_LOG_INTERVAL_MS && transferredBytes < dataLength) {
-        const logWindowBytes = Math.max(transferredBytes - logWindowStartedBytes, 0);
-        logFileTransferMetrics({
-          transport,
-          status: 'progress',
-          path: options.path,
-          transferredBytes,
-          totalBytes: dataLength,
-          elapsedMs,
-          rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
-          hostWriteElapsedMs,
-          responseWaitElapsedMs,
-          measuredAttempts,
-        });
-        logWindowStartedAt = now;
-        logWindowStartedBytes = transferredBytes;
-      }
+      confirmChunk(response, offset, chunk.byteLength);
       if (options.paceMs && options.paceMs > 0) {
         await new Promise(resolve => {
           setTimeout(resolve, options.paceMs);
         });
       }
     }
-  } catch (error) {
-    const now = Date.now();
-    const elapsedMs = Math.max(now - startTime, 0);
-    const logWindowElapsedMs = Math.max(now - logWindowStartedAt, 0);
-    const logWindowBytes = Math.max(written - logWindowStartedBytes, 0);
-    logFileTransferMetrics({
-      transport,
-      status: 'failed',
-      path: options.path,
-      transferredBytes: written,
-      totalBytes: dataLength,
-      elapsedMs,
-      rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
-      hostWriteElapsedMs,
-      responseWaitElapsedMs,
-      measuredAttempts,
-    });
-    throw error;
+  };
+  while (true) {
+    try {
+      await writeAttempt();
+      break;
+    } catch (error) {
+      const now = Date.now();
+      const elapsedMs = Math.max(now - startTime, 0);
+      const logWindowElapsedMs = Math.max(now - logWindowStartedAt, 0);
+      const logWindowBytes = Math.max(written - logWindowStartedBytes, 0);
+      logFileTransferMetrics({
+        transport,
+        status: 'failed',
+        path: options.path,
+        transferredBytes: written,
+        totalBytes: dataLength,
+        elapsedMs,
+        rateBytesPerSecond: getAverageFileTransferRate(logWindowBytes, logWindowElapsedMs),
+        hostWriteElapsedMs,
+        responseWaitElapsedMs,
+        measuredAttempts,
+        fileWriteWindow,
+        chunkSize,
+        retryCount,
+      });
+      if (
+        !canRecoverPipeline ||
+        retryCount >= maxChunkRetries ||
+        !isProtocolV2ResponseTimeout(error)
+      ) {
+        throw error;
+      }
+      options.throwIfAborted?.();
+      retryCount += 1;
+      Log.log(
+        `[FileWrite] retry=${retryCount}/${maxChunkRetries} restarting window=${fileWriteWindow} after reconnect path=${options.path}`
+      );
+      options.onProgress?.({
+        progress: 0,
+        transferredBytes: 0,
+        totalBytes: dataLength,
+        elapsedMs: 0,
+        retryCount,
+      });
+      // The timed-out link is invalid. Only a verified reconnect may restart this
+      // fixed-path overwriting upload; never replay an uncertain in-flight chunk.
+      commands = await canRecoverPipeline();
+      options.throwIfAborted?.();
+      written = 0;
+      chunks = 0;
+      lastMessage = undefined;
+      startTime = Date.now();
+      lastConfirmedAt = startTime;
+      rateWindowStartedAt = startTime;
+      rateWindowStartedBytes = 0;
+      rateBytesPerSecond = undefined;
+      logWindowStartedAt = startTime;
+      logWindowStartedBytes = 0;
+      hostWriteElapsedMs = 0;
+      responseWaitElapsedMs = 0;
+      measuredAttempts = 0;
+    }
   }
 
   const elapsedMs = Math.max(lastConfirmedAt - startTime, 0);
@@ -385,6 +646,9 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     hostWriteElapsedMs,
     responseWaitElapsedMs,
     measuredAttempts,
+    fileWriteWindow,
+    chunkSize,
+    retryCount,
   });
 
   return {

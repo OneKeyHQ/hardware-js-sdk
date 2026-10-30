@@ -36,6 +36,7 @@ import { requestProtocolV2DeviceInfo } from '../protocols/protocol-v2/features';
 import {
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH,
   PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH,
+  PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE,
   PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE,
   type ProtocolV2ResourcePackageHeader,
   isProtocolV2ResourceArchiveEntryName,
@@ -77,6 +78,7 @@ import type {
 import type { FirmwareByteSource } from './firmware/FirmwareArtifactSource';
 
 const Log = getLogger(LoggerNames.Method);
+const TransferLog = getLogger(LoggerNames.Core);
 
 // Restored after a rebase dropped the declaration while keeping its use in
 // fileWriteChunk; without it that error branch throws ReferenceError instead of
@@ -112,6 +114,7 @@ const PROTOCOL_V2_RESOURCE_HEADER_RECOVERY_LIMIT = 2;
 // window. Set it to undefined to keep every transfer serial.
 const PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION: string | undefined = '1.0.3';
 const PROTOCOL_V2_TRANSFER_PROGRESS_HEARTBEAT_MS = 1000;
+const PROTOCOL_V2_TRANSFER_LOG_INTERVAL_MS = 10_000;
 const PROTOCOL_V2_INSTALL_STATUS_CONFLICT_CODE = 'FirmwareInstallStatusConflict';
 const PROTOCOL_V2_INSTALL_FAILED_CODE = 'FirmwareInstallFailed';
 const PROTOCOL_V2_INSTALL_TIMEOUT_CODE = 'FirmwareInstallTimeout';
@@ -630,9 +633,6 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private protocolV2LastTransferProgressAt = 0;
 
   private protocolV2LastTransferredBytes = 0;
-
-  /** Set when a windowed FileWrite attempt fails: the rest of this update writes serially. */
-  private protocolV2FileWriteWindowDisabled = false;
 
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
@@ -1868,8 +1868,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     const chunkSize = this.getProtocolV2FirmwareChunkSize('read');
     const chunks: Uint8Array[] = [];
     let offset = 0;
-    while (offset < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE) {
-      const readLen = Math.min(chunkSize, PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE - offset);
+    while (offset < PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE) {
+      const readLen = Math.min(chunkSize, PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE - offset);
       const res = await typedCall('FilesystemFileRead', 'FilesystemFile', {
         file: {
           path: filePath,
@@ -1880,7 +1880,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ui_percentage: undefined,
       });
       const data = toProtocolV2Bytes(res.message?.data);
-      if (data.byteLength === 0) return null;
+      if (data.byteLength === 0 || data.byteLength > readLen) return null;
       chunks.push(data);
       offset += data.byteLength;
     }
@@ -1995,6 +1995,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
       await this.protocolV2Reboot(DeviceRebootType.Bootloader);
       await wait(1000);
+      if (this.isBleReconnect()) {
+        await this.device.deviceConnector?.disconnect(this.device.originalDescriptor.id);
+      }
       await this.waitForProtocolV2BootloaderMode();
       this.protocolV2ExecutionInLoader = true;
       this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
@@ -2037,12 +2040,19 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     while (Date.now() - startTime < timeout) {
       try {
         if (shouldReconnect) {
-          await this.reconnectProtocolV2Device();
+          if (this.isBleReconnect()) {
+            await this.reconnectProtocolV2Device({ skipProtocolProbe: true });
+          } else {
+            await this.reconnectProtocolV2Device();
+          }
           shouldReconnect = false;
         }
         const deviceInfo = await requestProtocolV2DeviceInfo({
           commands: this.device.getCommands(),
-          timeoutMs: this.getProtocolV2DeviceInfoTimeout(),
+          timeoutMs: Math.min(
+            this.getProtocolV2DeviceInfoTimeout(),
+            PROTOCOL_V2_SHORT_RESPONSE_TIMEOUT
+          ),
         });
         this.assertProtocolV2DeviceInfoIdentity(deviceInfo);
         const features = await this.device.probeProtocolV2RuntimeState(
@@ -2335,10 +2345,37 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
       this.throwIfAborted();
       const attemptStartedAt = Date.now();
       let windowed = false;
+      let chunkSize = 0;
+      let confirmedBytes = 0;
+      let lastMetricsAt = attemptStartedAt;
+      const logTransfer = (status: 'started' | 'progress' | 'completed' | 'failed') => {
+        const elapsedMs = getProtocolV2ElapsedMs(attemptStartedAt);
+        TransferLog.log('[FirmwareUpdateV4] FileWrite metrics', {
+          status,
+          path: filePath,
+          fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
+          chunkSize,
+          attempt,
+          retryCount: attempt - 1,
+          transferredBytes: confirmedBytes,
+          totalBytes: source.size,
+          elapsedMs,
+          rateBytesPerSecond: getProtocolV2TransferRate(confirmedBytes, elapsedMs),
+        });
+      };
+      const reportAttemptChunk = (chunkEnd: number) => {
+        confirmedBytes = chunkEnd;
+        reportConfirmedChunk(chunkEnd);
+        const now = Date.now();
+        if (now - lastMetricsAt >= PROTOCOL_V2_TRANSFER_LOG_INTERVAL_MS && chunkEnd < source.size) {
+          logTransfer('progress');
+          lastMetricsAt = now;
+        }
+      };
       try {
-        windowed =
-          !this.protocolV2FileWriteWindowDisabled && this.shouldUseProtocolV2BleFileWriteWindow();
-        const chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath, windowed);
+        windowed = this.shouldUseProtocolV2BleFileWriteWindow();
+        chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath, windowed);
+        logTransfer('started');
         if (windowed) {
           await this.writeProtocolV2SourceWindowed({
             source,
@@ -2346,7 +2383,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             chunkSize,
             processedSize,
             totalSize,
-            onChunkConfirmed: reportConfirmedChunk,
+            onChunkConfirmed: reportAttemptChunk,
           });
         } else {
           await writeFirmwareByteSource({
@@ -2377,23 +2414,18 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
                   `invalid processed_byte ${rawProcessedByte} for offset ${sourceOffset}`
                 );
               }
-              reportConfirmedChunk(chunkEnd);
+              reportAttemptChunk(chunkEnd);
               return length;
             },
           });
         }
-        Log.debug('[FirmwareUpdateV4] Protocol V2 file transferred', {
-          path: filePath,
-          bytes: source.size,
-          elapsedMs: getProtocolV2ElapsedMs(attemptStartedAt),
-          attempt,
-          fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
-        });
+        logTransfer('completed');
         return processedSize + source.size;
       } catch (error) {
         this.throwIfAborted();
         lastError = error;
-        Log.debug('[FirmwareUpdateV4] Protocol V2 file transfer attempt failed', {
+        logTransfer('failed');
+        TransferLog.debug('[FirmwareUpdateV4] Protocol V2 file transfer attempt failed', {
           path: filePath,
           attempt,
           fileWriteWindow: windowed ? PROTOCOL_V2_FILE_WRITE_PIPELINE_WINDOW : 1,
@@ -3346,7 +3378,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     // parsed version keeps major.minor.patch only, so a 1.0.3 prerelease counts as 1.0.3.
     const bootloaderVersion = getDeviceBootloaderVersion(this.device.features).join('.');
     const enabled = supportsProtocolV2BleFileWriteWindow(bootloaderVersion, minBootloaderVersion);
-    Log.debug('[FirmwareUpdateV4] BLE FileWrite window', {
+    TransferLog.debug('[FirmwareUpdateV4] BLE FileWrite window', {
       enabled,
       bootloaderVersion,
       bootloaderBuildId: this.device.features?.verify?.bootloaderBuildId,
@@ -3406,9 +3438,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (source.size === 0) return;
     const firstRequest = await readRequest();
 
-    // A failed exchange may mean the running bootloader cannot hold two in-flight frames, so the
-    // retry and every later file of this update are written serially. Source read errors say
-    // nothing about the bootloader and keep the window.
+    // Core retries the whole overwriting file after a verified reconnect. Keep the same
+    // window on retries and subsequent files; the running bootloader version gates support.
     const response = await this.device
       .getCommands()
       .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
@@ -3422,16 +3453,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             onChunkConfirmed(Number(confirmed.message.processed_byte));
           },
         },
-      })
-      .catch((error: unknown) => {
-        this.protocolV2FileWriteWindowDisabled = true;
-        throw error;
       });
     this.throwIfAborted();
     if (sourceError) throw sourceError;
     const rawProcessedByte = response.message.processed_byte;
     if (Number(rawProcessedByte) !== source.size) {
-      this.protocolV2FileWriteWindowDisabled = true;
       throw ERRORS.TypedError(
         HardwareErrorCode.EmmcFileWriteFirmwareError,
         `invalid processed_byte ${rawProcessedByte} for file size ${source.size}`

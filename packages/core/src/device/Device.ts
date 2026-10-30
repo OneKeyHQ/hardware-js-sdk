@@ -236,6 +236,9 @@ export class Device extends EventEmitter {
    */
   private deviceAcquired = false;
 
+  /** A completed BLE release left the physical link available for the next call. */
+  private releasedBleConnection = false;
+
   /**
    * Connection-attempt generation. interruptionFromUser() pins the current
    * attempt so a late acquire cannot finish, while the next public connect
@@ -452,6 +455,7 @@ export class Device extends EventEmitter {
   ) {
     const attempt = this.connectionAttempt;
     this.throwIfInterruptedByUser();
+    this.releasedBleConnection = false;
     const env = DataManager.getSettings('env');
     const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     const previousProtocol = this.originalDescriptor.protocolType;
@@ -562,6 +566,7 @@ export class Device extends EventEmitter {
       (this.isUsedHere() && !this.keepSession && this.mainId) ||
       (this.mainId && DataManager.isBleConnect(env))
     ) {
+      this.releasedBleConnection = false;
       // wait for callback tasks to complete before releasing device
       if (this.pendingCallbackPromise) {
         try {
@@ -585,8 +590,18 @@ export class Device extends EventEmitter {
         }
       }
       try {
+        const deviceType = this.getCurrentDeviceType();
+        const keepBleConnection =
+          (env === 'react-native' || env === 'desktop-web-ble') &&
+          this.isProtocolV2() &&
+          (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo);
         // BLE releases even when keepSession is set, so forward the intent.
-        await this.deviceConnector?.release(this.mainId, false, this.keepSession);
+        await this.deviceConnector?.release(
+          this.mainId,
+          false,
+          this.keepSession || keepBleConnection
+        );
+        this.releasedBleConnection = keepBleConnection;
       } catch (err) {
         Log.error('[Device] release error: ', err);
       } finally {
@@ -1371,6 +1386,7 @@ export class Device extends EventEmitter {
 
   markTransportDisconnected() {
     this.deviceAcquired = false;
+    this.releasedBleConnection = false;
     this.invalidateProtocolV2RuntimeState();
   }
 
@@ -1633,7 +1649,7 @@ export class Device extends EventEmitter {
           await commands?.cancelDevice?.().catch(cancelError => {
             Log.debug('Protocol V2 fallback cancel error', cancelError);
           });
-        } else if (!acquired) {
+        } else if (!acquired && !this.releasedBleConnection) {
           // Abort setup without acquiring a session just to send Cancel.
           if (mainId && deviceConnector?.disconnect) {
             // The connector drops the link silently, so without this line a
