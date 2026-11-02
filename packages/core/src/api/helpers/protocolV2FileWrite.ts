@@ -93,6 +93,13 @@ export function createProtocolV2AssetFileWriteRecovery(
     if (!expectedSerialNo) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
     }
+    if (DataManager.isBleConnect(DataManager.getSettings('env'))) {
+      // Acquire may otherwise reuse a native connection with an uncertain in-flight write.
+      await device.deviceConnector?.disconnect(device.originalDescriptor.id);
+      if (method.abortSignal?.aborted) {
+        throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+      }
+    }
     await device.acquire('V2', { throwOnRunPromiseError: true });
     if (method.abortSignal?.aborted) {
       throw ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);

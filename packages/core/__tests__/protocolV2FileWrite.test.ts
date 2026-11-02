@@ -284,37 +284,57 @@ describe('writeProtocolV2File', () => {
       }
     );
 
-    test('refreshes unlock status after reconnect even when the original preflight completed', async () => {
-      const { commands, device, typedCall } = createCommands();
-      typedCall.mockResolvedValueOnce({ type: 'DeviceStatus', message: { unlocked: false } });
-      const unlockDevice = jest.fn().mockResolvedValue({ unlocked: true });
-      const method = {
-        name: 'deviceUploadWallpaper',
-        device: {
-          ...device,
-          state: {
-            ...device.state,
-            identity: { serialNo: 'test-device', deviceType: EDeviceType.Pro2 },
-            status: { mode: 'normal', initialized: true },
+    test.each(['react-native', 'desktop-web-ble'])(
+      'disconnects a cached %s link and refreshes unlock status after reconnect',
+      async env => {
+        jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+        const { commands, device, typedCall } = createCommands();
+        typedCall.mockResolvedValueOnce({ type: 'DeviceStatus', message: { unlocked: false } });
+        const unlockDevice = jest.fn().mockResolvedValue({ unlocked: true });
+        let nativeConnected = true;
+        const disconnect = jest.fn(() => {
+          nativeConnected = false;
+          return Promise.resolve();
+        });
+        const acquire = jest.fn(() => {
+          if (nativeConnected) {
+            return Promise.reject(new Error('reused the timed-out native connection'));
+          }
+          nativeConnected = true;
+          return Promise.resolve();
+        });
+        const method = {
+          name: 'deviceUploadWallpaper',
+          device: {
+            ...device,
+            state: {
+              ...device.state,
+              identity: { serialNo: 'test-device', deviceType: EDeviceType.Pro2 },
+              status: { mode: 'normal', initialized: true },
+            },
+            commands,
+            originalDescriptor: { id: 'ble-device' },
+            deviceConnector: { disconnect },
+            acquire,
+            initialize: jest.fn().mockResolvedValue(undefined),
+            updateProtocolV2Status: (status: unknown) => status,
+            unlockDevice,
+            toMessageObject: () => ({}),
           },
-          commands,
-          acquire: jest.fn().mockResolvedValue(undefined),
-          initialize: jest.fn().mockResolvedValue(undefined),
-          updateProtocolV2Status: (status: unknown) => status,
-          unlockDevice,
-          toMessageObject: () => ({}),
-        },
-        unlockPolicy: 'unlock-before-run',
-        useDevicePassphraseState: false,
-        protocolV2PreUnlockPinType: DeviceSessionPinType.Any,
-        protocolV2UnlockContext: { preflightCompleted: true },
-        postMessage: jest.fn(),
-        payload: {},
-      } as unknown as BaseMethod;
-      await expect(createProtocolV2AssetFileWriteRecovery(method)()).resolves.toBe(commands);
-      expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
-      expect(unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
-    });
+          unlockPolicy: 'unlock-before-run',
+          useDevicePassphraseState: false,
+          protocolV2PreUnlockPinType: DeviceSessionPinType.Any,
+          protocolV2UnlockContext: { preflightCompleted: true },
+          postMessage: jest.fn(),
+          payload: {},
+        } as unknown as BaseMethod;
+        await expect(createProtocolV2AssetFileWriteRecovery(method)()).resolves.toBe(commands);
+        expect(disconnect).toHaveBeenCalledWith('ble-device');
+        expect(acquire).toHaveBeenCalledWith('V2', { throwOnRunPromiseError: true });
+        expect(typedCall).toHaveBeenCalledWith('DeviceStatusGet', 'DeviceStatus', {});
+        expect(unlockDevice).toHaveBeenCalledWith(DeviceSessionPinType.Any, expect.any(Object));
+      }
+    );
 
     const serialCases: {
       name: string;
