@@ -161,8 +161,10 @@ Inside a file write pipeline, a `Failure` stops further chunks. The Session drai
 returns the `Failure`, so the Link stays usable. A confirmation that does not match the oldest in-flight chunk, or an interactive
 response such as `ButtonRequest`, is a frame error and is link-fatal.
 
-Core retains the two-chunk window when retrying eligible Pro2/Neo BLE firmware staging and
-wallpaper/NFT/Portfolio uploads. A retry still reconnects, verifies device identity and readiness,
+For eligible Pro2/Neo BLE firmware staging, the first failed windowed exchange disables the
+two-chunk window for retries and subsequent files in that update; source read failures do not.
+Wallpaper/NFT/Portfolio uploads retain their window on retries.
+A retry still reconnects, verifies device identity and readiness,
 and restarts the overwriting file from offset zero; it never replays a chunk on the invalid Link.
 Existing version/transport gates and retry limits still apply. Core file-transfer metrics record the
 window, chunk size, retry count, confirmed bytes and elapsed time. Firmware rates are per-attempt

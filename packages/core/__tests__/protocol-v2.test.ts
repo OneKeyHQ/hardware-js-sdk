@@ -9427,12 +9427,12 @@ describe('Protocol V2 firmware update targets', () => {
       method.postProgressMessage = jest.fn();
       return method;
     };
-    const transfer = async (method: FirmwareUpdateV4) => {
+    const transfer = async (method: FirmwareUpdateV4, filePath = 'vol0:/application_p1.bin') => {
       const source = await openFirmwareByteSource({ binary: new Uint8Array(2500).buffer });
       try {
         const processedSize: number = await (method as any).protocolV2SourceUpdateProcess({
           source,
-          filePath: 'vol0:/application_p1.bin',
+          filePath,
           processedSize: 500,
           totalSize: 3000,
         });
@@ -9506,49 +9506,56 @@ describe('Protocol V2 firmware update targets', () => {
       }
     );
 
-    const failOnceThenSucceed = (requests: any[]) =>
-      jest
-        .fn()
-        .mockRejectedValueOnce(new Error('Protocol V2 file write response does not match'))
-        .mockImplementation(streamAll(requests));
+    const failWindowThenWriteSerial = (requests: any[]) => {
+      const writeSerial = streamAll(requests);
+      return jest.fn((name: string, resType: string, first: any, options: any) => {
+        if (options.fileWritePipeline) {
+          return Promise.reject(new Error('Protocol V2 file write response does not match'));
+        }
+        return writeSerial(name, resType, first, options);
+      });
+    };
 
-    test('restarts the whole file with dual frames after a failed windowed write', async () => {
+    test('falls back to serial whole-file overwrite after a failed windowed exchange', async () => {
       const requests: any[] = [];
-      const typedCall = failOnceThenSucceed(requests);
+      const typedCall = failWindowThenWriteSerial(requests);
       const method = createMethod(typedCall);
 
       await expect(transfer(method)).resolves.toBe(3000);
 
       expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
-      // One failed pipeline, then a fresh pipeline overwriting the file from offset 0.
-      expect(typedCall).toHaveBeenCalledTimes(2);
+      // One failed pipeline, then serial chunks overwriting the file from offset 0.
+      expect(typedCall).toHaveBeenCalledTimes(4);
+      expect(typedCall.mock.calls[0][3]).toHaveProperty('fileWritePipeline');
       typedCall.mock.calls
         .slice(1)
-        .forEach(call => expect(call[3]).toHaveProperty('fileWritePipeline'));
+        .forEach(call => expect(call[3]).not.toHaveProperty('fileWritePipeline'));
       expect(typedCall.mock.calls[1][2]).toEqual(
         expect.objectContaining({ overwrite: true, file: expect.objectContaining({ offset: 0 }) })
       );
       expect(requests.map(request => request.file.offset)).toEqual([0, 1000, 2000]);
-      // Retries retain the two-frame chunk limit.
       const chunkSize = (method as any).getProtocolV2FirmwareChunkSize as jest.Mock;
       expect(chunkSize).toHaveBeenNthCalledWith(1, 'write', 'vol0:/application_p1.bin', true);
-      expect(chunkSize).toHaveBeenNthCalledWith(2, 'write', 'vol0:/application_p1.bin', true);
+      expect(chunkSize).toHaveBeenNthCalledWith(2, 'write', 'vol0:/application_p1.bin', false);
     });
 
-    test('keeps later files on dual frames after a windowed attempt failed', async () => {
-      const typedCall = failOnceThenSucceed([]);
+    test('keeps subsequent files serial after a failed windowed exchange', async () => {
+      const typedCall = failWindowThenWriteSerial([]);
       const method = createMethod(typedCall);
       await transfer(method);
       typedCall.mockClear();
 
-      await expect(transfer(method)).resolves.toBe(3000);
+      await expect(transfer(method, 'vol0:/resource.bin')).resolves.toBe(3000);
 
-      expect(typedCall).toHaveBeenCalledTimes(1);
-      typedCall.mock.calls.forEach(call => expect(call[3]).toHaveProperty('fileWritePipeline'));
-      expect((method as any).shouldUseProtocolV2BleFileWriteWindow).toHaveBeenCalledTimes(3);
+      expect(typedCall).toHaveBeenCalledTimes(3);
+      typedCall.mock.calls.forEach(call => {
+        expect(call[3]).not.toHaveProperty('fileWritePipeline');
+        expect(call[2].file.path).toBe('vol0:/resource.bin');
+      });
+      expect((method as any).shouldUseProtocolV2BleFileWriteWindow).toHaveBeenCalledTimes(1);
     });
 
-    test('bounds failed dual-frame transfers to three attempts', async () => {
+    test('bounds failed file transfers to three attempts after serial fallback', async () => {
       const typedCall = jest.fn().mockRejectedValue(new Error('BLE response timeout'));
       const method = createMethod(typedCall);
       await expect(transfer(method)).rejects.toMatchObject({
@@ -9556,7 +9563,10 @@ describe('Protocol V2 firmware update targets', () => {
       });
       expect(typedCall).toHaveBeenCalledTimes(3);
       expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(2);
-      typedCall.mock.calls.forEach(call => expect(call[3]).toHaveProperty('fileWritePipeline'));
+      expect(typedCall.mock.calls[0][3]).toHaveProperty('fileWritePipeline');
+      typedCall.mock.calls
+        .slice(1)
+        .forEach(call => expect(call[3]).not.toHaveProperty('fileWritePipeline'));
     });
 
     test('logs confirmed progress every ten seconds and average speed through Core', async () => {

@@ -634,6 +634,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
 
   private protocolV2LastTransferredBytes = 0;
 
+  private protocolV2FileWriteWindowDisabled = false;
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -2373,7 +2375,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         }
       };
       try {
-        windowed = this.shouldUseProtocolV2BleFileWriteWindow();
+        windowed =
+          !this.protocolV2FileWriteWindowDisabled && this.shouldUseProtocolV2BleFileWriteWindow();
         chunkSize = this.getProtocolV2FirmwareChunkSize('write', filePath, windowed);
         logTransfer('started');
         if (windowed) {
@@ -3438,8 +3441,8 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     if (source.size === 0) return;
     const firstRequest = await readRequest();
 
-    // Core retries the whole overwriting file after a verified reconnect. Keep the same
-    // window on retries and subsequent files; the running bootloader version gates support.
+    // A failed exchange disables the window for the rest of this update. Source read
+    // failures are raised separately and do not change the bootloader capability decision.
     const response = await this.device
       .getCommands()
       .typedCall('FilesystemFileWrite', 'FilesystemFile', firstRequest, {
@@ -3453,11 +3456,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
             onChunkConfirmed(Number(confirmed.message.processed_byte));
           },
         },
+      })
+      .catch((error: unknown) => {
+        this.protocolV2FileWriteWindowDisabled = true;
+        throw error;
       });
     this.throwIfAborted();
     if (sourceError) throw sourceError;
     const rawProcessedByte = response.message.processed_byte;
     if (Number(rawProcessedByte) !== source.size) {
+      this.protocolV2FileWriteWindowDisabled = true;
       throw ERRORS.TypedError(
         HardwareErrorCode.EmmcFileWriteFirmwareError,
         `invalid processed_byte ${rawProcessedByte} for file size ${source.size}`
