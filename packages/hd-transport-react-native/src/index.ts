@@ -8,7 +8,7 @@ import {
   ScanMode,
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
-import transport, {
+import transportModule, {
   type OneKeyDeviceInfoBase,
   type OneKeyMobileDeviceInfo,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
@@ -69,6 +69,9 @@ type FirmwareInstallBleAcquireInput = BleAcquireInput & {
   skipProtocolProbe?: boolean;
 };
 
+const transport: typeof transportModule =
+  (transportModule as typeof transportModule & { default?: typeof transportModule }).default ??
+  transportModule;
 const { check, ProtocolV1, parseConfigure } = transport;
 
 const Log = bleLogger;
