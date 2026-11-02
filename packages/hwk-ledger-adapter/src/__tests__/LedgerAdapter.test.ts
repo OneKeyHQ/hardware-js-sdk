@@ -333,6 +333,9 @@ describe('LedgerAdapter', () => {
         expect(connector.call).toHaveBeenLastCalledWith('ble-session', 'installApp', {
           appName: 'Tron',
         });
+        expect((await adapter.listInstalledNames(bleOperation)).success).toBe(true);
+        expect(connector.searchDevices).toHaveBeenCalledTimes(previousScans);
+        expect(connector.call).toHaveBeenLastCalledWith('ble-session', 'listInstalledNames', {});
         expect(connector.connect).toHaveBeenCalledTimes(1);
 
         await adapter.releaseOperation(bleOperation);
@@ -495,12 +498,16 @@ describe('LedgerAdapter', () => {
   }
 
   /** Start a BTC account-100 read and wait for its high-index prompt. */
-  async function openHighIndexPrompt() {
+  async function openHighIndexPrompt(params?: { operationId?: string }) {
     const prompts: { payload: { operationId?: string } }[] = [];
     adapter.on(UI_REQUEST.REQUEST_BTC_HIGH_INDEX_CONFIRM, event => {
       prompts.push(event);
     });
-    const pending = adapter.btcGetPublicKey('dev-1', '', { path: "m/84'/0'/100'", coin: 'btc' });
+    const pending = adapter.btcGetPublicKey('dev-1', '', {
+      path: "m/84'/0'/100'",
+      coin: 'btc',
+      ...params,
+    });
     await waitForCondition(() => prompts.length === 1);
     return { prompts, pending };
   }
@@ -824,6 +831,111 @@ describe('LedgerAdapter', () => {
       );
     }
   );
+
+  it('lists the apps on the plugged USB Ledger when the named Bluetooth one is not connected', async () => {
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+      options?.transportType === 'usb'
+        ? [{ connectId: 'usb-B', deviceId: 'usb-B', name: 'Ledger Stax', model: 'stax' }]
+        : []
+    );
+    connector.callImpl.mockResolvedValue(['Ethereum']);
+    const select = jest.fn();
+    adapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, select);
+
+    const result = await adapter.listInstalledNames('ble-A');
+
+    expect(result).toEqual({ success: true, payload: ['Ethereum'] });
+    expect(connector.connect).toHaveBeenCalledWith('usb-B', { transportType: 'usb' });
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [true, true],
+    [true, false],
+    [false, false],
+  ])(
+    'asks permission for the selected USB Ledger instead of the stale BLE target (USB granted=%s, device granted=%s)',
+    async (usbGranted, deviceGranted) => {
+      Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+      Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+      connector.searchDevices.mockImplementation(async (options?: ConnectorSearchDevicesOptions) =>
+        options?.transportType === 'usb'
+          ? [{ connectId: 'usb-B', deviceId: 'usb-B', name: 'Ledger Stax', connectionType: 'usb' }]
+          : []
+      );
+      connector.connect.mockResolvedValue(ledgerSession('usb-session', { connectId: 'usb-B' }));
+      connector.callImpl.mockResolvedValue(['Ethereum']);
+      (
+        adapter as unknown as { emitter: { removeAllListeners(event: string): void } }
+      ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
+      const permissions: { transportType: string; connectId?: string }[] = [];
+      adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+        permissions.push(event.payload);
+        adapter.uiResponse({
+          type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+          payload: {
+            granted:
+              event.payload.transportType !== 'ble' &&
+              usbGranted &&
+              (!event.payload.connectId || deviceGranted),
+          },
+        });
+      });
+
+      const result = await adapter.listInstalledNames('ble-A');
+
+      expect(permissions.every(permission => permission.transportType === 'hid')).toBe(true);
+      if (usbGranted && deviceGranted) {
+        expect(result).toEqual({ success: true, payload: ['Ethereum'] });
+        expect(permissions).toContainEqual(
+          expect.objectContaining({
+            transportType: 'hid',
+            connectId: 'usb-B',
+          })
+        );
+        expect(connector.connect).toHaveBeenCalledWith('usb-B', { transportType: 'usb' });
+        expect(connector.call).toHaveBeenCalledWith('usb-session', 'listInstalledNames', {});
+      } else {
+        expect(result).toMatchObject({
+          success: false,
+          payload: { code: HardwareErrorCode.DevicePermissionDenied },
+        });
+        expect(connector.connect).not.toHaveBeenCalled();
+        expect(connector.call).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('still requires BLE permission when app management reuses an active BLE session', async () => {
+    Object.defineProperty(connector, 'connectionType', { value: 'ble' });
+    Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
+    connector.connect.mockResolvedValue(
+      ledgerSession('ble-session', { connectId: 'ble-A', connectionType: 'ble' })
+    );
+    await expect(adapter.connectDevice('ble-A')).resolves.toMatchObject({ success: true });
+    (
+      adapter as unknown as { emitter: { removeAllListeners(event: string): void } }
+    ).emitter.removeAllListeners(UI_REQUEST.REQUEST_DEVICE_PERMISSION);
+    const permissions: { transportType: string; connectId?: string }[] = [];
+    adapter.on(UI_REQUEST.REQUEST_DEVICE_PERMISSION, event => {
+      permissions.push(event.payload);
+      adapter.uiResponse({
+        type: UI_RESPONSE.RECEIVE_DEVICE_PERMISSION,
+        payload: { granted: false },
+      });
+    });
+
+    await expect(adapter.listInstalledNames('ble-A')).resolves.toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DevicePermissionDenied },
+    });
+    expect(permissions).toEqual([
+      expect.objectContaining({ transportType: 'ble', connectId: 'ble-A' }),
+    ]);
+    expect(connector.searchDevices).not.toHaveBeenCalled();
+    expect(connector.call).not.toHaveBeenCalled();
+  });
 
   it('does not select BLE for a legacy target when the caller disallows selection', async () => {
     Object.defineProperty(connector, 'availableTransports', { value: ['usb', 'ble'] });
@@ -2275,27 +2387,39 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('names the connection live operation on a prompt from an unpinned call', async () => {
-      const operationId = await connectOperation();
-      connector.callImpl.mockImplementation(
-        () =>
-          new Promise(() => {
-            // Never settles: the prompt has to stay open.
-          })
-      );
-      const { prompts, pending } = await openHighIndexPrompt();
+    it.each([true, false])(
+      'attributes a prompt only to its supplied operation (supplied=%s)',
+      async supplied => {
+        const operationId = await connectOperation();
+        connector.callImpl.mockImplementation(
+          () =>
+            new Promise(() => {
+              // Never settles: the prompt has to stay open.
+            })
+        );
+        const { prompts, pending } = await openHighIndexPrompt(
+          supplied ? { operationId } : undefined
+        );
+        expect(prompts[0].payload.operationId).toBe(supplied ? operationId : undefined);
 
-      // The call carries no operationId, so it queues under the connectId; the
-      // live operation on that connection still owns the prompt.
-      expect(prompts[0].payload.operationId).toBe(operationId);
-
-      // Which is what lets a cancel naming that operation reach the prompt.
-      adapter.cancel(operationId);
-      expect((await pending).success).toBe(false);
-    });
+        let settled = false;
+        void pending.then(() => {
+          settled = true;
+        });
+        connector.cancel.mockClear();
+        adapter.cancel(operationId);
+        if (!supplied) {
+          await new Promise(resolve => setImmediate(resolve));
+          expect(settled).toBe(false);
+          expect(connector.cancel).not.toHaveBeenCalled();
+          adapter.cancel('dev-1');
+        }
+        expect((await pending).success).toBe(false);
+      }
+    );
 
     it('reaches nothing when the named connectId resolves to no operation', async () => {
-      const operationId = await connectOperation();
+      await connectOperation();
       connector.callImpl.mockImplementation(
         () =>
           new Promise(() => {
@@ -2316,7 +2440,7 @@ describe('LedgerAdapter', () => {
       });
       expect(settled).toBe(false);
 
-      adapter.cancel(operationId);
+      adapter.cancel('dev-1');
       expect((await pending).success).toBe(false);
     });
 

@@ -1,4 +1,5 @@
 import {
+  CryptoAccount,
   CryptoCoinInfo,
   CryptoHDKey,
   CryptoKeypath,
@@ -22,7 +23,13 @@ import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import { KeystoneUrEngine } from '../urEngine/KeystoneUrEngine';
 import { TronSignRequest } from '../urEngine/TronSignRequest';
 import { TronSignature as TronUrSignature } from '../urEngine/TronSignature';
-import { psbtFixtureHex, urJson } from './fixtures';
+import {
+  KEYSTONE_BITGET_EXPORT_CBOR,
+  KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR,
+  KEYSTONE_NEXUS_EXPORT_CBOR,
+  psbtFixtureHex,
+  urJson,
+} from './fixtures';
 
 import type { KeyDerivation } from '@keystonehq/bc-ur-registry';
 import type { KeystoneUr } from '../urEngine/types';
@@ -61,7 +68,76 @@ function buildMultiAccountsUr(device = 'Keystone 3 Pro', deviceVersion = '1.7.0'
 describe('KeystoneUrEngine', () => {
   const engine = new KeystoneUrEngine('OneKey-test');
 
+  it('accepts the firmware BTC export including receiving hints and Taproot', () => {
+    const parsed = engine.parseAccountExport({
+      urType: 'crypto-account',
+      urData: KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR,
+    });
+    expect(parsed.masterFingerprint).toBe('73c5da0a');
+    expect(parsed.accounts.map(account => account.path)).toEqual([
+      "m/84'/0'/0'",
+      "m/44'/0'/0'",
+      "m/49'/0'/0'",
+      "m/86'/0'/0'",
+    ]);
+    expect(parsed.accounts.every(account => account.extendedPublicKey?.startsWith('xpub'))).toBe(
+      true
+    );
+    expect(
+      CryptoAccount.fromCBOR(Buffer.from(KEYSTONE_BTC_ACCOUNT_EXPORT_CBOR, 'hex'))
+        .getOutputDescriptors()
+        .map(output =>
+          output
+            .getScriptExpressions()
+            .map(script => script.getExpression())
+            .join('/')
+        )
+    ).toEqual(['wpkh', 'pkh', 'sh/wpkh', 'tr']);
+  });
+
+  it.each([
+    ['Keystone Nexus', KEYSTONE_NEXUS_EXPORT_CBOR, []],
+    ['Bitget', KEYSTONE_BITGET_EXPORT_CBOR, ["m/44'/607'/0'"]],
+  ])(
+    'reads the firmware %s export, setting aside the Ledger Live keys it cannot use',
+    (_, cbor, extraPaths) => {
+      const parsed = engine.parseAccountExport({ urType: 'crypto-multi-accounts', urData: cbor });
+      expect(parsed.accounts.map(account => account.path)).toEqual([
+        "m/44'/60'/0'",
+        "m/44'/0'/0'",
+        "m/49'/0'/0'",
+        "m/84'/0'/0'",
+        "m/86'/0'/0'",
+        ...extraPaths,
+      ]);
+      expect(parsed.rejectedPaths?.length).toBeGreaterThan(0);
+      for (const rejected of parsed.rejectedPaths ?? []) {
+        expect(rejected.reason).toBe('unusable-key');
+        expect(rejected.path).toMatch(/^m\/44'\/60'\/\d+'\/0(\/0)?$/);
+      }
+    }
+  );
+
+  it('reports an unreadable account code apart from a missing account', () => {
+    expect(() =>
+      engine.parseAccountExport({ urType: 'crypto-multi-accounts', urData: 'a0' })
+    ).toThrow(
+      expect.objectContaining({
+        code: HardwareErrorCode.InvalidParams,
+        params: { reason: 'unexpected-qr-code' },
+      })
+    );
+  });
+
   describe('parseMultiAccounts', () => {
+    it.each(['3.1.4-CYPHERPUNK-B', '3.1.4-BTC-ONLY'])(
+      'preserves a multi-segment firmware suffix (%s)',
+      version => {
+        const parsed = engine.parseAccountResponse(buildMultiAccountsUr('Keystone 3 Pro', version));
+        expect(parsed.deviceVersion).toBe(version);
+      }
+    );
+
     it.each([
       ['a name longer than any model name', 'K'.repeat(65), '1.7.0', undefined, '1.7.0'],
       ['a name with a control character', 'Keystone\u0000 3 Pro', '1.7.0', undefined, '1.7.0'],

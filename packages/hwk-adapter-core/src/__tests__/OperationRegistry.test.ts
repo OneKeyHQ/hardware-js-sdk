@@ -61,6 +61,18 @@ describe('OperationRegistry', () => {
     );
   });
 
+  it('attributes only explicit operation job keys while keeping connection lookup for cleanup', () => {
+    const registry = newRegistry({ vendor: 'ledger' });
+    const operation = createOperation(registry, { connectionKeys: ['session-1'] });
+    expect(registry.findOperationIdByJobKey(operation.operationId)).toBe(operation.operationId);
+    for (const key of ['usb-target', 'session-1', undefined]) {
+      expect(registry.findOperationIdByJobKey(key)).toBeUndefined();
+    }
+    expect(registry.findActiveByConnectionKey('session-1')?.operationId).toBe(
+      operation.operationId
+    );
+  });
+
   it('creates an opaque random runtime id and resolves the same bound search target', () => {
     const registry = newRegistry({ vendor: 'ledger' });
     const operation = createOperation(registry, { connectionKeys: ['session-1'] });

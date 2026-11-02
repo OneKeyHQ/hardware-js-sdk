@@ -1,4 +1,5 @@
 import {
+  EConnectorInteraction,
   HardwareErrorCode,
   ORPHAN_ELIGIBLE_ERROR_CODES,
   rehydrateConnectorError,
@@ -14,7 +15,16 @@ import {
   mapLedgerError,
 } from '../errors';
 
-import type { ConnectionType, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
+import type { ConnectorContext } from '../connector/chains/types';
+import type {
+  ConnectionType,
+  ConnectorUiEvent,
+  DeviceDescriptor,
+} from '@onekeyfe/hwk-adapter-core';
+
+interface MethodContextConnector {
+  _ctxForMethod(method: string): ConnectorContext;
+}
 
 class SearchConnector extends LedgerConnectorBase {
   constructor(private readonly descriptors: DeviceDescriptor[], connectionType: ConnectionType) {
@@ -67,6 +77,72 @@ describe('LedgerConnectorBase error wrapping', () => {
       _tag: ERROR_TAG.EthAppCommand,
       errorCode: '6a80',
     });
+  });
+});
+
+describe('LedgerConnectorBase open-app prompt', () => {
+  it.each([
+    ['btcGetPublicKey', 'Bitcoin'],
+    ['evmGetAddress', 'Ethereum'],
+    ['solGetAddress', 'Solana'],
+    ['tronGetAddress', 'Tron'],
+    ['zcashGetFullViewingKey', 'Zcash'],
+  ])('names the app requested by %s', (method, appName) => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const events: ConnectorUiEvent[] = [];
+    connector.on('ui-event', event => events.push(event));
+    const ctx = (connector as unknown as MethodContextConnector)._ctxForMethod(method);
+    const confirmOnDevice: ConnectorUiEvent = {
+      type: EConnectorInteraction.ConfirmOnDevice,
+      payload: { sessionId: 'session-1' },
+    };
+
+    ctx.emit('ui-event', {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId: 'session-1' },
+    });
+    ctx.emit('ui-event', confirmOnDevice);
+
+    expect(events).toEqual([
+      {
+        type: EConnectorInteraction.ConfirmOpenApp,
+        payload: { sessionId: 'session-1', appName },
+      },
+      confirmOnDevice,
+    ]);
+    expect(events[1]).toBe(confirmOnDevice);
+  });
+
+  it('preserves an explicit app name on the event', () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const events: ConnectorUiEvent[] = [];
+    connector.on('ui-event', event => events.push(event));
+    const event: ConnectorUiEvent = {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId: 'session-1', appName: 'Bitcoin Test' },
+    };
+
+    const ctx = (connector as unknown as MethodContextConnector)._ctxForMethod('btcGetPublicKey');
+    ctx.emit('ui-event', event);
+
+    expect(events).toEqual([event]);
+    expect(events[0]).toBe(event);
+  });
+
+  it('keeps an unknown method event unchanged', () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const events: ConnectorUiEvent[] = [];
+    connector.on('ui-event', event => events.push(event));
+    const event: ConnectorUiEvent = {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId: 'session-1' },
+    };
+
+    const ctx = (connector as unknown as MethodContextConnector)._ctxForMethod('getFeatures');
+    ctx.emit('ui-event', event);
+
+    expect(events).toEqual([event]);
+    expect(events[0]).toBe(event);
   });
 });
 

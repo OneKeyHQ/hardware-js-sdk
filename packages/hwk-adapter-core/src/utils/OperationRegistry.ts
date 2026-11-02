@@ -134,11 +134,9 @@ export class OperationRegistry {
     );
   }
 
-  /** Map a job queue key (an operation id or a connection key) to its live operation id. */
+  /** Only an explicitly supplied operation job key owns the call's UI requests. */
   findOperationIdByJobKey(jobKey: string | undefined): string | undefined {
-    if (!jobKey) return undefined;
-    if (isHardwareOperationId(jobKey)) return jobKey;
-    return this.findActiveByConnectionKey(jobKey)?.operationId;
+    return isHardwareOperationId(jobKey) ? jobKey : undefined;
   }
 
   /**

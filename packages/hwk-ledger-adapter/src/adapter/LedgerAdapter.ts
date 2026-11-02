@@ -119,6 +119,8 @@ type LedgerConnectionAttempt = ICommonCallParams & {
   /** The caller checks the wallet first, so a BLE pick waits in `pendingBinding`. */
   deferBindingSave?: boolean;
   pendingBinding?: { connectId: string; requestId: string };
+  /** App management may use a Ledger already on USB in place of a named endpoint. */
+  takesPluggedUsb?: boolean;
 };
 
 /**
@@ -164,6 +166,17 @@ function isLostConnectionError(err: unknown): boolean {
  * `display=true`. See app-bitcoin-new src/handler/get_extended_pubkey.c.
  */
 const BTC_HIGH_INDEX_THRESHOLD = 100;
+
+/**
+ * App management works on the device OS, never on a wallet: when its named endpoint is not
+ * connected, it may use a Ledger already plugged in over USB (a BLE picker still never swaps one in).
+ */
+const APP_MANAGEMENT_METHODS = new Set([
+  'installApp',
+  'listInstalledApps',
+  'listInstalledNames',
+  'listAvailableApps',
+]);
 
 function btcAccountIndexFromPath(path: string): number | null {
   const segments = path.replace(/^m\//, '').split('/');
@@ -1604,13 +1617,6 @@ export class LedgerAdapter implements IHardwareWallet {
       this._jobQueue.cancelActiveAndPending(undefined, userAbortReason);
     }
 
-    if (resolvedConnectId) {
-      const sessionId = this._sessions.get(resolvedConnectId) ?? resolvedConnectId;
-      void this.connector.cancel(sessionId);
-    } else {
-      for (const sid of this._sessions.values()) void this.connector.cancel(sid);
-    }
-
     // Snapshot guard: only abort if connect is actually in flight (avoids
     // hitting a NEW controller from a restart between resolve and re-entry).
     // A named cancel reaches an in-flight connect only when it runs for the cancelled job or
@@ -1630,6 +1636,14 @@ export class LedgerAdapter implements IHardwareWallet {
       !connectId ||
       (activeJobId !== undefined && queueKeys.has(activeJobId)) ||
       (connectingConnectId !== undefined && targetKeys.has(connectingConnectId));
+    if (activeJobId === undefined || ownsPendingConnect) {
+      if (resolvedConnectId) {
+        const sessionId = this._sessions.get(resolvedConnectId) ?? resolvedConnectId;
+        void this.connector.cancel(sessionId);
+      } else {
+        for (const sid of this._sessions.values()) void this.connector.cancel(sid);
+      }
+    }
     if (this._connectingPromise && ownsPendingConnect) {
       this._doConnectAbortController?.abort(userAbortReason);
     }
@@ -1884,7 +1898,7 @@ export class LedgerAdapter implements IHardwareWallet {
       // still be set, so signal it to drop the dialog.
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
         type: UI_REQUEST.CLOSE_UI_WINDOW,
-        payload: {},
+        payload: { operationId },
       });
       // Re-tag as UserAborted so upstream classifiers stop the batch.
       throw Object.assign(new Error('User cancelled Ledger connection'), {
@@ -1969,7 +1983,7 @@ export class LedgerAdapter implements IHardwareWallet {
     } catch (err) {
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
         type: UI_REQUEST.CLOSE_UI_WINDOW,
-        payload: {},
+        payload: { operationId },
       });
       return false;
     }
@@ -2015,7 +2029,7 @@ export class LedgerAdapter implements IHardwareWallet {
     } catch (err) {
       this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
         type: UI_REQUEST.CLOSE_UI_WINDOW,
-        payload: {},
+        payload: { operationId },
       });
       return false;
     }
@@ -2121,7 +2135,11 @@ export class LedgerAdapter implements IHardwareWallet {
           : usbDevices.find(device => device.connectId === targetConnectId)?.connectId;
       // A named target that is not on USB may only fall back to another USB Ledger when the call
       // checks the wallet; an unchecked call would otherwise derive on whichever one is plugged in.
-      if (usbDevices.length > 0 && (usbTarget || !targetConnectId || allowUsbEphemeralFallback)) {
+      // App management derives nothing, so it may.
+      if (
+        usbDevices.length > 0 &&
+        (usbTarget || !targetConnectId || allowUsbEphemeralFallback || context?.takesPluggedUsb)
+      ) {
         return this._connectFirstOrSelect(
           usbDevices,
           usbTarget,
@@ -2732,7 +2750,13 @@ export class LedgerAdapter implements IHardwareWallet {
     lockedRetryBudget = LedgerAdapter.MAX_BUSINESS_RETRY_BUDGET
   ): Promise<unknown> {
     LedgerAdapter._throwIfAborted(signal);
-    if (!operationId) {
+    const resolvesAppManagementTransport =
+      APP_MANAGEMENT_METHODS.has(method) &&
+      this.connector.availableTransports?.includes('usb') &&
+      this.connector.availableTransports.includes('ble');
+    // A stale BLE endpoint may resolve to USB for app management. Discovery and connection
+    // request their own permissions; authorize the resolved session before the actual call.
+    if (!operationId && !resolvesAppManagementTransport) {
       await this._ensureDevicePermission(
         connectId,
         permissionDeviceId ?? fingerprint?.deviceId,
@@ -2778,6 +2802,7 @@ export class LedgerAdapter implements IHardwareWallet {
     const connectionAttempt: LedgerConnectionAttempt = {
       ...commonParams,
       deferBindingSave: checksWallet,
+      ...(APP_MANAGEMENT_METHODS.has(method) ? { takesPluggedUsb: true } : {}),
     };
     const bundleConnection = installContext?.connection;
     if (
@@ -2831,6 +2856,17 @@ export class LedgerAdapter implements IHardwareWallet {
       throw Object.assign(new Error('Auto-connect succeeded but no session found'), {
         _tag: ERROR_TAG.DeviceSessionNotFound,
       });
+    }
+
+    if (!operationId && resolvesAppManagementTransport) {
+      const transport = this._sessionTransports.get(sessionId);
+      await this._ensureDevicePermission(
+        resolvedConnectId,
+        permissionDeviceId ?? fingerprint?.deviceId,
+        signal,
+        transport && (isLedgerBleConnectionType(transport) ? 'ble' : 'hid')
+      );
+      LedgerAdapter._throwIfAborted(signal);
     }
 
     // Fingerprint verification inside the session — atomic with the actual call
@@ -3092,7 +3128,7 @@ export class LedgerAdapter implements IHardwareWallet {
           // being absorbed by the install dialog.
           this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
             type: UI_REQUEST.CLOSE_UI_WINDOW,
-            payload: {},
+            payload: { operationId },
           });
           return await this._runConnectorCall(
             resolvedConnectId,
@@ -3138,12 +3174,13 @@ export class LedgerAdapter implements IHardwareWallet {
   private async _ensureDevicePermission(
     connectId?: string,
     deviceId?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    transportOverride?: TransportType
   ): Promise<void> {
     if (signal?.aborted) {
       LedgerAdapter._throwIfAborted(signal);
     }
-    const transportType: TransportType = this.activeTransport ?? 'hid';
+    const transportType: TransportType = transportOverride ?? this.activeTransport ?? 'hid';
 
     // Register the wait before emitting: a synchronous listener that replies
     // immediately (e.g. in tests or a same-process consumer) would otherwise
@@ -3176,7 +3213,7 @@ export class LedgerAdapter implements IHardwareWallet {
       if ((err as { _tag?: string })?._tag === UI_REQUEST_PREEMPTED_TAG) {
         this.emitter.emit(UI_REQUEST.CLOSE_UI_WINDOW, {
           type: UI_REQUEST.CLOSE_UI_WINDOW,
-          payload: {},
+          payload: { operationId },
         });
         throw Object.assign(new Error('Device permission request superseded'), {
           _tag: ERROR_TAG.UserAborted,
@@ -3283,6 +3320,7 @@ export class LedgerAdapter implements IHardwareWallet {
   // need to subscribe in one place. The AppInstallProgress variant re-keys
   // sessionId to connectId via `_sessions`, and drops if no mapping exists.
   private uiEventForwarder = (event: ConnectorUiEvent): void => {
+    const operationId = this._activeOperationId();
     if (event.type === EConnectorInteraction.AppInstallProgress) {
       let connectId: string | undefined;
       for (const [cid, sid] of this._sessions) {
@@ -3314,6 +3352,7 @@ export class LedgerAdapter implements IHardwareWallet {
       this._installProgressLastEmittedValue = progress;
       this.emitter.emit('ui-event', {
         type: EConnectorInteraction.AppInstallProgress,
+        ...(operationId ? { operationId } : {}),
         payload: {
           connectId,
           appName,
@@ -3322,7 +3361,7 @@ export class LedgerAdapter implements IHardwareWallet {
       });
       return;
     }
-    this.emitter.emit('ui-event', event);
+    this.emitter.emit('ui-event', operationId ? { ...event, operationId } : event);
   };
 
   private registerEventListeners(): void {

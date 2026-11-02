@@ -504,4 +504,17 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
   neoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
+  zcashGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'zcashGetAddress' }),
+  zcashSignPczt: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'zcashSignPczt' }),
+
+  moneroGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroGetAddress' }),
+  moneroGetWatchKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroGetWatchKey' }),
+  moneroKeyImageSync: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroKeyImageSync' }),
+  moneroSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroSignTransaction' }),
 });

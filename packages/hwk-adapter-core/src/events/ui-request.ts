@@ -22,6 +22,8 @@ export const UI_REQUEST = {
   // Required app is not installed; with autoInstallApp on, ask the user
   // whether to install it before retrying the operation.
   REQUEST_INSTALL_APP: 'ui-request-install-app',
+  // The request cannot go over USB (see QrFallbackReason); ask whether to show it as a QR instead.
+  REQUEST_QR_FALLBACK_CONFIRM: 'ui-request-qr-fallback-confirm',
   REQUEST_PREEMPTION: 'ui-request-preemption',
   REQUEST_TREZOR_THP_PAIRING: 'ui-request-trezor-thp-pairing',
   CLOSE_UI_WINDOW: 'ui-close',
@@ -40,6 +42,7 @@ export const UI_RESPONSE = {
   RECEIVE_DEVICE_PERMISSION: 'receive-device-permission',
   RECEIVE_BTC_HIGH_INDEX_CONFIRM: 'receive-btc-high-index-confirm',
   RECEIVE_INSTALL_APP: 'receive-install-app',
+  RECEIVE_QR_FALLBACK_CONFIRM: 'receive-qr-fallback-confirm',
   RECEIVE_PREEMPTION: 'receive-preemption',
   RECEIVE_TREZOR_THP_PAIRING: 'receive-trezor-thp-pairing',
   CANCEL: 'cancel',
@@ -79,6 +82,16 @@ export type DevicePermissionResponse = {
  * releases the operation, and has the user select a device again.
  */
 export type SaveDeviceBindingDeclineReason = 'mismatch' | 'skipped';
+
+/**
+ * Why the request cannot go over USB. Only `payload-too-large` comes after the request was built;
+ * the others mean a connected device cannot serve this wallet, so the host may offer a retry.
+ */
+export type QrFallbackReason =
+  | 'payload-too-large'
+  | 'wallet-mismatch'
+  | 'device-locked'
+  | 'usb-unavailable';
 
 export type UiResponseEvent =
   | {
@@ -135,6 +148,14 @@ export type UiResponseEvent =
   | {
       type: typeof UI_RESPONSE.RECEIVE_INSTALL_APP;
       payload: { confirmed: boolean };
+    }
+  | {
+      type: typeof UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM;
+      /**
+       * Echo the prompt's requestId; missing or stale IDs are ignored. `retry` asks to look for
+       * the USB device again; it is ignored for `payload-too-large`.
+       */
+      payload: { confirmed: boolean; retry?: boolean; requestId?: string };
     }
   | {
       type: typeof UI_RESPONSE.RECEIVE_PREEMPTION;

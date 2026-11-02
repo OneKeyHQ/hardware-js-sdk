@@ -1,6 +1,28 @@
-import { HardwareErrorCode } from '../index';
+import { HardwareErrorCode, UI_REQUEST, UI_RESPONSE } from '../index';
 
-import type { IHardwareWallet } from '../index';
+import type {
+  DeviceEventListener,
+  HardwareEventMap,
+  IHardwareWallet,
+  UiRequestEvent,
+} from '../index';
+
+function typeOnlyQrFallbackEvents(
+  wallet: IHardwareWallet,
+  event: HardwareEventMap[typeof UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM]
+) {
+  const request: UiRequestEvent = event;
+  const listener: DeviceEventListener = hardwareEvent => {
+    if (hardwareEvent.type === UI_REQUEST.REQUEST_QR_FALLBACK_CONFIRM) {
+      wallet.uiResponse({
+        type: UI_RESPONSE.RECEIVE_QR_FALLBACK_CONFIRM,
+        payload: { confirmed: false, requestId: hardwareEvent.payload.requestId },
+      });
+    }
+  };
+  listener(request);
+}
+void typeOnlyQrFallbackEvents;
 
 function typeOnlyHardwareWalletCalls(wallet: IHardwareWallet) {
   void wallet.evmGetAddress(undefined, null, {

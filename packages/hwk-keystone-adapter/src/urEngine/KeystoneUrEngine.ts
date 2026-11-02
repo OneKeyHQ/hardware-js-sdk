@@ -1,4 +1,12 @@
 import { generateAddressFromXpub } from '@keystonehq/bc-ur-registry-eth';
+import {
+  CryptoAccount,
+  CryptoHDKey,
+  CryptoMultiAccounts,
+  ScriptExpressions,
+  extend,
+} from '@keystonehq/bc-ur-registry';
+import { ScriptExpression } from '@keystonehq/bc-ur-registry/dist/ScriptExpression.js';
 import { Curve, KeystoneSDK, QRHardwareCallVersion, UR } from '@keystonehq/keystone-sdk';
 import bs58check from 'bs58check';
 import * as bitcoin from 'bitcoinjs-lib';
@@ -14,6 +22,7 @@ import {
 import { TronSignRequest, TronSignType } from './TronSignRequest';
 import { TronSignature } from './TronSignature';
 
+import type { HwkError } from '@onekeyfe/hwk-adapter-core';
 import type {
   BtcScriptType,
   KeystoneBtcSignRequestAccount,
@@ -23,6 +32,7 @@ import type {
   KeystoneKeyDerivationRequestInput,
   KeystoneParsedAccount,
   KeystoneParsedMultiAccounts,
+  KeystoneRejectedExportPath,
   KeystoneSolSignRequestInput,
   KeystoneSolSignatureResult,
   KeystoneTronSignRequestInput,
@@ -105,6 +115,70 @@ function toParsedAccount(key: ReturnType<KeystoneSDK['parseHDKey']>): KeystonePa
 
 const BIP32_HARDENED_OFFSET = 0x80000000;
 
+type RejectionReason = KeystoneRejectedExportPath['reason'];
+
+/** The account path form a request can name: hardened first segment, every index below 2^31. */
+function isExportedAccountPath(path: string): boolean {
+  return (
+    /^m(?:\/\d+')+(?:\/\d+)*$/.test(path) &&
+    path
+      .slice(2)
+      .split('/')
+      .every(
+        segment =>
+          Number(segment.endsWith("'") ? segment.slice(0, -1) : segment) < BIP32_HARDENED_OFFSET
+      )
+  );
+}
+
+/** One exported key: its identity when usable, otherwise why it cannot be used. */
+function checkExportedKey(
+  key: CryptoHDKey,
+  account: KeystoneParsedAccount,
+  masterFingerprint: string,
+  unsupportedDescriptor: boolean
+):
+  | { identity: string; rejected?: undefined }
+  | { identity?: undefined; rejected: RejectionReason } {
+  if (unsupportedDescriptor || key.isMaster() || key.isPrivateKey()) {
+    return { rejected: 'unusable-key' };
+  }
+  const source = key.getOrigin()?.getSourceFingerprint();
+  if (source && source.toString('hex') !== masterFingerprint) {
+    return { rejected: 'different-wallet' };
+  }
+  if (!account.extendedPublicKey) {
+    return /^[0-9a-f]{64}$/i.test(account.publicKey)
+      ? { identity: account.publicKey }
+      : { rejected: 'unusable-key' };
+  }
+  try {
+    const node = HDKey.fromExtendedKey(account.extendedPublicKey);
+    if (
+      node.privateKey ||
+      !node.publicKey ||
+      !node.chainCode ||
+      node.publicKey.toString('hex') !== account.publicKey.toLowerCase()
+    ) {
+      return { rejected: 'unusable-key' };
+    }
+    return { identity: `${account.publicKey}:${node.chainCode.toString('hex')}` };
+  } catch {
+    return { rejected: 'unusable-key' };
+  }
+}
+
+/**
+ * The scanned code is not this request's answer: another kind of code, an unreadable one, or the
+ * answer to another request. `code` keeps the failure's class; the reason tells the host so.
+ */
+export function unexpectedQrCodeError(
+  message: string,
+  code: HardwareErrorCode = HardwareErrorCode.InvalidParams
+): HwkError {
+  return createHwkError({ code, message, params: { reason: 'unexpected-qr-code' } });
+}
+
 /**
  * Relative derivation path in the `m/`-prefixed form the xpub helpers expect. Each segment must be
  * a plain non-hardened index: the derivation library reads `0h` or `0abc` as index 0 instead of
@@ -125,7 +199,7 @@ function relativeHdPath(relativeDerivePath: string): string {
 }
 
 // Text a scanned export carries reaches the host UI and version gates; keep only what fits.
-const FIRMWARE_VERSION = /^\d{1,4}(\.\d{1,4}){1,3}(-[0-9A-Za-z.]{1,20})?$/;
+const FIRMWARE_VERSION = /^\d{1,4}(\.\d{1,4}){1,3}(-[0-9A-Za-z.-]{1,20})?$/;
 const DEVICE_TEXT = /^[^\p{Cc}\p{Cf}]{1,64}$/u;
 
 function deviceText(value: unknown, pattern: RegExp): string | undefined {
@@ -193,6 +267,110 @@ export class KeystoneUrEngine {
       };
     }
     return this.parseMultiAccounts(ur);
+  }
+
+  /**
+   * Device exports are opt-in: request responses retain their existing format/path checks. An
+   * export carries whatever the device syncs to other wallets, so each key is checked on its own: a
+   * key that fails lands in `rejectedPaths` instead of discarding the whole export.
+   */
+  parseAccountExport(ur: KeystoneUr): KeystoneParsedMultiAccounts {
+    let parsed: KeystoneParsedMultiAccounts;
+    let keys: CryptoHDKey[];
+    const unsupportedDescriptors = new Set<number>();
+    try {
+      const { cbor } = toSdkUr(ur);
+      if (ur.urType === 'crypto-account') {
+        // Extend both registry layers so existing account parsers also understand Taproot.
+        if (!Object.values(ScriptExpressions).some(script => script.getTag() === 409)) {
+          Object.assign(ScriptExpressions, { TAPROOT: new ScriptExpression(409, 'tr') });
+        }
+        extend.cbor.patchTags([409]);
+        const account = CryptoAccount.fromCBOR(cbor);
+        keys = account.getOutputDescriptors().map((output, index) => {
+          const key = output.getHDKey();
+          const path = key?.getOrigin()?.getPath();
+          const script = output
+            .getScriptExpressions()
+            .map(item => item.getExpression())
+            .join('/');
+          const validScript =
+            (path?.startsWith("44'/0'/") && script === 'pkh') ||
+            (path?.startsWith("49'/0'/") && script === 'sh/wpkh') ||
+            (path?.startsWith("84'/0'/") && script === 'wpkh') ||
+            (path?.startsWith("86'/0'/") && script === 'tr');
+          // Keystone's BTC export includes the receiving-branch hint on its account xpub.
+          const children = key?.getChildren();
+          if (!key) throw new Error('Unsupported account descriptor');
+          if (!validScript || (children && children.getPath() !== '0/*')) {
+            unsupportedDescriptors.add(index);
+          }
+          return key;
+        });
+        const result = this.sdk.parseAccount(toSdkUr(ur));
+        parsed = {
+          masterFingerprint: requireBip32MasterFingerprint(result.masterFingerprint),
+          accounts: result.keys.map(toParsedAccount),
+        };
+      } else if (ur.urType === 'crypto-multi-accounts') {
+        keys = CryptoMultiAccounts.fromCBOR(cbor).getKeys();
+        parsed = this.parseMultiAccounts(ur);
+      } else if (ur.urType === 'crypto-hdkey') {
+        keys = [CryptoHDKey.fromCBOR(cbor)];
+        parsed = this.parseAccountResponse(ur);
+      } else {
+        throw new Error('Unsupported account export type');
+      }
+      if (!keys.length || keys.length !== parsed.accounts.length) {
+        throw new Error('Empty account export');
+      }
+    } catch {
+      throw unexpectedQrCodeError(
+        'Unable to read account export; scan a supported Keystone account export code'
+      );
+    }
+    // Per path: the key read there, or why the path cannot be used. A good key does not clear a
+    // different wallet or a conflicting key at its path, and an unusable key alone does not void one.
+    const byPath = new Map<
+      string,
+      { account?: KeystoneParsedAccount; identity?: string; rejected?: RejectionReason }
+    >();
+    parsed.accounts.forEach((account, index) => {
+      // No request names a path in any other form, so such a key is never read.
+      if (!isExportedAccountPath(account.path)) return;
+      const entry = byPath.get(account.path) ?? {};
+      byPath.set(account.path, entry);
+      const check = checkExportedKey(
+        keys[index],
+        account,
+        parsed.masterFingerprint,
+        unsupportedDescriptors.has(index)
+      );
+      if (check.rejected === 'different-wallet') {
+        entry.rejected = check.rejected;
+      } else if (check.identity === undefined) {
+        entry.rejected ??= check.rejected;
+      } else if (entry.identity === undefined) {
+        entry.account = account;
+        entry.identity = check.identity;
+      } else if (entry.identity !== check.identity && entry.rejected !== 'different-wallet') {
+        entry.rejected = 'conflicting-keys';
+      }
+    });
+    const accounts: KeystoneParsedAccount[] = [];
+    const rejectedPaths: KeystoneRejectedExportPath[] = [];
+    byPath.forEach((entry, path) => {
+      if (
+        entry.account &&
+        entry.rejected !== 'different-wallet' &&
+        entry.rejected !== 'conflicting-keys'
+      ) {
+        accounts.push(entry.account);
+      } else if (entry.rejected) {
+        rejectedPaths.push({ path, reason: entry.rejected });
+      }
+    });
+    return { ...parsed, accounts, rejectedPaths };
   }
 
   // --- EVM ---
@@ -293,10 +471,10 @@ export class KeystoneUrEngine {
       sameTransaction = false;
     }
     if (!sameTransaction) {
-      throw createHwkError({
-        code: HardwareErrorCode.DeviceMismatch,
-        message: 'Keystone returned a PSBT for another transaction than the one requested',
-      });
+      throw unexpectedQrCodeError(
+        'Keystone returned a PSBT for another transaction than the one requested',
+        HardwareErrorCode.DeviceMismatch
+      );
     }
     return signedPsbtHex;
   }

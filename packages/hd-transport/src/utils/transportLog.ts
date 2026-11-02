@@ -4,29 +4,39 @@ const REDACTED = '[REDACTED]';
 
 const SENSITIVE_LOG_KEYS = new Set([
   'accesstoken',
+  'additionaltxpubkeys',
   'address',
   'apikey',
   'connectid',
+  'datachunk',
   'devicestate',
   'deviceid',
+  'enckey',
   'entropy',
   'expectedpassphrasestate',
   'mnemonic',
+  'outkey',
   'passphrase',
   'passphrasestate',
   'password',
+  'pczt',
   'pin',
   'privatekey',
   'publickey',
   'seed',
   'secret',
+  'seedfingerprint',
   'serialnumber',
   'session',
   'sessionid',
   'signature',
+  'signedpczt',
   'token',
+  'txpubkey',
+  'ufvk',
   'uuid',
   'walletsessionid',
+  'watchkey',
   'xprv',
   'xpub',
 ]);
@@ -45,7 +55,11 @@ const isSensitiveLogKey = (key: string) => {
 };
 
 const isSigningMessage = (messageName?: string) =>
-  Boolean(messageName && /(?:sign|txack|transaction)/i.test(messageName));
+  Boolean(messageName && /(?:sign|txack|transaction|pczt)/i.test(messageName));
+
+// Key image and tx key exchanges carry per-output secrets under generic field names (iv, blob, salt).
+const isMoneroSecretMessage = (messageName?: string) =>
+  Boolean(messageName && /^Monero(?:KeyImage|GetTxKey|LiveRefresh)/.test(messageName));
 
 const redactLogValue = (value: unknown, seen: WeakSet<object>): unknown => {
   if (ArrayBuffer.isView(value)) {
@@ -78,7 +92,7 @@ const redactLogValue = (value: unknown, seen: WeakSet<object>): unknown => {
 };
 
 export function getSafeTransportLogPayload(value: unknown, messageName?: string): unknown {
-  if (isSigningMessage(messageName)) {
+  if (isSigningMessage(messageName) || isMoneroSecretMessage(messageName)) {
     return REDACTED;
   }
   return redactLogValue(value, new WeakSet());

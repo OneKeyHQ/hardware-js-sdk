@@ -31,6 +31,16 @@ export interface KeystoneParsedMultiAccounts {
   deviceId?: string;
   deviceVersion?: string;
   accounts: KeystoneParsedAccount[];
+  /**
+   * Export only: paths the export carried but could not vouch for. They are left out of `accounts`
+   * and only fail a caller that asks for one of them.
+   */
+  rejectedPaths?: KeystoneRejectedExportPath[];
+}
+
+export interface KeystoneRejectedExportPath {
+  path: string;
+  reason: 'different-wallet' | 'conflicting-keys' | 'unusable-key';
 }
 
 export interface KeystoneEthSignRequestInput {

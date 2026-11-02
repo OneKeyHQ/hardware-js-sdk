@@ -1366,7 +1366,7 @@ export class TrezorAdapter implements IHardwareWallet {
       for (const key of queueKeys) {
         this._jobQueue.cancelActiveAndPending(key, userAbortReason);
       }
-      if (resolvedConnectId) {
+      if (resolvedConnectId && (activeJobId === undefined || ownsConnectorInteraction)) {
         void this._connector.cancel(this._sessions.get(resolvedConnectId) ?? resolvedConnectId);
       }
       return;
@@ -1381,8 +1381,7 @@ export class TrezorAdapter implements IHardwareWallet {
   }
 
   /**
-   * Operation owning the running job: its queue key when pinned, else the live
-   * operation of its connectId, so a mid-call UI request can name it.
+   * Only the operation explicitly supplied to the running job owns its UI requests.
    */
   private _activeOperationId(): string | undefined {
     return this._operations.findOperationIdByJobKey(this._jobQueue.getActiveJob()?.deviceId);
@@ -2849,7 +2848,8 @@ export class TrezorAdapter implements IHardwareWallet {
   };
 
   private _onUiEvent = (data: ConnectorUiEvent): void => {
-    this._emitter.emit('ui-event', data);
+    const operationId = this._activeOperationId();
+    this._emitter.emit('ui-event', operationId ? { ...data, operationId } : data);
   };
 
   private _onThpCredentialsChanged = (data: {

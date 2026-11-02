@@ -82,4 +82,146 @@ describe('transport log sanitization', () => {
       data: '[BINARY:128]',
     });
   });
+
+  test('redacts Zcash viewing keys and fingerprints in protocol and API field names', () => {
+    const payload = {
+      address: 'synthetic-address-marker',
+      ufvk: 'synthetic-viewing-key-marker',
+      seed_fingerprint: 'synthetic-fingerprint-marker',
+      nested: [{ seedFingerprint: 'synthetic-fingerprint-marker' }],
+    };
+    expect(getSafeTransportLogPayload(payload, 'ZcashAddress')).toEqual({
+      address: '[REDACTED]',
+      ufvk: '[REDACTED]',
+      seed_fingerprint: '[REDACTED]',
+      nested: [{ seedFingerprint: '[REDACTED]' }],
+    });
+    expect(payload.ufvk).toBe('synthetic-viewing-key-marker');
+  });
+
+  test('redacts Monero view keys in protocol and API field names', () => {
+    expect(
+      getSafeTransportLogPayload(
+        {
+          address: 'synthetic-address-marker',
+          watch_key: 'synthetic-view-key-marker',
+          nested: { watchKey: 'synthetic-view-key-marker' },
+        },
+        'MoneroWatchKey'
+      )
+    ).toEqual({
+      address: '[REDACTED]',
+      watch_key: '[REDACTED]',
+      nested: { watchKey: '[REDACTED]' },
+    });
+  });
+
+  test.each([
+    [
+      'MoneroKeyImageExportInitRequest',
+      { num: 1, hash: 'synthetic-hash-marker', subs: [{ account: 0, minor_indices: [2] }] },
+    ],
+    [
+      'MoneroKeyImageSyncStepRequest',
+      {
+        tdis: [
+          {
+            out_key: 'synthetic-out-key-marker',
+            tx_pub_key: 'synthetic-tx-key-marker',
+            internal_output_index: 1,
+          },
+        ],
+      },
+    ],
+    [
+      'MoneroKeyImageSyncStepAck',
+      { kis: [{ iv: 'synthetic-iv-marker', blob: 'synthetic-key-image-marker' }] },
+    ],
+    ['MoneroKeyImageSyncFinalAck', { enc_key: 'synthetic-enc-key-marker' }],
+    ['MoneroGetTxKeyAck', { salt: 'synthetic-salt-marker', tx_keys: 'synthetic-tx-keys-marker' }],
+    [
+      'MoneroLiveRefreshStepAck',
+      { salt: 'synthetic-salt-marker', key_image: 'synthetic-ki-marker' },
+    ],
+  ])('redacts the complete Monero key image message %s', (name, payload) => {
+    expect(createTransportCallLog(name, 'V1', payload).request).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(payload, name)).toBe('[REDACTED]');
+  });
+
+  test('redacts Monero key image fields even without protocol message context', () => {
+    expect(
+      getSafeTransportLogPayload({
+        encKey: 'synthetic-enc-key-marker',
+        transfers: [
+          {
+            outKey: 'synthetic-out-key-marker',
+            txPubKey: 'synthetic-tx-key-marker',
+            additional_tx_pub_keys: ['synthetic-additional-key-marker'],
+            internalOutputIndex: 1,
+          },
+        ],
+      })
+    ).toEqual({
+      encKey: '[REDACTED]',
+      transfers: [
+        {
+          outKey: '[REDACTED]',
+          txPubKey: '[REDACTED]',
+          additional_tx_pub_keys: '[REDACTED]',
+          internalOutputIndex: 1,
+        },
+      ],
+    });
+  });
+
+  test.each([
+    'MoneroTransactionInitRequest',
+    'MoneroTransactionInitAck',
+    'MoneroTransactionSetInputRequest',
+    'MoneroTransactionSetInputAck',
+    'MoneroTransactionInputViniRequest',
+    'MoneroTransactionInputViniAck',
+    'MoneroTransactionAllInputsSetRequest',
+    'MoneroTransactionAllInputsSetAck',
+    'MoneroTransactionSetOutputRequest',
+    'MoneroTransactionSetOutputAck',
+    'MoneroTransactionAllOutSetRequest',
+    'MoneroTransactionAllOutSetAck',
+    'MoneroTransactionSignInputRequest',
+    'MoneroTransactionSignInputAck',
+    'MoneroTransactionFinalRequest',
+    'MoneroTransactionFinalAck',
+  ])('redacts the complete Monero signing message %s', name => {
+    const payload = { src_entr: { mask: 'synthetic-mask-marker' }, opening_key: 'synthetic-key' };
+    expect(createTransportCallLog(name, 'V1', payload).request).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(payload, name)).toBe('[REDACTED]');
+  });
+
+  test.each([
+    'ZcashSignPczt',
+    'ZcashPcztChunkRequest',
+    'ZcashPcztChunkAck',
+    'ZcashSignedPczt',
+    'ZcashSignedPcztChunkRequest',
+  ])('redacts the complete %s request and response', name => {
+    const payload = { data_chunk: 'synthetic-pczt-marker', chunk_length: 64 };
+    expect(createTransportCallLog(name, 'V2', payload).request).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(payload, name)).toBe('[REDACTED]');
+  });
+
+  test('redacts named PCZT fields even without protocol message context', () => {
+    expect(
+      getSafeTransportLogPayload({
+        pczt: 'synthetic-pczt-marker',
+        signedPczt: 'synthetic-signed-pczt-marker',
+        data_chunk: 'synthetic-chunk-marker',
+        nested: { dataChunk: 'synthetic-chunk-marker' },
+      })
+    ).toEqual({
+      pczt: '[REDACTED]',
+      signedPczt: '[REDACTED]',
+      data_chunk: '[REDACTED]',
+      nested: { dataChunk: '[REDACTED]' },
+    });
+  });
 });

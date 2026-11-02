@@ -2,11 +2,15 @@ export interface QrDisplayData {
   urType: string;
   urData: string;
   animated: boolean;
+  /** Public-account requests may be answered with a device-initiated account export instead. */
+  allowAccountExport?: boolean;
 }
 
 export interface QrResponseData {
   urType: string;
   urData: string;
+  /** Set only when the user explicitly chooses to scan a device's account export. */
+  accountExport?: boolean;
 }
 
 /**

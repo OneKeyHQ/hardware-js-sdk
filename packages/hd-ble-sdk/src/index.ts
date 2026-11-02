@@ -15,6 +15,7 @@ import HardwareSdk, {
   executeCallback,
   getLogBlockLabel,
   getLogger,
+  getSafeLogPayload,
   initCore,
   parseConnectSettings,
   setLoggerPostMessage,
@@ -72,7 +73,11 @@ function handleMessage(message: CoreMessage) {
           progress: message?.payload?.progress,
         });
       } else {
-        Log.debug('hd-ble-sdk handleMessage', JSON.stringify(message));
+        const blockLog = getLogBlockLabel(message);
+        Log.debug(
+          'hd-ble-sdk handleMessage',
+          blockLog ? { event, type, method: blockLog } : JSON.stringify(getSafeLogPayload(message))
+        );
       }
     } catch (error) {
       // ignore

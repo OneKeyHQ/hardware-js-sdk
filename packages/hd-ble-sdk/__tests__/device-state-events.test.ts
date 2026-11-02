@@ -1,7 +1,15 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import EventEmitter from 'events';
-import { CORE_EVENT, UI_REQUEST, initCore } from '@onekeyfe/hd-core';
+import {
+  CORE_EVENT,
+  IFRAME,
+  LoggerNames,
+  UI_EVENT,
+  UI_REQUEST,
+  getLog,
+  initCore,
+} from '@onekeyfe/hd-core';
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import sdkExport, { messagePromises } from '../src';
@@ -81,6 +89,31 @@ describe('SDK request cleanup', () => {
     first.reject(new Error('Connection failed'));
     await firstCall;
     expect(Object.keys(messagePromises)).toHaveLength(0);
+  });
+
+  test('keeps Monero and Zcash addresses out of the handled-message log', () => {
+    core.emit(CORE_EVENT, {
+      event: UI_EVENT,
+      type: UI_REQUEST.PREVIOUS_ADDRESS_RESULT,
+      payload: {
+        device: {},
+        method: 'moneroGetAddress',
+        data: { address: 'synthetic-xmr-address-marker', path: "m/44'/128'/0'" },
+      },
+    });
+    core.emit(CORE_EVENT, {
+      event: IFRAME.CALLBACK,
+      type: IFRAME.CALLBACK,
+      payload: {
+        callbackId: 'unregistered',
+        data: { network: 'zcash', success: true, payload: { ufvk: 'synthetic-ufvk-marker' } },
+      },
+    });
+
+    const logged = JSON.stringify(getLog().filter(entry => entry.prefix === LoggerNames.HdBleSdk));
+    expect(logged).toContain('moneroGetAddress');
+    expect(logged).toContain('unregistered');
+    expect(logged).not.toContain('synthetic-');
   });
 
   test('waits for Core disposal and does not retain old listeners after reinitialization', async () => {

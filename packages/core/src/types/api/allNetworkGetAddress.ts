@@ -34,7 +34,9 @@ export type INetwork =
   | 'nostr'
   | 'benfen'
   | 'neo'
-  | 'stellar';
+  | 'stellar'
+  | 'xmr'
+  | 'zcash';
 
 export type CommonResponseParams = {
   path: string;
@@ -65,6 +67,12 @@ type AllNetworkAddressPayload =
       publicKey?: string;
       // Nostr public key (bech32)
       npub?: string;
+    }
+  | {
+      // Zcash
+      address: string;
+      ufvk?: string;
+      seedFingerprint?: string;
     }
   | {
       // Cardano
