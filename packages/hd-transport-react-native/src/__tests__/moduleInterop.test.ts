@@ -1,11 +1,9 @@
 import { getConnectedDeviceIds } from '../BleManager';
 import ReactNativeBleTransport from '../index';
 
-jest.mock(
-  'react-native',
-  () => ({ PermissionsAndroid: {}, Platform: { OS: 'android' } }),
-  { virtual: true }
-);
+jest.mock('react-native', () => ({ PermissionsAndroid: {}, Platform: { OS: 'android' } }), {
+  virtual: true,
+});
 
 jest.mock('react-native-ble-plx', () => ({
   BleError: class BleError extends Error {},
