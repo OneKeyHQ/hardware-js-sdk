@@ -80,6 +80,102 @@ describe('public device lifecycle events', () => {
     jest.restoreAllMocks();
   });
 
+  test.each([
+    ['react-native', 'V2', EDeviceType.Pro2, true],
+    ['react-native', 'V2', EDeviceType.Neo, true],
+    ['desktop-web-ble', 'V2', EDeviceType.Pro2, true],
+    ['desktop-web-ble', 'V2', EDeviceType.Neo, true],
+    ['react-native', 'V1', EDeviceType.Pro, false],
+    ['desktop-web-ble', 'V1', EDeviceType.Touch, false],
+    ['react-native', 'V1', EDeviceType.Pro2, false],
+    ['react-native', 'V2', EDeviceType.Unknown, false],
+    ['desktop-webusb', 'V2', EDeviceType.Pro2, false],
+    ['lowlevel', 'V2', EDeviceType.Neo, false],
+  ] as const)(
+    'releases the task and keeps only the intended BLE links: %s / %s / %s',
+    async (env, protocol, deviceType, keepConnection) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const device = createInitializedDevice(protocol);
+      device.features = { ...device.features, deviceType } as never;
+      device.originalDescriptor.session = device.mainId;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+      const release = jest.fn().mockResolvedValue(true);
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      device.deviceConnector = { release, disconnect } as never;
+      const commands = {
+        disposed: false,
+        dispose: jest.fn(() => {
+          commands.disposed = true;
+          return Promise.resolve();
+        }),
+        cancel: jest.fn().mockResolvedValue(undefined),
+      };
+      device.commands = commands as never;
+
+      await device.release();
+
+      expect(release).toHaveBeenCalledWith(device.mainId, false, keepConnection);
+      expect(device.hasDeviceAcquire()).toBe(false);
+      expect(commands.disposed).toBe(true);
+      expect(device.keepSession).toBe(false);
+
+      await device.interruptionFromUser();
+      expect(disconnect).toHaveBeenCalledTimes(keepConnection ? 0 : 1);
+    }
+  );
+
+  test('still disconnects when setup is cancelled after a kept-alive release', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const device = createInitializedDevice('V2');
+    const pendingAcquire = createDeferred<{ uuid: string; protocolType: 'V2' }>();
+    const release = jest.fn().mockResolvedValue(true);
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    device.deviceConnector = {
+      release,
+      disconnect,
+      acquire: jest.fn(() => pendingAcquire.promise),
+    } as never;
+    device.commands = {
+      disposed: true,
+      dispose: jest.fn().mockResolvedValue(undefined),
+      cancel: jest.fn().mockResolvedValue(undefined),
+    } as never;
+    await device.release();
+    device.beginConnectionAttempt();
+    const acquiring = device.acquire('V2');
+
+    await device.interruptionFromUser();
+    expect(disconnect).toHaveBeenCalledWith(device.mainId);
+    pendingAcquire.resolve({ uuid: 'late-kept-alive-session', protocolType: 'V2' });
+    await expect(acquiring).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(disconnect).toHaveBeenLastCalledWith('late-kept-alive-session');
+  });
+
+  test.each(['release failure', 'disconnect event'])(
+    'does not treat %s as a kept-alive connection',
+    async reason => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      const device = createInitializedDevice('V2');
+      const release = jest.fn().mockResolvedValue(true);
+      if (reason === 'release failure') release.mockRejectedValueOnce(new Error('release failed'));
+      const disconnect = jest.fn().mockResolvedValue(undefined);
+      device.deviceConnector = { release, disconnect } as never;
+      device.commands = {
+        disposed: true,
+        dispose: jest.fn().mockResolvedValue(undefined),
+        cancel: jest.fn().mockResolvedValue(undefined),
+      } as never;
+      await device.release();
+      if (reason === 'disconnect event') device.markTransportDisconnected();
+
+      await device.interruptionFromUser();
+
+      expect(disconnect).toHaveBeenCalledWith(device.mainId);
+    }
+  );
+
   test.each(['V1', 'V2'] as const)(
     'preserves the %s acknowledged result and waits for release before the next acquire',
     async protocol => {

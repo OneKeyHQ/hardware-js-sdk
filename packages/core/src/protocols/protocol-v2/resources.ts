@@ -7,6 +7,8 @@ export const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH =
 export const PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_STAGING_PATH = `${PROTOCOL_V2_BOOT_RESOURCE_PACKAGE_PATH}.staging`;
 export const PROTOCOL_V2_ROM_PARAMS_PACKAGE_PATH = 'vol0:/loaders/rom/params.okpkg';
 export const PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE = 0x5f90;
+// Installed-package comparison only needs the prefix through the header hash.
+export const PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE = 0x280;
 
 const PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_VERSION = 1;
 const PROTOCOL_V2_RESOURCE_PACKAGE_FLEXIBLE_OFFSET = 0x6c;
@@ -123,7 +125,7 @@ export function parseProtocolV2ResourcePackageHeader(
   bytes: Uint8Array,
   packageSize: number
 ): ProtocolV2ResourcePackageHeader {
-  if (bytes.byteLength < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE) {
+  if (bytes.byteLength < PROTOCOL_V2_RESOURCE_PACKAGE_COMPARE_SIZE) {
     throw new Error('Pro2 RESOURCE package is shorter than its header');
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -169,5 +171,8 @@ export function parseProtocolV2ResourcePackage(
   binary: ArrayBuffer | Uint8Array
 ): ProtocolV2ResourcePackageHeader {
   const bytes = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+  if (bytes.byteLength < PROTOCOL_V2_RESOURCE_PACKAGE_HEADER_SIZE) {
+    throw new Error('Pro2 RESOURCE package is shorter than its header');
+  }
   return parseProtocolV2ResourcePackageHeader(bytes, bytes.byteLength);
 }

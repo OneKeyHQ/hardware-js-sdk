@@ -27,7 +27,10 @@ import {
 import { BaseMethod } from '../BaseMethod';
 import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
 import { invalidParameter } from '../helpers/filesystemValidation';
-import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+import {
+  createProtocolV2AssetFileWriteRecovery,
+  writeProtocolV2File,
+} from '../helpers/protocolV2FileWrite';
 
 export type DeviceUploadNftParams = {
   imageJpegBase64: string;
@@ -238,6 +241,8 @@ export default class DeviceUploadNft extends BaseMethod<DeviceUploadNftParams> {
         chunkSize: this.params.chunkSize,
         timeoutMs: this.params.timeoutMs,
         paceMs: this.params.paceMs,
+        maxChunkRetries: 3,
+        recoverConnection: createProtocolV2AssetFileWriteRecovery(this),
         overwrite: true,
         append: false,
         throwIfAborted: () => this.throwIfAborted(),

@@ -6,7 +6,10 @@ import {
   validateProtocolV2FilesystemPath,
   validateRequiredData,
 } from './helpers/filesystemValidation';
-import { writeProtocolV2File } from './helpers/protocolV2FileWrite';
+import {
+  createProtocolV2AssetFileWriteRecovery,
+  writeProtocolV2File,
+} from './helpers/protocolV2FileWrite';
 import { UI_REQUEST, createUiMessage } from '../events/ui-request';
 
 export type FileWriteParams = {
@@ -63,6 +66,9 @@ export default class FileWrite extends BaseMethod<FileWriteParams> {
       append: this.params.append,
       uiPercentage: this.params.uiPercentage,
       timeoutMs: this.params.timeoutMs === undefined ? undefined : Number(this.params.timeoutMs),
+      ...(this.name === 'uploadPortfolio'
+        ? { maxChunkRetries: 3, recoverConnection: createProtocolV2AssetFileWriteRecovery(this) }
+        : {}),
       throwIfAborted: () => this.throwIfAborted(),
       onProgress: payload => {
         if (this.params.emitProgress && typeof this.postMessage === 'function') {

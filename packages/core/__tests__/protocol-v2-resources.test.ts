@@ -5,6 +5,7 @@ import { DataManager } from '../src/data-manager';
 import {
   isProtocolV2ResourceArchiveEntryName,
   parseProtocolV2ResourcePackage,
+  parseProtocolV2ResourcePackageHeader,
   parseProtocolV2Resources,
 } from '../src/protocols/protocol-v2/resources';
 
@@ -161,6 +162,19 @@ describe('Pro2 resource configuration', () => {
     expect(() =>
       parseProtocolV2ResourcePackage(createResourcePackage('vol0://bundles/images.okpkg'))
     ).toThrow('device path');
+  });
+
+  test('compares installed resources from 640 bytes without accepting a truncated local package', () => {
+    const bytes = createResourcePackage('vol0:/bundles/images.okpkg');
+    const prefix = bytes.slice(0, 640);
+    expect(parseProtocolV2ResourcePackageHeader(prefix, bytes.byteLength)).toEqual(
+      parseProtocolV2ResourcePackage(bytes)
+    );
+    expect(() => parseProtocolV2ResourcePackage(prefix)).toThrow('shorter than its header');
+    expect(() =>
+      parseProtocolV2ResourcePackageHeader(prefix.slice(0, -1), bytes.byteLength)
+    ).toThrow();
+    expect(() => parseProtocolV2ResourcePackageHeader(prefix, bytes.byteLength + 1)).toThrow();
   });
 
   test('rejects missing or malformed release sources', () => {
