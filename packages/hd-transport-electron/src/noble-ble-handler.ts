@@ -1756,6 +1756,10 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       }),
     ]);
     if (raced === 'timeout' || disposing) {
+      if (!disposing) {
+        // Settle this attempt before Noble replaces its exclusive connect listener on retry.
+        nobleInstance.cancelConnect?.(deviceId);
+      }
       directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
       logger?.info('[NobleBLE] Direct connect-by-id timed out, falling back to scan', {
         deviceId,

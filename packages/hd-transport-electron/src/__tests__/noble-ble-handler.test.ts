@@ -1015,6 +1015,87 @@ describe('Noble BLE process shutdown', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  test('releases native promptly after repeated direct connect timeouts for the same device', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const { sdk, native, handlers } = await setup();
+    // Use Noble's real exclusive listeners without loading its native bindings.
+    const Noble = jest.requireActual('@stoprocent/noble/lib/noble');
+    const direct = new Noble({ connect: jest.fn(), cancelConnect: jest.fn() });
+    const connectAsync = jest.fn((id: string) => direct.connectAsync(id));
+    const cancelConnect = jest.fn((id: string) => direct.cancelConnect(id));
+    Object.assign(native, { connectAsync, cancelConnect });
+    const deviceId = 'aabbccddeeff';
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, deviceId);
+      await flushCallbacks();
+      jest.advanceTimersByTime(1500);
+      await flushCallbacks();
+      expect(connectAsync).toHaveBeenCalledTimes(attempt + 1);
+      jest.advanceTimersByTime(2000);
+      await flushCallbacks();
+      expect(await connecting).toMatchObject({
+        success: false,
+        error: { errorCode: HardwareErrorCode.DeviceNotFound },
+      });
+      jest.advanceTimersByTime(15_000);
+    }
+
+    const disposing = sdk.disposeNobleBleSupport();
+    await flushCallbacks();
+    expect(native.stop).toHaveBeenCalledTimes(1);
+    await disposing;
+    expect(cancelConnect).toHaveBeenCalledTimes(2);
+    expect(direct.listenerCount(`connect:${deviceId}`)).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test.each(['unavailable', 'throws'])(
+    'keeps late direct connect cleanup when cancellation %s',
+    async cancellation => {
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      const { sdk, native, handlers } = await setup();
+      const peripheral = Object.assign(new EventEmitter(), {
+        ...createPeripheral('late-device', 'OneKey Pro'),
+        disconnect: jest.fn(callback => callback?.()),
+      });
+      let finishConnect: ((value: typeof peripheral) => void) | undefined;
+      Object.assign(native, {
+        connectAsync: jest.fn(
+          () =>
+            new Promise<typeof peripheral>(resolve => {
+              finishConnect = resolve;
+            })
+        ),
+        ...(cancellation === 'throws'
+          ? {
+              cancelConnect: jest.fn(() => {
+                throw new Error('native cancellation failed');
+              }),
+            }
+          : {}),
+      });
+      const connecting = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT)?.({}, peripheral.id);
+      await flushCallbacks();
+      jest.advanceTimersByTime(1500);
+      await flushCallbacks();
+      jest.advanceTimersByTime(2000);
+      await flushCallbacks();
+      expect(await connecting).toMatchObject({
+        success: false,
+        error: { errorCode: HardwareErrorCode.DeviceNotFound },
+      });
+
+      peripheral.state = 'connected';
+      finishConnect?.(peripheral);
+      await flushCallbacks();
+      expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
+      await sdk.disposeNobleBleSupport();
+      expect(native.stop).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
   test('cancels native connects and waits for disconnect before release', async () => {
     const { sdk, native, handlers } = await setup();
     await handlers.get(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK)?.({});
