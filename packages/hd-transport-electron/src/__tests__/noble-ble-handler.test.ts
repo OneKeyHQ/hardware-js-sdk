@@ -1681,3 +1681,76 @@ describe('Electron Noble BLE advertisement color', () => {
     ]);
   });
 });
+
+describe('Noble synchronous native connection failures', () => {
+  test.each(['direct', 'peripheral'] as const)(
+    'releases %s async connection listeners and permits a subsequent retry',
+    async entry => {
+      const Noble = jest.requireActual('@stoprocent/noble/lib/noble');
+      const error = new Error('Peripheral could not be retrieved for connection');
+      const bindings = { connect: jest.fn() };
+      const noble = new Noble(bindings);
+      noble.removeAllListeners('warning');
+      noble.on('warning', jest.fn());
+      const deviceId = 'aabbccddeeff';
+      const peripheral =
+        entry === 'peripheral'
+          ? noble._createPeripheral(deviceId, '', '', true, {}, 0, true)
+          : undefined;
+      bindings.connect.mockImplementationOnce(() => {
+        throw error;
+      });
+
+      await expect(
+        entry === 'direct' ? noble.connectAsync(deviceId) : peripheral.connectAsync()
+      ).rejects.toBe(error);
+      expect(noble.listenerCount(`connect:${deviceId}`)).toBe(0);
+      expect(noble._exclusiveCallbacks?.size ?? 0).toBe(0);
+      if (peripheral) {
+        expect(peripheral.state).toBe('error');
+        expect(peripheral.listenerCount('connect')).toBe(0);
+        expect(peripheral._exclusiveCallbacks.size).toBe(0);
+      }
+
+      const retryPeripheral =
+        peripheral ?? noble._createPeripheral(deviceId, '', '', true, {}, 0, true);
+      const retry =
+        entry === 'direct' ? noble.connectAsync(deviceId) : retryPeripheral.connectAsync();
+      noble._onConnect(deviceId);
+      await retry;
+      expect(retryPeripheral.state).toBe('connected');
+      expect(bindings.connect).toHaveBeenCalledTimes(2);
+      expect(noble.listenerCount(`connect:${deviceId}`)).toBe(0);
+      expect(retryPeripheral.listenerCount('connect')).toBe(0);
+    }
+  );
+
+  test.each(['direct', 'peripheral'] as const)(
+    'settles the %s callback once when the binding throws',
+    entry => {
+      const Noble = jest.requireActual('@stoprocent/noble/lib/noble');
+      const error = new Error('Peripheral could not be retrieved for connection');
+      const noble = new Noble({
+        connect: () => {
+          throw error;
+        },
+      });
+      const deviceId = 'aabbccddeeff';
+      const peripheral = noble._createPeripheral(deviceId, '', '', true, {}, 0, true);
+      const callback = jest.fn();
+
+      expect(() =>
+        entry === 'direct'
+          ? noble.connect(deviceId, undefined, callback)
+          : peripheral.connect(undefined, callback)
+      ).not.toThrow();
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback.mock.calls[0][0]).toBe(error);
+      expect(peripheral.state).toBe('error');
+      expect(noble.listenerCount(`connect:${deviceId}`)).toBe(0);
+      expect(peripheral.listenerCount('connect')).toBe(0);
+      noble._onConnect(deviceId, error);
+      expect(callback).toHaveBeenCalledTimes(1);
+    }
+  );
+});
