@@ -1,4 +1,4 @@
-import BleUtils from '@onekeyfe/react-native-ble-utils';
+import BleUtilsModule from '@onekeyfe/react-native-ble-utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { bleLogger } from './logger';
@@ -6,6 +6,9 @@ import { bleLogger } from './logger';
 import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
 
 const Logger = bleLogger;
+const BleUtils =
+  (BleUtilsModule as typeof BleUtilsModule & { default?: typeof BleUtilsModule }).default ??
+  BleUtilsModule;
 
 // Android BluetoothDevice.EXTRA_UNBOND_REASON values.
 const bondFailureReasons: Record<number, string> = {

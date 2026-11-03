@@ -31,6 +31,10 @@ const createReader = (bytes = artifactBytes) => {
 };
 
 describe('FirmwareArtifactSource', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('materializes verified bytes before exposing the source', async () => {
     const backingBytes = Uint8Array.from(artifactBytes);
     const { reader, read, close } = createReader(backingBytes);
@@ -86,6 +90,10 @@ describe('FirmwareArtifactSource', () => {
       sha256: bytesToHex(sha256(bytes)),
     };
     const { reader, read } = createReader(bytes);
+    const hasher = sha256.create();
+    const update = jest.spyOn(hasher, 'update');
+    const digest = jest.spyOn(hasher, 'digest');
+    jest.spyOn(sha256, 'create').mockReturnValue(hasher);
 
     const source = await openFirmwareByteSource({ artifact: largeArtifact, reader });
     if (!source) {
@@ -103,6 +111,9 @@ describe('FirmwareArtifactSource', () => {
         length: 3,
       },
     ]);
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(read.mock.invocationCallOrder[1]);
+    expect(digest.mock.invocationCallOrder[0]).toBeGreaterThan(update.mock.invocationCallOrder[1]);
     await source.close();
   });
 

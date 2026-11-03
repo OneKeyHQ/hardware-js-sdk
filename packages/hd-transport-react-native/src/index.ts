@@ -8,7 +8,7 @@ import {
   ScanMode,
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
-import transport, {
+import transportModule, {
   type OneKeyDeviceInfoBase,
   type OneKeyMobileDeviceInfo,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
@@ -69,6 +69,9 @@ type FirmwareInstallBleAcquireInput = BleAcquireInput & {
   skipProtocolProbe?: boolean;
 };
 
+const transport: typeof transportModule =
+  (transportModule as typeof transportModule & { default?: typeof transportModule }).default ??
+  transportModule;
 const { check, ProtocolV1, parseConfigure } = transport;
 
 const Log = bleLogger;
@@ -1747,11 +1750,26 @@ export default class ReactNativeBleTransport {
     return subscription;
   }
 
-  async release(uuid: string, onclose = false) {
-    return this.runLifecycleOperation(uuid, () => this.releaseUnlocked(uuid, onclose));
+  async release(uuid: string, onclose = false, keepSession = false) {
+    return this.runLifecycleOperation(uuid, () => this.releaseUnlocked(uuid, onclose, keepSession));
   }
 
-  private async releaseUnlocked(uuid: string, onclose = false) {
+  private async releaseUnlocked(uuid: string, onclose = false, keepSession = false) {
+    const transport = transportCache[uuid];
+    if (
+      keepSession &&
+      !onclose &&
+      transport &&
+      this.deviceProtocol.get(uuid) === 'V2' &&
+      !this.protocolV2FrameWrites.has(uuid) &&
+      !this.protocolV2FramePromises.has(uuid)
+    ) {
+      // Keep the monitor generation and V2 session together when reusing the link.
+      await this.runNativeTeardown(uuid, this.blePlxManager, () =>
+        this.restoreAndroidConnectionPriority(uuid, transport)
+      );
+      return true;
+    }
     const reason = 'React Native BLE transport released';
     this.cancelProtocolV2FrameWrite(uuid, new Error(reason));
     await this.protocolV2Links.invalidateLink(uuid, reason);
