@@ -71,6 +71,24 @@ describe('transport log sanitization', () => {
     ).toBe('[REDACTED]');
   });
 
+  test.each(['V1', 'V2'])('redacts BTC message signing protocol logs for %s', protocol => {
+    const request = { message: 'synthetic-message-marker', coin_name: 'Bitcoin' };
+    const response = {
+      signature: 'synthetic-signature-marker',
+      address: 'synthetic-address-marker',
+    };
+    const originals = JSON.stringify([request, response]);
+
+    expect(createTransportCallLog('SignMessage', protocol, request)).toEqual({
+      name: 'SignMessage',
+      protocol,
+      request: '[REDACTED]',
+    });
+    expect(getSafeTransportLogPayload(request, 'SignMessage')).toBe('[REDACTED]');
+    expect(getSafeTransportLogPayload(response, 'MessageSignature')).toBe('[REDACTED]');
+    expect(JSON.stringify([request, response])).toBe(originals);
+  });
+
   test('replaces binary content with its byte length', () => {
     expect(
       getSafeTransportLogPayload({
