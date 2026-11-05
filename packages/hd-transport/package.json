@@ -12,8 +12,10 @@
   },
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
-    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "build": "node scripts/protobuf-static.js --check && rimraf dist && rollup -c ../../build/rollup.config.js",
     "test": "jest",
+    "test:static-csp": "node --disallow-code-generation-from-strings scripts/protobuf-static-csp.js",
+    "check:static": "node scripts/protobuf-static.js --check",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "update:protobuf": "./scripts/protobuf-build.sh"
