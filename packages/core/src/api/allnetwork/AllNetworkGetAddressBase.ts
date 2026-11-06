@@ -269,7 +269,7 @@ const networkConfigMap: NetworkConfigMap = {
   },
   zcash: {
     methodName: 'zcashGetAddress',
-    // The account's unified address with the keys a wallet needs to watch it.
+    // The account's unified address and seed fingerprint; the viewing key needs its own confirmed export.
     getParams: (baseParams: AllNetworkAddressParams) => {
       const { path, showOnOneKey } = baseParams;
       return {
@@ -278,7 +278,6 @@ const networkConfigMap: NetworkConfigMap = {
         addressType: PROTO.ZcashAddressType.UNIFIED_ORCHARD,
         scope: PROTO.ZcashAddressScope.EXTERNAL,
         diversifierIndex: 0,
-        includeUfvk: true,
         includeSeedFingerprint: true,
       };
     },
@@ -618,7 +617,14 @@ function preCheckDeviceSupport(device: Device, method: BaseMethod) {
   }
 }
 
-function handleSkippableHardwareError(
+// Pro 2 reports a message type it lacks as `Failure_ProcessError,Handler not found: ...`.
+const UNSUPPORTED_MESSAGE_FAILURES = [
+  'Failure_UnexpectedMessage',
+  'Failure_UnknownMessage',
+  'Handler not found: No handler for type',
+];
+
+export function handleSkippableHardwareError(
   e: any,
   device: Device,
   method: BaseMethod
@@ -632,10 +638,7 @@ function handleSkippableHardwareError(
     } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
       error = e;
     }
-  } else if (
-    e.message?.includes('Failure_UnexpectedMessage') ||
-    e.message?.includes('Failure_UnknownMessage')
-  ) {
+  } else if (UNSUPPORTED_MESSAGE_FAILURES.some(text => e.message?.includes(text))) {
     const versionRange = device.getCurrentMethodVersionRange(
       type => method.getVersionRange()[type]
     );

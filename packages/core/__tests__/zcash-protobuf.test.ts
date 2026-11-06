@@ -42,6 +42,8 @@ describe('Zcash protobuf messages (protocol V2)', () => {
     ['ZcashPcztChunkRequest', 12404],
     ['ZcashPcztChunkAck', 12405],
     ['ZcashSignedPcztChunkRequest', 12406],
+    ['ZcashGetFullViewingKey', 12407],
+    ['ZcashFullViewingKey', 12408],
   ])('%s has wire type %d', (name, typeId) => {
     expect(createMessageFromName(messages, name).messageTypeId).toBe(typeId);
   });
@@ -73,18 +75,16 @@ describe('Zcash protobuf messages (protocol V2)', () => {
       address_n: [2147483680, 2147483781, 2147483648],
       show_display: true,
       include_seed_fingerprint: true,
-      include_ufvk: true,
       diversifier_index: 0xffffffff,
       address_type: 2,
       scope: 1,
     });
-    // address_n is unpacked: one tag per element.
-    expect(ids).toEqual([1, 1, 1, 2, 3, 4, 5, 6, 7]);
+    // address_n is unpacked: one tag per element. Field 4 (include_ufvk) was removed.
+    expect(ids).toEqual([1, 1, 1, 2, 3, 5, 6, 7]);
     expect(decoded).toEqual({
       address_n: [2147483680, 2147483781, 2147483648],
       show_display: true,
       include_seed_fingerprint: true,
-      include_ufvk: true,
       diversifier_index: 0xffffffff,
       address_type: 'UNIFIED_ORCHARD',
       scope: 'INTERNAL',
@@ -115,23 +115,34 @@ describe('Zcash protobuf messages (protocol V2)', () => {
     expect(empty.scope).toBe(0);
   });
 
-  test('ZcashAddress decodes optional ufvk and seed fingerprint', () => {
+  test('ZcashAddress decodes the optional seed fingerprint and no viewing key', () => {
     const fingerprint = '0f'.repeat(32);
-    const full = roundTrip('ZcashAddress', {
-      address: 'u1abc',
-      ufvk: 'uview1abc',
-      seed_fingerprint: fingerprint,
-    });
-    expect(full.ids).toEqual([1, 2, 3]);
-    expect(full.decoded).toEqual({
-      address: 'u1abc',
-      ufvk: 'uview1abc',
-      seed_fingerprint: fingerprint,
-    });
+    const full = roundTrip('ZcashAddress', { address: 'u1abc', seed_fingerprint: fingerprint });
+    expect(full.ids).toEqual([1, 3]);
+    expect(full.decoded).toEqual({ address: 'u1abc', seed_fingerprint: fingerprint });
 
     const minimal = roundTrip('ZcashAddress', { address: 't1abc' });
     expect(minimal.ids).toEqual([1]);
-    expect(minimal.decoded).toEqual({ address: 't1abc', ufvk: null, seed_fingerprint: null });
+    expect(minimal.decoded).toEqual({ address: 't1abc', seed_fingerprint: null });
+    expect(createMessageFromName(messages, 'ZcashAddress').Message.fields).not.toHaveProperty(
+      'ufvk'
+    );
+  });
+
+  test('ZcashGetFullViewingKey carries only the account path', () => {
+    const { ids, decoded } = roundTrip('ZcashGetFullViewingKey', {
+      address_n: [2147483680, 2147483781, 2147483648],
+    });
+    expect(ids).toEqual([1, 1, 1]);
+    expect(decoded).toEqual({ address_n: [2147483680, 2147483781, 2147483648] });
+  });
+
+  test('ZcashFullViewingKey round trips the required UFVK', () => {
+    const { ids, decoded } = roundTrip('ZcashFullViewingKey', { ufvk: 'uview1abc' });
+    expect(ids).toEqual([1]);
+    expect(decoded).toEqual({ ufvk: 'uview1abc' });
+    const { Message } = createMessageFromName(messages, 'ZcashFullViewingKey');
+    expect(() => Message.decode(new Uint8Array(0))).toThrow(/missing required/);
   });
 
   test('required fields are enforced on decode', () => {

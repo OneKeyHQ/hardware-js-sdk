@@ -138,7 +138,7 @@ describe('getLogBlockLabel', () => {
     expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
   });
 
-  it.each(['zcashGetAddress', 'zcashSignPczt'])(
+  it.each(['zcashGetAddress', 'zcashGetFullViewingKey', 'zcashSignPczt'])(
     'keeps %s wallet data out of logger caches and events with debug disabled',
     method => {
       const postMessage = jest.fn();
@@ -147,7 +147,7 @@ describe('getLogBlockLabel', () => {
       setLoggerPostMessage(postMessage);
       const request = {
         event: 'iframe-call',
-        payload: { method, pczt: 'synthetic-pczt-marker', includeUfvk: true },
+        payload: { method, pczt: 'synthetic-pczt-marker', path: 'synthetic-path-marker' },
       };
       const response = {
         success: true,

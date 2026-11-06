@@ -4680,6 +4680,43 @@ export type UiAnimationRequest = {
   type?: UiAnimationType;
 };
 
+export enum ZcashAddressType {
+  UNIFIED_ORCHARD_P2PKH = 0,
+  TRANSPARENT_P2PKH = 1,
+  UNIFIED_ORCHARD = 2,
+}
+
+export enum ZcashAddressScope {
+  EXTERNAL = 0,
+  INTERNAL = 1,
+}
+
+// ZcashGetAddress
+export type ZcashGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  include_seed_fingerprint?: boolean;
+  diversifier_index?: number;
+  address_type?: ZcashAddressType;
+  scope?: ZcashAddressScope;
+};
+
+// ZcashAddress
+export type ZcashAddress = {
+  address: string;
+  seed_fingerprint?: string;
+};
+
+// ZcashGetFullViewingKey
+export type ZcashGetFullViewingKey = {
+  address_n: number[];
+};
+
+// ZcashFullViewingKey
+export type ZcashFullViewingKey = {
+  ufvk: string;
+};
+
 // ZcashSignPczt
 export type ZcashSignPczt = {
   pczt_length: number;
@@ -5401,35 +5438,6 @@ export type ViewVerifyPage = {
   content?: ViewContentPreview;
 };
 
-export enum ZcashAddressType {
-  UNIFIED_ORCHARD_P2PKH = 0,
-  TRANSPARENT_P2PKH = 1,
-  UNIFIED_ORCHARD = 2,
-}
-
-export enum ZcashAddressScope {
-  EXTERNAL = 0,
-  INTERNAL = 1,
-}
-
-// ZcashGetAddress
-export type ZcashGetAddress = {
-  address_n: number[];
-  show_display?: boolean;
-  include_seed_fingerprint?: boolean;
-  include_ufvk?: boolean;
-  diversifier_index?: number;
-  address_type?: ZcashAddressType;
-  scope?: ZcashAddressScope;
-};
-
-// ZcashAddress
-export type ZcashAddress = {
-  address: string;
-  ufvk?: string;
-  seed_fingerprint?: string;
-};
-
 export enum ProtocolV2FailureType {
   Failure_InvalidMessage = 1,
   Failure_UndefinedError = 2,
@@ -6044,6 +6052,10 @@ export type MessageType = {
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
+  ZcashGetAddress: ZcashGetAddress;
+  ZcashAddress: ZcashAddress;
+  ZcashGetFullViewingKey: ZcashGetFullViewingKey;
+  ZcashFullViewingKey: ZcashFullViewingKey;
   ZcashSignPczt: ZcashSignPczt;
   ZcashPcztChunkRequest: ZcashPcztChunkRequest;
   ZcashPcztChunkAck: ZcashPcztChunkAck;
@@ -6125,8 +6137,6 @@ export type MessageType = {
   ViewSignPage: ViewSignPage;
   ViewWarningPage: ViewWarningPage;
   ViewVerifyPage: ViewVerifyPage;
-  ZcashGetAddress: ZcashGetAddress;
-  ZcashAddress: ZcashAddress;
 };
 
 export type MessageKey = keyof MessageType;

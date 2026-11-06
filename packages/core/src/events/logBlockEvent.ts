@@ -19,6 +19,7 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'fileWrite',
   'fileRead',
   'zcashGetAddress',
+  'zcashGetFullViewingKey',
   'zcashSignPczt',
   'moneroGetAddress',
   'moneroGetWatchKey',
