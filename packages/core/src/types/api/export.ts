@@ -228,6 +228,7 @@ export type { BenfenPublicKey, BenfenGetPublicKeyParams } from './benfenGetPubli
 export type { BenfenSignMessageParams } from './benfenSignMessage';
 export type { BenfenSignedTx, BenfenSignTransactionParams } from './benfenSignTransaction';
 export type { ZcashAddress, ZcashGetAddressParams } from './zcashGetAddress';
+export type { ZcashFullViewingKey, ZcashGetFullViewingKeyParams } from './zcashGetFullViewingKey';
 export type { ZcashSignedPczt, ZcashSignPcztParams } from './zcashSignPczt';
 
 export type { MoneroAddress, MoneroGetAddressParams } from './moneroGetAddress';

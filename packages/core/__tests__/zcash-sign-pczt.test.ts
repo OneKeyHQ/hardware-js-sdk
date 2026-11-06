@@ -2,6 +2,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import ZcashSignPczt from '../src/api/zcash/ZcashSignPczt';
 import ZcashGetAddress from '../src/api/zcash/ZcashGetAddress';
+import ZcashGetFullViewingKey from '../src/api/zcash/ZcashGetFullViewingKey';
 
 import type { Device } from '../src/device/Device';
 
@@ -15,7 +16,10 @@ const hex = (byte: number, length: number) => byte.toString(16).padStart(2, '0')
 const createSignMethod = (pczt: string) =>
   new ZcashSignPczt({ id: 1, payload: { method: 'zcashSignPczt', pczt } });
 
-const attachDevice = (method: ZcashSignPczt | ZcashGetAddress, typedCall: jest.Mock) => {
+const attachDevice = (
+  method: ZcashSignPczt | ZcashGetAddress | ZcashGetFullViewingKey,
+  typedCall: jest.Mock
+) => {
   const commands = { typedCall };
   method.device = {
     commands,
@@ -329,20 +333,18 @@ describe('ZcashGetAddress', () => {
         method: 'zcashGetAddress',
         path: "m/32'/133'/0'",
         showOnOneKey: false,
-        includeUfvk: true,
         includeSeedFingerprint: true,
       },
     });
     method.init();
     const typedCall = jest.fn().mockResolvedValue({
-      message: { address: 'u1abc', ufvk: 'uview1abc', seed_fingerprint: hex(0x0f, 32) },
+      message: { address: 'u1abc', seed_fingerprint: hex(0x0f, 32) },
     });
     attachDevice(method, typedCall);
 
     await expect(method.run()).resolves.toEqual({
       path: "m/32'/133'/0'",
       address: 'u1abc',
-      ufvk: 'uview1abc',
       seedFingerprint: hex(0x0f, 32),
     });
     expect(typedCall).toHaveBeenCalledWith('ZcashGetAddress', 'ZcashAddress', {
@@ -351,12 +353,11 @@ describe('ZcashGetAddress', () => {
       scope: 0,
       diversifier_index: 0,
       show_display: false,
-      include_ufvk: true,
       include_seed_fingerprint: true,
     });
   });
 
-  test('omits the viewing key and fingerprint the V2 decoder returns as null', async () => {
+  test('omits the fingerprint the V2 decoder returns as null', async () => {
     const method = new ZcashGetAddress({
       id: 1,
       payload: { method: 'zcashGetAddress', path: "m/32'/133'/0'" },
@@ -364,18 +365,89 @@ describe('ZcashGetAddress', () => {
     method.init();
     const typedCall = jest.fn().mockResolvedValue({
       type: 'ZcashAddress',
-      message: { address: 'u1abc', ufvk: null, seed_fingerprint: null },
+      message: { address: 'u1abc', seed_fingerprint: null },
     });
     attachDevice(method, typedCall);
 
     const result = await method.run();
     expect(result).toEqual({ path: "m/32'/133'/0'", address: 'u1abc' });
-    expect(result).not.toHaveProperty('ufvk');
     expect(result).not.toHaveProperty('seedFingerprint');
-    expect(typedCall.mock.calls[0][2]).toMatchObject({
-      include_ufvk: false,
-      include_seed_fingerprint: false,
+    expect(typedCall.mock.calls[0][2]).toMatchObject({ include_seed_fingerprint: false });
+  });
+
+  // The UFVK has its own confirmed export; an address request never asks for it.
+  test('never requests the viewing key', async () => {
+    const method = new ZcashGetAddress({
+      id: 1,
+      payload: { method: 'zcashGetAddress', path: "m/32'/133'/0'", includeUfvk: true },
     });
+    method.init();
+    const typedCall = jest.fn().mockResolvedValue({ message: { address: 'u1abc' } });
+    attachDevice(method, typedCall);
+
+    const result = await method.run();
+    expect(typedCall.mock.calls[0][2]).not.toHaveProperty('include_ufvk');
+    expect(result).not.toHaveProperty('ufvk');
+  });
+});
+
+describe('ZcashGetFullViewingKey', () => {
+  const createViewingKey = (payload: Record<string, unknown>) =>
+    new ZcashGetFullViewingKey({
+      id: 1,
+      payload: { method: 'zcashGetFullViewingKey', ...payload },
+    });
+
+  test('maps the account path and response', async () => {
+    const method = createViewingKey({ path: "m/32'/133'/1'" });
+    method.init();
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'ZcashFullViewingKey',
+      message: { ufvk: 'uview1abc' },
+    });
+    attachDevice(method, typedCall);
+
+    await expect(method.run()).resolves.toEqual({ path: "m/32'/133'/1'", ufvk: 'uview1abc' });
+    expect(typedCall).toHaveBeenCalledWith('ZcashGetFullViewingKey', 'ZcashFullViewingKey', {
+      address_n: [2147483680, 2147483781, 2147483649],
+    });
+  });
+
+  test('exports a bundle one account at a time', async () => {
+    const method = createViewingKey({
+      bundle: [{ path: "m/32'/133'/0'" }, { path: "m/32'/133'/1'" }],
+    });
+    method.init();
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { ufvk: 'uview1zero' } })
+      .mockResolvedValueOnce({ message: { ufvk: 'uview1one' } });
+    attachDevice(method, typedCall);
+
+    await expect(method.run()).resolves.toEqual([
+      { path: "m/32'/133'/0'", ufvk: 'uview1zero' },
+      { path: "m/32'/133'/1'", ufvk: 'uview1one' },
+    ]);
+    expect(typedCall).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects a response without a viewing key', async () => {
+    const method = createViewingKey({ path: "m/32'/133'/0'" });
+    method.init();
+    attachDevice(method, jest.fn().mockResolvedValue({ message: {} }));
+
+    await expect(method.run()).rejects.toThrow();
+  });
+
+  test.each(["m/44'/133'/0'", "m/32'/133'/0'/0/0", "m/32'/133'/2147483648'"])(
+    'rejects the non-account path %s',
+    path => {
+      expect(() => createViewingKey({ path }).init()).toThrow();
+    }
+  );
+
+  test('requires a path', () => {
+    expect(() => createViewingKey({}).init()).toThrow();
   });
 });
 
@@ -386,7 +458,14 @@ describe('Zcash address protocol selection', () => {
       payload: { method: 'zcashGetAddress', path: "m/32'/133'/0'", ...params },
     });
   test('supports only Pro2 and protocol V2', () => {
-    for (const method of [createAddress(), createSignMethod(hex(1, 1))]) {
+    for (const method of [
+      createAddress(),
+      createSignMethod(hex(1, 1)),
+      new ZcashGetFullViewingKey({
+        id: 1,
+        payload: { method: 'zcashGetFullViewingKey', path: "m/32'/133'/0'" },
+      }),
+    ]) {
       method.init();
       expect(method.supportsProtocol('V1')).toBe(false);
       expect(method.supportsProtocol('V2')).toBe(true);

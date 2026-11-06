@@ -117,6 +117,16 @@ describe('transport log sanitization', () => {
     expect(payload.ufvk).toBe('synthetic-viewing-key-marker');
   });
 
+  test('redacts the exported Zcash viewing key response', () => {
+    const payload = { ufvk: 'synthetic-viewing-key-marker' };
+    expect(getSafeTransportLogPayload(payload, 'ZcashFullViewingKey')).toEqual({
+      ufvk: '[REDACTED]',
+    });
+    expect(
+      JSON.stringify(createTransportCallLog('ZcashFullViewingKey', 'V2', payload))
+    ).not.toContain('synthetic-');
+  });
+
   test('redacts Monero view keys in protocol and API field names', () => {
     expect(
       getSafeTransportLogPayload(
