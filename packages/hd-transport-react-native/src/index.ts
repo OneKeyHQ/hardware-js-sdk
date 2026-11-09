@@ -32,7 +32,12 @@ import {
   parseOnekeyBleColorCode,
 } from '@onekeyfe/hd-shared';
 
-import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
+import {
+  getBondedDevices,
+  getConnectedDeviceIds,
+  onDeviceBondState,
+  pairDevice,
+} from './BleManager';
 import {
   hasWritableCapability,
   resolveProtocolV2PacketCapacity,
@@ -125,6 +130,32 @@ const delay = (ms: number) =>
   new Promise<void>(resolve => {
     setTimeout(resolve, ms);
   });
+
+/**
+ * Android createBond() can transiently refuse to start (returns
+ * { bonded: false, bonding: false }) right after the host removed a pairing while
+ * the peripheral is between advertisements. Bounded retries give the stack a
+ * chance to see the device again before we surface an error. This happens before
+ * GATT, so no side-effecting command is ever replayed.
+ */
+const ANDROID_BOND_ATTEMPTS = 3;
+const ANDROID_BOND_RETRY_DELAY_MS = 300;
+
+/**
+ * BluetoothDevice#getAddress() and ble-plx ids are the same MAC but the exact
+ * separators/case vary across Android builds. Compare against the authoritative
+ * bonded list with separators stripped and case normalized.
+ */
+const normalizeBleMac = (id?: string | null): string =>
+  (id ?? '').replace(/[\s:-]/g, '').toUpperCase();
+
+/** Whether the Android system bonded-device list already contains this address. */
+const findBondedDevice = async (macAddress: string): Promise<boolean> => {
+  const target = normalizeBleMac(macAddress);
+  if (!target) return false;
+  const bonded = await getBondedDevices();
+  return bonded.some(device => normalizeBleMac(device.id) === target);
+};
 
 export const getFirmwareUploadWriteRetryType = (
   error: unknown
@@ -728,6 +759,14 @@ export default class ReactNativeBleTransport {
   /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
   private androidGattCacheRefreshes = new Set<string>();
 
+  /**
+   * Android MACs this transport has observed bonded (from the bonded list, a
+   * successful pairDevice, or a completed onDeviceBondState). Used to distinguish
+   * "previously paired but the host no longer holds a bond" (re-pair) from
+   * "never paired" (plain not-bonded) when createBond() cannot be restarted.
+   */
+  private knownBondedDevices = new Set<string>();
+
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
   private protocolV2FrameQueues: Map<string, Uint8Array[]> = new Map();
@@ -1255,6 +1294,69 @@ export default class ReactNativeBleTransport {
     return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
   }
 
+  /**
+   * Android must bond before GATT so the peripheral cannot trigger its own
+   * pairing mid-session. Three cases:
+   * - The authoritative bonded list already has the device (OK-66336): skip
+   *   createBond entirely. BluetoothDevice#bondState can be stale (BOND_NONE)
+   *   and a blind createBond() then pops a redundant system dialog.
+   * - createBond() returns { bonded: false, bonding: false } (OK-64703): retry a
+   *   bounded number of times with a short settle delay.
+   * - Retries exhausted: report a re-pairing error for a device this transport
+   *   previously observed bonded, otherwise keep the "never paired" error.
+   */
+  private async ensureAndroidBond(uuid: string): Promise<void> {
+    const key = normalizeBleMac(uuid);
+
+    try {
+      const bonded = await findBondedDevice(uuid);
+      if (bonded) {
+        this.knownBondedDevices.add(key);
+        Log?.debug(
+          '[ReactNativeBleTransport] Android device already bonded, skipping createBond:',
+          uuid
+        );
+        return;
+      }
+    } catch (error) {
+      // getBondedDevices can fail on older native builds or a transient adapter
+      // error; fall back to the legacy pairDevice path below.
+      Log?.debug('[ReactNativeBleTransport] Android bonded list query failed, using pairDevice:', {
+        uuid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    for (let attempt = 0; attempt < ANDROID_BOND_ATTEMPTS; attempt += 1) {
+      const bondState = await pairDevice(uuid);
+      if (bondState.bonding) {
+        await onDeviceBondState(uuid, this.bondAbortController.signal, {
+          systemInitiated: bondState.initiated === false,
+        });
+        this.knownBondedDevices.add(key);
+        return;
+      }
+      if (bondState.bonded) {
+        this.knownBondedDevices.add(key);
+        return;
+      }
+      // { bonded: false, bonding: false }: createBond() could not start. Give the
+      // device a moment to become visible/connectable before the next attempt.
+      if (attempt + 1 < ANDROID_BOND_ATTEMPTS) {
+        await delay(ANDROID_BOND_RETRY_DELAY_MS);
+      }
+    }
+
+    if (this.knownBondedDevices.has(key)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleDeviceBondError,
+        'Bluetooth pairing could not be restarted for a previously paired device',
+        { phase: 'bond', reason: 'peer_removed_pairing', attempts: ANDROID_BOND_ATTEMPTS }
+      );
+    }
+    throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
+  }
+
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
@@ -1361,14 +1463,7 @@ export default class ReactNativeBleTransport {
     if (Platform.OS === 'android') {
       // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
       try {
-        const bondState = await pairDevice(uuid);
-        if (bondState.bonding) {
-          await onDeviceBondState(uuid, this.bondAbortController.signal, {
-            systemInitiated: bondState.initiated === false,
-          });
-        } else if (!bondState.bonded) {
-          throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
-        }
+        await this.ensureAndroidBond(uuid);
       } catch (error) {
         await this.runNativeTeardown(uuid, blePlxManager, async () => {
           await this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>

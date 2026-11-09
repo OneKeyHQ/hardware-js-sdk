@@ -42,6 +42,7 @@ jest.mock('react-native-ble-plx', () => ({
 }));
 
 jest.mock('../BleManager', () => ({
+  getBondedDevices: jest.fn(() => Promise.resolve([])),
   getConnectedDeviceIds: jest.fn(() => Promise.resolve([])),
   onDeviceBondState: jest.fn(() => Promise.resolve()),
   pairDevice: jest.fn(() => Promise.resolve({ bonded: true, bonding: false })),
