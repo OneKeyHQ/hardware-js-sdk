@@ -550,7 +550,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
   });
 
   test.each([
-    ['ios', 'OneKey Neo', { iosErrorCode: 14, reason: 'Native connection failed' }],
+    ['ios', 'OneKey Neo', { iosErrorCode: 6, reason: 'Native connection failed' }],
     ['android', 'OneKey Pro 2', { androidErrorCode: 5, reason: 'Native connection failed' }],
   ] as const)(
     'keeps a %s %s native connect failure generic before protocol detection',
@@ -1250,7 +1250,7 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     device.connect.mockRejectedValueOnce(
       Object.assign(new BleErrorMock('Native connection failed'), {
         errorCode: 200,
-        iosErrorCode: 14,
+        iosErrorCode: 6,
       })
     );
 

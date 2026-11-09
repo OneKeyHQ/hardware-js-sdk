@@ -31,7 +31,7 @@ describe('Electron Noble BLE device discovery', () => {
     expect(NOBLE_BLE_SUBSCRIBE_TIMEOUT_MS).toBe(10_000);
   });
 
-  test('maps native macOS connection failures to the generic connection error', async () => {
+  test('maps a structured macOS lost bond to the re-pair error', async () => {
     const { createNobleBleConnectionError } = await import('../noble-ble-handler');
 
     expect(
@@ -41,7 +41,21 @@ describe('Electron Noble BLE device discovery', () => {
           nativeErrorDomain: 'CBErrorDomain',
         })
       )
-    ).toMatchObject({ errorCode: HardwareErrorCode.BleConnectedError });
+    ).toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+      params: {
+        phase: 'connect',
+        reason: 'peer_removed_pairing_information',
+        nativeErrorMessage: 'Peer removed pairing information on the device side',
+      },
+    });
+    // Some Noble builds only keep the domain in the message.
+    expect(
+      createNobleBleConnectionError(
+        new Error('CBErrorDomain:14 Peer removed pairing information on the device side')
+      )
+    ).toMatchObject({ errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation });
+    // Encryption is insufficient is not a lost bond by itself.
     expect(createNobleBleConnectionError(new Error('Encryption is insufficient'))).toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
     });
@@ -68,6 +82,33 @@ describe('Electron Noble BLE device discovery', () => {
     expect(createNobleBleConnectionError(new Error('connection failed'))).toMatchObject({
       errorCode: HardwareErrorCode.BleConnectedError,
     });
+  });
+
+  test('classifies Windows pairing failures by state, not message text alone', async () => {
+    const {
+      isWindowsPairingFailureText,
+      resolveWindowsNoResponseErrorCode,
+      resolveWindowsPairingErrorCode,
+    } = await import('../noble-ble-handler');
+
+    expect(isWindowsPairingFailureText('status: 3')).toBe(true);
+    expect(isWindowsPairingFailureText('Access denied')).toBe(true);
+    expect(isWindowsPairingFailureText('Protocol error')).toBe(true);
+    expect(isWindowsPairingFailureText('getDevice failed')).toBe(false);
+
+    expect(resolveWindowsPairingErrorCode({ wasBonded: false, canceled: true })).toBe(
+      HardwareErrorCode.BleDeviceBondedCanceled
+    );
+    expect(resolveWindowsPairingErrorCode({ wasBonded: true, canceled: false })).toBe(
+      HardwareErrorCode.BleBondInvalid
+    );
+    expect(resolveWindowsPairingErrorCode({ wasBonded: false, canceled: false })).toBe(
+      HardwareErrorCode.BleDeviceBondError
+    );
+
+    // A pairing that never produced a notification is the Windows wipe case.
+    expect(resolveWindowsNoResponseErrorCode(true)).toBe(HardwareErrorCode.BleBondInvalid);
+    expect(resolveWindowsNoResponseErrorCode(false)).toBe(HardwareErrorCode.BleDeviceBondError);
   });
 
   test('serializes HardwareError fields for the Noble IPC boundary', async () => {
@@ -720,6 +761,94 @@ describe('Electron Noble BLE device discovery', () => {
     } finally {
       await disconnect(undefined, peripheral.id);
     }
+  });
+
+  test('cancels a pending pairing and lets the next connect start a new native attempt', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const flush = () =>
+      new Promise(resolve => {
+        setImmediate(resolve);
+      });
+    const handlers = new Map<string, IpcHandler>();
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: IpcHandler) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+    let connectCallback: ((error?: Error) => void) | undefined;
+    const peripheral = Object.assign(
+      new EventEmitter(),
+      createPeripheral('pending-pairing-device', 'Pro2 A1B2', ['0001']),
+      {
+        connect: jest.fn((callback: (error?: Error) => void) => {
+          connectCallback = callback;
+        }),
+        cancelConnect: jest.fn(),
+        disconnect: jest.fn((callback: () => void) => {
+          peripheral.state = 'disconnected';
+          callback();
+        }),
+      }
+    );
+    const noble = Object.assign(new EventEmitter(), {
+      state: 'poweredOn',
+      startScanning: jest.fn((_services, _duplicates, callback) => {
+        callback?.();
+        noble.emit('discover', peripheral);
+      }),
+      stopScanning: jest.fn(callback => callback?.()),
+    });
+
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock('electron', () => ({ ipcMain }));
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const { setupNobleBleHandlers } = await import('../noble-ble-handler');
+    setupNobleBleHandlers({
+      on: jest.fn(),
+      send: jest.fn(),
+    } as unknown as WebContents);
+
+    const connect = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT);
+    const cancelPairing = handlers.get(EOneKeyBleMessageKeys.NOBLE_BLE_CANCEL_PAIRING);
+    if (!connect || !cancelPairing) {
+      throw new Error('Electron Noble BLE handlers were not registered');
+    }
+
+    const firstConnect = Promise.resolve(connect(undefined, peripheral.id));
+    for (let i = 0; i < 50 && !connectCallback; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+    }
+    expect(peripheral.connect).toHaveBeenCalledTimes(1);
+
+    await cancelPairing(undefined);
+    expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
+    await expect(firstConnect).resolves.toMatchObject({
+      type: 'NobleBleIpcError',
+      success: false,
+      error: { errorCode: HardwareErrorCode.BleDeviceBondedCanceled },
+    });
+
+    // A new acquire must reach the native connect again instead of reusing the
+    // half-cancelled attempt. The second attempt is left pending on purpose:
+    // reaching peripheral.connect() is the assertion, then it is cancelled.
+    connectCallback = undefined;
+    const secondConnect = Promise.resolve(connect(undefined, peripheral.id));
+    for (let i = 0; i < 50 && !connectCallback; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await flush();
+    }
+    expect(peripheral.connect).toHaveBeenCalledTimes(2);
+    await cancelPairing(undefined);
+    await secondConnect;
   });
 
   test('settles a pending Noble connect with the native disconnect error', () => {
