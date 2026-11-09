@@ -56,7 +56,7 @@ describe('allNetworkGetAddress privacy networks', () => {
     }
   );
 
-  test('asks zcashGetAddress for the Orchard address with its viewing key', () => {
+  test('asks zcashGetAddress for the Orchard address and seed fingerprint only', () => {
     const payload = { network: 'zcash' as const, path: "m/32'/133'/0'", showOnOneKey: false };
 
     expect(mapItem(payload)).toEqual(
@@ -68,7 +68,6 @@ describe('allNetworkGetAddress privacy networks', () => {
           addressType: 2,
           scope: 0,
           diversifierIndex: 0,
-          includeUfvk: true,
           includeSeedFingerprint: true,
           originPayload: payload,
         },

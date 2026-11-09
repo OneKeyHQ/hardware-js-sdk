@@ -6,6 +6,7 @@ import { hexToBytes, stripHexPrefix } from '../helpers/hexUtils';
 import { validateStrictPath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { createMethodInteraction } from '../../protocols/protocol-v2/uiInteraction';
 import { getMoneroVersionRange, validateMoneroNetworkType } from './helpers';
 
 import type { MoneroTransferDetails } from '@onekeyfe/hd-transport';
@@ -101,6 +102,11 @@ export default class MoneroKeyImageSync extends BaseMethod<KeyImageSyncParams> {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.strictCheckDeviceSupport = true;
+    // The name matches no Protocol V2 confirmation rule, so the export prompt is declared here.
+    this.protocolV2UiInteraction = createMethodInteraction(
+      'public-key-confirmation',
+      'moneroKeyImageSync'
+    );
 
     const payload = this.payload as MoneroKeyImageSyncParams;
     validateParams(payload, [

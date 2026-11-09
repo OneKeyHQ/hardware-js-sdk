@@ -71,7 +71,6 @@ type AllNetworkAddressPayload =
   | {
       // Zcash
       address: string;
-      ufvk?: string;
       seedFingerprint?: string;
     }
   | {
