@@ -800,6 +800,32 @@ describe('NobleBleHandler connect release', () => {
     await handler.stopScan();
   });
 
+  test('leaves a committed link up when a second connect to it times out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const native = Object.assign(new FakeNoble([peripheral]), { cancelConnect: jest.fn() });
+    const handler = makeHandler(native, { connectTimeoutMs: 1000 });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    const first = handler.connect('id-1', PADDED_PROFILE);
+    await settle();
+    await first;
+
+    // The second connect reuses the live link and stalls in service discovery.
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockImplementationOnce(
+      () => new Promise(() => undefined)
+    );
+    const second = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(second).rejects.toThrow(/timed out/);
+    await settle();
+    jest.advanceTimersByTime(700);
+    await flush();
+    await rejected;
+    expect(native.cancelConnect).not.toHaveBeenCalled();
+    expect(peripheral.disconnectAsync).not.toHaveBeenCalled();
+    expect(peripheral.state).toBe('connected');
+    await handler.stopScan();
+  });
+
   test('tears down the link a direct connect opened when service discovery fails', async () => {
     jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
     const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });

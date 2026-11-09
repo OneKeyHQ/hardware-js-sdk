@@ -704,6 +704,8 @@ export class NobleBleHandler {
     });
     const timer = setTimeout(() => {
       abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`));
+      // A link a committed connection owns stays up, same guard as abortIfAbandoned.
+      if (this._connected.has(id)) return;
       // Like cancelPairing: a native connect left pending completes whenever the
       // device returns, and its late teardown can then drop the next attempt's link.
       try {
