@@ -2,6 +2,7 @@ import { BaseMethod } from '../BaseMethod';
 import { serializedPath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { createMethodInteraction } from '../../protocols/protocol-v2/uiInteraction';
 import { validateZcashAccountPath } from './helpers';
 
 import type { ZcashGetFullViewingKey as HardwareZcashGetFullViewingKey } from '@onekeyfe/hd-transport';
@@ -23,6 +24,11 @@ export default class ZcashGetFullViewingKey extends BaseMethod<HardwareZcashGetF
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.strictCheckDeviceSupport = true;
+    // The name matches no Protocol V2 confirmation rule, so the export prompt is declared here.
+    this.protocolV2UiInteraction = createMethodInteraction(
+      'public-key-confirmation',
+      'zcashGetFullViewingKey'
+    );
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
