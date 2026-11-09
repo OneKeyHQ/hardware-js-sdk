@@ -735,6 +735,97 @@ describe('initThirdPartyBleSupport', () => {
   });
 });
 
+describe('NobleBleHandler connect release', () => {
+  afterEach(() => jest.useRealTimers());
+
+  // The scan window before a direct connect; matches THIRD_PARTY_BLE_SCAN_DURATION_MS.
+  const SCAN_WINDOW_MS = 5000;
+
+  test('cancels the pending native direct connect when the connect times out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    let rejectConnect: (error: Error) => void = () => undefined;
+    const connectAsync = jest.fn(
+      () =>
+        new Promise<NoblePeripheralLike>((_, reject) => {
+          rejectConnect = reject;
+        })
+    );
+    const native = Object.assign(new FakeNoble([]), {
+      connectAsync,
+      // noble.cancelConnect settles the pending connect with an error.
+      cancelConnect: jest.fn(() => rejectConnect(new Error('connection canceled!'))),
+    });
+    const handler = makeHandler(native, { connectTimeoutMs: 6000 });
+    const connecting = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(connecting).rejects.toThrow(/timed out/);
+    await settle();
+    jest.advanceTimersByTime(SCAN_WINDOW_MS);
+    await flush();
+    await flush();
+    expect(connectAsync).toHaveBeenCalledWith('id-1');
+    expect(native.cancelConnect).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1000);
+    await flush();
+    await rejected;
+    expect(native.cancelConnect).toHaveBeenCalledWith('id-1');
+    await flush();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('cancels a peripheral connect still in flight when the connect times out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    let rejectConnect: (error: Error) => void = () => undefined;
+    const peripheral = Object.assign(new FakePeripheral('id-1', { localName: 'Trezor Safe 7' }), {
+      cancelConnect: jest.fn(() => rejectConnect(new Error('connection canceled!'))),
+    });
+    peripheral.connectAsync.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          peripheral.state = 'connecting';
+          rejectConnect = reject;
+        })
+    );
+    const handler = makeHandler(new FakeNoble([peripheral]), { connectTimeoutMs: 1000 });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    const connecting = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(connecting).rejects.toThrow(/timed out/);
+    await settle();
+    expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(700);
+    await flush();
+    await rejected;
+    expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
+    await handler.stopScan();
+  });
+
+  test('tears down the link a direct connect opened when service discovery fails', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockRejectedValueOnce(
+      new Error('Device is unreachable while discovering services')
+    );
+    const native = Object.assign(new FakeNoble([]), {
+      // A direct connect hands the peripheral back already connected.
+      connectAsync: jest.fn(async (): Promise<NoblePeripheralLike> => {
+        peripheral.state = 'connected';
+        return peripheral;
+      }),
+    });
+    const handler = makeHandler(native);
+    const connecting = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(connecting).rejects.toThrow(/unreachable/);
+    await settle();
+    jest.advanceTimersByTime(SCAN_WINDOW_MS);
+    await flush();
+    await flush();
+    await rejected;
+    expect(peripheral.disconnectAsync).toHaveBeenCalledTimes(1);
+    expect(peripheral.state).toBe('disconnected');
+  });
+});
+
 describe('Trezor BLE process shutdown', () => {
   afterEach(() => jest.useRealTimers());
 

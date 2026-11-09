@@ -702,10 +702,16 @@ export class NobleBleHandler {
         claim.cancelScan?.();
       };
     });
-    const timer = setTimeout(
-      () => abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`)),
-      this._connectTimeoutMs
-    );
+    const timer = setTimeout(() => {
+      abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`));
+      // Like cancelPairing: a native connect left pending completes whenever the
+      // device returns, and its late teardown can then drop the next attempt's link.
+      try {
+        claim.cancelNative?.();
+      } catch (error) {
+        this._log('warn', 'connect.timeout.cancelConnect.error', { id, error: String(error) });
+      }
+    }, this._connectTimeoutMs);
     const attempt = {
       id,
       vendor: options.vendor,
@@ -781,6 +787,8 @@ export class NobleBleHandler {
       const native = this._requireNoble();
       claim.cancelNative = () => native.cancelConnect?.(id);
       peripheral = await this._directConnect(id);
+      // A cancelled direct connect returns undefined; report it as abandoned, not missing.
+      await abortIfAbandoned('direct');
     }
     if (!peripheral) {
       // discoveredCount=0 points at the radio/scan; counts only, see scan.empty.
@@ -849,8 +857,10 @@ export class NobleBleHandler {
       this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
-      // Don't leak a GATT link this call opened.
-      if (!wasConnected) await this._safeDisconnect(peripheral);
+      // Don't leak a GATT link this call opened. A direct connect opened one even
+      // though the peripheral arrives connected, unless a committed link owns it.
+      const openedLink = !wasConnected || (route === 'direct' && !this._connected.has(id));
+      if (openedLink) await this._safeDisconnect(peripheral);
       throw error;
     }
   }
