@@ -85,6 +85,10 @@ const playgroundConfig = [
     data: require('../data/kaspa').default,
   },
   {
+    title: 'Monero API',
+    data: require('../data/monero').default,
+  },
+  {
     title: 'Near API',
     data: require('../data/near').default,
   },
@@ -143,6 +147,10 @@ const playgroundConfig = [
   {
     title: 'TRON API',
     data: require('../data/tron').default,
+  },
+  {
+    title: 'Zcash API',
+    data: require('../data/zcash').default,
   },
   {
     title: 'WipeDevice API',

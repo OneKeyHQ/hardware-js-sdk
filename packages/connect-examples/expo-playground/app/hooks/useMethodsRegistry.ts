@@ -48,6 +48,8 @@ import { nostr } from '../data/methods/nostr';
 import { lightning } from '../data/methods/lightning';
 import { allnetwork } from '../data/methods/allnetwork';
 import { benfen } from '../data/methods/benfen';
+import { monero } from '../data/methods/monero';
+import { zcash } from '../data/methods/zcash';
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
 
@@ -87,6 +89,8 @@ const chainModules: ModuleConfig[] = [
   { id: 'alephium', module: alephium },
   { id: 'conflux', module: conflux },
   { id: 'nostr', module: nostr },
+  { id: 'monero', module: monero },
+  { id: 'zcash', module: zcash },
 
   // 特殊功能
   { id: 'lightning', module: lightning },

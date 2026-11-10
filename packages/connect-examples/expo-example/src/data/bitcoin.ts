@@ -1,3 +1,5 @@
+import { prepareBitcoinSample } from '../utils/manualSigning/bitcoin';
+import type { ManualSigningCall } from '../utils/manualSigning/common';
 import { type PlaygroundProps } from '../components/Playground';
 
 const api: PlaygroundProps[] = [
@@ -423,7 +425,10 @@ const api: PlaygroundProps[] = [
           ],
         },
       },
-    ],
+    ].map(preset => ({
+      ...preset,
+      prepareSample: (call: ManualSigningCall) => prepareBitcoinSample(call, preset.value),
+    })),
   },
   {
     method: 'btcVerifyMessage',

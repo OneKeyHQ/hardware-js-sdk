@@ -30,6 +30,7 @@ import benfenIcon from '../../assets/chain/bfc.png';
 import stellarIcon from '../../assets/chain/stellar.png';
 import alephiumIcon from '../../assets/chain/alephium.png';
 import allnetworkIcon from '../../assets/chain/all_network_logo.png';
+import moneroIcon from '../../assets/chain/monero.png';
 import { AllMethodCategory } from '../../data/types';
 
 interface ChainIconProps {
@@ -71,6 +72,7 @@ const CHAIN_ICON_MAP: Partial<Record<AllMethodCategory, string>> = {
   benfen: benfenIcon,
   alephium: alephiumIcon,
   allnetwork: allnetworkIcon,
+  monero: moneroIcon,
   // 设备方法可能没有图标，使用默认图标
   // device: deviceIcon, // 可以添加设备图标
   // firmware: firmwareIcon, // 可以添加固件图标
