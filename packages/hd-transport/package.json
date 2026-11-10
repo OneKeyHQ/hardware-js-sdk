@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport",
-  "version": "1.2.8-alpha.135",
+  "version": "1.2.10-alpha.2",
   "description": "Transport layer abstractions and utilities for OneKey hardware SDK.",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -12,8 +12,10 @@
   },
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
-    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "build": "node scripts/protobuf-static.js --check && rimraf dist && rollup -c ../../build/rollup.config.js",
     "test": "jest",
+    "test:static-csp": "node --disallow-code-generation-from-strings scripts/protobuf-static-csp.js",
+    "check:static": "node scripts/protobuf-static.js --check",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "update:protobuf": "./scripts/protobuf-build.sh"
@@ -26,6 +28,6 @@
   "dependencies": {
     "bytebuffer": "^5.0.1",
     "long": "^4.0.0",
-    "protobufjs": "^6.11.2"
+    "protobufjs": "6.11.6"
   }
 }
