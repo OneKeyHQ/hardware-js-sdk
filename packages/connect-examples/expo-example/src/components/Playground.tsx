@@ -9,9 +9,12 @@ import { Button } from './ui/Button';
 import AutoWrapperTextArea from './ui/AutoWrapperTextArea';
 import { acquireEditorParams, preparePresetEditor } from '../utils/presetEditor';
 
+import type { PrepareSigningSample } from '../utils/manualSigning/common';
+
 export interface PresupposeProps {
   title: string;
   value: any; // JSON object
+  prepareSample?: PrepareSigningSample | null;
 }
 
 export type PlaygroundProps = {
@@ -33,6 +36,8 @@ const Playground = ({
   const [params, setParams] = useState('');
   const [hasOversizedPreset, setHasOversizedPreset] = useState(false);
   const [response, setResponse] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState(0);
+  const [hasGeneratedParams, setHasGeneratedParams] = useState(false);
   const paramsRef = useRef(params);
   const oversizedPresetRef = useRef<object | null>(null);
   const isExpandMode = useExpandMode();
@@ -45,6 +50,9 @@ const Playground = ({
     (index: number) => () => {
       const preset = presupposes?.[index];
       if (!preset) return;
+      setSelectedPreset(index);
+      setHasGeneratedParams(false);
+      setResponse('');
 
       const preparedPreset = preparePresetEditor(preset);
       oversizedPresetRef.current = preparedPreset.oversizedPreset;
@@ -56,6 +64,7 @@ const Playground = ({
   );
 
   const handleParamsChange = useCallback((value: string) => {
+    setHasGeneratedParams(false);
     oversizedPresetRef.current = null;
     paramsRef.current = value;
     setHasOversizedPreset(false);
@@ -99,7 +108,12 @@ const Playground = ({
           <Group orientation="horizontal" paddingHorizontal="$2" flexWrap="wrap">
             {presupposes.map((presuppose, index) => (
               <Group.Item key={`presuppose-${presuppose.title}-${index}`}>
-                <Button onPress={fillParameterCallback(index)}>{presuppose.title}</Button>
+                <Button
+                  variant={selectedPreset === index ? 'primary' : 'secondary'}
+                  onPress={fillParameterCallback(index)}
+                >
+                  {presuppose.title}
+                </Button>
               </Group.Item>
             ))}
           </Group>
@@ -107,13 +121,15 @@ const Playground = ({
       );
     }
     return null;
-  }, [fillParameterCallback, intl, presupposes]);
+  }, [fillParameterCallback, intl, presupposes, selectedPreset]);
 
   const RequestParamsView = useMemo(
     () => (
       <>
         <Text fontSize={16} fontWeight="bold">
-          {intl.formatMessage({ id: 'label__parameters' })}
+          {hasGeneratedParams
+            ? '参数（已按当前钱包生成）'
+            : intl.formatMessage({ id: 'label__parameters' })}
         </Text>
         <AutoWrapperTextArea
           marginHorizontal="$2"
@@ -126,7 +142,7 @@ const Playground = ({
         />
       </>
     ),
-    [handleParamsChange, hasOversizedPreset, intl, params, presupposes]
+    [handleParamsChange, hasGeneratedParams, hasOversizedPreset, intl, params, presupposes]
   );
 
   const copyResponse = useCallback(() => {
@@ -166,6 +182,7 @@ const Playground = ({
   const PlaygroundExecutorView = useMemo(
     () => (
       <PlaygroundExecutor
+        key={selectedPreset}
         methodPayload={{
           method,
           noConnIdReq,
@@ -173,9 +190,21 @@ const Playground = ({
         }}
         onAcquireParams={onAcquireParams()}
         onExecute={setResponse}
+        onPrepared={value => {
+          setHasGeneratedParams(true);
+          const prepared = preparePresetEditor({
+            title: `${presupposes?.[selectedPreset]?.title ?? method}（已生成）`,
+            value,
+          });
+          oversizedPresetRef.current = prepared.oversizedPreset;
+          paramsRef.current = prepared.editorValue;
+          setHasOversizedPreset(prepared.isOversized);
+          setParams(prepared.editorValue);
+        }}
+        prepareSample={presupposes?.[selectedPreset]?.prepareSample ?? undefined}
       />
     ),
-    [method, noConnIdReq, noDeviceIdReq, onAcquireParams]
+    [method, noConnIdReq, noDeviceIdReq, onAcquireParams, presupposes, selectedPreset]
   );
 
   return (

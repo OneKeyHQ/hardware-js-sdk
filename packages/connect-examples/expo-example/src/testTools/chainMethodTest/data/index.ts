@@ -3,6 +3,8 @@ import ethData from './eth';
 import adaData from './ada';
 import solData from './sol';
 import dotData from './dot';
+import zcashApi from '../../../data/zcash';
+import moneroApi from '../../../data/monero';
 
 import type { PlaygroundProps } from '../../../components/Playground';
 
@@ -22,6 +24,10 @@ export interface ChainTestData {
   symbol: string;
   data: ChainMethodEntry[];
 }
+
+// Batch suites use address-only presets; signing needs wallet-provided data and key export is manual.
+const zcashData = zcashApi.filter(entry => entry.method === 'zcashGetAddress');
+const moneroData = moneroApi.filter(entry => entry.method === 'moneroGetAddress');
 
 export const chainTestData: ChainTestData[] = [
   {
@@ -49,6 +55,8 @@ export const chainTestData: ChainTestData[] = [
     symbol: 'DOT',
     data: dotData,
   },
+  { name: 'Monero', symbol: 'XMR', data: moneroData },
+  { name: 'Zcash', symbol: 'ZEC', data: zcashData },
 ];
 
-export { btcData, ethData, adaData, solData, dotData };
+export { btcData, ethData, adaData, solData, dotData, zcashData, moneroData };

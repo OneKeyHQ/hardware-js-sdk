@@ -8,6 +8,8 @@ const JSON_PARAMETER_NAMES = [
   'bundle',
   'transaction',
   'inputs',
+  'tsxData',
+  'transfers',
   'outputs',
   'refTxs',
   'payload',
@@ -158,7 +160,11 @@ export function unflattenParameters(data: Record<string, unknown>): Record<strin
     let cursor = result;
     for (let index = 0; index < segments.length - 1; index += 1) {
       const segment = segments[index];
-      if (!cursor[segment] || typeof cursor[segment] !== 'object' || Array.isArray(cursor[segment])) {
+      if (
+        !cursor[segment] ||
+        typeof cursor[segment] !== 'object' ||
+        Array.isArray(cursor[segment])
+      ) {
         cursor[segment] = {};
       }
       cursor = cursor[segment] as Record<string, unknown>;

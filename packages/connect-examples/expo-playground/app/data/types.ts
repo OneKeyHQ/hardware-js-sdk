@@ -80,6 +80,8 @@ export type ChainCategory =
   | 'filecoin'
   | 'nostr'
   | 'lightning'
+  | 'monero'
+  | 'zcash'
   | 'allnetwork';
 
 export type DeviceMethodCategory = 'device' | 'firmware';
