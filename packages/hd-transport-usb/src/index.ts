@@ -368,6 +368,12 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
       } catch (cleanupError) {
         this.Log?.debug('NodeUsbTransport acquire cleanup error: ', cleanupError);
       }
+      if (
+        error.errorCode === HardwareErrorCode.TransportProtocolProbeFailed ||
+        error.errorCode === HardwareErrorCode.TransportProtocolMismatch
+      ) {
+        throw error;
+      }
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, error.message ?? String(error));
     }
   }
@@ -842,17 +848,13 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   }
 
   private createProtocolMismatchError(expected: ProtocolType) {
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+    });
   }
 
   private createProtocolDetectionError() {
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Unable to detect USB protocol: device did not respond to Protocol V1 Initialize or Protocol V2 Ping'
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed);
   }
 
   private async detectProtocol(

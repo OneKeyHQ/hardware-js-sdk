@@ -94,7 +94,7 @@ if (!result.success) throw new Error(result.payload.error);
 
 ## 4. Après l’appel [#4-after-the-call]
 
-1. L’appareil peut redémarrer. Attendez `DEVICE.CONNECT` (ou effectuez une nouvelle recherche). Une reconnexion ordinaire conserve le protocole confirmé. Consultez [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).
+1. L’appareil peut redémarrer. Attendez `DEVICE.CONNECT` (ou effectuez une nouvelle recherche). Une reconnexion ordinaire conserve le protocole confirmé. Consultez [Déconnexions et reconnexion](/fr/hardware-sdk/transport/reconnect).
 2. Relisez [`getDeviceState`](/fr/hardware-sdk/basic-api/get-device-state) (`scope: 'firmware'` si vous avez besoin des versions) avant de faire confiance à la nouvelle version.
 3. Si l’appel a échoué avec un délai de transport dépassé **après** l’envoi de la demande d’installation, **ne rejouez pas** la même mise à jour. Reconnectez-vous, lisez l’état, puis décidez.
 

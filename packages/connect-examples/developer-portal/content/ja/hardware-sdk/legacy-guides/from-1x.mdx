@@ -1,13 +1,13 @@
 ---
-description: "Hardware SDK 1.1.x から 1.2.x への移行：パッケージ、デバイス項目、ウォレットの紐付け、UI、制限、受け入れテストとロールバック。"
-title: "1.1.x から 1.2.x へ"
+description: "既存の Hardware SDK 1.1.x の組み込みを 1.2.x に更新します。必要な API 変更、ウォレットの扱い、検証手順を確認してください。"
+title: "Hardware SDK 1.2 へのアップグレード"
 ---
 
 <span id="migrate-from-11x-to-12x" />
 
-# 1.1.x から 1.2.x へ移行
+# Hardware SDK 1.2 へのアップグレード [#11x-から-12x-へ移行]
 
-このガイドは **1.1.x から 1.2.x** へ移行する外部アプリ向けです。SDK のエントリーポイントは一つのままで構いません。Protocol V2 のために別の SDK は不要です。新規プロジェクトは[はじめに](/ja/hardware-sdk/getting-started)から進めてください。
+既存の Hardware SDK **1.1.x** の組み込みを **1.2.x** にアップグレードします。SDK のエントリーポイントは一つのままで構いません。Protocol V2 のために別の SDK は不要です。新規プロジェクトは[はじめに](/ja/hardware-sdk/getting-started)から進めてください。
 
 **Protocol V2 で必須：**V1 専用のデバイス読み取りを置き換え、各メソッドの対応機種、ファームウェア、プロトコルを確認します。**推奨：**新しいコードでは明示的なウォレット選択を使います。**互換性：**既存の対応チェーン呼び出しは維持できます。`getPassphraseState` は両プロトコルで非推奨の互換補助 API として残ります。**必要に応じて：**Bridge から WebUSB への変更、SDK の入口変更、ファームウェア更新の実装は、それぞれ別の判断です。
 
@@ -223,4 +223,4 @@ WebUSB の権限選択にはセキュアコンテキストとユーザー操作�
 - [はじめに](/ja/hardware-sdk/getting-started)
 - [Core API ガイド](/ja/hardware-sdk/core-api-guide)
 - [ウォレットセッション](/ja/hardware-sdk/concepts/wallet-session)
-- [再接続と破棄](/ja/hardware-sdk/transport/reconnect)
+- [切断と再接続](/ja/hardware-sdk/transport/reconnect)

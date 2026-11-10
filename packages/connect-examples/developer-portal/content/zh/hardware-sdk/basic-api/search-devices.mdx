@@ -50,6 +50,7 @@ WebUSB 授权必须由用户主动操作触发。BLE 扫描需要平台要求的
 | `deviceType` | `IDeviceType` | 探测出的机型，初始化前可能未知。 |
 | `name` | `string` | 用于显示的名称，不是唯一标识。 |
 | `commType` | `OneKeyDeviceCommType` | 传输层报告的通信类型。 |
+| `bleColorCode` | `string \| undefined` | 仅 React Native BLE 和桌面端（Electron）BLE 发现。Pro 2 / Neo 在广播中携带的序列号颜色字母（`A`–`Z`），可能来自之前收到的广播；未知时不返回。需结合 `deviceType` 解释。 |
 
 完整公开类型为 [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts)。不要依赖 `path` 等内部附加字段。
 

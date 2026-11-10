@@ -107,7 +107,7 @@ if (!address.success) throw new Error(address.payload.error);
 - 同一设备的调用串行执行，超时后不自动重复签名或固件升级请求。
 - 拆除 SDK 或切换传输时调用 `dispose()`，再次使用前重新初始化。
 
-参见[重连与释放](/zh/hardware-sdk/transport/reconnect)。
+参见[断线与重连](/zh/hardware-sdk/transport/reconnect)。
 
 ## 故障排查
 

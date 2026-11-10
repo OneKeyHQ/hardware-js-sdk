@@ -15,6 +15,7 @@ import HardwareSdk, {
   executeCallback,
   getLogBlockLabel,
   getLogger,
+  getSafeLogPayload,
   initCore,
   parseConnectSettings,
   setLoggerPostMessage,
@@ -72,7 +73,11 @@ function handleMessage(message: CoreMessage) {
           progress: message?.payload?.progress,
         });
       } else {
-        Log.debug('hd-ble-sdk handleMessage', JSON.stringify(message));
+        const blockLog = getLogBlockLabel(message);
+        Log.debug(
+          'hd-ble-sdk handleMessage',
+          blockLog ? { event, type, method: blockLog } : JSON.stringify(getSafeLogPayload(message))
+        );
       }
     } catch (error) {
       // ignore
@@ -162,6 +167,12 @@ const call = async (params: any) => {
       Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
+        if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+        }
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
           /**
            * Send message notification when there is no Bluetooth access permission

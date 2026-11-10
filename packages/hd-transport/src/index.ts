@@ -37,6 +37,7 @@ export type {
   MessageFromOneKey,
   TransportCallOptions,
   TransportWriteMetrics,
+  ProtocolV2FileWritePipeline,
   LowlevelTransportSharedPlugin,
   LowLevelDevice,
   OneKeyDeviceInfoBase,

@@ -719,8 +719,8 @@
       "zh": "f72173c15254981d497565e92dc8ee59947403dbeb226a1821c64459f502f09b"
     },
     "hardware-sdk/basic-api/search-devices.mdx": {
-      "en": "db2f548e1669107cd6d844e08816bf0c38ef85074974612ddd89f5ad8fd3e050",
-      "zh": "d4e1684f3bb35fd8d9cd1d310a519532cf863c7c5b06215e96ea9dd337dd7f65"
+      "en": "b3b0a98037c2d545e3d1472c4cd10c8cdba4bd8e3c486557d845fa0727481a38",
+      "zh": "fa289efac153878552bc6219ca11bcd3c9802533fdf767b742984d4fa64f6e43"
     },
     "hardware-sdk/chains/alephium/alephiumgetaddress.mdx": {
       "en": "3cab6103754bbdeab2598e489399010a56d1be7eda404851b0c74f26be6f6196",
@@ -1199,8 +1199,8 @@
       "zh": "df00d9029bd2fd5284cf6452ce7c7f9243b10d36234ef47702236648f5156de7"
     },
     "hardware-sdk/transport/react-native-ble.mdx": {
-      "en": "ad4f4367db7b35df1c54e8848531780ec20566e88b9cc1056936c080c2f9640f",
-      "zh": "2d512764fca7e824653bbefe4532cfb20302d476f91285f45a26f0071970682d"
+      "en": "0373ec1e838eaf8b21b960ba81c621320865f533fcffcbe4aca77d4824d9a7f7",
+      "zh": "129dfc92e53ecf849de0bd198e66dcb432dec728cfeb5ff0179e5ac2cf6497f8"
     },
     "hardware-sdk/transport/reconnect.mdx": {
       "en": "db998d7ce990c7d666f0200c37e2e600b42de5c7acb2f1cce7aeed1aeae3a626",

@@ -6,7 +6,11 @@ import { DeviceSessionPinType } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { decodeJpegBase64ToRgba } from '../helpers/base64Data';
 import { invalidParameter } from '../helpers/filesystemValidation';
-import { writeProtocolV2File } from '../helpers/protocolV2FileWrite';
+import {
+  createProtocolV2AssetFileWriteRecovery,
+  writeProtocolV2File,
+} from '../helpers/protocolV2FileWrite';
+import { ProtocolV2UiInteractionCoordinator } from '../../protocols/protocol-v2/uiInteraction';
 import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { supportsProtocolV2Message } from '../../protocols/protocol-v2/features';
 import { LoggerNames, getLogger } from '../../utils';
@@ -142,6 +146,7 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       chunkSize: this.params.chunkSize,
       bleChunkSizeLimit,
       maxChunkRetries: 3,
+      recoverConnection: createProtocolV2AssetFileWriteRecovery(this),
       overwrite: true,
       append: false,
       throwIfAborted: () => this.throwIfAborted(),
@@ -171,6 +176,15 @@ export default class DeviceUploadWallpaper extends BaseMethod<DeviceUploadWallpa
       data,
       useHostAssetPackage ? WALLPAPER_PACKAGE_BLE_CHUNK_SIZE : undefined
     );
+    this.throwIfAborted();
+    new ProtocolV2UiInteractionCoordinator(this.device, this.postMessage).enterMethodInteraction({
+      request: 'button',
+      source: 'method-lifecycle',
+      reason: 'device-management',
+      completion: 'operation-completed',
+      deviceOnly: true,
+      operation: this.name,
+    });
     const response = await this.device.commands.typedCall('DeviceSettingsSet', 'Success', {
       settings: { wallpaper_path: this.path },
     });

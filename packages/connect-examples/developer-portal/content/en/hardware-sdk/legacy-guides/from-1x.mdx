@@ -1,11 +1,11 @@
 ---
-description: "Upgrade Hardware SDK 1.1.x to 1.2.x: package alignment, device fields, wallet binding, UI, protocol limits, acceptance tests and rollback."
-title: From 1.1.x to 1.2.x
+description: "Upgrade an existing Hardware SDK 1.1.x integration to 1.2.x. Review required API changes, wallet handling, and validation steps."
+title: "Upgrade to Hardware SDK 1.2"
 ---
 
-# Migrate from 1.1.x to 1.2.x
+# Upgrade to Hardware SDK 1.2 [#migrate-from-11x-to-12x]
 
-This guide is for third-party integrations moving from **1.1.x to 1.2.x**. Keep one SDK entry point; Protocol V2 support does not require a second SDK. New projects should start with [Getting Started](/en/hardware-sdk/getting-started).
+Upgrade an existing Hardware SDK **1.1.x** integration to **1.2.x**. Keep one SDK entry point; Protocol V2 support does not require a second SDK. New projects should start with [Getting Started](/en/hardware-sdk/getting-started).
 
 **Required for Protocol V2:** replace V1-only device reads and check each method's device, firmware and protocol support. **Recommended:** use explicit wallet selection for new code. **Compatibility:** existing supported chain calls can remain; `getPassphraseState` remains a deprecated compatibility helper on both protocols. **Conditional:** changing Bridge to WebUSB, changing SDK entry points, or implementing firmware updates is a separate integration decision.
 
@@ -221,4 +221,4 @@ Disable newly enabled V2-only integrations when returning to a 1.1.x baseline. A
 - [Getting Started](/en/hardware-sdk/getting-started)
 - [Core API Guide](/en/hardware-sdk/core-api-guide)
 - [Wallet Sessions](/en/hardware-sdk/concepts/wallet-session)
-- [Reconnect and dispose](/en/hardware-sdk/transport/reconnect)
+- [Disconnects and reconnection](/en/hardware-sdk/transport/reconnect)

@@ -1,13 +1,13 @@
 ---
-description: "Passer de Hardware SDK 1.1.x à 1.2.x : versions des paquets, champs, portefeuilles, UI, limites, tests de validation et retour arrière."
-title: "Passer de 1.1.x à 1.2.x"
+description: "Mettez à niveau une intégration Hardware SDK 1.1.x vers 1.2.x. Vérifiez les changements d’API requis, la gestion des portefeuilles et les étapes de validation."
+title: "Passer à Hardware SDK 1.2"
 ---
 
 <span id="migrate-from-11x-to-12x" />
 
-# Migrer de 1.1.x vers 1.2.x
+# Passer à Hardware SDK 1.2 [#migrer-de-11x-vers-12x]
 
-Ce guide s'adresse aux intégrations tierces passant de **1.1.x à 1.2.x**. Conservez un seul point d'entrée SDK ; Protocol V2 ne nécessite pas un second SDK. Les nouveaux projets peuvent suivre [Premiers pas](/fr/hardware-sdk/getting-started).
+Mettez à niveau une intégration existante de Hardware SDK **1.1.x** vers **1.2.x**. Conservez un seul point d’entrée SDK ; Protocol V2 ne nécessite pas un second SDK. Pour un nouveau projet, commencez par [Premiers pas](/fr/hardware-sdk/getting-started).
 
 **Obligatoire pour Protocol V2 :** remplacez les lectures réservées à V1 et vérifiez les appareils, micrologiciels et protocoles compatibles avec chaque méthode. **Recommandé :** utilisez un choix explicite du portefeuille dans le nouveau code. **Compatibilité :** les appels de chaîne existants pris en charge peuvent rester ; `getPassphraseState` reste un outil de compatibilité obsolète sur les deux protocoles. **Selon le besoin :** passer de Bridge à WebUSB, changer de point d'entrée ou gérer les mises à jour du micrologiciel reste une décision distincte.
 
@@ -223,4 +223,4 @@ Désactivez les intégrations réservées à V2 récemment activées si vous rev
 - [Premiers pas](/fr/hardware-sdk/getting-started)
 - [Guide des API principales](/fr/hardware-sdk/core-api-guide)
 - [Sessions de portefeuille](/fr/hardware-sdk/concepts/wallet-session)
-- [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect)
+- [Déconnexions et reconnexion](/fr/hardware-sdk/transport/reconnect)

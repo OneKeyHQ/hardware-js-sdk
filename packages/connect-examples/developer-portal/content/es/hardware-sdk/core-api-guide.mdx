@@ -59,7 +59,7 @@ sequenceDiagram
 | `connectId` | Qué conexión | `searchDevices()` | Reconexión USB, nuevo emparejamiento BLE, cambio de transporte |
 | `deviceId` | Qué vigencia de semilla | `getDeviceState` (`getFeatures` está obsoleto) | Borrado, recuperación, cambio de semilla |
 
-Los identificadores `connectId` de USB y BLE tienen valores distintos para la misma unidad; guárdalos en caché por separado. Consulta [Identificadores](/es/hardware-sdk/concepts/identifiers) y [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect).
+Los identificadores `connectId` de USB y BLE tienen valores distintos para la misma unidad; guárdalos en caché por separado. Consulta [Identificadores](/es/hardware-sdk/concepts/identifiers) y [Desconexiones y reconexión](/es/hardware-sdk/transport/reconnect).
 
 **Requisitos del entorno de ejecución**
 
@@ -110,7 +110,7 @@ const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 if (!address.success) throw new Error(address.payload.error);
 ```
 
-Serializa las llamadas por dispositivo. Actualiza `getDeviceState` tras cambiar de dispositivo. Elimina los listeners al desmontar. Llama a `HardwareSDK.dispose()` solo al cerrar el transporte; consulta [Reconexión y liberación de recursos](/es/hardware-sdk/transport/reconnect).
+Serializa las llamadas por dispositivo. Actualiza `getDeviceState` tras cambiar de dispositivo. Elimina los listeners al desmontar. Llama a `HardwareSDK.dispose()` solo al cerrar el transporte; consulta [Desconexiones y reconexión](/es/hardware-sdk/transport/reconnect).
 
 ## Parámetros comunes [#common-params]
 

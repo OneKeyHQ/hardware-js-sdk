@@ -15,6 +15,7 @@ import HardwareSdk, {
   executeCallback,
   getLogBlockLabel,
   getLogger,
+  getSafeLogPayload,
   parseConnectSettings,
   parseMessage,
   setLoggerPostMessage,
@@ -149,7 +150,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
           } else if (blockLog) {
             Log.debug('Host Bridge Receive message: ', blockLog);
           } else {
-            Log.debug('Host Bridge Receive message: ', message);
+            Log.debug('Host Bridge Receive message: ', getSafeLogPayload(message));
           }
         }
         const response = await handleMessage(message);

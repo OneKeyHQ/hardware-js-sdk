@@ -11034,6 +11034,149 @@
         }
       }
     },
+    "ZcashAddressType": {
+      "values": {
+        "UNIFIED_ORCHARD_P2PKH": 0,
+        "TRANSPARENT_P2PKH": 1,
+        "UNIFIED_ORCHARD": 2
+      }
+    },
+    "ZcashAddressScope": {
+      "values": {
+        "EXTERNAL": 0,
+        "INTERNAL": 1
+      }
+    },
+    "ZcashGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "include_seed_fingerprint": {
+          "type": "bool",
+          "id": 3
+        },
+        "diversifier_index": {
+          "type": "uint32",
+          "id": 5,
+          "options": {
+            "default": 0
+          }
+        },
+        "address_type": {
+          "type": "ZcashAddressType",
+          "id": 6,
+          "options": {
+            "default": "UNIFIED_ORCHARD_P2PKH"
+          }
+        },
+        "scope": {
+          "type": "ZcashAddressScope",
+          "id": 7,
+          "options": {
+            "default": "EXTERNAL"
+          }
+        }
+      }
+    },
+    "ZcashAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "seed_fingerprint": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "ZcashGetFullViewingKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        }
+      }
+    },
+    "ZcashFullViewingKey": {
+      "fields": {
+        "ufvk": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "ZcashSignPczt": {
+      "fields": {
+        "pczt_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "pczt_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ZcashPcztChunkRequest": {
+      "fields": {
+        "chunk_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "ZcashPcztChunkAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "ZcashSignedPczt": {
+      "fields": {
+        "pczt_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "pczt_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ZcashSignedPcztChunkRequest": {
+      "fields": {
+        "chunk_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
     "wire_in": {
       "type": "bool",
       "id": 50002,
@@ -11459,6 +11602,15 @@
         "MessageType_NeoAddress": 12302,
         "MessageType_NeoSignTx": 12303,
         "MessageType_NeoSignedTx": 12304,
+        "MessageType_ZcashGetAddress": 12400,
+        "MessageType_ZcashAddress": 12401,
+        "MessageType_ZcashSignPczt": 12402,
+        "MessageType_ZcashSignedPczt": 12403,
+        "MessageType_ZcashPcztChunkRequest": 12404,
+        "MessageType_ZcashPcztChunkAck": 12405,
+        "MessageType_ZcashSignedPcztChunkRequest": 12406,
+        "MessageType_ZcashGetFullViewingKey": 12407,
+        "MessageType_ZcashFullViewingKey": 12408,
         "MessageType_DeviceFactoryInfoSet": 60000,
         "MessageType_DeviceFactoryInfoGet": 60001,
         "MessageType_DeviceFactoryInfo": 60002,

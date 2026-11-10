@@ -18,7 +18,6 @@ import {
   HardwareErrorCode,
   HardwareErrorCodeMessage,
   createDeferred,
-  isBleStaleBondHardwareError,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
 
@@ -27,6 +26,7 @@ import { resolveBlePacketCapacity } from './ble-packet-capacity';
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { DesktopAPI, NobleBleIpcErrorResponse } from '@onekeyfe/hd-transport-electron';
 import type {
+  AcquireInput,
   OneKeyDeviceInfo,
   ProtocolType,
   ProtocolV2CallContext,
@@ -56,7 +56,7 @@ interface PacketProcessResult {
 }
 
 const toBleDescriptor = (
-  device: { id: string; name: string | null },
+  device: { id: string; name: string | null; bleColorCode?: string },
   protocolType?: ProtocolType
 ): OneKeyDeviceInfo =>
   ({
@@ -65,6 +65,7 @@ const toBleDescriptor = (
     path: device.id,
     debug: false,
     commType: 'electron-ble',
+    ...(device.bleColorCode ? { bleColorCode: device.bleColorCode } : {}),
     ...(protocolType ? { protocolType } : {}),
   } as OneKeyDeviceInfo);
 
@@ -116,6 +117,10 @@ export default class ElectronBleTransport {
   emitter?: EventEmitter;
 
   private connectedDevices: Set<string> = new Set();
+
+  private retainedDevices: Set<string> = new Set();
+
+  private protocolV2CallCounts: Map<string, number> = new Map();
 
   /**
    * Devices whose acquire() is still in flight.
@@ -203,11 +208,14 @@ export default class ElectronBleTransport {
         if (error.code === HardwareErrorCode.BlePermissionError) {
           return ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
         }
+        if (error.code === HardwareErrorCode.BleLocationError) {
+          return ERRORS.TypedError(HardwareErrorCode.BleLocationError);
+        }
       }
       const errorMessage = error.message || String(error);
       const poweredOffMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePoweredOff];
       const unsupportedMessage = HardwareErrorCodeMessage[HardwareErrorCode.BleUnsupported];
-      const permissionMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePermissionError];
+      const permissionMessage = HardwareErrorCodeMessage[HardwareErrorCode.BleLocationError];
 
       if (errorMessage.includes(poweredOffMessage) || errorMessage.includes('poweredOff')) {
         return ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
@@ -216,7 +224,7 @@ export default class ElectronBleTransport {
         return ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
       }
       if (errorMessage.includes(permissionMessage) || errorMessage.includes('unauthorized')) {
-        return ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        return ERRORS.TypedError(HardwareErrorCode.BleLocationError);
       }
     }
     return error;
@@ -231,6 +239,7 @@ export default class ElectronBleTransport {
       .invalidateLink(deviceId, 'Electron BLE device state cleaned')
       .catch(error => this.Log?.debug('[Electron BLE] link cleanup failed:', error));
     this.connectedDevices.delete(deviceId);
+    this.retainedDevices.delete(deviceId);
     this.deviceProtocol.delete(deviceId);
     this.deviceMtus.delete(deviceId);
     this.devicePacketCapacities.delete(deviceId);
@@ -355,13 +364,22 @@ export default class ElectronBleTransport {
   }
 
   async acquire(input: BleAcquireInput) {
-    const { uuid, forceCleanRunPromise, expectedProtocol } = input;
+    const { uuid, forceCleanRunPromise, expectedProtocol, forceProtocolDetection }: AcquireInput =
+      input;
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    if (this.connectedDevices.has(uuid)) {
+    const retainedToken =
+      this.retainedDevices.has(uuid) &&
+      !forceProtocolDetection &&
+      (!expectedProtocol || expectedProtocol === 'V2') &&
+      this.deviceProtocol.get(uuid) === 'V2'
+        ? this.notificationTokens.get(uuid)
+        : undefined;
+    this.retainedDevices.delete(uuid);
+    if (this.connectedDevices.has(uuid) && retainedToken === undefined) {
       await this.release(uuid);
     }
 
@@ -381,6 +399,18 @@ export default class ElectronBleTransport {
       const device = await invokeNobleBle(window.desktopApi.nobleBle.getDevice(uuid));
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
+      }
+      // A disconnect during the IPC lookup invalidates the retained notification generation.
+      if (
+        retainedToken !== undefined &&
+        this.notificationTokens.get(uuid) === retainedToken &&
+        this.connectedDevices.has(uuid) &&
+        this.deviceProtocol.get(uuid) === 'V2'
+      ) {
+        return {
+          ...toBleDescriptor({ id: device.id, name: device.name }, 'V2'),
+          uuid,
+        };
       }
       const protocolHint = expectedProtocol
         ? undefined
@@ -449,10 +479,18 @@ export default class ElectronBleTransport {
     }
   }
 
-  async release(id: string, _onclose?: boolean, keepSession?: boolean) {
+  async release(id: string, onclose?: boolean, keepSession?: boolean) {
     try {
-      await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
-      await this.releaseLogical(id, keepSession);
+      const retainLink =
+        keepSession === true &&
+        !onclose &&
+        this.connectedDevices.has(id) &&
+        this.deviceProtocol.get(id) === 'V2' &&
+        !this.protocolV2CallCounts.has(id);
+      if (!retainLink) {
+        await this.protocolV2Links.invalidateLink(id, 'Electron BLE transport released');
+      }
+      await this.releaseLogical(id, keepSession, retainLink);
     } catch (error) {
       this.Log?.error('[Electron BLE] release failed:', error);
       this.cleanupDeviceState(id);
@@ -497,12 +535,15 @@ export default class ElectronBleTransport {
     }
   }
 
-  // Logical release: link and subscription stay up for the next call. Renderer
-  // listeners are still torn down, or fresh ones would double-process packets.
-  private async releaseLogical(id: string, keepSession?: boolean) {
+  // Retained V2 links reuse their renderer listeners; legacy releases remove them.
+  private async releaseLogical(id: string, keepSession?: boolean, retainLink = false) {
     try {
       if (!this.connectedDevices.has(id)) return;
-      this.cleanupDeviceState(id);
+      if (retainLink) {
+        this.retainedDevices.add(id);
+      } else {
+        this.cleanupDeviceState(id);
+      }
 
       const release = window.desktopApi?.nobleBle?.release;
       if (!release) {
@@ -524,17 +565,13 @@ export default class ElectronBleTransport {
   }
 
   private createProtocolMismatchError(expected: ProtocolType) {
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+    });
   }
 
   private createProtocolDetectionError() {
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 GetFeatures or Protocol V2 Ping'
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed);
   }
 
   private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
@@ -676,10 +713,7 @@ export default class ElectronBleTransport {
         this.resetProtocolV2Frames(uuid);
       },
       // A declared V2 protocol needs no fallback; preserve the actual link failure.
-      shouldRethrow: error =>
-        expectedProtocol === 'V2' ||
-        isBleStaleBondHardwareError(error) ||
-        isProtocolV2LinkDisabledError(error),
+      shouldRethrow: error => expectedProtocol === 'V2' || isProtocolV2LinkDisabledError(error),
     });
     if (!detected) {
       this.clearProbeProtocol(uuid, 'V2');
@@ -1020,6 +1054,7 @@ export default class ElectronBleTransport {
 
     const callOptions = options;
 
+    this.protocolV2CallCounts.set(uuid, (this.protocolV2CallCounts.get(uuid) ?? 0) + 1);
     try {
       return await this.protocolV2Links.call(
         uuid,
@@ -1031,6 +1066,10 @@ export default class ElectronBleTransport {
     } catch (e) {
       this.Log?.error('[Electron BLE] Protocol V2 call error:', e);
       throw e;
+    } finally {
+      const remaining = (this.protocolV2CallCounts.get(uuid) ?? 1) - 1;
+      if (remaining > 0) this.protocolV2CallCounts.set(uuid, remaining);
+      else this.protocolV2CallCounts.delete(uuid);
     }
   }
 

@@ -211,6 +211,7 @@ export interface DeviceProgress {
     totalBytes?: number;
     rateBytesPerSecond?: number;
     elapsedMs?: number;
+    retryCount?: number;
   };
 }
 
@@ -218,6 +219,7 @@ export interface PreviousAddressResult {
   type: typeof UI_REQUEST.PREVIOUS_ADDRESS_RESULT;
   payload: {
     device: Device;
+    method: string;
     data: {
       address?: string;
       path?: string;

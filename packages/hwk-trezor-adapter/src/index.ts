@@ -1,4 +1,5 @@
 export { TrezorAdapter } from './adapter/TrezorAdapter';
+export type { TrezorAdapterOptions, TrezorKnownDeviceConnection } from './adapter/TrezorAdapter';
 // Pure verifier for backend/mock-backend attestation validation. It performs
 // no device I/O and never trusts the adapter's client-side `verified` verdict.
 export {

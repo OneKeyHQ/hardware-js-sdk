@@ -124,7 +124,7 @@ export async function setupBle() {
 const devices = await HardwareSDK.searchDevices();
 if (!devices.success) throw new Error(devices.payload.error);
 
-// BLE 返回 id + name；用 getDeviceState 读 identity
+// BLE 返回 id + name（Pro 2 / Neo 可能附带 bleColorCode）；用 getDeviceState 读 identity
 // Select explicitly in the application when more than one device is available.
 if (devices.payload.length !== 1) throw new Error('Select exactly one device before continuing');
 const candidate = devices.payload[0];

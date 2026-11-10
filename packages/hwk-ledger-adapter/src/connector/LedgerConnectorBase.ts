@@ -1,6 +1,7 @@
 import {
   EConnectorInteraction,
   HardwareErrorCode,
+  createHwkError,
   isKnownNonTargetHardwareVendor,
   serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
@@ -10,11 +11,14 @@ import { SignerManager } from '../signer/SignerManager';
 import {
   ERROR_TAG,
   isAppStuckByApdu,
+  isBleBondInvalidError,
+  isConnectionOpeningTag,
   isKnownConnectionTag,
   isTransportStuck,
   mapLedgerError,
 } from '../errors';
 import { debugLog } from '../utils/debugLog';
+import { summarizeForLog } from '../utils/logSummary';
 import { isLedgerBleConnectionType } from '../utils/ledgerDmkTransport';
 import {
   btcGetAddress,
@@ -33,6 +37,8 @@ import {
   tronGetAddress,
   tronSignMessage,
   tronSignTransaction,
+  zcashGetFullViewingKey,
+  zcashGetShieldedAddress,
 } from './chains';
 import { DeviceAppsManager } from '../device-apps/DeviceAppsManager';
 import { collapseSignerInteraction } from './chains/utils';
@@ -55,6 +61,7 @@ import type {
   ConnectorEventMap,
   ConnectorEventType,
   ConnectorSession,
+  ConnectorUiEvent,
   DeviceDescriptor,
   IConnector,
   TronSignMsgParams,
@@ -76,6 +83,8 @@ import type {
   TronGetAddressCallParams,
   TronSignMessageCallParams,
   TronSignTransactionCallParams,
+  ZcashGetFullViewingKeyCallParams,
+  ZcashGetShieldedAddressCallParams,
 } from './chains';
 
 // ---------------------------------------------------------------------------
@@ -111,7 +120,22 @@ const METHOD_PREFIX_TO_APP_NAME: Record<string, string> = {
   btc: 'Bitcoin',
   sol: 'Solana',
   tron: 'Tron',
+  zcash: 'Zcash',
 };
+
+/** Names the app a ConfirmOpenApp from this call asks the person to open. */
+function withOpenAppName<K extends ConnectorEventType>(
+  event: K,
+  data: ConnectorEventMap[K],
+  appName: string
+): ConnectorEventMap[K] {
+  if (event !== 'ui-event') return data;
+  const uiEvent = data as ConnectorUiEvent;
+  if (uiEvent.type !== EConnectorInteraction.ConfirmOpenApp || uiEvent.payload.appName) {
+    return data;
+  }
+  return { ...uiEvent, payload: { ...uiEvent.payload, appName } } as ConnectorEventMap[K];
+}
 
 const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
   Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
@@ -182,7 +206,7 @@ function assertAllowedLedgerRelayUrl(rawUrl: string): void {
  * Metro (React Native) can't resolve these; pass a custom importer that
  * uses CJS paths (e.g. `@ledgerhq/device-signer-kit-ethereum/lib/cjs/index.js`).
  */
-async function defaultLedgerKitImporter(pkg: string): Promise<any> {
+export async function defaultLedgerKitImporter(pkg: string): Promise<any> {
   switch (pkg) {
     case '@ledgerhq/device-management-kit':
       return import('@ledgerhq/device-management-kit');
@@ -192,6 +216,10 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
       return import('@ledgerhq/device-signer-kit-bitcoin');
     case '@ledgerhq/device-signer-kit-solana':
       return import('@ledgerhq/device-signer-kit-solana');
+    case '@ledgerhq/device-signer-kit-tron':
+      return import('@ledgerhq/device-signer-kit-tron');
+    case '@ledgerhq/device-signer-kit-zcash':
+      return import('@ledgerhq/device-signer-kit-zcash');
     case '@ledgerhq/context-module':
       return import('@ledgerhq/context-module');
     default:
@@ -330,6 +358,7 @@ export class LedgerConnectorBase implements IConnector {
       emit: <K extends ConnectorEventType>(event: K, data: ConnectorEventMap[K]) =>
         this._emit(event, data),
       invalidateSession: sid => this._invalidateSession(sid),
+      teardownSecureChannelSession: sid => this._teardownSecureChannelSession(sid),
       wrapError: (err, opts) => this._wrapError(err, opts),
       getOrCreateDmk: () => this._getOrCreateDmk(),
       getDeviceManager: () => this._getDeviceManager(),
@@ -581,18 +610,23 @@ export class LedgerConnectorBase implements IConnector {
       // doubles the timeout the user sees before the unlock dialog appears.
       this._resetSignersAndSessions();
 
-      // BLE GATT failures split into 3 tags:
-      //   BlePairingTimeout — our 30s timeout (pre-classified above)
-      //   BleGattBondingFailed — anything else (PeerRemoved / BleError /
-      //                          iOS SMP reject / unknown transport)
-      //   DeviceNotAdvertising — pre-GATT scan miss (only from connectDevice)
       if (isLedgerBleConnectionType(this.connectionType)) {
+        if (isBleBondInvalidError(err)) {
+          throw createHwkError({
+            code: HardwareErrorCode.BleBondInvalid,
+            message:
+              'Ledger Bluetooth pairing is no longer valid. Forget this device in system Bluetooth settings, then reconnect.',
+            _tag: ERROR_TAG.PeerRemovedPairing,
+          });
+        }
         const tag = (err as { _tag?: string } | null | undefined)?._tag;
 
         // If DMK already gave a recognized tag (locked / disconnected / pairing
         // / transport-class), pass through untouched so SDK classifiers can
         // route on the real cause. We only wrap completely untagged errors.
-        if (isKnownConnectionTag(tag)) {
+        // The opening tag names the step, not the cause; passing it through
+        // would misclassify a GATT failure as DeviceBusy.
+        if (isKnownConnectionTag(tag) && !isConnectionOpeningTag(tag)) {
           throw err;
         }
 
@@ -722,7 +756,7 @@ export class LedgerConnectorBase implements IConnector {
   // whitelist (`toPlainError`). The SW-side adapter rehydrates and re-throws
   // locally (see LedgerAdapter._unwrapConnectorResult).
   async call(sessionId: string, method: string, params: unknown): Promise<ConnectorCallResult> {
-    debugLog('[DMK] call:', method, JSON.stringify(params));
+    debugLog('[DMK] call:', method, JSON.stringify(summarizeForLog(params, { method })));
     try {
       const payload = await this._dispatch(sessionId, method, params);
       return { success: true, payload };
@@ -801,6 +835,11 @@ export class LedgerConnectorBase implements IConnector {
         return solSignTransaction(ctx, sessionId, params as SolSignTransactionCallParams);
       case 'solSignMessage':
         return solSignMessage(ctx, sessionId, params as SolSignMessageCallParams);
+      // ZCASH
+      case 'zcashGetFullViewingKey':
+        return zcashGetFullViewingKey(ctx, sessionId, params as ZcashGetFullViewingKeyCallParams);
+      case 'zcashGetShieldedAddress':
+        return zcashGetShieldedAddress(ctx, sessionId, params as ZcashGetShieldedAddressCallParams);
       // TRON
       case 'tronGetAddress':
         return tronGetAddress(ctx, sessionId, params as TronGetAddressCallParams);
@@ -841,7 +880,7 @@ export class LedgerConnectorBase implements IConnector {
             });
           });
         } catch (err) {
-          ctx.invalidateSession(sessionId);
+          ctx.teardownSecureChannelSession(sessionId);
           throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
@@ -946,7 +985,7 @@ export class LedgerConnectorBase implements IConnector {
 
           return { isGenuine: output.isGenuine, deviceId };
         } catch (err) {
-          ctx.invalidateSession(sessionId);
+          ctx.teardownSecureChannelSession(sessionId);
           throw ctx.wrapError(err);
         } finally {
           ctx.clearCanceller(sessionId);
@@ -1105,6 +1144,19 @@ export class LedgerConnectorBase implements IConnector {
     this._signerManager?.invalidate(sessionId);
   }
 
+  private _teardownSecureChannelSession(sessionId: string): void {
+    const cancel = this._cancellers.get(sessionId);
+    this._cancellers.delete(sessionId);
+    if (cancel) {
+      try {
+        cancel();
+      } catch {
+        // Action may already have settled: nothing left to cancel.
+      }
+    }
+    this._invalidateSession(sessionId);
+  }
+
   /**
    * Replace an old session with a new one after app switch.
    * Emits device-connect so the adapter updates its _sessions Map.
@@ -1203,16 +1255,17 @@ export class LedgerConnectorBase implements IConnector {
 
   /**
    * Return a per-call ctx with the chain's Ledger app name pre-bound to
-   * wrapError, so chain handlers don't need to repeat `{ defaultAppName: 'X' }`
-   * at every catch site. Falls through unchanged for unknown methods.
+   * UI prompts and wrapError, so chain handlers don't need to repeat the name.
+   * Falls through unchanged for unknown methods.
    */
   private _ctxForMethod(method: string): ConnectorContext {
-    const prefix = /^(evm|btc|sol|tron)/.exec(method)?.[1];
+    const prefix = /^(evm|btc|sol|tron|zcash)/.exec(method)?.[1];
     const defaultAppName = prefix ? METHOD_PREFIX_TO_APP_NAME[prefix] : undefined;
     if (!defaultAppName) return this._ctx;
     return {
       ...this._ctx,
       wrapError: (err, opts) => this._wrapError(err, { defaultAppName, ...opts }),
+      emit: (event, data) => this._ctx.emit(event, withOpenAppName(event, data, defaultAppName)),
     };
   }
 

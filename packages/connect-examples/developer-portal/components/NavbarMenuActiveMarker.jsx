@@ -8,6 +8,11 @@ export function NavbarMenuActiveMarker({ lang }) {
 
   // Calculate active sections based on pathname
   const activeSection = useMemo(() => {
+    if (['integration-guides', 'legacy', 'troubleshooting'].some(section =>
+      pathname === `/${lang}/${section}` || pathname.startsWith(`/${lang}/${section}/`)
+    )) {
+      return 'resources'
+    }
     if (
       pathname === `/${lang}/agent-wallet` ||
       pathname.startsWith(`/${lang}/agent-wallet/`)
@@ -39,6 +44,12 @@ export function NavbarMenuActiveMarker({ lang }) {
   // This avoids useEffect and DOM queries on every route change
   return (
     <style>{`
+      ${activeSection === 'resources' ? `
+        #onekey-navbar-integration-guides {
+          font-weight: 500;
+          color: var(--tw-prose-links, currentColor) !important;
+        }
+      ` : ''}
       ${activeSection === 'hardware-integration' ? `
         #onekey-navbar-hardware-sdk {
           font-weight: 500;

@@ -8,8 +8,9 @@ import {
   ScanMode,
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
-import transport, {
+import transportModule, {
   type OneKeyDeviceInfoBase,
+  type OneKeyMobileDeviceInfo,
   PROTOCOL_V1_MESSAGE_HEADER_SIZE,
   PROTOCOL_V2_BLE_FRAME_MAX_BYTES,
   PROTOCOL_V2_CHANNEL_BLE_UART,
@@ -28,6 +29,7 @@ import {
   HardwareErrorCode,
   createDeferred,
   isOnekeyBluetoothDevice,
+  parseOnekeyBleColorCode,
 } from '@onekeyfe/hd-shared';
 
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
@@ -47,25 +49,7 @@ import {
   getInfosForServiceUuid,
   isSameBleUuid,
 } from './constants';
-import {
-  isBleKeyMissingSupported,
-  startBleKeyMissingTracking,
-  stopBleKeyMissingTracking,
-  waitForBleKeyMissing,
-} from './bleKeyMissing';
-import {
-  markBleLinkEncrypted,
-  startBleEncryptionTracking,
-  stopBleEncryptionTracking,
-  waitForAndroidLinkEncryption,
-} from './bleEncryption';
-import { IosPeerTerminationTracker } from './bleIosStaleBond';
 import { isNativeBleDisconnectError, toBleDisconnectHardwareError } from './bleNativeDisconnect';
-import {
-  isBleStaleBondHardwareError,
-  isNativeBleStaleBondError,
-  toBleStaleBondHardwareError,
-} from './bleStaleBond';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
@@ -75,7 +59,6 @@ import type { Deferred } from '@onekeyfe/hd-shared';
 import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
-import type { AndroidLinkEncryption } from './bleEncryption';
 
 type FirmwareInstallBleAcquireInput = BleAcquireInput & {
   /**
@@ -86,6 +69,9 @@ type FirmwareInstallBleAcquireInput = BleAcquireInput & {
   skipProtocolProbe?: boolean;
 };
 
+const transport: typeof transportModule =
+  (transportModule as typeof transportModule & { default?: typeof transportModule }).default ??
+  transportModule;
 const { check, ProtocolV1, parseConfigure } = transport;
 
 const Log = bleLogger;
@@ -185,14 +171,18 @@ const isWedgedWriteError = (error: unknown): boolean =>
   (error as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleWriteCharacteristicError &&
   typeof (error as { message?: unknown })?.message === 'string' &&
   (error as { message: string }).message.startsWith(WEDGED_WRITE_MESSAGE);
+const createWedgedWriteError = () =>
+  ERRORS.TypedError(
+    HardwareErrorCode.BleWriteCharacteristicError,
+    `${WEDGED_WRITE_MESSAGE} ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
+  );
 const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   const code = (error as { errorCode?: unknown })?.errorCode;
   // Bonding and GATT failures are not evidence of a protocol mismatch. Preserve
   // them instead of probing another protocol on an unusable connection.
-  // Native PLX disconnects (errorCode 201 / iOS 7) must match before they are
-  // mapped: Protocol V2 writes rethrow them unchanged unless normalized first.
+  // Native PLX disconnects (errorCode 201 / iOS 7, or the unstructured
+  // "was disconnected" fallback) must match before Protocol V2 probing.
   return (
-    isBleStaleBondHardwareError(error) ||
     isNativeBleDisconnectError(error) ||
     code === HardwareErrorCode.BleDeviceNotBonded ||
     code === HardwareErrorCode.BleDeviceBondedCanceled ||
@@ -200,38 +190,6 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
     code === HardwareErrorCode.BleCharacteristicNotifyError ||
     code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
     code === HardwareErrorCode.BleWriteCharacteristicError
-  );
-};
-/**
- * Android reports a lost bond (ACTION_KEY_MISSING) while it encrypts a new link, so only
- * a failure this soon after the link started can be explained by it. Later disconnects,
- * such as a firmware-update reboot, must keep their own meaning.
- */
-export const ANDROID_KEY_MISSING_LINK_WINDOW_MS = 10_000;
-/** The broadcast and the GATT disconnect it explains travel separately; either can land first. */
-export const ANDROID_KEY_MISSING_GRACE_MS = 500;
-/**
- * Android reports a bonded link's first encryption result within about half a second of
- * connecting. Past this, the result is treated as unknown and the link is used as before.
- */
-export const ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS = 1500;
-/**
- * A system re-pairing needs the user to accept a pairing request and confirm the code on the
- * device. The Bluetooth stack gives up after 30s and then reports key missing.
- */
-export const ANDROID_SYSTEM_REPAIR_TIMEOUT_MS = 35_000;
-/**
- * How a link dropped by a device that refuses a stale bond reaches JS. A wedged write is
- * excluded: the system is still re-pairing then and has not reported key missing yet.
- */
-const isAndroidLinkLossError = (error: unknown): boolean => {
-  const code = (error as { errorCode?: unknown })?.errorCode;
-  return (
-    isNativeBleDisconnectError(error) ||
-    code === HardwareErrorCode.BleDeviceNotBonded ||
-    code === HardwareErrorCode.BleDeviceDisconnected ||
-    code === HardwareErrorCode.BleCharacteristicNotifyError ||
-    code === HardwareErrorCode.BleConnectedError
   );
 };
 /** Consecutive wedged writes on one device before the BLE manager itself is recreated. */
@@ -242,6 +200,16 @@ const ANDROID_NOTIFY_READY_DELAY_MS = 300;
 export type ProtocolV2BleTuning = {
   iosPacketLength?: number;
   androidPacketLength?: number;
+  /**
+   * Write each multi-packet high-throughput frame with one native call when the native
+   * BLE module supports it. Defaults to true; false keeps the per-packet JS write loop.
+   */
+  nativeFrameWrite?: boolean;
+  /**
+   * Android CONNECTION_PRIORITY_HIGH around Protocol V2 high-throughput calls. 'auto' (the
+   * default) requests it below Android 17 only; true or false forces it on every version.
+   */
+  androidHighConnectionPriority?: boolean | 'auto';
 };
 
 type ResolvedProtocolV2BleTuning = Required<ProtocolV2BleTuning>;
@@ -249,6 +217,8 @@ type ResolvedProtocolV2BleTuning = Required<ProtocolV2BleTuning>;
 const DEFAULT_PROTOCOL_V2_BLE_TUNING: ResolvedProtocolV2BleTuning = {
   iosPacketLength: IOS_PROTOCOL_V2_PACKET_LENGTH,
   androidPacketLength: ANDROID_PROTOCOL_V2_PACKET_LENGTH,
+  nativeFrameWrite: true,
+  androidHighConnectionPriority: 'auto',
 };
 
 let protocolV2BleTuning: ResolvedProtocolV2BleTuning = { ...DEFAULT_PROTOCOL_V2_BLE_TUNING };
@@ -269,6 +239,15 @@ export function configureProtocolV2BleTuning(tuning: ProtocolV2BleTuning = {}) {
       tuning.androidPacketLength,
       protocolV2BleTuning.androidPacketLength
     ),
+    nativeFrameWrite:
+      typeof tuning.nativeFrameWrite === 'boolean'
+        ? tuning.nativeFrameWrite
+        : protocolV2BleTuning.nativeFrameWrite,
+    androidHighConnectionPriority:
+      typeof tuning.androidHighConnectionPriority === 'boolean' ||
+      tuning.androidHighConnectionPriority === 'auto'
+        ? tuning.androidHighConnectionPriority
+        : protocolV2BleTuning.androidHighConnectionPriority,
   };
   Log?.debug('[ReactNativeBleTransport] BLE tuning configured', protocolV2BleTuning);
 }
@@ -282,13 +261,193 @@ export function getProtocolV2BleTuning() {
   return { ...protocolV2BleTuning };
 }
 
+/**
+ * Optional frame-write extension of the App's patched react-native-ble-plx. The SDK depends on
+ * the unpatched release, so the shape is declared here and probed at runtime.
+ */
+type ProtocolV2NativeFrameWriteExtension = {
+  isWriteCharacteristicWithoutResponseFrameSupported?: () => boolean;
+  writeCharacteristicWithoutResponseFrame?: (
+    characteristicIdentifier: number,
+    base64Frame: string,
+    packetSize: number,
+    transactionId: string
+  ) => Promise<void>;
+};
+
+type ProtocolV2NativeFrameWriter = BlePlxManager & Required<ProtocolV2NativeFrameWriteExtension>;
+
+type ActiveProtocolV2FrameWrite = {
+  generation: number;
+  cancel: (error: Error) => void;
+};
+
+/**
+ * A newer JS bundle can run on an older native binary that ships the JS wrapper without the
+ * native method, so support comes from the wrapper's native check, never from its presence.
+ */
+const getProtocolV2NativeFrameWriter = (
+  manager: BlePlxManager | undefined
+): ProtocolV2NativeFrameWriter | undefined => {
+  const candidate = manager as (BlePlxManager & ProtocolV2NativeFrameWriteExtension) | undefined;
+  if (!candidate || typeof candidate.writeCharacteristicWithoutResponseFrame !== 'function') {
+    return undefined;
+  }
+  try {
+    return candidate.isWriteCharacteristicWithoutResponseFrameSupported?.() === true
+      ? (candidate as ProtocolV2NativeFrameWriter)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const getNativeBleErrorReason = (error: unknown): string | undefined => {
+  const { reason, message } = (error ?? {}) as { reason?: unknown; message?: unknown };
+  if (typeof reason === 'string' && reason) return reason;
+  return typeof message === 'string' && message ? message : undefined;
+};
+
+type ProtocolV2FrameWriteMode = 'native-frame' | 'per-packet';
+
+const nowMs = () =>
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+
+const roundMs = (ms: number) => Math.round(ms * 10) / 10;
+
+/** Upper bounds of the per-packet write histogram buckets; the last bucket is open. */
+const FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS = [1, 2, 3, 5, 8];
+
+const createDurationStats = () => {
+  let total = 0;
+  let count = 0;
+  let max = 0;
+  return {
+    add(ms: number) {
+      total += ms;
+      count += 1;
+      max = Math.max(max, ms);
+    },
+    summarize: () => ({
+      total: roundMs(total),
+      avg: count ? roundMs(total / count) : 0,
+      max: roundMs(max),
+    }),
+  };
+};
+
+/** Scalar-only timing of one pipelined FilesystemFileWrite call. */
+const createProtocolV2FileWritePerf = () => {
+  const startedAt = nowMs();
+  let nativeFrames = 0;
+  let frames = 0;
+  let packets = 0;
+  let frameBytes = 0;
+  const write = createDurationStats();
+  const readWait = createDurationStats();
+  const packet = createDurationStats();
+  const packetHistogram = Array.from(
+    { length: FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS.length + 1 },
+    () => 0
+  );
+
+  return {
+    /** Called before each frame write so a frame that fails still reports its mode. */
+    startFrame(mode: ProtocolV2FrameWriteMode) {
+      if (mode === 'native-frame') nativeFrames += 1;
+    },
+    recordFrame(bytes: number, framePackets: number, elapsedMs: number) {
+      frames += 1;
+      packets += framePackets;
+      frameBytes += bytes;
+      write.add(elapsedMs);
+    },
+    recordPacket(elapsedMs: number) {
+      packet.add(elapsedMs);
+      const bucket = FILE_WRITE_PACKET_HISTOGRAM_BOUNDS_MS.findIndex(bound => elapsedMs < bound);
+      packetHistogram[bucket < 0 ? packetHistogram.length - 1 : bucket] += 1;
+    },
+    recordReadWait(elapsedMs: number) {
+      readWait.add(elapsedMs);
+    },
+    summarize(ok: boolean) {
+      const mode: ProtocolV2FrameWriteMode = nativeFrames > 0 ? 'native-frame' : 'per-packet';
+      const packetStats = packet.summarize();
+      return {
+        platform: Platform.OS,
+        mode,
+        ok,
+        frames,
+        packets,
+        frameBytes,
+        elapsedMs: roundMs(nowMs() - startedAt),
+        writeMs: write.summarize(),
+        readWaitMs: readWait.summarize(),
+        ...(mode === 'per-packet'
+          ? { packetMs: { avg: packetStats.avg, max: packetStats.max, hist: [...packetHistogram] } }
+          : {}),
+      };
+    },
+  };
+};
+
+type ProtocolV2FileWritePerf = ReturnType<typeof createProtocolV2FileWritePerf>;
+
 function getDeviceDisplayName(device?: Device | null) {
   return device?.name || device?.localName || null;
+}
+
+// The color is only in the primary advertisement, and the name only in the scan
+// response, so the callback a scan keeps may not carry it. A connected device stops
+// advertising. Keep the last valid color per device for the life of the process.
+// iOS reports connected peripherals with lowercased ids, so key case-insensitively.
+const bleColorCodesById = new Map<string, string>();
+
+function getManufacturerDataLength(device?: Device | null) {
+  return device?.manufacturerData ? Buffer.from(device.manufacturerData, 'base64').length : 0;
+}
+
+function rememberBleColorCode(device?: Device | null) {
+  if (!device?.id || !device.manufacturerData) return;
+  const colorCode = parseOnekeyBleColorCode(Buffer.from(device.manufacturerData, 'base64'));
+  const key = device.id.toLowerCase();
+  if (colorCode && bleColorCodesById.get(key) !== colorCode) {
+    bleColorCodesById.set(key, colorCode);
+    Log?.debug('[ReactNativeBleTransport] BLE color code', {
+      deviceId: device.id,
+      bleColorCode: colorCode,
+    });
+  }
+}
+
+function withBleColorCode(device: IOneKeyDevice): IOneKeyDevice {
+  const bleColorCode = bleColorCodesById.get(device.id.toLowerCase());
+  return bleColorCode ? ({ ...device, bleColorCode } as IOneKeyDevice) : device;
 }
 
 const IOS_REQUEST_MTU = 247;
 const ANDROID_REQUEST_MTU = 517;
 const ANDROID_HIGH_PRIORITY_IDLE_MS = 1000;
+/**
+ * Android 17 maps CONNECTION_PRIORITY_HIGH to 11.25-15 ms with peripheral latency 1. OneKey BLE
+ * firmware accepts any latency at its 15 ms interval, and latency 1 roughly halves Protocol V2
+ * FileWrite throughput. BLE 1.0.23 requests 15 ms with latency 0 by itself; older BLE firmware
+ * asks for 15-30 ms or nothing and has not been measured on Android 17 without HIGH.
+ */
+const ANDROID_HIGH_PRIORITY_PERIPHERAL_LATENCY_API_LEVEL = 37;
+
+const shouldRequestAndroidHighConnectionPriority = () => {
+  if (Platform.OS !== 'android') return false;
+  const { androidHighConnectionPriority } = protocolV2BleTuning;
+  if (typeof androidHighConnectionPriority === 'boolean') return androidHighConnectionPriority;
+  const apiLevel = Number(Platform.Version);
+  // Unknown versions keep the long-standing HIGH request.
+  return (
+    !Number.isFinite(apiLevel) || apiLevel < ANDROID_HIGH_PRIORITY_PERIPHERAL_LATENCY_API_LEVEL
+  );
+};
 
 const getRequestedBleMtu = () =>
   Platform.OS === 'android' ? ANDROID_REQUEST_MTU : IOS_REQUEST_MTU;
@@ -408,7 +567,9 @@ const isMtuOrCancelledConnectError = (error: unknown): boolean => {
 
 type NegotiatedMtuResult = { device: Device; timedOut: boolean };
 
-export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
+export type IOneKeyDevice = OneKeyDeviceInfoBase &
+  Device &
+  Pick<OneKeyMobileDeviceInfo, 'bleColorCode'>;
 
 const tryToGetConfiguration = (device: Device) => {
   if (!device || !device.serviceUUIDs) return null;
@@ -494,23 +655,11 @@ const resolveNegotiatedMtu = (
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
 function remapError(error: IOBleErrorRemap) {
-  if (error instanceof BleError) {
-    if (isNativeBleStaleBondError(error)) {
-      throw toBleStaleBondHardwareError(error);
-    }
-
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore It's not documented but seems to match a refusal on Android pairing
-    if (error?.attErrorCode === 22) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
-    }
+  if (isNativeBleDisconnectError(error)) {
+    throw toBleDisconnectHardwareError(error);
   }
 
-  if (
-    error instanceof Error &&
-    error.message &&
-    (error.message.includes('was disconnected') || error.message.includes('not found'))
-  ) {
+  if (error instanceof Error && error.message?.includes('not found')) {
     throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
   }
 
@@ -579,22 +728,6 @@ export default class ReactNativeBleTransport {
   /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
   private androidGattCacheRefreshes = new Set<string>();
 
-  /**
-   * Native encryption/pairing failures seen before Protocol V2 probe starts.
-   * Pro2/Neo GATT connect can succeed on a stale iOS bond; the CCCD write then
-   * fails with ATT 5/15. Remember it so detectProtocol fails immediately.
-   */
-  private staleBondErrors: Map<string, Error> = new Map();
-
-  /** When the current Android link attempt began; bounds which key-missing signals apply. */
-  private androidLinkStartedAt: Map<string, number> = new Map();
-
-  /** iOS acquire attempts whose new link the peer ended; two in a row mean a stale bond. */
-  private iosPeerTermination = new IosPeerTerminationTracker();
-
-  /** Strict or previously confirmed V2 target while acquire installs notifications. */
-  private acquiringProtocolV2 = new Set<string>();
-
   private protocolV2Assemblers: Map<string, ProtocolV2FrameAssembler> = new Map();
 
   private protocolV2FrameQueues: Map<string, Uint8Array[]> = new Map();
@@ -640,6 +773,13 @@ export default class ReactNativeBleTransport {
 
   private androidPriorityResetTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
+  /** In-flight native frame write per device; Protocol V2 writes are serialized per device. */
+  private protocolV2FrameWrites: Map<string, ActiveProtocolV2FrameWrite> = new Map();
+
+  private protocolV2FrameWriteCounter = 0;
+
+  private protocolV2FileWritePerfs: Map<string, ProtocolV2FileWritePerf> = new Map();
+
   private nextMonitorToken = 1;
 
   /** Serializes transport lifecycle changes for the same physical device. */
@@ -656,11 +796,6 @@ export default class ReactNativeBleTransport {
   init(logger: any, emitter: EventEmitter) {
     setBleLogger(logger);
     this.emitter = emitter;
-    if (Platform.OS === 'android') {
-      // Link security events are only meaningful if they were observed since the link came up.
-      startBleKeyMissingTracking();
-      startBleEncryptionTracking();
-    }
   }
 
   configure(signedData: any) {
@@ -908,7 +1043,6 @@ export default class ReactNativeBleTransport {
     const scanStartedAt = Date.now();
     let firstDeviceMs: number | undefined;
     const blePlxManager = await this.getPlxManager();
-    await subscribeBleOn(blePlxManager);
     if (Platform.OS === 'android' && Platform.Version >= 31) {
       Log?.debug('requesting permissions, please wait...');
 
@@ -922,9 +1056,10 @@ export default class ReactNativeBleTransport {
         resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] !== 'granted' ||
         resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] !== 'granted'
       ) {
-        throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        throw ERRORS.TypedError(HardwareErrorCode.BleLocationError);
       }
     }
+    await subscribeBleOn(blePlxManager);
 
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     return new Promise<IOneKeyDevice[]>((resolve, reject) => {
@@ -940,7 +1075,7 @@ export default class ReactNativeBleTransport {
         }).then(() => {
           this.scanCleanups.delete(cancelScan);
           if (error) reject(error);
-          else resolve(deviceList);
+          else resolve(deviceList.map(withBleColorCode));
         });
         return scanCleanup;
       };
@@ -967,12 +1102,10 @@ export default class ReactNativeBleTransport {
         (error, device) => {
           if (error) {
             Log?.debug('ble scan error: ', error);
-            if (
-              [BleErrorCode.BluetoothPoweredOff, BleErrorCode.BluetoothInUnknownState].includes(
-                error.errorCode
-              )
-            ) {
-              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+            if (error.errorCode === BleErrorCode.BluetoothPoweredOff) {
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
+            } else if (error.errorCode === BleErrorCode.BluetoothUnsupported) {
+              finishScan(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
               finishScan(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
             } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
@@ -987,6 +1120,9 @@ export default class ReactNativeBleTransport {
             return;
           }
 
+          // The native scan is filtered to the OneKey communication service, so an
+          // unnamed iOS advertisement rejected below can still carry the color.
+          rememberBleColorCode(device);
           const displayName = getDeviceDisplayName(device);
           // iOS may report a service-only advertisement before the named scan response.
           // Do not cache that incomplete advertisement as an unknown device.
@@ -1052,6 +1188,9 @@ export default class ReactNativeBleTransport {
             deviceId: device.id,
             name: displayName,
             serviceUUIDs: device.serviceUUIDs,
+            // 5 = advertises a color slot; 4 = BLE firmware before 1.0.23.
+            manufacturerDataLength: getManufacturerDataLength(device),
+            bleColorCode: bleColorCodesById.get(device.id.toLowerCase()),
           });
         }
       };
@@ -1097,6 +1236,7 @@ export default class ReactNativeBleTransport {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
     Log?.debug('[ReactNativeBleTransport] BLE MTU ready', {
+      connectionId: monitorToken,
       platform: Platform.OS,
       requested: getRequestedBleMtu(),
       actual: transport.mtuSize,
@@ -1112,23 +1252,12 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    return this.runLifecycleOperation(uuid, async () => {
-      try {
-        return await this.acquireUnlocked(input);
-      } catch (error) {
-        throw this.resolveIosBondInvalid(input, await this.resolveAndroidBondInvalid(uuid, error));
-      }
-    });
+    return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
   }
 
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
-    this.iosPeerTermination.attemptStarted(uuid);
-    const shouldMapProtocolV2StaleBond = expectedProtocol
-      ? expectedProtocol === 'V2'
-      : this.confirmedProtocolV2.has(uuid);
-
     const cachedTransport = transportCache[uuid];
     if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
       Log?.debug(
@@ -1199,8 +1328,6 @@ export default class ReactNativeBleTransport {
 
     let device: Device | null = null;
     const isAndroid = Platform.OS === 'android';
-    // Only a bond that existed before this acquire can have been lost by the device.
-    let androidBondedBeforeConnect = false;
     // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
     const refreshAndroidGattCache =
       isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
@@ -1232,15 +1359,9 @@ export default class ReactNativeBleTransport {
 
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     if (Platform.OS === 'android') {
-      // Subscribe before the link exists: key missing is broadcast while Android encrypts it.
-      startBleKeyMissingTracking();
-      startBleEncryptionTracking();
-      // Failures before the new link starts must not be read against the previous link.
-      this.androidLinkStartedAt.delete(uuid);
       // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
       try {
         const bondState = await pairDevice(uuid);
-        androidBondedBeforeConnect = !bondState.bonding && bondState.bonded;
         if (bondState.bonding) {
           await onDeviceBondState(uuid, this.bondAbortController.signal, {
             systemInitiated: bondState.initiated === false,
@@ -1256,7 +1377,6 @@ export default class ReactNativeBleTransport {
         });
         throw error;
       }
-      this.androidLinkStartedAt.set(uuid, Date.now());
     }
     if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
@@ -1440,17 +1560,7 @@ export default class ReactNativeBleTransport {
       this.deviceProtocolHints.set(uuid, protocolHint);
     }
 
-    if (shouldMapProtocolV2StaleBond) {
-      this.acquiringProtocolV2.add(uuid);
-    }
-
-    let linkEncryption: AndroidLinkEncryption | undefined;
     try {
-      // A firmware-install reconnect keeps its existing sequence.
-      if (androidBondedBeforeConnect && !skipProtocolProbe) {
-        linkEncryption = await this.waitForAndroidLinkSecurity(uuid);
-        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-      }
       await this.installTransportForAcquire(uuid, acquiredDevice, {
         writeCharacteristic,
         notifyCharacteristic,
@@ -1497,25 +1607,17 @@ export default class ReactNativeBleTransport {
         }
       );
       if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-      this.iosPeerTermination.linkProven(uuid);
       const currentTransport = transportCache[uuid];
       if (!currentTransport) {
         throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
       }
       this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
-      if (linkEncryption === 'unresolved') {
-        // Notifications and the probe only work on an encrypted link, so the next reuse of this
-        // link needs no result that was reported before tracking started.
-        markBleLinkEncrypted(uuid);
-      }
       return { uuid, protocolType };
     } catch (error) {
       // A failed acquire must retire the physical link before Core retries. Logical
       // release leaves GATT connected even when neither protocol receives a response.
       await this.disconnectUnlocked(uuid);
       throw error;
-    } finally {
-      this.acquiringProtocolV2.delete(uuid);
     }
   }
 
@@ -1530,7 +1632,6 @@ export default class ReactNativeBleTransport {
     const subscription = characteristic.monitor((error, c) => {
       const isCurrentMonitor = this.monitorTokens.get(uuid) === monitorToken;
       if (error) {
-        if (isCurrentMonitor) this.noteIosLinkError(uuid, 'notify', error);
         Log?.debug(
           `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
             error as unknown as string
@@ -1542,13 +1643,6 @@ export default class ReactNativeBleTransport {
         }
         if (!isCurrentMonitor) {
           Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
-          return;
-        }
-        if (
-          (this.getActiveProtocol(uuid) === 'V2' || this.acquiringProtocolV2.has(uuid)) &&
-          isNativeBleStaleBondError(error)
-        ) {
-          this.rememberStaleBondError(uuid, toBleStaleBondHardwareError(error));
           return;
         }
         if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
@@ -1656,16 +1750,34 @@ export default class ReactNativeBleTransport {
     return subscription;
   }
 
-  async release(uuid: string, onclose = false) {
-    return this.runLifecycleOperation(uuid, () => this.releaseUnlocked(uuid, onclose));
+  async release(uuid: string, onclose = false, keepSession = false) {
+    return this.runLifecycleOperation(uuid, () => this.releaseUnlocked(uuid, onclose, keepSession));
   }
 
-  private async releaseUnlocked(uuid: string, onclose = false) {
-    await this.protocolV2Links.invalidateLink(uuid, 'React Native BLE transport released');
+  private async releaseUnlocked(uuid: string, onclose = false, keepSession = false) {
+    const transport = transportCache[uuid];
+    if (
+      keepSession &&
+      !onclose &&
+      transport &&
+      this.deviceProtocol.get(uuid) === 'V2' &&
+      !this.protocolV2FrameWrites.has(uuid) &&
+      !this.protocolV2FramePromises.has(uuid)
+    ) {
+      // Keep the monitor generation and V2 session together when reusing the link.
+      await this.runNativeTeardown(uuid, this.blePlxManager, () =>
+        this.restoreAndroidConnectionPriority(uuid, transport)
+      );
+      return true;
+    }
+    const reason = 'React Native BLE transport released';
+    this.cancelProtocolV2FrameWrite(uuid, new Error(reason));
+    await this.protocolV2Links.invalidateLink(uuid, reason);
     return this.releaseNative(uuid, onclose);
   }
 
   private async releaseNative(uuid: string, onclose = false) {
+    this.cancelProtocolV2FrameWrite(uuid, new Error('React Native BLE transport released'));
     const transport = transportCache[uuid];
     const manager = this.blePlxManager;
     if (this.runPromise && this.runPromiseDeviceId === uuid) {
@@ -1710,8 +1822,6 @@ export default class ReactNativeBleTransport {
 
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    this.staleBondErrors.delete(uuid);
-    this.acquiringProtocolV2.delete(uuid);
     // Confirmed protocol and caller hints stay in deviceProtocol / protocolHint.
     this.protocolV2Assemblers.get(uuid)?.reset();
     this.protocolV2Assemblers.delete(uuid);
@@ -1782,122 +1892,9 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
-    try {
-      return protocol === 'V2'
-        ? await this.callProtocolV2(uuid, name, data, options)
-        : await this.callProtocolV1(uuid, name, data, options);
-    } catch (error) {
-      // An expected-V1 acquire skips the probe, so the first call is what meets the dropped link.
-      throw await this.resolveAndroidBondInvalid(uuid, error);
-    }
-  }
-
-  /**
-   * Android 16+ keeps a bond the device no longer holds keys for. The device drops the link
-   * and the only structured evidence is ACTION_KEY_MISSING, so a link loss right after
-   * connect is re-read as an invalid bond when that signal belongs to the same attempt.
-   */
-  private async resolveAndroidBondInvalid(uuid: string, error: unknown): Promise<unknown> {
-    if (Platform.OS !== 'android' || !isBleKeyMissingSupported()) return error;
-    if (isBleStaleBondHardwareError(error) || !isAndroidLinkLossError(error)) return error;
-    const linkStartedAt = this.androidLinkStartedAt.get(uuid);
-    if (
-      linkStartedAt === undefined ||
-      Date.now() - linkStartedAt > ANDROID_KEY_MISSING_LINK_WINDOW_MS
-    ) {
-      return error;
-    }
-    if (!(await waitForBleKeyMissing(uuid, linkStartedAt, ANDROID_KEY_MISSING_GRACE_MS))) {
-      return error;
-    }
-    Log?.debug('[ReactNativeBleTransport] Android key missing, bond is invalid:', uuid);
-    return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
-      phase: 'connect',
-      reason: 'key_missing',
-    });
-  }
-
-  /**
-   * iOS says why a link ended only on the operation it interrupted, so the native codes are read
-   * and logged here. Codes only: the reason text is localized and cannot be matched or searched.
-   */
-  private noteIosLinkError(uuid: string, stage: 'gatt-setup' | 'notify' | 'write', error: unknown) {
-    if (Platform.OS !== 'ios') return;
-    this.iosPeerTermination.note(uuid, error);
-    // Writes and notifications also fail for reasons that say nothing about the link.
-    if (stage !== 'gatt-setup' && !isNativeBleDisconnectError(error)) return;
-    const native = (error ?? {}) as {
-      errorCode?: unknown;
-      iosErrorCode?: unknown;
-      attErrorCode?: unknown;
-    };
-    const code = (value: unknown) =>
-      typeof value === 'number' || typeof value === 'string' ? value : undefined;
-    Log?.debug('[ReactNativeBleTransport] iOS operation failed', {
-      connectIdSuffix: uuid.slice(-8),
-      stage,
-      errorCode: code(native.errorCode),
-      iosErrorCode: code(native.iosErrorCode),
-      attErrorCode: code(native.attErrorCode),
-    });
-  }
-
-  /**
-   * iPhones that do not report a lost bond only show the device ending each new link. One such
-   * attempt keeps its error so Core retries; the second in a row is the stale bond.
-   */
-  private resolveIosBondInvalid(input: FirmwareInstallBleAcquireInput, error: unknown): unknown {
-    if (Platform.OS !== 'ios') return error;
-    const { uuid, skipProtocolProbe } = input;
-    // A firmware-install reconnect expects the device to come and go.
-    if (skipProtocolProbe || isBleStaleBondHardwareError(error)) {
-      this.iosPeerTermination.forget(uuid);
-      return error;
-    }
-    if (!this.iosPeerTermination.attemptFailed(uuid)) return error;
-    Log?.debug(
-      '[ReactNativeBleTransport] iOS peer ended two new links in a row, bond is invalid:',
-      {
-        connectIdSuffix: uuid.slice(-8),
-      }
-    );
-    return ERRORS.TypedError(HardwareErrorCode.BleBondInvalid, undefined, {
-      phase: 'connect',
-      reason: 'peer_disconnected',
-    });
-  }
-
-  /**
-   * Android 16+ encrypts a bonded link on its own right after connecting. Subscribing to
-   * notifications before that finishes gets the CCCD write rejected, and the framework's retry
-   * encrypts again with the same stale key; firmware that allows one failure per link then drops
-   * it before the system can re-pair. Holding GATT until the result lets a lost bond be re-paired
-   * in place. Without the platform signal this resolves immediately.
-   */
-  private async waitForAndroidLinkSecurity(uuid: string): Promise<AndroidLinkEncryption> {
-    const linkStartedAt = this.androidLinkStartedAt.get(uuid);
-    if (linkStartedAt === undefined) return 'unresolved';
-    const waitStartedAt = Date.now();
-    const result = await waitForAndroidLinkEncryption({
-      deviceId: uuid,
-      linkStartedAt,
-      resultTimeoutMs: ANDROID_ENCRYPTION_RESULT_TIMEOUT_MS,
-      repairTimeoutMs: ANDROID_SYSTEM_REPAIR_TIMEOUT_MS,
-      keyMissingGraceMs: ANDROID_KEY_MISSING_GRACE_MS,
-      signal: this.bondAbortController.signal,
-      onRepairStarted: () => {
-        Log?.debug(
-          '[ReactNativeBleTransport] Android bond lost, waiting for system re-pairing:',
-          uuid
-        );
-      },
-    });
-    Log?.debug('[ReactNativeBleTransport] Android link encryption', {
-      connectIdSuffix: uuid.slice(-8),
-      result,
-      waitedMs: Date.now() - waitStartedAt,
-    });
-    return result;
+    return protocol === 'V2'
+      ? this.callProtocolV2(uuid, name, data, options)
+      : this.callProtocolV1(uuid, name, data, options);
   }
 
   private async callProtocolV1(
@@ -2165,10 +2162,6 @@ export default class ReactNativeBleTransport {
     this.androidPriorityResetTimers.forEach(timeout => clearTimeout(timeout));
     this.androidPriorityResetTimers.clear();
     this.androidHighPriorityDevices.clear();
-    this.androidLinkStartedAt.clear();
-    this.iosPeerTermination.reset();
-    stopBleKeyMissingTracking();
-    stopBleEncryptionTracking();
     const error = ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     this.runPromise?.reject(error);
     this.runPromise = null;
@@ -2205,7 +2198,13 @@ export default class ReactNativeBleTransport {
   }
 
   private async disconnectUnlocked(session: string) {
-    await this.protocolV2Links.invalidateLink(session, 'React Native BLE transport disconnected');
+    // The next link starts at the stack's default priority; a cached HIGH or a pending
+    // Balanced restore from this link must not carry over to it.
+    this.clearAndroidPriorityResetTimer(session);
+    this.androidHighPriorityDevices.delete(session);
+    const reason = 'React Native BLE transport disconnected';
+    this.cancelProtocolV2FrameWrite(session, new Error(reason));
+    await this.protocolV2Links.invalidateLink(session, reason);
     const transport = transportCache[session];
     const manager = this.blePlxManager;
     const monitorToken = transport?.monitorToken ?? this.monitorTokens.get(session);
@@ -2242,7 +2241,6 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(session);
     this.probingProtocols.delete(session);
-    this.staleBondErrors.delete(session);
     this.deviceProtocolHints.delete(session);
     this.sessionProtocols.delete(session);
     this.protocolReprobeFailures.delete(session);
@@ -2484,7 +2482,6 @@ export default class ReactNativeBleTransport {
         }),
       ]);
       succeeded = true;
-      this.iosPeerTermination.linkStarted(uuid);
       return result;
     } catch (error) {
       if (timedOut || isNativeOperationTimeoutError(error)) {
@@ -2538,11 +2535,6 @@ export default class ReactNativeBleTransport {
       succeeded = true;
       return result;
     } catch (error) {
-      this.noteIosLinkError(uuid, 'gatt-setup', error);
-      if (Platform.OS === 'ios' && isNativeBleStaleBondError(error)) {
-        // iOS can report the lost bond on the first request instead of on the connect.
-        throw toBleStaleBondHardwareError(error);
-      }
       if (timedOut || isNativeOperationTimeoutError(error)) {
         const resetManager = this.abandonStalledConnection(
           uuid,
@@ -2551,6 +2543,9 @@ export default class ReactNativeBleTransport {
         if (resetManager) {
           throw this.createWedgedBleSetupError();
         }
+      }
+      if (isNativeBleDisconnectError(error)) {
+        throw toBleDisconnectHardwareError(error);
       }
       if (Platform.OS === 'android' && isMissingGattShapeError(error)) {
         this.androidGattCacheRefreshes.add(uuid);
@@ -2599,8 +2594,6 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    this.staleBondErrors.delete(uuid);
-    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2649,18 +2642,12 @@ export default class ReactNativeBleTransport {
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             timedOut = true;
-            reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.BleWriteCharacteristicError,
-                `BLE write timeout after ${BLE_WRITE_PACKET_TIMEOUT_MS}ms`
-              )
-            );
+            reject(createWedgedWriteError());
           }, BLE_WRITE_PACKET_TIMEOUT_MS);
         }),
       ]);
       this.writeTimeoutCounts.delete(uuid);
     } catch (error) {
-      this.noteIosLinkError(uuid, 'write', error);
       if (timedOut) {
         // A superseded call's late write must not tear down the link the current
         // call is using; only the owner of the transport may declare it dead.
@@ -2689,6 +2676,7 @@ export default class ReactNativeBleTransport {
       consecutiveWriteTimeouts: timeouts,
     });
 
+    this.cancelProtocolV2FrameWrite(uuid, createWedgedWriteError());
     const wedged = transportCache[uuid];
     this.disconnect(uuid).catch(error => {
       Log?.debug('[ReactNativeBleTransport] wedged link teardown failed (ignored):', error);
@@ -2698,8 +2686,6 @@ export default class ReactNativeBleTransport {
     }
     this.deviceProtocol.delete(uuid);
     this.probingProtocols.delete(uuid);
-    this.staleBondErrors.delete(uuid);
-    this.acquiringProtocolV2.delete(uuid);
     this.protocolV2Assemblers.delete(uuid);
     this.resetProtocolV2Frames(uuid);
 
@@ -2718,6 +2704,8 @@ export default class ReactNativeBleTransport {
     const manager = this.blePlxManager;
     this.blePlxManager = undefined;
     const reason = 'React Native BLE manager reset';
+    // Cancel through the manager that started each frame before destroy() drops its queue.
+    this.protocolV2FrameWrites.forEach(active => active.cancel(new Error(reason)));
     // Destroying the shared manager invalidates every peripheral it owns. Notify
     // each cached session before clearing generations so Core cannot retain a
     // silently stale connection for an unrelated device.
@@ -2751,8 +2739,6 @@ export default class ReactNativeBleTransport {
     });
     this.deviceProtocol.clear();
     this.probingProtocols.clear();
-    this.staleBondErrors.clear();
-    this.acquiringProtocolV2.clear();
     this.sessionProtocols.clear();
     // Keep transport-lifetime V2 proof so the same endpoint can finish a no-probe
     // firmware reconnect after the native BLE manager is recreated.
@@ -2782,17 +2768,13 @@ export default class ReactNativeBleTransport {
   private createProtocolMismatchError(expected: ProtocolType) {
     // A protocol probe miss alone does not prove that the OS bond is stale.
     // Native authentication/encryption failures are mapped separately.
-    return ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      `Device protocol mismatch: expected ${expected}, but device did not respond to expected protocol`
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed, undefined, {
+      expectedProtocol: expected,
+    });
   }
 
   private createProtocolDetectionError() {
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleTimeoutError,
-      'Unable to detect BLE protocol: device did not respond to Protocol V1 GetFeatures or Protocol V2 Ping'
-    );
+    return ERRORS.TypedError(HardwareErrorCode.TransportProtocolProbeFailed);
   }
 
   private clearProbeProtocol(uuid: string, protocol: ProtocolType) {
@@ -2833,10 +2815,6 @@ export default class ReactNativeBleTransport {
         source: 'expected',
       });
       return 'V1';
-    }
-
-    if (expectedProtocol === 'V2' || this.acquiringProtocolV2.has(uuid)) {
-      this.throwIfStaleBondError(uuid);
     }
 
     if (expectedProtocol === 'V2') {
@@ -3027,7 +3005,6 @@ export default class ReactNativeBleTransport {
 
     this.probingProtocols.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
-    this.throwIfStaleBondError(uuid);
     const detected = await probeProtocolV2Helper({
       call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
         this.callProtocolV2(uuid, name, data, options),
@@ -3107,21 +3084,6 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  private rememberStaleBondError(uuid: string, error: Error) {
-    this.staleBondErrors.set(uuid, error);
-    this.rejectProtocolV2Frames(uuid, error);
-    if (this.runPromise && this.runPromiseDeviceId === uuid) {
-      this.runPromise.reject(error);
-    }
-  }
-
-  private throwIfStaleBondError(uuid: string) {
-    const error = this.staleBondErrors.get(uuid);
-    if (error) {
-      throw error;
-    }
-  }
-
   private async readProtocolV2Frame(uuid: string) {
     const queuedFrame = this.getProtocolV2FrameQueue(uuid).shift();
     if (queuedFrame) {
@@ -3180,11 +3142,6 @@ export default class ReactNativeBleTransport {
         assertCurrentGeneration();
         return;
       } catch (error) {
-        if (isNativeBleStaleBondError(error) || isBleStaleBondHardwareError(error)) {
-          const bondError = toBleStaleBondHardwareError(error);
-          this.rememberStaleBondError(uuid, bondError);
-          throw bondError;
-        }
         if (isNativeBleDisconnectError(error)) {
           throw toBleDisconnectHardwareError(error);
         }
@@ -3220,22 +3177,204 @@ export default class ReactNativeBleTransport {
       androidPacketLength: tuning.androidPacketLength,
       mtu: transport.mtuSize,
     });
-    await writeProtocolV2BleFrame({
-      frame,
-      packetCapacity,
-      assertActive: assertCurrentGeneration,
-      signal: context.signal,
-      abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
-      wait: delay,
-      writePacket: packet =>
-        this.writeProtocolV2Packet(
-          uuid,
-          transport,
-          Buffer.from(packet).toString('base64'),
-          context,
-          assertCurrentGeneration
-        ),
+    const perf = this.getProtocolV2FileWritePerf(uuid, context);
+    const startedAt = perf ? nowMs() : 0;
+    const nativeFrameWriter =
+      frame.length > packetCapacity
+        ? this.resolveProtocolV2NativeFrameWriter(transport, context, tuning.nativeFrameWrite)
+        : undefined;
+    perf?.startFrame(nativeFrameWriter ? 'native-frame' : 'per-packet');
+    if (nativeFrameWriter) {
+      await this.writeProtocolV2NativeFrame(
+        uuid,
+        transport,
+        nativeFrameWriter,
+        frame,
+        packetCapacity,
+        context,
+        assertCurrentGeneration
+      );
+    } else {
+      await writeProtocolV2BleFrame({
+        frame,
+        packetCapacity,
+        assertActive: assertCurrentGeneration,
+        signal: context.signal,
+        abortMessage: `Protocol V2 BLE write aborted for ${context.messageName}`,
+        wait: delay,
+        writePacket: async packet => {
+          const packetStartedAt = perf ? nowMs() : 0;
+          await this.writeProtocolV2Packet(
+            uuid,
+            transport,
+            Buffer.from(packet).toString('base64'),
+            context,
+            assertCurrentGeneration
+          );
+          perf?.recordPacket(nowMs() - packetStartedAt);
+        },
+      });
+    }
+    perf?.recordFrame(frame.length, Math.ceil(frame.length / packetCapacity), nowMs() - startedAt);
+  }
+
+  /**
+   * The native frame write only replaces the per-packet loop where its JS<->native round trips
+   * dominate: multi-packet (checked by the caller) high-throughput frames written without response.
+   */
+  private resolveProtocolV2NativeFrameWriter(
+    transport: BleTransport,
+    context: Pick<ProtocolV2CallContext, 'highThroughput' | 'writeWithResponse'>,
+    nativeFrameWrite: boolean
+  ): ProtocolV2NativeFrameWriter | undefined {
+    if (!context.highThroughput || !nativeFrameWrite) return undefined;
+    if (
+      shouldWriteProtocolV2WithResponse({
+        platform: Platform.OS,
+        highThroughput: context.highThroughput,
+        requestedWithResponse: context.writeWithResponse,
+        characteristic: transport.writeCharacteristic,
+      })
+    ) {
+      return undefined;
+    }
+    if (typeof transport.writeCharacteristic.id !== 'number') return undefined;
+    return getProtocolV2NativeFrameWriter(this.blePlxManager);
+  }
+
+  /**
+   * Writes one frame with a single native call that sends its packets in order without response.
+   * Nothing here retries it: a resend could duplicate bytes the device already received. The
+   * native transaction is cancelled on abort, watchdog expiry and link teardown so the native
+   * side stops writing a frame nobody waits for any more; a generation change detected after
+   * the frame completes still fails the write.
+   */
+  private async writeProtocolV2NativeFrame(
+    uuid: string,
+    transport: BleTransport,
+    manager: ProtocolV2NativeFrameWriter,
+    frame: Uint8Array,
+    packetCapacity: number,
+    context: ProtocolV2CallContext,
+    assertCurrentGeneration: () => void
+  ) {
+    const abortMessage = `Protocol V2 BLE write aborted for ${context.messageName}`;
+    assertCurrentGeneration();
+    if (context.signal.aborted) {
+      throw new Error(abortMessage);
+    }
+
+    this.protocolV2FrameWriteCounter += 1;
+    const transactionId = `${uuid}:v2frame:${context.generation}:${this.protocolV2FrameWriteCounter}`;
+    let cancelError: Error | undefined;
+    let rejectCancelled: (error: Error) => void = () => undefined;
+    const cancelled = new Promise<never>((_, reject) => {
+      rejectCancelled = reject;
     });
+    const active: ActiveProtocolV2FrameWrite = {
+      generation: context.generation,
+      cancel: error => {
+        if (cancelError) return;
+        cancelError = error;
+        if (this.protocolV2FrameWrites.get(uuid) === active) {
+          this.protocolV2FrameWrites.delete(uuid);
+        }
+        rejectCancelled(error);
+        this.cancelNativeTransaction(manager, transactionId);
+      },
+    };
+    // Same rule as writeBlePacket: a superseded generation must not tear down the current link.
+    const isCurrentOwner = () => {
+      try {
+        assertCurrentGeneration();
+        return !context.signal.aborted;
+      } catch {
+        return false;
+      }
+    };
+    const onAbort = () => active.cancel(new Error(abortMessage));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const nativeWrite = Promise.resolve(
+        manager.writeCharacteristicWithoutResponseFrame(
+          transport.writeCharacteristic.id,
+          Buffer.from(frame).toString('base64'),
+          packetCapacity,
+          transactionId
+        )
+      );
+      // A cancelled or timed-out frame still settles natively later; that outcome is ignored.
+      nativeWrite.catch(() => undefined);
+      this.protocolV2FrameWrites.set(uuid, active);
+      context.signal.addEventListener('abort', onAbort);
+      timer = setTimeout(() => {
+        const owner = isCurrentOwner();
+        active.cancel(createWedgedWriteError());
+        if (owner) {
+          this.tearDownWedgedLink(uuid);
+        } else {
+          Log?.debug('[ReactNativeBleTransport] stale BLE frame write timed out, link kept');
+        }
+      }, BLE_WRITE_PACKET_TIMEOUT_MS);
+      await Promise.race([nativeWrite, cancelled]);
+    } catch (error) {
+      if (cancelError) throw cancelError;
+      if (isNativeBleDisconnectError(error)) {
+        throw toBleDisconnectHardwareError(error);
+      }
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleWriteCharacteristicError,
+        getNativeBleErrorReason(error)
+      );
+    } finally {
+      if (timer) clearTimeout(timer);
+      context.signal.removeEventListener('abort', onAbort);
+      if (this.protocolV2FrameWrites.get(uuid) === active) {
+        this.protocolV2FrameWrites.delete(uuid);
+      }
+    }
+
+    this.writeTimeoutCounts.delete(uuid);
+    try {
+      assertCurrentGeneration();
+    } catch (error) {
+      active.cancel(error instanceof Error ? error : new Error(String(error)));
+    }
+    if (cancelError) throw cancelError;
+  }
+
+  /** Stops the native frame write in flight on `uuid`, optionally only one of `generation`. */
+  private cancelProtocolV2FrameWrite(uuid: string, error: Error, generation?: number) {
+    const active = this.protocolV2FrameWrites.get(uuid);
+    if (!active || (generation !== undefined && active.generation !== generation)) return;
+    active.cancel(error);
+  }
+
+  private cancelNativeTransaction(manager: BlePlxManager, transactionId: string) {
+    const logFailure = (error: unknown) =>
+      Log?.debug('[ReactNativeBleTransport] Protocol V2 frame write cancellation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    try {
+      Promise.resolve(manager.cancelTransaction(transactionId)).catch(logFailure);
+    } catch (error) {
+      logFailure(error);
+    }
+  }
+
+  private getProtocolV2FileWritePerf(uuid: string, context: ProtocolV2CallContext) {
+    return context.messageName === 'FilesystemFileWrite'
+      ? this.protocolV2FileWritePerfs.get(uuid)
+      : undefined;
+  }
+
+  /** Returns true the first time `signature` is seen for `uuid` on this link. */
+  private markProtocolV2LogSignature(uuid: string, signature: string): boolean {
+    const signatures = this.protocolV2HighVolumeLogSignatures.get(uuid) ?? new Set<string>();
+    if (signatures.has(signature)) return false;
+    signatures.add(signature);
+    this.protocolV2HighVolumeLogSignatures.set(uuid, signatures);
+    return true;
   }
 
   private async callProtocolV2(
@@ -3272,15 +3411,27 @@ export default class ReactNativeBleTransport {
       const logSignature = `${name}:${writeMode}:${String(
         currentTransport.mtuSize
       )}:${packetCapacity}`;
-      const loggedSignatures =
-        this.protocolV2HighVolumeLogSignatures.get(uuid) ?? new Set<string>();
-      if (!loggedSignatures.has(logSignature)) {
-        loggedSignatures.add(logSignature);
-        this.protocolV2HighVolumeLogSignatures.set(uuid, loggedSignatures);
+      if (this.markProtocolV2LogSignature(uuid, logSignature)) {
         Log?.debug('[ReactNativeBleTransport] Protocol V2 high-volume write configured', {
           name,
           writeMode,
           reportedMtu: currentTransport.mtuSize,
+          packetCapacity,
+        });
+      }
+      const frameWriteMode: ProtocolV2FrameWriteMode = this.resolveProtocolV2NativeFrameWriter(
+        currentTransport,
+        { highThroughput: true, writeWithResponse: options?.writeWithResponse },
+        tuning.nativeFrameWrite
+      )
+        ? 'native-frame'
+        : 'per-packet';
+      if (this.markProtocolV2LogSignature(uuid, `frameWriteMode:${frameWriteMode}`)) {
+        Log?.debug('[ReactNativeBleTransport] Protocol V2 frame write mode', {
+          platform: Platform.OS,
+          mode: frameWriteMode,
+          nativeFrameWrite: tuning.nativeFrameWrite,
+          nativeFrameWriteSupported: !!getProtocolV2NativeFrameWriter(this.blePlxManager),
           packetCapacity,
         });
       }
@@ -3290,14 +3441,25 @@ export default class ReactNativeBleTransport {
       await this.enableAndroidHighConnectionPriority(uuid);
     }
 
+    const fileWritePerf =
+      name === 'FilesystemFileWrite' && options?.fileWritePipeline
+        ? createProtocolV2FileWritePerf()
+        : undefined;
+    if (fileWritePerf) {
+      this.protocolV2FileWritePerfs.set(uuid, fileWritePerf);
+    }
+    let fileWriteOk = false;
+
     try {
-      return await this.protocolV2Links.call(
+      const response = await this.protocolV2Links.call(
         uuid,
         () => this.createProtocolV2Adapter(uuid),
         name,
         data,
         callOptions
       );
+      fileWriteOk = response.type !== 'Failure';
+      return response;
     } catch (e) {
       Log?.error('[ReactNativeBleTransport] Protocol V2 call error:', e);
       if (
@@ -3317,6 +3479,15 @@ export default class ReactNativeBleTransport {
     } finally {
       if (highThroughputWrite) {
         this.scheduleAndroidBalancedConnectionPriority(uuid);
+      }
+      if (fileWritePerf) {
+        if (this.protocolV2FileWritePerfs.get(uuid) === fileWritePerf) {
+          this.protocolV2FileWritePerfs.delete(uuid);
+        }
+        Log?.debug(
+          '[ReactNativeBleTransport] FileWrite perf',
+          fileWritePerf.summarize(fileWriteOk)
+        );
       }
     }
   }
@@ -3356,6 +3527,15 @@ export default class ReactNativeBleTransport {
 
     this.clearAndroidPriorityResetTimer(uuid);
     if (this.androidHighPriorityDevices.has(uuid)) return;
+    if (!shouldRequestAndroidHighConnectionPriority()) {
+      if (this.markProtocolV2LogSignature(uuid, 'androidPriority:peripheral')) {
+        Log?.debug('[ReactNativeBleTransport] Android BLE connection priority left to peripheral', {
+          apiLevel: Platform.Version,
+          setting: protocolV2BleTuning.androidHighConnectionPriority,
+        });
+      }
+      return;
+    }
 
     const transport = transportCache[uuid];
     if (!transport) return;
@@ -3434,15 +3614,20 @@ export default class ReactNativeBleTransport {
           assertCurrentGeneration
         );
       },
-      readFrame: async () => {
+      readFrame: async (context: ProtocolV2CallContext) => {
         assertCurrentGeneration();
+        const perf = this.getProtocolV2FileWritePerf(uuid, context);
+        const startedAt = perf ? nowMs() : 0;
         const rxFrame = await this.readProtocolV2Frame(uuid);
+        perf?.recordReadWait(nowMs() - startedAt);
         if (!(rxFrame instanceof Uint8Array)) {
           throw new Error('Protocol V2 response is not Uint8Array');
         }
         return rxFrame;
       },
       reset: (reason: string) => {
+        // The frame belongs to this link even after a newer monitor generation took over.
+        this.cancelProtocolV2FrameWrite(uuid, new Error(reason), generation);
         if (this.monitorTokens.get(uuid) !== generation) return;
         this.protocolV2Assemblers.get(uuid)?.reset();
         this.rejectProtocolV2Frames(uuid, new Error(reason));

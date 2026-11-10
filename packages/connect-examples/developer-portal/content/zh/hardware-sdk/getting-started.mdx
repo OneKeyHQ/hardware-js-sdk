@@ -126,7 +126,7 @@ console.log(address.payload.address);
 
 WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 
-## 1.2.0 帮你做了什么
+## 设备与钱包支持 [#120-帮你做了什么]
 
 - SDK 根据设备实时响应识别 Protocol V1 / V2。不要用 USB PID、蓝牙名或产品字符串来分支。见 [Protocol V1 与 V2](/zh/hardware-sdk/concepts/protocol)。
 - Pro 2 和 Neo 使用与 Classic / Pro 相同的方法。机型差异见 [设备](/zh/hardware-sdk/concepts/devices)。
@@ -136,10 +136,10 @@ WebUSB 需要 HTTPS 和用户手势。BLE 需要系统蓝牙权限。
 
 <Link className="doc-next" href="/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM &amp; EVM</small><strong>签署第一笔交易</strong><span>参数、费率类型和签名结果。</span></span><span aria-hidden="true">↗</span></Link>
 
-1. 已经在 1.1.x：[从 1.1.x 迁到 1.2.x](/zh/hardware-sdk/legacy-guides/from-1x)
+1. 已经在 1.1.x：[升级到 Hardware SDK 1.2](/zh/hardware-sdk/legacy-guides/from-1x)
 2. 接 PIN / passphrase UI 事件：[Core API Guide](/zh/hardware-sdk/core-api-guide)
 3. 按平台真正连上设备：[传输](/zh/hardware-sdk/transport)
-4. 处理掉线：[重连与释放](/zh/hardware-sdk/transport/reconnect)
+4. 处理掉线：[断线与重连](/zh/hardware-sdk/transport/reconnect)
 5. 哪条链在哪台设备：[链支持](/zh/hardware-sdk/concepts/chain-support)
 6. 签一笔交易：[交易签名指引](/zh/hardware-sdk/signers)
 7. 固件：[固件升级](/zh/hardware-sdk/firmware-update)

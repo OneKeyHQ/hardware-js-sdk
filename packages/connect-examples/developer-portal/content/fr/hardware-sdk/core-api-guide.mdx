@@ -59,7 +59,7 @@ sequenceDiagram
 | `connectId` | Quelle connexion | `searchDevices()` | Rebranchement USB, nouvel appairage BLE, changement de transport |
 | `deviceId` | Quelle durée de vie de graine | `getDeviceState` (`getFeatures` est obsolète) | Effacement, récupération, changement de graine |
 
-USB et BLE ont des valeurs de `connectId` différentes pour la même unité — mettez-les en cache séparément. Consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers) et [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).
+USB et BLE ont des valeurs de `connectId` différentes pour la même unité — mettez-les en cache séparément. Consultez [Identifiants](/fr/hardware-sdk/concepts/identifiers) et [Déconnexions et reconnexion](/fr/hardware-sdk/transport/reconnect).
 
 **Exigences d’exécution**
 
@@ -110,7 +110,7 @@ const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 if (!address.success) throw new Error(address.payload.error);
 ```
 
-Sérialisez par appareil. Actualisez `getDeviceState` après un changement d’appareil. Supprimez les écouteurs au démontage. Appelez `HardwareSDK.dispose()` uniquement lors de la fermeture du transport — consultez [Reconnexion et libération](/fr/hardware-sdk/transport/reconnect).
+Sérialisez par appareil. Actualisez `getDeviceState` après un changement d’appareil. Supprimez les écouteurs au démontage. Appelez `HardwareSDK.dispose()` uniquement lors de la fermeture du transport — consultez [Déconnexions et reconnexion](/fr/hardware-sdk/transport/reconnect).
 
 ## Paramètres communs [#common-params]
 

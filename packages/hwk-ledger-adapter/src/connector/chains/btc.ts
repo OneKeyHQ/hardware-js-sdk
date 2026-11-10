@@ -4,6 +4,7 @@ import { Psbt } from 'bitcoinjs-lib';
 import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerBtc } from '../../signer/SignerBtc';
 import { debugError, debugLog } from '../../utils/debugLog';
+import { summarizeForLog } from '../../utils/logSummary';
 
 import type { ConnectorContext } from './types';
 
@@ -75,6 +76,18 @@ function _purposeToTemplate(purpose: string | undefined, DDT: any): any {
   }
 }
 
+/**
+ * The Bitcoin signer kit always talks to the mainnet Bitcoin app, so a request for another coin
+ * would get a mainnet-encoded result; refuse it instead.
+ */
+function assertBitcoinMainnet(coin: string | undefined): void {
+  if (coin !== undefined && !['btc', 'bitcoin'].includes(coin.toLowerCase())) {
+    throw Object.assign(new Error(`Ledger BTC supports Bitcoin mainnet only, not ${coin}`), {
+      code: HardwareErrorCode.ChainNotSupported,
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
@@ -84,6 +97,14 @@ export async function btcGetAddress(
   sessionId: string,
   params: BtcGetAddressCallParams
 ): Promise<{ address: string; path: string }> {
+  assertBitcoinMainnet(params.coin);
+  // The address is derived as path/change/addressIndex, so path must be the account path.
+  if (normalizePath(params.path).split('/').length !== 3) {
+    throw Object.assign(
+      new Error("Ledger btcGetAddress takes an account path (e.g. m/84'/0'/0') plus addressIndex"),
+      { code: HardwareErrorCode.InvalidParams }
+    );
+  }
   const btcSigner = await _createBtcSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
@@ -122,6 +143,7 @@ export async function btcGetPublicKey(
   sessionId: string,
   params: BtcGetPublicKeyCallParams
 ): Promise<{ xpub: string; path: string }> {
+  assertBitcoinMainnet(params.coin);
   const btcSigner = await _createBtcSigner(ctx, sessionId);
   const path = normalizePath(params.path);
 
@@ -130,7 +152,7 @@ export async function btcGetPublicKey(
     const xpub = await btcSigner.getExtendedPublicKey(path, {
       checkOnDevice: params.showOnDevice ?? false,
     });
-    debugLog('[LedgerConnector] btcGetPublicKey success, xpub:', `${xpub?.substring(0, 20)}...`);
+    debugLog('[LedgerConnector] btcGetPublicKey success, xpub:', summarizeForLog(xpub));
     return { xpub, path: params.path };
   } catch (err) {
     debugError('[LedgerConnector] btcGetPublicKey error, path:', path, 'err:', err);

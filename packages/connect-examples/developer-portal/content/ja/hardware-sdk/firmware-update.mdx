@@ -94,7 +94,7 @@ if (!result.success) throw new Error(result.payload.error);
 
 ## 4. 呼び出し後 [#4-after-the-call]
 
-1. デバイスが再起動する場合があります。`DEVICE.CONNECT` を待つか、再検索してください。通常の再接続では確認済みプロトコルを維持します。[再接続と破棄](/ja/hardware-sdk/transport/reconnect)を参照してください。
+1. デバイスが再起動する場合があります。`DEVICE.CONNECT` を待つか、再検索してください。通常の再接続では確認済みプロトコルを維持します。[切断と再接続](/ja/hardware-sdk/transport/reconnect)を参照してください。
 2. 新しいビルドを信頼する前に、[`getDeviceState`](/ja/hardware-sdk/basic-api/get-device-state) を再取得して確認します (バージョンが必要な場合は `scope: 'firmware'` を指定)。
 3. トランスポートのタイムアウトで失敗し、 **すでに** インストールリクエストを送信済みの場合、 **再実行しないでください:** 同じ更新を再実行せず、再接続して状態を読み取り、判断してください。
 

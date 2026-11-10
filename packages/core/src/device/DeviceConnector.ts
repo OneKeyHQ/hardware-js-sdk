@@ -133,10 +133,10 @@ export default class DeviceConnector {
             : undefined;
         const detectedProtocol = acquiredProtocol ?? transport.getProtocolType(path);
         if (detectedProtocol !== expectedProtocol) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            `Device protocol mismatch: expected ${expectedProtocol}, detected ${detectedProtocol}`
-          );
+          throw ERRORS.TypedError(HardwareErrorCode.TransportProtocolMismatch, undefined, {
+            expectedProtocol,
+            detectedProtocol,
+          });
         }
       }
       return res;

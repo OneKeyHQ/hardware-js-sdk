@@ -3,7 +3,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { initConnector, initCore } from '../src/core';
 import { DataManager } from '../src/data-manager';
 import TransportManager from '../src/data-manager/TransportManager';
-import { IFRAME } from '../src/events';
+import { IFRAME, createErrorMessage } from '../src/events';
 import SearchDevices from '../src/api/SearchDevices';
 import { DeviceList } from '../src/device/DeviceList';
 import { Device } from '../src/device/Device';
@@ -27,6 +27,40 @@ describe('Core 错误输出边界', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
+  test('entry-point errors preserve USB recovery context across JSON serialization', () => {
+    const params = {
+      operation: 'open',
+      nativeErrorName: 'SecurityError',
+      nativeErrorMessage: 'Access denied',
+    };
+    const error = ERRORS.TypedError(
+      HardwareErrorCode.BridgeNeedsPermission,
+      'Access denied',
+      params
+    );
+    expect(JSON.parse(JSON.stringify(createErrorMessage(error)))).toEqual({
+      success: false,
+      payload: { code: HardwareErrorCode.BridgeNeedsPermission, error: 'Access denied', params },
+    });
+  });
+
+  test.each([
+    [HardwareErrorCode.TransportProtocolProbeFailed, { expectedProtocol: 'V1' }],
+    [
+      HardwareErrorCode.TransportProtocolMismatch,
+      { expectedProtocol: 'V2', detectedProtocol: 'V1' },
+    ],
+  ] as const)(
+    'preserves protocol error %s and structured context across the public boundary',
+    (code, params) => {
+      const error = ERRORS.TypedError(code, undefined, params);
+      expect(JSON.parse(JSON.stringify(createErrorMessage(error)))).toEqual({
+        success: false,
+        payload: { code, error: error.message, params },
+      });
+    }
+  );
 
   test.each([
     ['webusb', false],
@@ -108,14 +142,32 @@ describe('Core 错误输出边界', () => {
     HardwareErrorCode.BleDeviceBondedCanceled,
     HardwareErrorCode.BleDeviceDisconnected,
     HardwareErrorCode.PollingTimeout,
+    HardwareErrorCode.BlePoweredOff,
+    HardwareErrorCode.BleUnsupported,
+    HardwareErrorCode.BridgeNeedsPermission,
+    HardwareErrorCode.WebUsbDeviceAccessError,
+    HardwareErrorCode.TransportProtocolProbeFailed,
+    HardwareErrorCode.TransportProtocolMismatch,
   ])(
-    'preserves terminal BLE error %s in the public response without polling again',
+    'preserves terminal transport error %s in the public response without polling again',
     async errorCode => {
-      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+      jest
+        .spyOn(DataManager, 'getSettings')
+        .mockReturnValue(
+          [
+            HardwareErrorCode.BridgeNeedsPermission,
+            HardwareErrorCode.WebUsbDeviceAccessError,
+            HardwareErrorCode.TransportProtocolProbeFailed,
+            HardwareErrorCode.TransportProtocolMismatch,
+          ].includes(errorCode)
+            ? ('desktop-webusb' as never)
+            : ('react-native' as never)
+        );
       const error = ERRORS.TypedError(errorCode);
       const acquire = jest.fn().mockRejectedValue(error);
       jest.spyOn(TransportManager, 'getTransport').mockReturnValue({
         acquire,
+        enumerate: jest.fn().mockResolvedValue([{ path: 'ble-pairing-test' }]),
         release: jest.fn().mockResolvedValue(true),
         stop: jest.fn().mockResolvedValue(undefined),
       } as never);

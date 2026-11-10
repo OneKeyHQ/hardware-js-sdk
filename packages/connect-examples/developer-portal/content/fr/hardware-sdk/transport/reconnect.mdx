@@ -1,15 +1,13 @@
 ---
 description: "Rétablissez les connexions des appareils, préservez les associations de portefeuille et fermez le SDK sans rejouer les effets de bord."
-title: "Reconnexion et libération"
+title: "Déconnexions et reconnexion"
 ---
 
 <span id="reconnect-and-dispose" />
 
-# Reconnexion et libération
+# Déconnexions et reconnexion [#reconnexion-et-libération]
 
-Les interruptions de transport sont normales : débranchement USB, portée BLE, réinitialisation Bluetooth du système, redémarrage du micrologiciel. Hardware SDK 1.2.0 rétablit la **liaison**. Votre application doit toujours rétablir l’**appel**.
-
-Cette page décrit le contrat de l’intégrateur. Elle ne décrit pas les numéros de séquence Protocol V2 ni la génération du transport.
+Un débranchement USB, une perte du signal BLE, une réinitialisation Bluetooth ou un redémarrage du micrologiciel peuvent interrompre la connexion. Suivez ces étapes pour terminer l’opération interrompue, reconnecter l’appareil et réutiliser le portefeuille sélectionné en toute sécurité.
 
 ## Ce que le SDK fait déjà [#what-the-sdk-already-does]
 

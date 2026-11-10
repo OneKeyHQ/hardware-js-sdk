@@ -14,7 +14,7 @@ describe('native BLE disconnect mapping', () => {
     });
   });
 
-  test('does not treat a stale-bond iOS code as a disconnect', () => {
+  test('does not treat an unrelated iOS code as a disconnect', () => {
     expect(
       isNativeBleDisconnectError({
         iosErrorCode: 14,
@@ -27,6 +27,27 @@ describe('native BLE disconnect mapping', () => {
     expect(
       isNativeBleDisconnectError({
         errorCode: HardwareErrorCode.BleDeviceNotBonded,
+      })
+    ).toBe(false);
+  });
+
+  test('recognizes the unstructured ble-plx disconnect observed during GATT discovery', () => {
+    const nativeError = {
+      errorCode: 0,
+      message: 'BleError: Device stalled-connect-device was disconnected',
+    };
+
+    expect(isNativeBleDisconnectError(nativeError)).toBe(true);
+    expect(toBleDisconnectHardwareError(nativeError)).toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+  });
+
+  test('does not infer a disconnect from an unrelated discovery failure', () => {
+    expect(
+      isNativeBleDisconnectError({
+        errorCode: 0,
+        message: 'Known OneKey service UUID not found',
       })
     ).toBe(false);
   });

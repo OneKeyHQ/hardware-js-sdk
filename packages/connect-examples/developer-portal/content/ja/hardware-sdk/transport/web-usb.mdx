@@ -98,7 +98,7 @@ if (!address.success) throw new Error(address.payload.error);
 - デバイスごとに呼び出しを直列化し、タイムアウト後に署名やファームウェア更新を自動で繰り返さないでください。
 - SDK の終了時やトランスポートの切り替え時には `dispose()` を呼び出し、再利用する前に初期化してください。
 
-参照: [再接続と破棄](/ja/hardware-sdk/transport/reconnect).
+参照: [切断と再接続](/ja/hardware-sdk/transport/reconnect).
 
 ## トラブルシューティング [#troubleshooting]
 

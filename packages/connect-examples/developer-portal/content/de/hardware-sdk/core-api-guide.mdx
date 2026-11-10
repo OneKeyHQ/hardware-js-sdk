@@ -59,7 +59,7 @@ sequenceDiagram
 | `connectId` | Welche Verbindung | `searchDevices()` | USB erneut anschließen, BLE neu koppeln, Transport wechseln |
 | `deviceId` | Welche Seed-Lebensdauer | `getDeviceState` (`getFeatures` ist veraltet) | Löschen, Wiederherstellung, Seed-Wechsel |
 
-USB- und BLE-`connectId`-Werte für dasselbe Gerät unterscheiden sich — speichern Sie sie getrennt zwischen. Siehe [Kennungen](/de/hardware-sdk/concepts/identifiers) und [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect).
+USB- und BLE-`connectId`-Werte für dasselbe Gerät unterscheiden sich — speichern Sie sie getrennt zwischen. Siehe [Kennungen](/de/hardware-sdk/concepts/identifiers) und [Verbindungsabbrüche und Wiederverbindung](/de/hardware-sdk/transport/reconnect).
 
 **Laufzeitanforderungen**
 
@@ -110,7 +110,7 @@ const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 if (!address.success) throw new Error(address.payload.error);
 ```
 
-Pro Gerät serialisieren. Aktualisieren Sie `getDeviceState` nach einem Gerätewechsel. Entfernen Sie Listener beim Unmount. Rufen Sie `HardwareSDK.dispose()` nur beim Beenden des Transports auf — siehe [Wiederverbinden und freigeben](/de/hardware-sdk/transport/reconnect).
+Pro Gerät serialisieren. Aktualisieren Sie `getDeviceState` nach einem Gerätewechsel. Entfernen Sie Listener beim Unmount. Rufen Sie `HardwareSDK.dispose()` nur beim Beenden des Transports auf — siehe [Verbindungsabbrüche und Wiederverbindung](/de/hardware-sdk/transport/reconnect).
 
 ## Gemeinsame Parameter [#common-params]
 

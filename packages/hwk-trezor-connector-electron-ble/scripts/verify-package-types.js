@@ -1,21 +1,13 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 const fs = require('fs');
 const path = require('path');
 
+const manifest = require('../package.json');
+
 const packageRoot = path.resolve(__dirname, '..');
-const packageJson = require(path.join(packageRoot, 'package.json'));
-
-const declarationPaths = [
-  packageJson.types,
-  packageJson.exports?.['.']?.import?.types,
-  packageJson.exports?.['.']?.require?.types,
-  packageJson.exports?.['./main']?.import?.types,
-  packageJson.exports?.['./main']?.require?.types,
-].filter(Boolean);
-
-const missingDeclarations = declarationPaths.filter(
-  declarationPath => !fs.existsSync(path.join(packageRoot, declarationPath))
-);
-
-if (missingDeclarations.length > 0) {
-  throw new Error(`Missing package declaration files: ${missingDeclarations.join(', ')}`);
-}
+const declarations = [
+  manifest.types,
+  ...Object.values(manifest.exports).flatMap(entry => [entry.import.types, entry.require.types]),
+];
+const missing = declarations.filter(file => !fs.existsSync(path.join(packageRoot, file)));
+if (missing.length) throw new Error(`Missing package declarations: ${missing.join(', ')}`);

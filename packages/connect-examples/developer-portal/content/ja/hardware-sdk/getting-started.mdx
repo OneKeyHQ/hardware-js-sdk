@@ -127,7 +127,7 @@ console.log(address.payload.address);
 
 WebUSB には HTTPS とユーザー操作が必要です。BLE には OS の Bluetooth 権限が必要です。
 
-## 1.2.0 が提供する機能 [#what-120-does-for-you]
+## デバイスとウォレットのサポート [#what-120-does-for-you]
 
 - SDK は実際のデバイスから Protocol V1 と V2 を検出します。USB PID、BLE 名、製品文字列で分岐させないでください。参照: [Protocol V1 と V2](/ja/hardware-sdk/concepts/protocol).
 - Pro 2 と Neo は Classic / Pro と同じメソッドを使用します。デバイスごとの違いは次に記載しています: [デバイス](/ja/hardware-sdk/concepts/devices).
@@ -137,10 +137,10 @@ WebUSB には HTTPS とユーザー操作が必要です。BLE には OS の Blu
 
 <Link className="doc-next" href="/ja/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction"><span><small>ETHEREUM と EVM</small><strong>最初のトランザクションに署名</strong><span>パラメーター、手数料の種類、署名レスポンス。</span></span><span aria-hidden="true">↗</span></Link>
 
-1. すでに 1.1.x を使用している場合: [1.1.x から 1.2.x へ](/ja/hardware-sdk/legacy-guides/from-1x)
+1. すでに 1.1.x を使用している場合: [Hardware SDK 1.2 へのアップグレード](/ja/hardware-sdk/legacy-guides/from-1x)
 2. PIN / パスフレーズの UI イベントを接続: [Core API ガイド](/ja/hardware-sdk/core-api-guide)
 3. 実際のプラットフォームで接続: [トランスポート](/ja/hardware-sdk/transport)
-4. 切断を処理: [再接続と破棄](/ja/hardware-sdk/transport/reconnect)
+4. 切断を処理: [切断と再接続](/ja/hardware-sdk/transport/reconnect)
 5. 各デバイスの対応チェーン: [対応チェーン](/ja/hardware-sdk/concepts/chain-support)
 6. トランザクションに署名: [署名者ガイド](/ja/hardware-sdk/signers)
 7. ファームウェア: [ファームウェア更新](/ja/hardware-sdk/firmware-update)

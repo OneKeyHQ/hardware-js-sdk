@@ -9,7 +9,7 @@ import {
 
 import { serializedPath, toHardened } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { invalidParameter, validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
@@ -34,6 +34,12 @@ import type {
 } from '../../types/api/allNetworkGetAddress';
 
 const Mainnet = 'mainnet';
+
+const MoneroNetworkTypes = new Map<string, number>([
+  [Mainnet, PROTO.MoneroNetworkType.MAINNET],
+  ['testnet', PROTO.MoneroNetworkType.TESTNET],
+  ['stagenet', PROTO.MoneroNetworkType.STAGENET],
+]);
 
 export type NetworkConfig = {
   methodName: keyof CoreApi;
@@ -245,6 +251,36 @@ const networkConfigMap: NetworkConfigMap = {
   },
   stellar: {
     methodName: 'stellarGetAddress',
+  },
+  xmr: {
+    methodName: 'moneroGetAddress',
+    getParams: (baseParams: AllNetworkAddressParams, chainName?: string) => {
+      const { path, showOnOneKey } = baseParams;
+      const networkType = MoneroNetworkTypes.get(chainName ?? Mainnet);
+      if (networkType === undefined) {
+        throw invalidParameter(`Unsupported Monero chainName: ${chainName}`);
+      }
+      return {
+        path,
+        networkType,
+        showOnOneKey,
+      };
+    },
+  },
+  zcash: {
+    methodName: 'zcashGetAddress',
+    // The account's unified address and seed fingerprint; the viewing key needs its own confirmed export.
+    getParams: (baseParams: AllNetworkAddressParams) => {
+      const { path, showOnOneKey } = baseParams;
+      return {
+        path,
+        showOnOneKey,
+        addressType: PROTO.ZcashAddressType.UNIFIED_ORCHARD,
+        scope: PROTO.ZcashAddressScope.EXTERNAL,
+        diversifierIndex: 0,
+        includeSeedFingerprint: true,
+      };
+    },
   },
 };
 
@@ -581,7 +617,14 @@ function preCheckDeviceSupport(device: Device, method: BaseMethod) {
   }
 }
 
-function handleSkippableHardwareError(
+// Pro 2 reports a message type it lacks as `Failure_ProcessError,Handler not found: ...`.
+const UNSUPPORTED_MESSAGE_FAILURES = [
+  'Failure_UnexpectedMessage',
+  'Failure_UnknownMessage',
+  'Handler not found: No handler for type',
+];
+
+export function handleSkippableHardwareError(
   e: any,
   device: Device,
   method: BaseMethod
@@ -595,10 +638,7 @@ function handleSkippableHardwareError(
     } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
       error = e;
     }
-  } else if (
-    e.message?.includes('Failure_UnexpectedMessage') ||
-    e.message?.includes('Failure_UnknownMessage')
-  ) {
+  } else if (UNSUPPORTED_MESSAGE_FAILURES.some(text => e.message?.includes(text))) {
     const versionRange = device.getCurrentMethodVersionRange(
       type => method.getVersionRange()[type]
     );

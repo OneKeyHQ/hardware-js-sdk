@@ -4680,6 +4680,70 @@ export type UiAnimationRequest = {
   type?: UiAnimationType;
 };
 
+export enum ZcashAddressType {
+  UNIFIED_ORCHARD_P2PKH = 0,
+  TRANSPARENT_P2PKH = 1,
+  UNIFIED_ORCHARD = 2,
+}
+
+export enum ZcashAddressScope {
+  EXTERNAL = 0,
+  INTERNAL = 1,
+}
+
+// ZcashGetAddress
+export type ZcashGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  include_seed_fingerprint?: boolean;
+  diversifier_index?: number;
+  address_type?: ZcashAddressType;
+  scope?: ZcashAddressScope;
+};
+
+// ZcashAddress
+export type ZcashAddress = {
+  address: string;
+  seed_fingerprint?: string;
+};
+
+// ZcashGetFullViewingKey
+export type ZcashGetFullViewingKey = {
+  address_n: number[];
+};
+
+// ZcashFullViewingKey
+export type ZcashFullViewingKey = {
+  ufvk: string;
+};
+
+// ZcashSignPczt
+export type ZcashSignPczt = {
+  pczt_length: number;
+  pczt_initial_chunk: string;
+};
+
+// ZcashPcztChunkRequest
+export type ZcashPcztChunkRequest = {
+  chunk_length: number;
+};
+
+// ZcashPcztChunkAck
+export type ZcashPcztChunkAck = {
+  data_chunk: string;
+};
+
+// ZcashSignedPczt
+export type ZcashSignedPczt = {
+  pczt_length: number;
+  pczt_initial_chunk: string;
+};
+
+// ZcashSignedPcztChunkRequest
+export type ZcashSignedPcztChunkRequest = {
+  chunk_length: number;
+};
+
 // experimental_message
 export type experimental_message = {};
 
@@ -5988,6 +6052,15 @@ export type MessageType = {
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   UiAnimationRequest: UiAnimationRequest;
+  ZcashGetAddress: ZcashGetAddress;
+  ZcashAddress: ZcashAddress;
+  ZcashGetFullViewingKey: ZcashGetFullViewingKey;
+  ZcashFullViewingKey: ZcashFullViewingKey;
+  ZcashSignPczt: ZcashSignPczt;
+  ZcashPcztChunkRequest: ZcashPcztChunkRequest;
+  ZcashPcztChunkAck: ZcashPcztChunkAck;
+  ZcashSignedPczt: ZcashSignedPczt;
+  ZcashSignedPcztChunkRequest: ZcashSignedPcztChunkRequest;
   experimental_message: experimental_message;
   experimental_field: experimental_field;
   ProtocolInfoRequest: ProtocolInfoRequest;

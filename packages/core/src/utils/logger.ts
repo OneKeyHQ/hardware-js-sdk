@@ -78,6 +78,10 @@ class Log {
 const _logs: { [k: string]: Log } = {};
 
 export const initLog = (prefix: string, enabled?: boolean) => {
+  // Loggers that share a prefix must share one instance; otherwise enableLog only reaches the
+  // last one registered and the others never print.
+  const existing = _logs[prefix];
+  if (existing) return existing;
   const instance = new Log(prefix, !!enabled);
   _logs[prefix] = instance;
   return instance;

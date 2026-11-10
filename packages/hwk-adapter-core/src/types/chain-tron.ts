@@ -1,6 +1,7 @@
 import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
 import type { IHardwareCallParams, NullableCallArg } from './wallet';
+import type { ExportedAccountKey } from './qr';
 
 export interface TronGetAddressParams extends PassphraseStateAware {
   path: string;
@@ -11,6 +12,8 @@ export interface TronAddress {
   /** Base58check-encoded TRON address (starts with 'T') */
   address: string;
   path: string;
+  /** Set by air-gapped wallets (Keystone): the exported key this address derives from. */
+  accountKey?: ExportedAccountKey;
 }
 
 /** TRON network resource, used by freeze/unfreeze contracts. */
@@ -131,6 +134,12 @@ export interface TronSignMsgParams extends PassphraseStateAware {
   path: string;
   /** Message hex (no 0x prefix) */
   messageHex: string;
+  /**
+   * TRON message scheme: 'V1' = legacy signMessage (prefix + 32-byte hash),
+   * 'V2' = TIP-191 signMessageV2 (prefix + byte length + message). Adapters
+   * that only implement one scheme reject the other with MethodNotSupported.
+   */
+  messageType?: 'V1' | 'V2';
 }
 
 export interface TronSignature {

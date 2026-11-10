@@ -1,13 +1,11 @@
 ---
 description: "Recover device connections, preserve wallet bindings, and tear down the SDK without replaying side effects."
-title: Reconnect and dispose
+title: "Disconnects and reconnection"
 ---
 
-# Reconnect and dispose
+# Disconnects and reconnection [#reconnect-and-dispose]
 
-Transport drops are normal: USB unplug, BLE range, OS Bluetooth reset, firmware reboot. Hardware SDK 1.2.0 recovers the **link**. Your app still has to recover the **call**.
-
-This page is the integrator contract. It does not describe Protocol V2 sequence numbers or Transport generation.
+USB unplugging, loss of BLE signal, Bluetooth resets, and firmware reboots can interrupt a connection. Follow these steps to end the interrupted operation, reconnect the device, and reuse the selected wallet safely.
 
 ## What the SDK already does
 

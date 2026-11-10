@@ -16,10 +16,10 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   createKnownBleUuidAliases,
   hasOnekeyCommunicationService,
-  isBleStaleBondHardwareError,
   isOnekeyBluetoothDevice,
   isPro2FamilyBleName,
   matchesKnownBleUuid,
+  parseOnekeyBleColorCode,
   wait,
 } from '@onekeyfe/hd-shared';
 import pRetry from 'p-retry';
@@ -74,19 +74,6 @@ type NobleBleNativeError = Error & {
 
 export function createNobleBleConnectionError(error: NobleBleNativeError, messagePrefix = '') {
   const errorMessage = error.message;
-  const isInvalidMacOsBond =
-    error.nativeErrorCode === 14 && error.nativeErrorDomain === 'CBErrorDomain';
-  if (isInvalidMacOsBond) {
-    const nativeErrorMessage = `${messagePrefix}${errorMessage}`;
-    return ERRORS.TypedError(
-      HardwareErrorCode.BleBondInvalid,
-      `${HardwareErrorCodeMessage[HardwareErrorCode.BleBondInvalid]} (${nativeErrorMessage})`,
-      {
-        nativeErrorMessage,
-      }
-    );
-  }
-
   return ERRORS.TypedError(HardwareErrorCode.BleConnectedError, `${messagePrefix}${errorMessage}`);
 }
 
@@ -443,7 +430,18 @@ function updateBluetoothState(state: string): void {
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   assertBleActive();
-  if (noble) return;
+  if (noble) {
+    if (noble.state === 'poweredOff') {
+      throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+    }
+    if (noble.state === 'unsupported') {
+      throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+    }
+    if (noble.state === 'unauthorized') {
+      throw ERRORS.TypedError(HardwareErrorCode.BleLocationError);
+    }
+    return;
+  }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
@@ -496,7 +494,7 @@ async function initializeNoble(): Promise<void> {
           reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
         } else if (state === 'unauthorized') {
           cleanup();
-          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
         }
       };
 
@@ -508,6 +506,7 @@ async function initializeNoble(): Promise<void> {
       };
       pendingCancellations.add(cancel);
       noble.on('stateChange', onStateChange);
+      onStateChange(noble.state);
     });
 
     assertBleActive();
@@ -522,7 +521,7 @@ async function initializeNoble(): Promise<void> {
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to initialize Noble:', error);
-    bluetoothState.unsupported = true;
+    bluetoothState.unsupported = noble?.state === 'unsupported';
     bluetoothState.initialized = true;
     throw error;
   }
@@ -1014,6 +1013,22 @@ function rememberBleName(deviceId: string, name?: string | null): void {
   }
 }
 
+// Noble reuses one Peripheral per id, and on macOS/Windows an event without 0xFF data
+// replaces manufacturerData with an empty buffer. Snapshot the color when the OneKey
+// advertisement is seen; it is kept like the name because a linked device stops advertising.
+const bleColorCodesById = new Map<string, string>();
+
+function rememberBleColorCode(peripheral: Peripheral): void {
+  const colorCode = parseOnekeyBleColorCode(peripheral.advertisement?.manufacturerData);
+  if (colorCode && bleColorCodesById.get(peripheral.id) !== colorCode) {
+    bleColorCodesById.set(peripheral.id, colorCode);
+    logger?.debug('[NobleBLE] BLE color code', {
+      deviceId: peripheral.id,
+      bleColorCode: colorCode,
+    });
+  }
+}
+
 function resolveBleName(deviceId: string): string | undefined {
   const live =
     connectedDevices.get(deviceId)?.advertisement?.localName?.trim() ||
@@ -1033,6 +1048,12 @@ function shouldConnectByIdFirst(deviceId: string): boolean {
 }
 
 function handleDeviceDiscovered(peripheral: Peripheral): void {
+  // The color rides in the primary advertisement while the name may only come
+  // in a later scan response, so record it before the name-dependent filter.
+  if (hasOnekeyCommunicationService(peripheral.advertisement?.serviceUuids)) {
+    rememberBleColorCode(peripheral);
+  }
+
   // Only process OneKey candidates for general discovery. Avoid logging every
   // ambient BLE peripheral; it makes Pro2 debugging hard to read.
   if (!isOneKeyPeripheral(peripheral)) {
@@ -1047,6 +1068,9 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
       deviceId: peripheral.id,
       name: peripheral.advertisement?.localName || 'Unknown Device',
       serviceUUIDs: peripheral.advertisement?.serviceUuids || [],
+      // 5 = advertises a color slot; 4 = BLE firmware before 1.0.23.
+      manufacturerDataLength: peripheral.advertisement?.manufacturerData?.length ?? 0,
+      bleColorCode: bleColorCodesById.get(peripheral.id),
     });
   }
 }
@@ -1151,9 +1175,7 @@ async function performTargetedScan(
 
 // Enumerate devices
 async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<DeviceInfo[]> {
-  if (!noble) {
-    await initializeNoble();
-  }
+  await initializeNoble();
 
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
@@ -1204,6 +1226,12 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
         state: peripheral.state || 'disconnected',
       });
     };
+    // A device kept from an earlier round is pushed before this round's
+    // advertisements arrive, so apply colors when the scan resolves.
+    const withBleColorCode = (device: DeviceInfo): DeviceInfo => {
+      const bleColorCode = bleColorCodesById.get(device.id);
+      return bleColorCode ? { ...device, bleColorCode } : device;
+    };
     const checkDevices = () => {
       discoveredDevices.forEach(pushDevice);
       // A linked device stops advertising, so the scan never rediscovers it.
@@ -1217,7 +1245,7 @@ async function enumerateDevices(isWindowDestroyed: () => boolean): Promise<Devic
       checkDevices();
       await cleanup();
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
-      resolve(devices);
+      resolve(devices.map(withBleColorCode));
     }, DEVICE_SCAN_TIMEOUT);
 
     const cancel = () => cleanup().then(() => resolve([]), reject);
@@ -1634,7 +1662,6 @@ async function setupConnectionAndDiscoverServices(
     await forceReconnectPeripheral(peripheral, deviceId);
   } catch (resetError) {
     if (
-      isBleStaleBondHardwareError(resetError) ||
       (resetError as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceDisconnected
     ) {
       throw resetError;
@@ -1671,11 +1698,13 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
-// noble/mac never resolves for an id CoreBluetooth cannot retrieve.
+// Bound probes while a native backend is still waiting for the device.
 const DIRECT_CONNECT_TIMEOUT_MS = 2000;
 // Floor after a timeout: do not pay the probe on every attempt.
 const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
 const directConnectCooldownUntil = new Map<string, number>();
+const pendingDirectNativeConnections = new Set<string>();
+const deviceConnectionPromises = new Map<string, Promise<void>>();
 
 /**
  * Connect straight by id, skipping the ~650ms targeted scan. Both native
@@ -1694,6 +1723,8 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
     | null;
   if (!nobleInstance?.connectAsync) return undefined;
 
+  // Retain the original listener and late cleanup until the native attempt settles.
+  if (pendingDirectNativeConnections.has(deviceId)) return undefined;
   const cooldownUntil = directConnectCooldownUntil.get(deviceId) ?? 0;
   if (Date.now() < cooldownUntil) return undefined;
 
@@ -1703,18 +1734,21 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   try {
     // The late-orphan guard must attach to THIS pending connect.
     const directPromise = nobleInstance.connectAsync(deviceId);
+    pendingDirectNativeConnections.add(deviceId);
     trackNativeConnection(
-      directPromise.then(async late => {
-        if ((!abandoned && !disposing) || nativeReleased) return;
-        const peripheral = late ?? discoveredDevices.get(deviceId);
-        if (peripheral?.state === 'connected' && !connectedDevices.has(deviceId)) {
-          peripheral.removeAllListeners('disconnect');
-          await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
-            timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
-            timeoutBehavior: 'resolve',
-          });
-        }
-      }),
+      directPromise
+        .then(async late => {
+          if ((!abandoned && !disposing) || nativeReleased) return;
+          const peripheral = late ?? discoveredDevices.get(deviceId);
+          if (peripheral?.state === 'connected' && !connectedDevices.has(deviceId)) {
+            peripheral.removeAllListeners('disconnect');
+            await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
+              timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
+              timeoutBehavior: 'resolve',
+            });
+          }
+        })
+        .finally(() => pendingDirectNativeConnections.delete(deviceId)),
       () => nobleInstance.cancelConnect?.(deviceId)
     );
     const raced = await Promise.race([
@@ -1745,10 +1779,6 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       deviceId,
       error: String(error),
     });
-    const nativeError = error as NobleBleNativeError;
-    if (nativeError.nativeErrorCode === 14 && nativeError.nativeErrorDomain === 'CBErrorDomain') {
-      throw createNobleBleConnectionError(nativeError);
-    }
     directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
     return undefined;
   } finally {
@@ -1758,7 +1788,19 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
 }
 
 // Connect to device - supports both discovered and direct connection modes
-async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+  // Share the whole attempt so a scan fallback cannot race another caller's native probe.
+  const pending = deviceConnectionPromises.get(deviceId);
+  if (pending) return pending;
+  const connecting = connectDeviceOnce(deviceId, webContents).finally(() => {
+    deviceConnectionPromises.delete(deviceId);
+  });
+  deviceConnectionPromises.set(deviceId, connecting);
+  return connecting;
+}
+
+async function connectDeviceOnce(deviceId: string, webContents: WebContents): Promise<void> {
+  await initializeNoble();
   logger?.info('[NobleBLE] Connect device request:', {
     deviceId,
     hasDiscovered: discoveredDevices.has(deviceId),
@@ -1776,11 +1818,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   }
 
   if (!peripheral) {
-    // Initialize Noble if not already done
-    if (!noble) {
-      await initializeNoble();
-    }
-
     if (!noble) {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
     }
@@ -1812,21 +1849,12 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       }
     };
 
-    let staleBondError: Error | undefined;
     const connectById = async () => {
-      try {
-        const found = await tryDirectConnectById(deviceId);
-        if (found) {
-          discoveredDevices.set(deviceId, found);
-        }
-        return found;
-      } catch (error) {
-        if ((error as { errorCode?: number }).errorCode !== HardwareErrorCode.BleBondInvalid) {
-          throw error;
-        }
-        staleBondError = error as Error;
-        return undefined;
+      const found = await tryDirectConnectById(deviceId);
+      if (found) {
+        discoveredDevices.set(deviceId, found);
       }
+      return found;
     };
 
     peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
@@ -1835,7 +1863,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // silent), or not reachable by id. Try the other one before giving up.
       peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
     }
-    if (!peripheral && staleBondError) throw staleBondError;
   }
 
   assertBleActive();

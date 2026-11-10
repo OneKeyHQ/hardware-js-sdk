@@ -75,8 +75,11 @@ describe('DeviceConnector protocol validation', () => {
     });
     const connector = new DeviceConnector();
 
-    await expect(connector.acquire('classic-id', undefined, undefined, 'V2')).rejects.toThrow(
-      'Device protocol mismatch: expected V2, detected V1'
+    await expect(connector.acquire('classic-id', undefined, undefined, 'V2')).rejects.toMatchObject(
+      {
+        errorCode: HardwareErrorCode.TransportProtocolMismatch,
+        params: { expectedProtocol: 'V2', detectedProtocol: 'V1' },
+      }
     );
   });
 

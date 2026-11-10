@@ -36,4 +36,6 @@ This package vendors MIT-licensed source from `trezor/trezor-suite`.
 - 其余 `*_pb.js` 生成文件（bitcoin/ble/cardano/common/crypto/debug/definitions/
   ethereum(-eip712)/evolu/management/ripple/solana/stellar/telemetry/thp/tron）—
   纯 `@generated` 产物，v26.7.4 原样覆盖，未手改。
-
+- `src/definitions/messages-solana.ts` and `messages-solana_pb.js` are synced from
+  `trezor/trezor-suite` commit `35672ae78a8e911928ecc9c92bbd63c00b7ee124` to add the
+  finalized Solana OCMS v1 request and `signed_data` response fields.

@@ -43,6 +43,9 @@ export const isKnownTrezorWebUsbDevice = (descriptor: WebUsbIdentityDescriptor):
  * These errors indicate the device is in an invalid state and needs to be released
  */
 export const ERROR_CODES_REQUIRE_RELEASE = [
+  HardwareErrorCode.WebUsbDeviceAccessError,
+  HardwareErrorCode.TransportProtocolProbeFailed,
+  HardwareErrorCode.TransportProtocolMismatch,
   HardwareErrorCode.DeviceInitializeFailed,
   HardwareErrorCode.DeviceInterruptedFromOutside,
   HardwareErrorCode.DeviceInterruptedFromUser,
@@ -58,6 +61,9 @@ export const ERROR_CODES_REQUIRE_RELEASE = [
  * These errors indicate a communication failure that requires full reconnection
  */
 export const ERROR_CODES_REQUIRE_DISCONNECT = [
+  HardwareErrorCode.WebUsbDeviceAccessError,
+  HardwareErrorCode.TransportProtocolProbeFailed,
+  HardwareErrorCode.TransportProtocolMismatch,
   HardwareErrorCode.DeviceInitializeFailed,
   HardwareErrorCode.ResponseUnexpectTypeError,
 ] as const;
@@ -366,6 +372,24 @@ export const isPro2FamilyBleName = (value?: string | null): boolean => {
     NEO_COMPACT_NAME_PATTERN.test(compact) ||
     isPro2FindMyAdvertisementName(value)
   );
+};
+
+// Pro2 / Neo manufacturer-specific data has no Bluetooth SIG company ID: byte 0 is
+// serial_number[10] (the color letter, 0x00 before the SN is known) and bytes 1-4
+// are a nonce. Older Pro2 / Neo firmware sends 4 zero bytes and Classic sends a
+// company ID plus MAC, so any other length is not a color.
+const ONEKEY_BLE_COLOR_PAYLOAD_LENGTH = 5;
+
+/**
+ * Reads the serial-number color letter from the raw 0xFF advertisement payload
+ * (the bytes after the AD type). Returns undefined when no valid letter is present.
+ */
+export const parseOnekeyBleColorCode = (
+  manufacturerData: Uint8Array | null | undefined
+): string | undefined => {
+  if (manufacturerData?.length !== ONEKEY_BLE_COLOR_PAYLOAD_LENGTH) return undefined;
+  const code = manufacturerData[0];
+  return code >= 0x41 && code <= 0x5a ? String.fromCharCode(code) : undefined;
 };
 
 export const isOnekeyBluetoothDevice = ({

@@ -19,6 +19,7 @@ export const APP_NAME_MAP: Record<string, string> = {
   BTC: 'Bitcoin',
   SOL: 'Solana',
   TRX: 'Tron',
+  ZEC: 'Zcash',
   XRP: 'XRP',
   ADA: 'Cardano',
   DOT: 'Polkadot',

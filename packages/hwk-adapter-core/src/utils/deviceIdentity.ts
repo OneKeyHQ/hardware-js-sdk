@@ -1,4 +1,4 @@
-export type DetectableHardwareVendor = 'onekey' | 'trezor' | 'ledger';
+export type DetectableHardwareVendor = 'onekey' | 'trezor' | 'ledger' | 'keystone';
 
 export type HardwareDeviceIdentityInput = {
   name?: string | null;
@@ -27,6 +27,9 @@ export type HardwareDeviceIdentityInput = {
 const ONEKEY_BLE_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';
 const TREZOR_BLE_SERVICE_UUID = '8c000001-a59b-4d58-a9ad-073df69fa1b1';
 const LEDGER_USB_VENDOR_ID = 0x2c97;
+// 0x1209 is the shared pid.codes open-hardware VID, so the PID must match too.
+const KEYSTONE_USB_VENDOR_ID = 0x1209;
+const KEYSTONE_USB_PRODUCT_ID = 0x3001;
 
 const lower = (value?: string | null): string => value?.trim().toLowerCase() ?? '';
 
@@ -69,6 +72,14 @@ export function detectHardwareVendorFromDescriptor(
     manufacturerName.includes('ledger')
   ) {
     return 'ledger';
+  }
+  const usbVendorId = typeof input.vendor === 'number' ? input.vendor : input.vendorId;
+  const usbProductId = typeof input.product === 'number' ? input.product : input.productId;
+  if (
+    (usbVendorId === KEYSTONE_USB_VENDOR_ID && usbProductId === KEYSTONE_USB_PRODUCT_ID) ||
+    manufacturerName.includes('keystone')
+  ) {
+    return 'keystone';
   }
   return undefined;
 }

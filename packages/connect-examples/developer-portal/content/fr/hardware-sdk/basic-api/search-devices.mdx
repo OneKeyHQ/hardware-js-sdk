@@ -48,6 +48,7 @@ L’objet de paramètres est facultatif. Consultez le [type `searchDevices`](htt
 | `deviceType` | `IDeviceType` | Modèle détecté, ou inconnu avant l’initialisation. |
 | `name` | `string` | Nom d’affichage ; ce n’est pas un identifiant unique. |
 | `commType` | `OneKeyDeviceCommType` | Type de communication signalé par le transport. |
+| `bleColorCode` | `string \| undefined` | Découverte React Native BLE et BLE de bureau (Electron) uniquement. Lettre de couleur (`A`–`Z`) issue du numéro de série, diffusée par Pro 2 et Neo ; elle peut provenir d'une diffusion antérieure. Absente si inconnue. À interpréter avec `deviceType`. |
 
 La structure publique exacte est [`SearchDevice`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/types/device.ts). Ne dépendez pas de champs internes supplémentaires tels que `path`.
 

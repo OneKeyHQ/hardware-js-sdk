@@ -1,9 +1,30 @@
-import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+import {
+  EConnectorInteraction,
+  HardwareErrorCode,
+  ORPHAN_ELIGIBLE_ERROR_CODES,
+  rehydrateConnectorError,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { LedgerConnectorBase } from '../connector/LedgerConnectorBase';
-import { ERROR_TAG } from '../errors';
+import {
+  ERROR_TAG,
+  isConnectionLevelError,
+  isDeviceDisconnectedError,
+  isDeviceNotAdvertisingError,
+  isTimeoutError,
+  mapLedgerError,
+} from '../errors';
 
-import type { ConnectionType, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
+import type { ConnectorContext } from '../connector/chains/types';
+import type {
+  ConnectionType,
+  ConnectorUiEvent,
+  DeviceDescriptor,
+} from '@onekeyfe/hwk-adapter-core';
+
+interface MethodContextConnector {
+  _ctxForMethod(method: string): ConnectorContext;
+}
 
 class SearchConnector extends LedgerConnectorBase {
   constructor(private readonly descriptors: DeviceDescriptor[], connectionType: ConnectionType) {
@@ -56,6 +77,72 @@ describe('LedgerConnectorBase error wrapping', () => {
       _tag: ERROR_TAG.EthAppCommand,
       errorCode: '6a80',
     });
+  });
+});
+
+describe('LedgerConnectorBase open-app prompt', () => {
+  it.each([
+    ['btcGetPublicKey', 'Bitcoin'],
+    ['evmGetAddress', 'Ethereum'],
+    ['solGetAddress', 'Solana'],
+    ['tronGetAddress', 'Tron'],
+    ['zcashGetFullViewingKey', 'Zcash'],
+  ])('names the app requested by %s', (method, appName) => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const events: ConnectorUiEvent[] = [];
+    connector.on('ui-event', event => events.push(event));
+    const ctx = (connector as unknown as MethodContextConnector)._ctxForMethod(method);
+    const confirmOnDevice: ConnectorUiEvent = {
+      type: EConnectorInteraction.ConfirmOnDevice,
+      payload: { sessionId: 'session-1' },
+    };
+
+    ctx.emit('ui-event', {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId: 'session-1' },
+    });
+    ctx.emit('ui-event', confirmOnDevice);
+
+    expect(events).toEqual([
+      {
+        type: EConnectorInteraction.ConfirmOpenApp,
+        payload: { sessionId: 'session-1', appName },
+      },
+      confirmOnDevice,
+    ]);
+    expect(events[1]).toBe(confirmOnDevice);
+  });
+
+  it('preserves an explicit app name on the event', () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const events: ConnectorUiEvent[] = [];
+    connector.on('ui-event', event => events.push(event));
+    const event: ConnectorUiEvent = {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId: 'session-1', appName: 'Bitcoin Test' },
+    };
+
+    const ctx = (connector as unknown as MethodContextConnector)._ctxForMethod('btcGetPublicKey');
+    ctx.emit('ui-event', event);
+
+    expect(events).toEqual([event]);
+    expect(events[0]).toBe(event);
+  });
+
+  it('keeps an unknown method event unchanged', () => {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const events: ConnectorUiEvent[] = [];
+    connector.on('ui-event', event => events.push(event));
+    const event: ConnectorUiEvent = {
+      type: EConnectorInteraction.ConfirmOpenApp,
+      payload: { sessionId: 'session-1' },
+    };
+
+    const ctx = (connector as unknown as MethodContextConnector)._ctxForMethod('getFeatures');
+    ctx.emit('ui-event', event);
+
+    expect(events).toEqual([event]);
+    expect(events[0]).toBe(event);
   });
 });
 
@@ -352,5 +439,139 @@ describe('LedgerConnectorBase BLE direct-connect gate', () => {
     await expect(connector.connect(TARGET_PATH)).rejects.toMatchObject({
       _tag: ERROR_TAG.BleGattBondingFailed,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// installApp failure teardown
+// ---------------------------------------------------------------------------
+
+describe('LedgerConnectorBase installApp failure teardown', () => {
+  const SESSION_ID = 'session-install-1';
+
+  /** Wire a connector with a stubbed DeviceApps whose install() rejects. */
+  function connectorWithFailingInstall(error: unknown) {
+    const connector = new LedgerConnectorBase(async () => ({}));
+    const cancel = jest.fn();
+    const invalidateSigners = jest.fn();
+
+    (connector as any)._deviceAppsManager = {
+      getOrCreate: async () => ({
+        install: async () => {
+          throw error;
+        },
+        set onRegisterCanceller(fn: (c: () => void) => void) {
+          fn(cancel);
+        },
+      }),
+      clearAll: jest.fn(),
+    };
+    (connector as any)._signerManager = {
+      invalidate: invalidateSigners,
+      clearAll: jest.fn(),
+    };
+
+    return { connector, cancel, invalidateSigners };
+  }
+
+  it('maps SecureChannelError, cancels the action and drops the session signers', async () => {
+    const secureChannelError = {
+      _tag: ERROR_TAG.SecureChannel,
+      error: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
+      originalError: { url: 'wss://scriptrunner', errorMessage: 'Connection closed unexpectedly' },
+    };
+    const { connector, cancel, invalidateSigners } =
+      connectorWithFailingInstall(secureChannelError);
+
+    const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('expected failure');
+    expect(result.error.code).toBe(HardwareErrorCode.LedgerSecureChannelError);
+    expect(result.error.params?._tag).toBe(ERROR_TAG.SecureChannel);
+    // Cancelling is the teardown that reaches the secure channel: it stops
+    // DMK's device action, which closes the WebSocket.
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(invalidateSigners).toHaveBeenCalledWith(SESSION_ID);
+    expect((connector as any)._cancellers.has(SESSION_ID)).toBe(false);
+  });
+
+  it('maps a metadata failure to LedgerFirmwareMetadataError without a transport teardown', async () => {
+    const { connector } = connectorWithFailingInstall({
+      _tag: ERROR_TAG.InvalidFirmwareMetadataResponse,
+      originalError: new Error('Invalid Firmware Metadata response error.'),
+    });
+
+    const result = await connector.call(SESSION_ID, 'installApp', { appName: 'Bitcoin' });
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('expected failure');
+    expect(result.error.code).toBe(HardwareErrorCode.LedgerFirmwareMetadataError);
+    expect(result.error.params?._tag).toBe(ERROR_TAG.InvalidFirmwareMetadataResponse);
+    // The adapter drops the link only for these lost-connection classes.
+    const rehydrated = rehydrateConnectorError(result.error);
+    expect(
+      [
+        isDeviceDisconnectedError,
+        isDeviceNotAdvertisingError,
+        isTimeoutError,
+        isConnectionLevelError,
+      ].some(isLost => isLost(rehydrated))
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DMK transports raise OpeningConnectionError from connect()'s catch-all:
+// BLE keeps it a pairing failure, HID means DeviceBusy.
+// ---------------------------------------------------------------------------
+
+describe('LedgerConnectorBase connect() opening-tag classification', () => {
+  const DEVICE_PATH = 'device-path-1';
+
+  function connectorWithFailingDmConnect(connectionType: ConnectionType) {
+    const connector = new LedgerConnectorBase(async () => ({}), {
+      connectionType,
+      dmk: {} as any,
+    });
+    const connect = jest.fn(async () => {
+      throw Object.assign(new Error('Failed to open connection'), {
+        _tag: ERROR_TAG.OpeningConnection,
+      });
+    });
+    (connector as any)._deviceManager = {
+      connect,
+      // Must be present: the BLE direct-connect path probes it before
+      // connecting, and a missing method would throw a TypeError that the
+      // catch below would wrap as a pairing failure for the wrong reason.
+      hasDiscoveredDevice: () => true,
+      getLiveDevices: async () => [{ id: DEVICE_PATH }],
+      getDeviceName: () => 'Ledger',
+      getDeviceId: () => DEVICE_PATH,
+      getDiscoveredDeviceInfo: () => undefined,
+      disposeKeepingDmk: () => undefined,
+      dispose: () => undefined,
+    };
+    return { connector, connect };
+  }
+
+  it.each([
+    ['ble', HardwareErrorCode.BlePairingTimeout],
+    ['usb', HardwareErrorCode.DeviceBusy],
+  ] as const)('classifies a %s opening failure as code %s', async (connectionType, code) => {
+    const { connector, connect } = connectorWithFailingDmConnect(connectionType);
+
+    const err = await connector.connect(DEVICE_PATH).then(
+      () => null,
+      (e: unknown) => e
+    );
+
+    // Guard the guard: the failure must come from dm.connect, not from a
+    // half-built stub.
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(err).not.toBeNull();
+    expect(mapLedgerError(err).code).toBe(code);
+    // BLE stays in the bluetooth family, so the host may treat it as orphan-eligible.
+    if (connectionType === 'ble') expect(ORPHAN_ELIGIBLE_ERROR_CODES).toContain(code);
   });
 });

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { UI_EVENT, UI_REQUEST, getDeviceType } from '@onekeyfe/hd-core';
-import { EDeviceType, isSameOnekeyBleName } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode, isSameOnekeyBleName } from '@onekeyfe/hd-shared';
 
 import {
   resolveBatchGetAddress,
@@ -1259,20 +1259,14 @@ function getFirmwareUpdateV4TotalBytes(params: ReturnType<typeof buildFirmwareUp
   ].reduce((total, binary) => total + (binary?.byteLength ?? 0), 0);
 }
 
-function getFirmwareUpdateV4ErrorText(result: unknown) {
-  if (!result || typeof result !== 'object') return '';
-  const { payload } = result as { payload?: unknown };
-  if (!payload || typeof payload !== 'object') return '';
-  const { error } = payload as { error?: unknown };
-  return typeof error === 'string' ? error : '';
-}
-
 function isProtocolV2UsbProbeTransientResult(result: unknown) {
-  const error = getFirmwareUpdateV4ErrorText(result);
+  if (!result || typeof result !== 'object') return false;
+  const { payload } = result as {
+    payload?: { code?: unknown; params?: { expectedProtocol?: unknown } };
+  };
   return (
-    error.includes('Device protocol mismatch') &&
-    error.includes('expected V2') &&
-    error.includes('did not respond to expected protocol')
+    payload?.code === HardwareErrorCode.TransportProtocolProbeFailed &&
+    payload.params?.expectedProtocol === 'V2'
   );
 }
 

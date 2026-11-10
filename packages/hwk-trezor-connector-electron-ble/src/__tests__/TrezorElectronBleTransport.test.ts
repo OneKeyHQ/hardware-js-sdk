@@ -3,15 +3,16 @@ import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import { TREZOR_BLE_UUIDS } from '@onekeyfe/hwk-trezor-adapter';
 
 import { TrezorElectronBleConnector } from '../TrezorElectronBleConnector';
+import { TREZOR_BLE_CONNECT_PROFILE } from '../bleProfile';
 import { TrezorElectronBleTransport } from '../TrezorElectronBleTransport';
 
-import type { TrezorBleApi } from '../types/desktop-api';
+import type { ThirdPartyBleApi } from '@onekeyfe/hwk-desktop-noble-ble';
 
 type NotificationHandler = (id: string, hex: string) => void;
 type DisconnectHandler = (id: string) => void;
 
 /** Fake `window.desktopApi.trezorBle` for unit tests. */
-class FakeBridge implements TrezorBleApi {
+class FakeBridge implements ThirdPartyBleApi {
   scan = jest.fn(async (_durationMs?: number) => [
     {
       id: 'BLE-1',
@@ -21,7 +22,9 @@ class FakeBridge implements TrezorBleApi {
     },
   ]);
 
-  stopScan = jest.fn(async () => undefined);
+  stopScan = jest.fn(async (_vendor?: string) => undefined);
+
+  cancelPairing = jest.fn(async (_options?: { vendor: string; id?: string }) => undefined);
 
   connect = jest.fn(async (id: string) => ({ id, name: 'Trezor Safe 7' }));
 
@@ -81,7 +84,8 @@ describe('TrezorElectronBleTransport', () => {
     const transport = new TrezorElectronBleTransport({ bridge });
 
     await transport.connect('BLE-1');
-    expect(bridge.connect).toHaveBeenCalledWith('BLE-1');
+    // The shared handler holds no vendor defaults, so the profile travels with every connect.
+    expect(bridge.connect).toHaveBeenCalledWith('BLE-1', TREZOR_BLE_CONNECT_PROFILE);
     expect(bridge.subscribe).toHaveBeenCalledWith('BLE-1');
 
     await transport.disconnect('BLE-1');
@@ -342,5 +346,54 @@ describe('TrezorElectronBleConnector', () => {
     await expect(connector.connect('BLE-2')).rejects.toMatchObject({
       code: HardwareErrorCode.BleConnectFailed,
     });
+  });
+});
+
+describe('targeted pairing cancellation', () => {
+  it('only sends the devices owned by this transport and rejects late subscription completion', async () => {
+    const bridge = new FakeBridge();
+    const transport = new TrezorElectronBleTransport({ bridge });
+    let finish!: () => void;
+    bridge.subscribe.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finish = resolve;
+        })
+    );
+    const pending = transport.connect('BLE-1');
+    await new Promise<void>(resolve => {
+      setImmediate(resolve);
+    });
+    await transport.cancelPairing();
+    expect(bridge.cancelPairing).toHaveBeenCalledWith({
+      vendor: TREZOR_BLE_CONNECT_PROFILE.vendor,
+      id: 'BLE-1',
+    });
+    expect(bridge.stopScan).toHaveBeenCalledWith(TREZOR_BLE_CONNECT_PROFILE.vendor);
+    finish();
+    await expect(pending).rejects.toMatchObject({ code: HardwareErrorCode.BlePairingCancelled });
+    expect(bridge.disconnect).toHaveBeenCalledWith('BLE-1');
+    transport.reset();
+  });
+
+  it('targeted cancel retires only that local link and allows reconnecting it', async () => {
+    const bridge = new FakeBridge();
+    const transport = new TrezorElectronBleTransport({ bridge });
+    await transport.connect('BLE-1');
+    await transport.connect('BLE-2');
+    const disconnected = jest.fn();
+    transport.onDisconnect('BLE-1', disconnected);
+    await transport.cancelPairing('BLE-1');
+    expect(bridge.cancelPairing).toHaveBeenCalledTimes(1);
+    expect(bridge.cancelPairing).toHaveBeenCalledWith({
+      vendor: TREZOR_BLE_CONNECT_PROFILE.vendor,
+      id: 'BLE-1',
+    });
+    expect(disconnected).toHaveBeenCalledTimes(1);
+    await expect(transport.write('BLE-1', new Uint8Array())).rejects.toThrow('not connected');
+    await expect(transport.write('BLE-2', new Uint8Array())).resolves.toBeUndefined();
+    await transport.connect('BLE-1');
+    expect(bridge.connect).toHaveBeenCalledTimes(3);
+    transport.reset();
   });
 });

@@ -1,3 +1,5 @@
+import { bytesToHex, hexToBytes, prepareSolanaOffchainMessageV1 } from '@onekeyfe/hwk-adapter-core';
+
 import {
   type TrezorChainContext,
   assertHexString,
@@ -10,6 +12,7 @@ import {
 import type {
   SolAddress,
   SolGetAddressParams,
+  SolSignMsgParams,
   SolSignTxParams,
   SolSignature,
   SolSignedTx,
@@ -76,20 +79,43 @@ export async function solSignTransaction(
   return { signature };
 }
 
-/**
- * Trezor firmware does NOT implement Solana message signing — only
- * SolanaSignTx exists in the protobuf. 1K ships a custom OneKey-only
- * SolanaSignUnsafeMessage extension, which Trezor devices don't have.
- * Surface a clear MethodNotSupported so callers don't confuse it with
- * "not yet ported".
- */
 export async function solSignMessage(
-  _ctx: TrezorChainContext,
-  _params: unknown
+  ctx: TrezorChainContext,
+  params: unknown
 ): Promise<SolSignature> {
-  throw createMethodNotSupportedError(
-    'Trezor firmware does not support Solana message signing — only solSignTransaction is available'
-  );
+  const request = readSolSignMsgParams(params);
+  if (request.messageVersion !== 1) {
+    throw createMethodNotSupportedError(
+      'Trezor supports finalized Solana off-chain message version 1 only'
+    );
+  }
+
+  const preparedMessage = prepareSolanaOffchainMessageV1({
+    message: hexToBytes(request.message),
+    requiredSigners: request.requiredSigners,
+  });
+  const response = await ctx.deviceSession.call('SolanaSignMessage', {
+    address_n: parseBip32Path(request.path),
+    message: {
+      message: preparedMessage.messageText,
+      signers: preparedMessage.requiredSigners,
+    },
+  });
+  if (response.type !== 'SolanaMessageSignature') {
+    throw new Error(`Expected SolanaMessageSignature response, received ${response.type}`);
+  }
+
+  const signature = readString(response.message, 'signature');
+  if (!signature) {
+    throw new Error('SolanaMessageSignature response did not include a signature');
+  }
+  const signedData = readString(response.message, 'signed_data');
+  const expectedSignedData = bytesToHex(preparedMessage.serializedMessage);
+  if (!signedData || stripHexPrefix(signedData).toLowerCase() !== expectedSignedData) {
+    throw new Error('Trezor signed data does not match the requested Solana off-chain message');
+  }
+
+  return { signature: stripHexPrefix(signature).toLowerCase() };
 }
 
 function readSolGetAddressParams(params: unknown): SolGetAddressParams {
@@ -121,6 +147,26 @@ function readSolSignTxParams(params: unknown): SolSignTxParams {
   }
   assertHexString('serializedTx', serializedTx);
   return params as SolSignTxParams;
+}
+
+function readSolSignMsgParams(params: unknown): SolSignMsgParams {
+  if (!params || typeof params !== 'object') {
+    throw createInvalidParamsError('solSignMessage params must be an object');
+  }
+  const request = params as Partial<SolSignMsgParams>;
+  if (typeof request.path !== 'string' || request.path.trim().length === 0) {
+    throw createInvalidParamsError('solSignMessage requires a non-empty path');
+  }
+  if (typeof request.message !== 'string' || request.message.length === 0) {
+    throw createInvalidParamsError('solSignMessage requires message as a hex string');
+  }
+  assertHexString('message', request.message);
+  if (request.messageVersion === 1 && !Array.isArray(request.requiredSigners)) {
+    throw createInvalidParamsError(
+      'Solana off-chain message version 1 requires signer public keys'
+    );
+  }
+  return request as SolSignMsgParams;
 }
 
 function stripHexPrefix(value: string): string {

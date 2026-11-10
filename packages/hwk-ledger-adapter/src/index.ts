@@ -13,6 +13,7 @@ export { SignerManager } from './signer/SignerManager';
 export { SignerEth } from './signer/SignerEth';
 export { SignerBtc } from './signer/SignerBtc';
 export { SignerSol } from './signer/SignerSol';
+export { SignerZcash } from './signer/SignerZcash';
 export { DmkTransport } from './transport/DmkTransport';
 export { deviceActionToPromise } from './signer/deviceActionToPromise';
 

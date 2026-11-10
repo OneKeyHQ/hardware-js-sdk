@@ -1,5 +1,5 @@
 import { ui } from '../../i18n/ui.mjs'
-import { Layout, LastUpdated } from 'nextra-theme-docs'
+import DocsLayout from '../../components/DocsLayout.client'
 import { publishedLocales, publishedLocaleCodes } from '../../i18n/locales.mjs'
 import { getPageMap } from 'nextra/page-map'
 import { OneKeyWordmark } from '../../components/OneKeyLogo'
@@ -36,7 +36,8 @@ export default async function LocaleLayout({ children, params }) {
   return (
     <>
       <DocumentLanguage locale={lang} />
-      <Layout
+      <DocsLayout
+        locale={lang}
         navbar={navbar}
         search={<OneKeySidebarSearch lang={lang} />}
         pageMap={pageMap}
@@ -52,7 +53,6 @@ export default async function LocaleLayout({ children, params }) {
           title: ui(lang, 'On This Page', '本页内容'),
           backToTop: ui(lang, 'Back to top', '返回顶部')
         }}
-        lastUpdated={<LastUpdated locale={lang}>{ui(lang, 'Last updated on', '最后更新于')}</LastUpdated>}
         navigation={true}
         copyPageButton={false}
         themeSwitch={{ light: ui(lang, 'Light', '浅色'), dark: ui(lang, 'Dark', '深色'), system: ui(lang, 'System', '跟随系统') }}
@@ -61,7 +61,7 @@ export default async function LocaleLayout({ children, params }) {
         footer={<Footer key="onekey-footer" locale={lang} />}
       >
         {children}
-      </Layout>
+      </DocsLayout>
       <DocAIChatWidget lang={lang} />
     </>
   )

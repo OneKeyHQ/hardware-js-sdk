@@ -119,6 +119,33 @@ function affectedPackageDirectories(files) {
   ].toSorted();
 }
 
+/**
+ * Fails when the manifests and yarn.lock disagree (e.g. lock entries lost in a rebase). Yarn 1
+ * `--frozen-lockfile` misses this in workspaces, so install normally, compare, and put the
+ * original lockfile back either way.
+ */
+function checkLockfile(logDirectory) {
+  const lockPath = path.join(rootDir, 'yarn.lock');
+  const original = fs.readFileSync(lockPath);
+  let updated;
+  try {
+    run(logDirectory, 'lockfile install', 'yarn', [
+      'install',
+      '--ignore-scripts',
+      '--prefer-offline',
+    ]);
+  } finally {
+    updated = fs.readFileSync(lockPath);
+    fs.writeFileSync(lockPath, original);
+  }
+  if (!updated.equals(original)) {
+    throw new Error(
+      'yarn.lock does not match the package manifests; run `yarn install --ignore-scripts` and commit the lockfile'
+    );
+  }
+  console.log('PASS lockfile matches the package manifests');
+}
+
 function main() {
   const profile = parseProfile(process.argv.slice(2));
   const files = changedFiles();
@@ -126,6 +153,13 @@ function main() {
 
   run(logDirectory, 'agent context', process.execPath, ['scripts/agent-context-check.js']);
   run(logDirectory, 'diff whitespace', 'git', ['diff', '--check']);
+
+  const touchesManifests = files.some(
+    file => file === 'yarn.lock' || file === 'package.json' || file.endsWith('/package.json')
+  );
+  if (profile === 'pr' || touchesManifests) {
+    checkLockfile(logDirectory);
+  }
 
   const lintFiles = files.filter(
     file =>

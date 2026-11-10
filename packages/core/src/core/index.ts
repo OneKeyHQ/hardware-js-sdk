@@ -1,4 +1,5 @@
 import semver from 'semver';
+import { getOwnedUsbDeviceIdentity } from '../api/SearchDevices';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
@@ -23,7 +24,6 @@ import {
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
-  isBleStaleBondHardwareError,
 } from '@onekeyfe/hd-shared';
 
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
@@ -61,6 +61,7 @@ import {
   formatLogMethodLabel,
   getLogBlockLabel,
   getSafeLogPayload,
+  getSafeLogTask,
 } from '../events';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
@@ -126,6 +127,8 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
 });
 
 let _core: Core | undefined;
+let transportSwitchGeneration = 0;
+let pendingTransportSwitch: Promise<void> = Promise.resolve();
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
@@ -991,15 +994,11 @@ function canSkipInitialize(method: BaseMethod, device: Device): boolean {
 }
 
 export function isRetryableBleProtocolV2ProbeError(method: BaseMethod, error: unknown) {
-  const typedError = error as { errorCode?: unknown; message?: unknown };
-  const message =
-    typeof typedError?.message === 'string' ? typedError.message : String(error ?? '');
+  const typedError = error as { errorCode?: unknown; params?: { expectedProtocol?: unknown } };
   return (
     method.payload.connectProtocol === 'V2' &&
-    typedError?.errorCode === HardwareErrorCode.RuntimeError &&
-    message.includes('Device protocol mismatch') &&
-    message.includes('expected V2') &&
-    message.includes('did not respond to expected protocol')
+    typedError?.errorCode === HardwareErrorCode.TransportProtocolProbeFailed &&
+    typedError.params?.expectedProtocol === 'V2'
   );
 }
 
@@ -1009,7 +1008,7 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   }
   const typedError = error as {
     errorCode?: unknown;
-    params?: { acquireDeadlineExceeded?: unknown };
+    params?: { acquireDeadlineExceeded?: unknown; expectedProtocol?: unknown };
   };
   if (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError &&
@@ -1020,6 +1019,8 @@ export function isRetryableBleConnectionError(method: BaseMethod, error: unknown
   return (
     typedError?.errorCode === HardwareErrorCode.BleTimeoutError ||
     typedError?.errorCode === HardwareErrorCode.BleConnectedError ||
+    (typedError?.errorCode === HardwareErrorCode.TransportProtocolProbeFailed &&
+      !typedError.params?.expectedProtocol) ||
     isRetryableBleProtocolV2ProbeError(method, error) ||
     isMissingDetectedProtocolV2Error(method, error)
   );
@@ -1033,10 +1034,6 @@ export function isMissingDetectedProtocolV2Error(method: BaseMethod, error: unkn
     typeof typedError.message === 'string' &&
     typedError.message.includes('Device protocol has not been detected')
   );
-}
-
-export function isTerminalBleStaleBondError(error: unknown) {
-  return isBleStaleBondHardwareError(error);
 }
 
 export function isDeviceIdentityMismatchError(error: unknown) {
@@ -1277,6 +1274,9 @@ const ensureConnected = async (
             HardwareErrorCode.BridgeNotInstalled,
             HardwareErrorCode.BridgeTimeoutError,
             HardwareErrorCode.BridgeNeedsPermission,
+            HardwareErrorCode.WebUsbDeviceAccessError,
+            HardwareErrorCode.TransportProtocolProbeFailed,
+            HardwareErrorCode.TransportProtocolMismatch,
           ].includes(error.errorCode)
         ) {
           _deviceList = undefined;
@@ -1363,6 +1363,9 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.BridgeNeedsPermission,
+            HardwareErrorCode.WebUsbDeviceAccessError,
+            HardwareErrorCode.TransportProtocolProbeFailed,
+            HardwareErrorCode.TransportProtocolMismatch,
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
@@ -1370,7 +1373,6 @@ const ensureConnected = async (
             [HardwareErrorCode.BleDeviceDisconnected, HardwareErrorCode.PollingTimeout].includes(
               error.errorCode
             )) ||
-          isTerminalBleStaleBondError(error) ||
           isDeviceIdentityMismatchError(error)
         ) {
           reject(error);
@@ -1450,7 +1452,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       };
       for (const requestId of requestIds) {
         const task = requestQueue.getTask(requestId);
-        Log.debug('Cancel Api connect task: ', task);
+        Log.debug('Cancel Api connect task: ', getSafeLogTask(task));
         if (task) {
           // During ensureConnected the method has a connectId but device is
           // assigned only after the poll succeeds. Interrupt the cached BLE
@@ -1485,7 +1487,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       };
       for (const requestId of requestQueue.getRequestTasksId()) {
         const task = requestQueue.getTask(requestId);
-        Log.debug('Cancel Api connect task: ', task);
+        Log.debug('Cancel Api connect task: ', getSafeLogTask(task));
         if (task) {
           interruptDevice(task.method?.device);
           if (task.method.connectId) {
@@ -1830,6 +1832,10 @@ export default class Core extends EventEmitter {
 
   private requestQueue = new RequestQueue();
 
+  getOwnedUsbDeviceIdentity(descriptor: Parameters<typeof getOwnedUsbDeviceIdentity>[0]) {
+    return getOwnedUsbDeviceIdentity(descriptor, this.requestQueue);
+  }
+
   private disposePromise?: Promise<void>;
 
   // background task
@@ -1944,7 +1950,7 @@ export default class Core extends EventEmitter {
         break;
       }
       case IFRAME.CALLBACK: {
-        Log.log('callback message: ', message);
+        Log.log('callback message: ', getSafeLogPayload(message));
         postMessage(message);
         break;
       }
@@ -1963,6 +1969,8 @@ export default class Core extends EventEmitter {
 
   private async disposeResources(): Promise<void> {
     Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    transportSwitchGeneration += 1;
+    pendingTransportSwitch = Promise.resolve();
     pollingManager.stopAll();
     this.requestQueue.abortAllRequests();
     cleanup();
@@ -1997,6 +2005,8 @@ export default class Core extends EventEmitter {
 }
 
 export const initCore = () => {
+  transportSwitchGeneration += 1;
+  pendingTransportSwitch = Promise.resolve();
   const core = new Core();
   _core = core;
   return core;
@@ -2026,6 +2036,8 @@ export const init = async (
   plugin?: LowlevelTransportSharedPlugin
 ) => {
   try {
+    transportSwitchGeneration += 1;
+    pendingTransportSwitch = Promise.resolve();
     await DataManager.load(settings);
     initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
@@ -2051,10 +2063,26 @@ export const switchTransport = ({
   Transport: any;
   plugin?: LowlevelTransportSharedPlugin;
 }) => {
-  DataManager.updateEnv(env);
-  TransportManager.setTransport(Transport, plugin);
-  _deviceList = undefined;
-  DevicePool.resetState();
-  _connector = undefined;
-  initConnector();
+  const generation = transportSwitchGeneration;
+  // Preserve request order while native transport cleanup is pending.
+  const switching = pendingTransportSwitch
+    .catch(() => undefined)
+    .then(async () => {
+      if (generation !== transportSwitchGeneration) {
+        throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+      }
+      _connector?.stop();
+      await TransportManager.getTransport()?.stop?.();
+      if (generation !== transportSwitchGeneration) {
+        throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+      }
+      DataManager.updateEnv(env);
+      TransportManager.setTransport(Transport, plugin);
+      _deviceList = undefined;
+      DevicePool.resetState();
+      _connector = undefined;
+      initConnector();
+    });
+  pendingTransportSwitch = switching;
+  return switching;
 };

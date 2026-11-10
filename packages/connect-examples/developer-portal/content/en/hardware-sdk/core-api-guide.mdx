@@ -57,7 +57,7 @@ sequenceDiagram
 | `connectId` | Which connection | `searchDevices()` | USB re-plug, BLE re-pair, transport switch |
 | `deviceId` | Which seed lifetime | `getDeviceState` (`getFeatures` is deprecated) | Wipe, recovery, seed switch |
 
-USB and BLE `connectId` values for the same unit are different — cache them separately. See [Identifiers](/en/hardware-sdk/concepts/identifiers) and [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+USB and BLE `connectId` values for the same unit are different — cache them separately. See [Identifiers](/en/hardware-sdk/concepts/identifiers) and [Disconnects and reconnection](/en/hardware-sdk/transport/reconnect).
 
 **Runtime requirements**
 
@@ -108,7 +108,7 @@ const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 if (!address.success) throw new Error(address.payload.error);
 ```
 
-Serialize per device. Refresh `getDeviceState` after a device switch. Remove listeners on unmount. Call `HardwareSDK.dispose()` only when tearing down the transport — see [Reconnect and dispose](/en/hardware-sdk/transport/reconnect).
+Serialize per device. Refresh `getDeviceState` after a device switch. Remove listeners on unmount. Call `HardwareSDK.dispose()` only when tearing down the transport — see [Disconnects and reconnection](/en/hardware-sdk/transport/reconnect).
 
 ## Common params
 

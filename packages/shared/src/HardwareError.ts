@@ -320,6 +320,18 @@ export const HardwareErrorCode = {
   TransportInvalidProtobuf: 603,
 
   /**
+   * No supported device protocol answered the active probe.
+   * @params: { expectedProtocol?: 'V1' | 'V2'; attempts?: number }
+   */
+  TransportProtocolProbeFailed: 604,
+
+  /**
+   * The actively detected device protocol differs from the required protocol.
+   * @params: { expectedProtocol: 'V1' | 'V2'; detectedProtocol?: 'V1' | 'V2' }
+   */
+  TransportProtocolMismatch: 605,
+
+  /**
    * Bluetooth error code
    */
   BleScanError: 700,
@@ -456,7 +468,7 @@ export const HardwareErrorCode = {
   FirmwareVerificationFailed: 820,
 
   /**
-   * Web bridge coonect needs permission
+   * USB access needs OS permission (bridge/libusb or WebUSB).
    */
   BridgeNeedsPermission: 821,
 
@@ -522,6 +534,12 @@ export const HardwareErrorCode = {
    * Web USB or Web Bluetooth device prompt access error
    */
   WebDevicePromptAccessError: 902,
+
+  /**
+   * WebUSB device is present, but its interface or endpoint is unavailable
+   * @params: { operation: 'open' | 'claimInterface' | 'transferIn' | 'transferOut'; nativeErrorName?: string; nativeErrorMessage?: string }
+   */
+  WebUsbDeviceAccessError: 903,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -599,6 +617,10 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.TransportCallInProgress]: 'Transport call in progress',
   [HardwareErrorCode.TransportNotFound]: 'Transport not found',
   [HardwareErrorCode.TransportInvalidProtobuf]: 'Transport invalid protobuf',
+  [HardwareErrorCode.TransportProtocolProbeFailed]:
+    'Failed to detect the device communication protocol. Reconnect the device and try again.',
+  [HardwareErrorCode.TransportProtocolMismatch]:
+    'The device communication protocol does not match the expected protocol.',
 
   /**
    * Bluetooth Error
@@ -606,7 +628,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleScanError]: 'BLE scan error',
   [HardwareErrorCode.BlePermissionError]: 'Bluetooth required to be turned on',
   [HardwareErrorCode.BleLocationError]:
-    'Location permissions for the application are not available',
+    'Bluetooth or location permissions for the application are not available',
   [HardwareErrorCode.BleRequiredUUID]: 'uuid is required',
   [HardwareErrorCode.BleConnectedError]: 'connected error is always runtime error',
   [HardwareErrorCode.BleDeviceNotBonded]: 'device is not bonded',
@@ -677,6 +699,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
     'Web-USB or Web-Bluetooth device not found or needs permission',
   [HardwareErrorCode.WebDevicePromptAccessError]:
     'Web-USB or Web-Bluetooth device prompt access error',
+  [HardwareErrorCode.WebUsbDeviceAccessError]: 'WebUSB device access failed',
 } as const;
 
 export const TypedError = (
@@ -688,26 +711,6 @@ export const TypedError = (
     return new HardwareError(hardwareError);
   }
   return new HardwareError({ errorCode: hardwareError, message: message ?? '', params });
-};
-
-export const isBleStaleBondHardwareError = (error: unknown): boolean => {
-  const code = (error as { errorCode?: unknown })?.errorCode;
-  return (
-    code === HardwareErrorCode.BleDeviceBondError ||
-    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
-    code === HardwareErrorCode.BleBondInvalid
-  );
-};
-
-export const isBleStaleBondErrorText = (text: string): boolean => {
-  const value = text.toLowerCase();
-  return (
-    value.includes('encryption is insufficient') ||
-    value.includes('insufficient encryption') ||
-    value.includes('peer removed pairing information') ||
-    value.includes('cberrordomain:14') ||
-    value.includes('gatt_insuf_authentication')
-  );
 };
 
 export const serializeError = (payload: any) => {

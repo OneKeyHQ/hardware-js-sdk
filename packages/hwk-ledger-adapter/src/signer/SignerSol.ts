@@ -1,4 +1,4 @@
-import { deviceActionToPromise } from './deviceActionToPromise';
+import { INTERACTIVE_TIMEOUT_MS, deviceActionToPromise } from './deviceActionToPromise';
 
 import type { CancelReason } from './deviceActionToPromise';
 import type { SignerSolana as ISdkSignerSol } from '@ledgerhq/device-signer-kit-solana';
@@ -32,7 +32,7 @@ export class SignerSol {
     return deviceActionToPromise<string>(
       action,
       this.onInteraction,
-      undefined,
+      options?.checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined,
       this.onRegisterCanceller
     );
   }
@@ -49,7 +49,7 @@ export class SignerSol {
     return deviceActionToPromise<Uint8Array>(
       action,
       this.onInteraction,
-      undefined,
+      INTERACTIVE_TIMEOUT_MS,
       this.onRegisterCanceller
     );
   }
@@ -67,7 +67,7 @@ export class SignerSol {
     return deviceActionToPromise<{ signature: string }>(
       action,
       this.onInteraction,
-      undefined,
+      INTERACTIVE_TIMEOUT_MS,
       this.onRegisterCanceller
     );
   }

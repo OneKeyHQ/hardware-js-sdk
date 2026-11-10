@@ -34,6 +34,7 @@ import DeviceSettings from '../src/api/device/DeviceSettings';
 import DeviceUnlock from '../src/api/device/DeviceUnlock';
 import DeviceWipe from '../src/api/device/DeviceWipe';
 import DeviceUploadWallpaper from '../src/api/protocol-v2/DeviceUploadWallpaper';
+import DeviceUploadNft from '../src/api/protocol-v2/DeviceUploadNft';
 import DeviceStatusGet from '../src/api/protocol-v2/DeviceStatusGet';
 import FilesystemFormat from '../src/api/protocol-v2/FilesystemFormat';
 import FilesystemPermissionFix from '../src/api/protocol-v2/FilesystemPermissionFix';
@@ -44,6 +45,7 @@ import FirmwareUpdateV3 from '../src/api/FirmwareUpdateV3';
 import FirmwareUpdateV4, {
   assertProtocolV2FirmwareTargetsSupported,
   assertProtocolV2ReconnectIdentity,
+  supportsProtocolV2BleFileWriteWindow,
 } from '../src/api/FirmwareUpdateV4';
 import GetPassphraseState from '../src/api/GetPassphraseState';
 import GetOnekeyFeatures from '../src/api/GetOnekeyFeatures';
@@ -67,6 +69,7 @@ import StellarGetAddress from '../src/api/stellar/StellarGetAddress';
 import BenfenSignMessage from '../src/api/benfen/BenfenSignMessage';
 import { getBitcoinForkSupportedProtocols } from '../src/api/btc/helpers/versionLimit';
 import { DataManager } from '../src/data-manager';
+import { LoggerNames, getLogger } from '../src/utils/logger';
 import { createCoreApi } from '../src/inject';
 import { Device, preloadSessionCache } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
@@ -120,7 +123,13 @@ import {
 
 import type { DeviceCommands } from '../src/device/DeviceCommands';
 import type { Features } from '../src/types';
-import type { DeviceStatus, ProtocolInfo } from '@onekeyfe/hd-transport';
+import type {
+  DeviceStatus,
+  FilesystemFileWrite,
+  MessageFromOneKey,
+  ProtocolInfo,
+  TransportCallOptions,
+} from '@onekeyfe/hd-transport';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -651,6 +660,162 @@ describe('UploadPortfolio', () => {
 
     expect(() => method.init()).toThrow('canonical Base64');
   });
+});
+
+describe('Pro2 / Neo application asset pipelines', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test.each(
+    [EDeviceType.Pro2, EDeviceType.Neo].flatMap(deviceType =>
+      (['wallpaper', 'nft', 'portfolio'] as const).flatMap(asset =>
+        [
+          { fail: false, recover: false },
+          { fail: true, recover: false },
+          { fail: true, recover: true },
+        ].map(outcome => ({ deviceType, asset, ...outcome }))
+      )
+    )
+  )(
+    '$deviceType $asset applies only a fully confirmed upload (fail=$fail, recover=$recover)',
+    async ({ deviceType, asset, fail, recover }) => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
+      jest.spyOn(DataManager, 'isBleConnect').mockReturnValue(true);
+      const failure = new Error('BLE response timeout');
+      let pipelineAttempts = 0;
+      const applyMessage = {
+        wallpaper: 'DeviceSettingsSet',
+        nft: 'NftUpdate',
+        portfolio: 'PortfolioUpdate',
+      }[asset];
+      const typedCall = jest.fn(
+        async (
+          name: string,
+          _response: string,
+          first: FilesystemFileWrite,
+          options?: TransportCallOptions
+        ) => {
+          if (name !== 'FilesystemFileWrite') return { type: 'Success', message: {} };
+          const pipeline = options?.fileWritePipeline;
+          if (!pipeline) {
+            if (fail && !recover) throw failure;
+            const { data } = first.file;
+            if (!(data instanceof Uint8Array)) throw new Error('Expected Uint8Array file data');
+            return {
+              type: 'FilesystemFile',
+              message: { ...first.file, processed_byte: first.file.offset + data.byteLength },
+            };
+          }
+          pipelineAttempts += 1;
+          let request: FilesystemFileWrite | undefined = first;
+          let response: MessageFromOneKey = { type: 'FilesystemFile', message: {} };
+          while (request) {
+            const { data } = request.file;
+            if (!(data instanceof Uint8Array)) throw new Error('Expected Uint8Array file data');
+            expect(data.byteLength).toBeLessThanOrEqual(1800);
+            expect(typedCall.mock.calls.some(call => call[0] === applyMessage)).toBe(false);
+            response = {
+              type: 'FilesystemFile',
+              message: { ...request.file, processed_byte: request.file.offset + data.byteLength },
+            };
+            pipeline.onResponse(response);
+            if (fail && (!recover || pipelineAttempts === 1)) throw failure;
+            request = (await pipeline.next()) as FilesystemFileWrite | undefined;
+          }
+          return response;
+        }
+      );
+      let method: DeviceUploadWallpaper | DeviceUploadNft | UploadPortfolio;
+      if (asset === 'wallpaper') {
+        method = new DeviceUploadWallpaper({
+          id: 1,
+          payload: { method: 'deviceUploadWallpaper', jpegBase64: createJpegBase64(604, 1024) },
+        });
+      } else if (asset === 'nft') {
+        method = new DeviceUploadNft({
+          id: 1,
+          payload: {
+            method: 'deviceUploadNft',
+            imageJpegBase64: createJpegBase64(540, 540),
+            thumbnailJpegBase64: createJpegBase64(263, 263),
+            title: 'NFT',
+            subtitle: '',
+            timestampMs: 1_760_000_000_000,
+          },
+        });
+      } else {
+        method = new UploadPortfolio({
+          id: 1,
+          payload: {
+            method: 'uploadPortfolio',
+            packageBase64: Buffer.from(new Uint8Array(3601)).toString('base64'),
+            uiMode: 'progress',
+          },
+        });
+      }
+      const commands = { typedCall, device: undefined as Device | undefined };
+      const acquire = jest.fn().mockResolvedValue(undefined);
+      method.device = stubDevice({
+        commands,
+        originalDescriptor: { protocolType: 'V2' },
+        features: { deviceType, mode: 'normal' },
+        state: {
+          identity: { serialNo: 'test-asset-device', deviceType },
+          status: { mode: 'normal', initialized: false },
+          versions: { firmware: '1.0.3', bootloader: '1.0.0' },
+        },
+        acquire,
+        initialize: jest.fn().mockResolvedValue(undefined),
+        ensureProtocolV2RuntimeContext: jest.fn().mockResolvedValue({
+          version: 2,
+          supported_messages: [60412, 60805, 60809, 61400, 61500],
+        }),
+        refreshProtocolV2SettingsAfterMutation: jest.fn().mockResolvedValue({}),
+      }) as unknown as Device;
+      commands.device = method.device;
+      method.postMessage = jest.fn();
+      method.init();
+
+      if (fail && !recover) {
+        await expect(method.run()).rejects.toBe(failure);
+        expect(typedCall.mock.calls.some(call => call[0] === applyMessage)).toBe(false);
+        expect(method.postMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ type: UI_REQUEST.REQUEST_BUTTON })
+        );
+      } else {
+        await method.run();
+        expect(typedCall.mock.calls[typedCall.mock.calls.length - 1][0]).toBe(applyMessage);
+        expect(typedCall.mock.calls.filter(call => call[0] === applyMessage)).toHaveLength(1);
+        expect(method.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: UI_REQUEST.DEVICE_PROGRESS,
+            payload: expect.objectContaining({ progress: 100 }),
+          })
+        );
+        if (asset === 'wallpaper') {
+          expect(method.postMessage).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              type: UI_REQUEST.REQUEST_BUTTON,
+              payload: expect.objectContaining({
+                deviceOnly: true,
+                completion: 'operation-completed',
+                operation: 'deviceUploadWallpaper',
+              }),
+            })
+          );
+          const postMessageMock = method.postMessage as jest.Mock;
+          const promptOrder =
+            postMessageMock.mock.invocationCallOrder[postMessageMock.mock.calls.length - 1];
+          const applyOrder = typedCall.mock.invocationCallOrder[typedCall.mock.calls.length - 1];
+          expect(promptOrder).toBeLessThan(applyOrder);
+        }
+      }
+      const recoveryAttempts = recover ? 1 : 3;
+      expect(typedCall.mock.calls.filter(call => call[3]?.fileWritePipeline)).toHaveLength(
+        fail ? recoveryAttempts + 1 : 1
+      );
+      expect(acquire).toHaveBeenCalledTimes(fail ? recoveryAttempts : 0);
+    }
+  );
 });
 
 const descriptor = {
@@ -4991,21 +5156,74 @@ describe('Protocol V2 firmware update targets', () => {
     expect(typedCall.mock.calls.map(call => call[0])).toEqual(['DeviceInfoGet']);
   });
 
-  test('stops V4 bootloader reconnect polling on a stale BLE bond', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-    const staleBondError = ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
-    const reconnectProtocolV2Device = jest.fn().mockRejectedValue(staleBondError);
-    (method as any).reconnectProtocolV2Device = reconnectProtocolV2Device;
+  test.each([undefined, 1500])(
+    'uses short BLE readiness attempts and reconnects after a lost response (override %s)',
+    async protocolV2DeviceInfoTimeoutMs => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: { method: 'firmwareUpdateV4', protocolV2DeviceInfoTimeoutMs },
+      });
+      const typedCall = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('BLE response timeout'))
+        .mockResolvedValue({ type: 'DeviceInfo', message: protocolV2BootloaderDeviceInfo });
+      method.device = stubDevice({
+        originalDescriptor: { id: 'ble-id', protocolType: 'V2' },
+        getCommands: () => ({ typedCall }),
+        probeProtocolV2RuntimeState: jest.fn().mockResolvedValue({ mode: 'bootloader' }),
+      }) as unknown as Device;
+      jest.spyOn(method, 'isBleReconnect').mockReturnValue(true);
+      const update = method as unknown as {
+        reconnectProtocolV2Device: jest.Mock;
+        waitForProtocolV2BootloaderMode: (timeout: number, interval: number) => Promise<unknown>;
+        protocolV2ExpectedSerialNumber: string;
+        getProtocolV2DeviceInfoTimeout: () => number;
+      };
+      update.protocolV2ExpectedSerialNumber = 'PR9999999999';
+      update.reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
 
-    await expect((method as any).waitForProtocolV2BootloaderMode(60_000, 0)).rejects.toBe(
-      staleBondError
+      await update.waitForProtocolV2BootloaderMode(60_000, 0);
+
+      expect(typedCall).toHaveBeenCalledTimes(2);
+      expect(typedCall).toHaveBeenNthCalledWith(
+        1,
+        'DeviceInfoGet',
+        'DeviceInfo',
+        expect.anything(),
+        { timeoutMs: protocolV2DeviceInfoTimeoutMs ?? 5000 }
+      );
+      expect(update.reconnectProtocolV2Device).toHaveBeenCalledTimes(2);
+      expect(update.reconnectProtocolV2Device).toHaveBeenCalledWith({ skipProtocolProbe: true });
+      expect(update.getProtocolV2DeviceInfoTimeout()).toBe(protocolV2DeviceInfoTimeoutMs ?? 30_000);
+    }
+  );
+
+  test('disconnects the pre-reboot BLE connection before waiting for bootloader readiness', async () => {
+    const method = new FirmwareUpdateV4({ id: 1, payload: { method: 'firmwareUpdateV4' } });
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    method.device = stubDevice({
+      originalDescriptor: { id: 'ble-id', protocolType: 'V2' },
+      deviceConnector: { disconnect },
+    }) as unknown as Device;
+    jest.spyOn(method, 'isBleReconnect').mockReturnValue(true);
+    method.postTipMessage = jest.fn();
+    const update = method as unknown as {
+      protocolV2Reboot: jest.Mock;
+      waitForProtocolV2BootloaderMode: jest.Mock;
+      rebootProtocolV2ToBootloader: () => Promise<boolean>;
+    };
+    update.protocolV2Reboot = jest.fn().mockResolvedValue(undefined);
+    update.waitForProtocolV2BootloaderMode = jest.fn().mockResolvedValue({ mode: 'bootloader' });
+
+    await expect(update.rebootProtocolV2ToBootloader()).resolves.toBe(true);
+
+    expect(disconnect).toHaveBeenCalledWith('ble-id');
+    expect(disconnect.mock.invocationCallOrder[0]).toBeGreaterThan(
+      update.protocolV2Reboot.mock.invocationCallOrder[0]
     );
-    expect(reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+    expect(disconnect.mock.invocationCallOrder[0]).toBeLessThan(
+      update.waitForProtocolV2BootloaderMode.mock.invocationCallOrder[0]
+    );
   });
 
   test('polls again when Protocol V2 bootloader serial is temporarily unavailable', async () => {
@@ -8900,6 +9118,587 @@ describe('Protocol V2 firmware update targets', () => {
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
   });
 
+  describe('RESC header check link recovery', () => {
+    const currentHeader = {
+      version: [1, 0, 0],
+      payloadHash: '11'.repeat(64),
+      headerHash: '22'.repeat(64),
+    };
+    const linkLost = () =>
+      ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'Device protocol has not been detected for AA:BB'
+      );
+    const createResource = (name: string) => ({
+      name,
+      source: { size: 3, readAt: jest.fn(), close: jest.fn() },
+      devicePath: `vol0:/bundles/${name}`,
+      ...currentHeader,
+    });
+    const createMethod = () => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      method.postTipMessage = jest.fn();
+      method.postProgressMessage = jest.fn();
+      (method as any).protocolV2SourceUpdateProcess = jest.fn(
+        ({ processedSize }: { processedSize: number }) => Promise.resolve(processedSize + 3)
+      );
+      (method as any).verifyProtocolV2StagedFile = jest.fn().mockResolvedValue(undefined);
+      (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+      return method;
+    };
+
+    test('reconnects and asks again when the link drops during a header check', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest
+        .fn()
+        .mockRejectedValueOnce(linkLost())
+        .mockResolvedValue(currentHeader);
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: [createResource('images.okpkg'), createResource('fonts.okpkg')],
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      expect((method as any).readProtocolV2DeviceFileHeader).toHaveBeenCalledTimes(3);
+      expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['BLE disconnect', () => ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected)],
+      ['BLE timeout', () => ERRORS.TypedError(HardwareErrorCode.BleTimeoutError)],
+      [
+        'invalidated Protocol V2 link',
+        () =>
+          Object.assign(new Error('Protocol V2 link generation changed'), {
+            name: 'ProtocolV2LinkError',
+            code: 'generation',
+          }),
+      ],
+      [
+        'released React Native BLE transport',
+        () => new Error('React Native BLE transport released'),
+      ],
+      ['released Electron BLE transport', () => new Error('Electron BLE transport released')],
+      ['cleaned Electron BLE state', () => new Error('Electron BLE device state cleaned')],
+      [
+        'Electron BLE device that is no longer connected',
+        () => ERRORS.TypedError(HardwareErrorCode.TransportNotFound, 'Device AA:BB not connected'),
+      ],
+    ])('rethrows a %s from the header check for recovery', async (_label, createError) => {
+      const method = createMethod();
+      const error = createError();
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(error);
+
+      await expect(
+        (method as any).isProtocolV2ResourceBundleUpToDate(createResource('images.okpkg'))
+      ).rejects.toBe(error);
+    });
+
+    test('treats a device-side header read failure as stale without reconnecting', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest
+        .fn()
+        .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Failure: busy'));
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: [createResource('images.okpkg')],
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+      expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(1);
+    });
+
+    test('limits header-check reconnects per transfer phase', async () => {
+      const method = createMethod();
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+
+      await (method as any).executeProtocolV2TransferPhase({
+        installSources: [],
+        resourceSources: ['a.okpkg', 'b.okpkg', 'c.okpkg'].map(createResource),
+      });
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(2);
+      expect((method as any).protocolV2SourceUpdateProcess).toHaveBeenCalledTimes(3);
+    });
+
+    test.each([
+      ['no device to reconnect to', () => ERRORS.TypedError(HardwareErrorCode.DeviceNotFound)],
+      [
+        'an identity mismatch',
+        () =>
+          ERRORS.TypedError(
+            HardwareErrorCode.DeviceNotFound,
+            'Protocol V2 reconnect physical identity mismatch: expected A, received B'
+          ),
+      ],
+      [
+        'an unavailable identity',
+        () =>
+          ERRORS.TypedError(
+            HardwareErrorCode.DeviceNotFound,
+            'Protocol V2 reconnect physical identity unavailable: expected path A'
+          ),
+      ],
+      [
+        'a failed identity query',
+        () => ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Failure: busy'),
+      ],
+    ])(
+      'aborts instead of resending when the header-check reconnect fails with %s',
+      async (_label, createError) => {
+        const method = createMethod();
+        const error = createError();
+        (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+        (method as any).recoverProtocolV2FileTransfer = jest.fn().mockRejectedValue(error);
+
+        await expect(
+          (method as any).executeProtocolV2TransferPhase({
+            installSources: [],
+            resourceSources: [createResource('images.okpkg'), createResource('fonts.okpkg')],
+          })
+        ).rejects.toBe(error);
+        expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+        expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+      }
+    );
+
+    test('writes nothing to a reconnected device whose identity query fails', async () => {
+      const method = createMethod();
+      // Run the real recovery: the session is replaced before the identity check.
+      delete (method as any).recoverProtocolV2FileTransfer;
+      const initialize = jest.fn();
+      (method as any).device = stubDevice({ initialize });
+      (method as any).reconnectProtocolV2Device = jest.fn().mockResolvedValue(undefined);
+      (method as any).verifyProtocolV2ReconnectIdentity = jest
+        .fn()
+        .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Failure: busy'));
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+
+      await expect(
+        (method as any).executeProtocolV2TransferPhase({
+          installSources: [],
+          resourceSources: [createResource('images.okpkg')],
+        })
+      ).rejects.toMatchObject({ message: expect.stringContaining('Failure: busy') });
+      expect((method as any).reconnectProtocolV2Device).toHaveBeenCalledTimes(1);
+      expect(initialize).not.toHaveBeenCalled();
+      expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+    });
+
+    test('reports a cancel that tears the header-check reconnect down as the cancel', async () => {
+      const method = createMethod();
+      delete (method as any).recoverProtocolV2FileTransfer;
+      const abortController = new AbortController();
+      method.abortSignal = abortController.signal;
+      (method as any).reconnectProtocolV2Device = jest.fn(() => {
+        abortController.abort();
+        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+      });
+      (method as any).readProtocolV2DeviceFileHeader = jest.fn().mockRejectedValue(linkLost());
+
+      await expect(
+        (method as any).executeProtocolV2TransferPhase({
+          installSources: [],
+          resourceSources: [createResource('images.okpkg')],
+        })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.CallQueueActionCancelled });
+      expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+    });
+  });
+
+  test.each([
+    ['1.0.3', '1.0.3', true],
+    ['1.0.10', '1.0.3', true],
+    ['1.0.2', '1.0.3', false],
+    ['0.0.0.1', '1.0.3', false],
+    ['1.0.3', '', false],
+  ] as const)(
+    'gates the BLE file write window on bootloader %s with minimum %s',
+    (bootloaderVersion, minBootloaderVersion, expected) => {
+      expect(supportsProtocolV2BleFileWriteWindow(bootloaderVersion, minBootloaderVersion)).toBe(
+        expected
+      );
+    }
+  );
+
+  test('keeps released 1.0.2 bootloaders serial by default', () => {
+    expect(supportsProtocolV2BleFileWriteWindow('1.0.3')).toBe(true);
+    expect(supportsProtocolV2BleFileWriteWindow('1.0.2')).toBe(false);
+  });
+
+  test.each([
+    ['react-native', 'bootloader', true],
+    ['desktop-web-ble', 'bootloader', true],
+    ['lowlevel', 'bootloader', false],
+    ['webusb', 'bootloader', false],
+    ['react-native', 'normal', false],
+  ] as const)(
+    'enables the BLE file write window for %s in %s mode only with a supported bootloader',
+    (env, mode, expected) => {
+      const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).device = stubDevice({
+        features: { mode, bootloaderMode: mode === 'bootloader', bootloaderVersion: '1.0.3' },
+      });
+
+      try {
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.3')).toBe(expected);
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.4')).toBe(false);
+      } finally {
+        getSettingsSpy.mockRestore();
+      }
+    }
+  );
+
+  test.each([
+    ['1.0.2', false],
+    ['1.0.3', true],
+    // The parsed bootloader version drops prerelease tags.
+    ['1.0.3-rc.1', true],
+  ] as const)(
+    'gates the default minimum on a running %s bootloader in React Native',
+    (bootloaderVersion, expected) => {
+      const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native');
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).device = stubDevice({
+        features: { mode: 'bootloader', bootloaderMode: true, bootloaderVersion },
+      });
+
+      try {
+        expect((method as any).shouldUseProtocolV2BleFileWriteWindow()).toBe(expected);
+      } finally {
+        getSettingsSpy.mockRestore();
+      }
+    }
+  );
+
+  describe('windowed BLE file write', () => {
+    const confirm = (request: { file: { offset: number; data: ArrayBuffer } }) => ({
+      type: 'FilesystemFile',
+      message: { processed_byte: request.file.offset + request.file.data.byteLength },
+    });
+    const streamAll = (requests: any[], onConfirmed?: () => void) =>
+      jest.fn(async (_name: string, _resType: string, first: any, options: any) => {
+        // A serial write sends one chunk per call.
+        if (!options.fileWritePipeline) {
+          requests.push(first);
+          return confirm(first);
+        }
+        const { next, onResponse } = options.fileWritePipeline;
+        let request = first;
+        let last;
+        while (request) {
+          requests.push(request);
+          last = confirm(request);
+          onConfirmed?.();
+          onResponse(last);
+          request = await next();
+        }
+        return last;
+      });
+    const createMethod = (typedCall: jest.Mock) => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).device = stubDevice({ getCommands: () => ({ typedCall }) });
+      (method as any).shouldUseProtocolV2BleFileWriteWindow = jest.fn().mockReturnValue(true);
+      (method as any).getProtocolV2FirmwareChunkSize = jest.fn().mockReturnValue(1000);
+      (method as any).recoverProtocolV2FileTransfer = jest.fn().mockResolvedValue(undefined);
+      method.postProgressMessage = jest.fn();
+      return method;
+    };
+    const transfer = async (method: FirmwareUpdateV4, filePath = 'vol0:/application_p1.bin') => {
+      const source = await openFirmwareByteSource({ binary: new Uint8Array(2500).buffer });
+      try {
+        const processedSize: number = await (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath,
+          processedSize: 500,
+          totalSize: 3000,
+        });
+        return processedSize;
+      } finally {
+        await source?.close();
+      }
+    };
+
+    test('streams the file through one FileWrite call and reports confirmed chunks', async () => {
+      const requests: any[] = [];
+      const typedCall = streamAll(requests);
+      const method = createMethod(typedCall);
+
+      await expect(transfer(method)).resolves.toBe(3000);
+
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(typedCall).toHaveBeenCalledWith(
+        'FilesystemFileWrite',
+        'FilesystemFile',
+        expect.anything(),
+        expect.objectContaining({
+          writeWithResponse: false,
+          fileWritePipeline: expect.objectContaining({
+            next: expect.any(Function),
+            onResponse: expect.any(Function),
+          }),
+        })
+      );
+      expect(requests.map(request => request.file.offset)).toEqual([0, 1000, 2000]);
+      expect(requests.map(request => request.file.data.byteLength)).toEqual([1000, 1000, 500]);
+      expect(requests.map(request => request.overwrite)).toEqual([true, false, false]);
+      expect(requests.map(request => request.ui_percentage)).toEqual([50, 84, 99]);
+      requests.forEach(request =>
+        expect(request).toMatchObject({
+          append: false,
+          file: { total_size: 2500, path: 'vol0:/application_p1.bin' },
+        })
+      );
+      const transferredBytes = (method.postProgressMessage as jest.Mock).mock.calls.map(
+        ([, , metrics]) => metrics.transferredBytes
+      );
+      expect(transferredBytes).toEqual([1500, 2500, 3000]);
+    });
+
+    test('caps windowed staging writes at the generic BLE chunk', async () => {
+      const requests: any[] = [];
+      const method = createMethod(streamAll(requests));
+      delete (method as any).getProtocolV2FirmwareChunkSize;
+      (method as any).params = { platform: 'native', chunkSize: 4096 };
+
+      await expect(transfer(method)).resolves.toBe(3000);
+
+      expect(requests.map(request => request.file.offset)).toEqual([0, 1800]);
+      expect(requests.map(request => request.file.data.byteLength)).toEqual([1800, 700]);
+    });
+
+    test.each(['react-native', 'desktop-web-ble'] as const)(
+      'bounds each windowed response wait in %s',
+      async env => {
+        const getSettingsSpy = jest.spyOn(DataManager, 'getSettings').mockReturnValue(env);
+        const typedCall = streamAll([]);
+
+        try {
+          await transfer(createMethod(typedCall));
+        } finally {
+          getSettingsSpy.mockRestore();
+        }
+
+        expect(typedCall.mock.calls[0][3]).toEqual(expect.objectContaining({ timeoutMs: 10_000 }));
+      }
+    );
+
+    const failWindowThenWriteSerial = (requests: any[]) => {
+      const writeSerial = streamAll(requests);
+      return jest.fn((name: string, resType: string, first: any, options: any) => {
+        if (options.fileWritePipeline) {
+          return Promise.reject(new Error('Protocol V2 file write response does not match'));
+        }
+        return writeSerial(name, resType, first, options);
+      });
+    };
+
+    test('falls back to serial whole-file overwrite after a failed windowed exchange', async () => {
+      const requests: any[] = [];
+      const typedCall = failWindowThenWriteSerial(requests);
+      const method = createMethod(typedCall);
+
+      await expect(transfer(method)).resolves.toBe(3000);
+
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      // One failed pipeline, then serial chunks overwriting the file from offset 0.
+      expect(typedCall).toHaveBeenCalledTimes(4);
+      expect(typedCall.mock.calls[0][3]).toHaveProperty('fileWritePipeline');
+      typedCall.mock.calls
+        .slice(1)
+        .forEach(call => expect(call[3]).not.toHaveProperty('fileWritePipeline'));
+      expect(typedCall.mock.calls[1][2]).toEqual(
+        expect.objectContaining({ overwrite: true, file: expect.objectContaining({ offset: 0 }) })
+      );
+      expect(requests.map(request => request.file.offset)).toEqual([0, 1000, 2000]);
+      const chunkSize = (method as any).getProtocolV2FirmwareChunkSize as jest.Mock;
+      expect(chunkSize).toHaveBeenNthCalledWith(1, 'write', 'vol0:/application_p1.bin', true);
+      expect(chunkSize).toHaveBeenNthCalledWith(2, 'write', 'vol0:/application_p1.bin', false);
+    });
+
+    test('keeps subsequent files serial after a failed windowed exchange', async () => {
+      const typedCall = failWindowThenWriteSerial([]);
+      const method = createMethod(typedCall);
+      await transfer(method);
+      typedCall.mockClear();
+
+      await expect(transfer(method, 'vol0:/resource.bin')).resolves.toBe(3000);
+
+      expect(typedCall).toHaveBeenCalledTimes(3);
+      typedCall.mock.calls.forEach(call => {
+        expect(call[3]).not.toHaveProperty('fileWritePipeline');
+        expect(call[2].file.path).toBe('vol0:/resource.bin');
+      });
+      expect((method as any).shouldUseProtocolV2BleFileWriteWindow).toHaveBeenCalledTimes(1);
+    });
+
+    test('bounds failed file transfers to three attempts after serial fallback', async () => {
+      const typedCall = jest.fn().mockRejectedValue(new Error('BLE response timeout'));
+      const method = createMethod(typedCall);
+      await expect(transfer(method)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+      });
+      expect(typedCall).toHaveBeenCalledTimes(3);
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(2);
+      expect(typedCall.mock.calls[0][3]).toHaveProperty('fileWritePipeline');
+      typedCall.mock.calls
+        .slice(1)
+        .forEach(call => expect(call[3]).not.toHaveProperty('fileWritePipeline'));
+    });
+
+    test('logs confirmed progress every ten seconds and average speed through Core', async () => {
+      let now = 1000;
+      const clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
+      const metrics = jest.spyOn(getLogger(LoggerNames.Core), 'log');
+      const method = createMethod(
+        streamAll([], () => {
+          now += 5000;
+        })
+      );
+      try {
+        await expect(transfer(method)).resolves.toBe(3000);
+        expect(metrics).toHaveBeenCalledTimes(3);
+        expect(metrics).toHaveBeenNthCalledWith(
+          2,
+          '[FirmwareUpdateV4] FileWrite metrics',
+          expect.objectContaining({
+            status: 'progress',
+            fileWriteWindow: 2,
+            chunkSize: 1000,
+            transferredBytes: 2000,
+            totalBytes: 2500,
+            elapsedMs: 10_000,
+            rateBytesPerSecond: 200,
+            attempt: 1,
+            retryCount: 0,
+          })
+        );
+        expect(metrics).toHaveBeenLastCalledWith(
+          '[FirmwareUpdateV4] FileWrite metrics',
+          expect.objectContaining({
+            status: 'completed',
+            transferredBytes: 2500,
+            elapsedMs: 15_000,
+            rateBytesPerSecond: 167,
+          })
+        );
+      } finally {
+        clock.mockRestore();
+        metrics.mockRestore();
+      }
+    });
+
+    test('stops sending on cancel and raises it after the transport call returns', async () => {
+      const abortController = new AbortController();
+      const requests: any[] = [];
+      const succeed = streamAll(requests);
+      const typedCall = jest.fn((name: string, resType: string, first: any, options: any) =>
+        succeed(name, resType, first, {
+          ...options,
+          fileWritePipeline: {
+            ...options.fileWritePipeline,
+            onResponse: (response: any) => {
+              options.fileWritePipeline.onResponse(response);
+              abortController.abort();
+            },
+          },
+        })
+      );
+      const method = createMethod(typedCall);
+      method.abortSignal = abortController.signal;
+
+      await expect(transfer(method)).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.CallQueueActionCancelled,
+      });
+      expect(requests.map(request => request.file.offset)).toEqual([0]);
+      expect((method as any).recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
+    });
+
+    test('raises a source read error after the windowed call and retries the file windowed', async () => {
+      const requests: any[] = [];
+      const typedCall = streamAll(requests);
+      const method = createMethod(typedCall);
+      const bytes = new Uint8Array(2500);
+      let failed = false;
+      const source = {
+        size: bytes.length,
+        readAt: jest.fn((offset: number, length: number) => {
+          if (offset === 1000 && !failed) {
+            failed = true;
+            return Promise.reject(new Error('artifact read failed'));
+          }
+          return Promise.resolve(bytes.slice(offset, offset + length).buffer);
+        }),
+        close: jest.fn(),
+      };
+
+      await expect(
+        (method as any).protocolV2SourceUpdateProcess({
+          source,
+          filePath: 'vol0:/application_p1.bin',
+          processedSize: 0,
+          totalSize: 2500,
+        })
+      ).resolves.toBe(2500);
+
+      // A host-side read error says nothing about the bootloader, so the retry keeps the window.
+      expect(typedCall).toHaveBeenCalledTimes(2);
+      typedCall.mock.calls.forEach(call => expect(call[3]).toHaveProperty('fileWritePipeline'));
+      expect((method as any).recoverProtocolV2FileTransfer).toHaveBeenCalledTimes(1);
+      expect(requests.map(request => request.file.offset)).toEqual([0, 0, 1000, 2000]);
+    });
+
+    test('rejects a windowed write that does not confirm the whole file', async () => {
+      const typedCall = jest.fn((_name: string, _resType: string, first: any) =>
+        Promise.resolve(confirm(first))
+      );
+      const method = createMethod(typedCall);
+      const source = await openFirmwareByteSource({ binary: new Uint8Array(2500).buffer });
+
+      try {
+        await expect(
+          (method as any).writeProtocolV2SourceWindowed({
+            source,
+            filePath: 'vol0:/application_p1.bin',
+            chunkSize: 1000,
+            processedSize: 500,
+            totalSize: 3000,
+            onChunkConfirmed: jest.fn(),
+          })
+        ).rejects.toMatchObject({
+          errorCode: HardwareErrorCode.EmmcFileWriteFirmwareError,
+          message: expect.stringContaining('invalid processed_byte 1000 for file size 2500'),
+        });
+      } finally {
+        await source?.close();
+      }
+      expect(typedCall).toHaveBeenCalledTimes(1);
+    });
+  });
+
   test('uses absolute processed_byte offsets and disables append for firmware file writes', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -9007,36 +9806,6 @@ describe('Protocol V2 firmware update targets', () => {
         writeWithResponse: false,
       })
     );
-  });
-
-  test('does not retry or wrap a stale BLE bond during a V4 file transfer', async () => {
-    const method = new FirmwareUpdateV4({
-      id: 1,
-      payload: {
-        method: 'firmwareUpdateV4',
-      },
-    });
-    const staleBondError = ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
-    (method as any).fileWriteChunk = jest.fn().mockRejectedValue(staleBondError);
-    const recoverProtocolV2FileTransfer = jest.fn();
-    (method as any).recoverProtocolV2FileTransfer = recoverProtocolV2FileTransfer;
-    const source = await openFirmwareByteSource({
-      binary: new Uint8Array([1]).buffer,
-    });
-
-    try {
-      await expect(
-        (method as any).protocolV2SourceUpdateProcess({
-          source,
-          filePath: 'vol1:firmware.bin',
-          processedSize: 0,
-          totalSize: 1,
-        })
-      ).rejects.toBe(staleBondError);
-    } finally {
-      await source?.close();
-    }
-    expect(recoverProtocolV2FileTransfer).not.toHaveBeenCalled();
   });
 
   test('does not recover or wrap a cancelled V4 file transfer', async () => {
@@ -9659,6 +10428,27 @@ describe('Protocol V2 firmware update targets', () => {
     expect(writePayloads.map(payload => payload.file.data.byteLength)).toEqual([1960, 1]);
   });
 
+  test.each([
+    [false, 'vol0:/application_p1.bin', 1960],
+    [true, 'vol0:/application_p1.bin', 1800],
+    [true, 'vol0:/bundles/images/animation.okpkg', 1800],
+  ])(
+    'sizes BLE write chunks for fileWriteWindow=%s and %s',
+    (fileWriteWindow, filePath, expected) => {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).params = { platform: 'native', chunkSize: 4096 };
+
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', filePath, fileWriteWindow)
+      ).toBe(expected);
+    }
+  );
+
   test('keeps confirmation active after the Request write until terminal Success arrives', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,
@@ -10197,8 +10987,7 @@ describe('Protocol V2 firmware reconnect identity', () => {
     });
 
     await expect((method as any).readProtocolV2DeviceFileHeader('bundle.okpp')).resolves.toBeNull();
-    expect(readChunkLengths.length).toBeGreaterThan(1);
-    expect(Math.max(...readChunkLengths)).toBe(900);
+    expect(readChunkLengths).toEqual([640]);
   });
 
   test('skips resource transfer when installed okpkg hashes match the downloaded package', async () => {
@@ -10254,6 +11043,12 @@ describe('Protocol V2 firmware reconnect identity', () => {
       path: 'vol0:/bundles/images/images.okpkg',
     });
     expect((method as any).protocolV2SourceUpdateProcess).not.toHaveBeenCalled();
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall).toHaveBeenCalledWith('FilesystemFileRead', 'FilesystemFile', {
+      file: { path: 'vol0:/bundles/images/images.okpkg', offset: 0, total_size: 0 },
+      chunk_len: 640,
+      ui_percentage: undefined,
+    });
   });
 
   test('updates a resource when the installed file size differs despite matching headers', async () => {

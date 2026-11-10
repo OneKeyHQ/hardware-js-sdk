@@ -1,6 +1,7 @@
 import type { PassphraseStateAware } from './passphrase';
 import type { Response } from './response';
 import type { IHardwareCallParams, NullableCallArg } from './wallet';
+import type { ExportedAccountKey } from './qr';
 
 export interface SolGetAddressParams extends PassphraseStateAware {
   path: string;
@@ -11,6 +12,8 @@ export interface SolAddress {
   /** Base58-encoded Solana address — this is also the Ed25519 public key. */
   address: string;
   path: string;
+  /** Set by air-gapped wallets (Keystone): the exported key this address derives from. */
+  accountKey?: ExportedAccountKey;
 }
 
 export interface SolSignTxParams extends PassphraseStateAware {
@@ -34,11 +37,27 @@ export interface SolSignedTx {
   signature: string;
 }
 
-export interface SolSignMsgParams extends PassphraseStateAware {
+interface SolSignMessageBaseParams extends PassphraseStateAware {
   path: string;
   /** Message bytes as hex string (no 0x prefix) */
   message: string;
 }
+
+export interface SolOffchainMessageV1Params {
+  /** Finalized Solana off-chain message format. */
+  messageVersion: 1;
+  /** Complete signer set as 32-byte hex public keys. */
+  requiredSigners: string[];
+}
+
+export type SolSignMsgParams = SolSignMessageBaseParams &
+  (
+    | {
+        messageVersion?: undefined;
+        requiredSigners?: undefined;
+      }
+    | SolOffchainMessageV1Params
+  );
 
 export interface SolSignature {
   /** Hex-encoded Ed25519 signature (no 0x prefix) */

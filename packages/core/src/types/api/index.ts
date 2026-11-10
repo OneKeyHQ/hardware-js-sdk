@@ -154,6 +154,13 @@ import type { benfenSignTransaction } from './benfenSignTransaction';
 import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
+import type { zcashGetAddress } from './zcashGetAddress';
+import type { zcashGetFullViewingKey } from './zcashGetFullViewingKey';
+import type { zcashSignPczt } from './zcashSignPczt';
+import type { moneroGetAddress } from './moneroGetAddress';
+import type { moneroGetWatchKey } from './moneroGetWatchKey';
+import type { moneroKeyImageSync } from './moneroKeyImageSync';
+import type { moneroSignTransaction } from './moneroSignTransaction';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -472,4 +479,19 @@ export type CoreApi = {
    */
   neoGetAddress: typeof neoGetAddress;
   neoSignTransaction: typeof neoSignTransaction;
+
+  /**
+   * Zcash
+   */
+  zcashGetAddress: typeof zcashGetAddress;
+  zcashGetFullViewingKey: typeof zcashGetFullViewingKey;
+  zcashSignPczt: typeof zcashSignPczt;
+
+  /**
+   * Monero
+   */
+  moneroGetAddress: typeof moneroGetAddress;
+  moneroGetWatchKey: typeof moneroGetWatchKey;
+  moneroKeyImageSync: typeof moneroKeyImageSync;
+  moneroSignTransaction: typeof moneroSignTransaction;
 };

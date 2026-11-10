@@ -57,7 +57,7 @@ sequenceDiagram
 | `connectId` | 哪条连接 | `searchDevices()` | USB 重插、BLE 重新配对、切换传输 |
 | `deviceId` | 哪一次种子生命周期 | `getDeviceState`（`getFeatures` 已废弃） | 擦除、恢复、换种子 |
 
-同一台设备的 USB 和 BLE `connectId` 不同，要分开缓存。见 [标识符](/zh/hardware-sdk/concepts/identifiers) 和 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
+同一台设备的 USB 和 BLE `connectId` 不同，要分开缓存。见 [标识符](/zh/hardware-sdk/concepts/identifiers) 和 [断线与重连](/zh/hardware-sdk/transport/reconnect)。
 
 **运行时要求**
 
@@ -108,7 +108,7 @@ const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 if (!address.success) throw new Error(address.payload.error);
 ```
 
-同一设备串行。切换设备后重新读取 `getDeviceState`。卸载时移除监听。只有拆除传输时才 `HardwareSDK.dispose()` —— 见 [重连与释放](/zh/hardware-sdk/transport/reconnect)。
+同一设备串行。切换设备后重新读取 `getDeviceState`。卸载时移除监听。只有拆除传输时才 `HardwareSDK.dispose()` —— 见 [断线与重连](/zh/hardware-sdk/transport/reconnect)。
 
 ## 通用参数
 <div id="common-params" />

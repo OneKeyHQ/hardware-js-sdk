@@ -34,6 +34,9 @@ This package vendors MIT-licensed source from `trezor/trezor-suite`.
 - 删掉了全包范围的 `// @ts-expect-error: ...noUncheckedIndexedAccess...` 压制注释
   （`api/abstract.ts`、`sessions/background.ts`、`thp/loop.ts`、`utils/send.ts`），
   原因同其它包：我们没开这个编译选项，属于无错可压。
+- `src/utils/receive.ts` — `Protocol decode failed` 的 `console.warn` 不再打印整帧 hex
+  （首帧可能携带地址、公钥或交易内容），改为 `payloadLength` + 前 2 字节 `payloadHead`
+  （足以区分 v1 `?##` 与 THP 控制字节）。
 
 ## 已知缺口
 

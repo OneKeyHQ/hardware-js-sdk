@@ -1,6 +1,11 @@
-import { HardwareErrorCode, enrichErrorMessage } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  defaultOriginForCode,
+  defaultRecoveryForCode,
+  enrichErrorMessage,
+} from '@onekeyfe/hwk-adapter-core';
 
-import type { Failure } from '@onekeyfe/hwk-adapter-core';
+import type { Failure, HwkErrorOrigin, HwkRecoveryHint } from '@onekeyfe/hwk-adapter-core';
 
 export const MULTIPLE_USB_LEDGER_DEVICES_ERROR_MESSAGE =
   'Multiple Ledger USB devices are connected. Please connect only one Ledger device and try again.';
@@ -26,12 +31,17 @@ export function ledgerFailure(
   error: string,
   appName?: string,
   tag?: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  origin?: HwkErrorOrigin,
+  recovery?: HwkRecoveryHint
 ): LedgerFailure {
   const payload: LedgerFailure['payload'] = { error, code };
   if (appName !== undefined) payload.appName = appName;
   if (tag !== undefined) payload._tag = tag;
   if (params !== undefined) payload.params = params;
+  const resolvedOrigin = origin ?? defaultOriginForCode(code);
+  if (resolvedOrigin !== undefined) payload.origin = resolvedOrigin;
+  payload.recovery = recovery ?? defaultRecoveryForCode(code);
   return { success: false, payload };
 }
 
@@ -237,7 +247,10 @@ export const ERROR_TAG = {
   UnknownDevice: 'UnknownDeviceError',
   DeviceSessionRefresher: 'DeviceSessionRefresherError',
   DeviceNotInitialized: 'DeviceNotInitializedError',
-  OpeningConnection: 'OpeningConnectionError',
+  // DMK class OpeningConnectionError carries `_tag` "ConnectionOpeningError"; both
+  // spellings are kept so a DMK release that aligns them still classifies.
+  OpeningConnection: 'ConnectionOpeningError',
+  OpeningConnectionLegacy: 'OpeningConnectionError',
   DeviceDisconnectedBeforeSendingApdu: 'DeviceDisconnectedBeforeSendingApdu',
   DeviceDisconnectedWhileSending: 'DeviceDisconnectedWhileSendingError',
   Disconnect: 'DisconnectError',
@@ -247,10 +260,20 @@ export const ERROR_TAG = {
   // outcome when the user doesn't confirm pairing on the device, or the
   // existing bond is invalid. Observed in production after ~30s.
   PairingRefused: 'PairingRefusedError',
+  PeerRemovedPairing: 'PeerRemovedPairingError',
   // DMK remote-network failures (manager-api HTTP / secure-channel WS).
   WebSocketConnection: 'WebSocketConnectionError',
   HttpFetch: 'FetchError',
+  NetworkDA: 'NetworkDAError',
   InvalidFirmwareMetadataResponse: 'InvalidGetFirmwareMetadataResponseError',
+  ApplicationsMetadataTask: 'GetApplicationsMetadataTaskError',
+  // DMK OS device actions. SecureChannelError is what mapInstallDAErrors() leaves
+  // after splitting out device answers, i.e. the relay itself broke.
+  SecureChannel: 'SecureChannelError',
+  RefusedByUserDA: 'RefusedByUserDAError',
+  AppAlreadyInstalledDA: 'AppAlreadyInstalledDAError',
+  OutOfMemoryDA: 'OutOfMemoryDAError',
+  DeviceNotOnboarded: 'DeviceNotOnboardedError',
 } as const;
 
 export type SdkErrorTag = (typeof ERROR_TAG)[keyof typeof ERROR_TAG];
@@ -280,7 +303,40 @@ export function isBleGattBondingFailedError(err: unknown): boolean {
   return (err as { _tag?: string })._tag === ERROR_TAG.BleGattBondingFailed;
 }
 
-// Any BLE pairing failure (DMK-native, ble-plx, our own). All map to
+/** DMK keeps native BLE errors in `err`, which may differ from `originalError`. */
+export function isBleBondInvalidError(err: unknown): boolean {
+  const pending: unknown[] = [err];
+  const seen = new Set<object>();
+  while (pending.length > 0) {
+    const candidate = pending.pop();
+    if (candidate && typeof candidate === 'object' && !seen.has(candidate)) {
+      seen.add(candidate);
+      const e = candidate as Record<string, unknown>;
+      if (
+        e._tag === ERROR_TAG.PeerRemovedPairing ||
+        e.iosErrorCode === 14 ||
+        e.attErrorCode === 5 ||
+        (e.nativeErrorDomain === 'CBErrorDomain' && e.nativeErrorCode === 14)
+      ) {
+        return true;
+      }
+      const reason = typeof e.reason === 'string' ? e.reason : '';
+      const message = typeof e.message === 'string' ? e.message : '';
+      // Electron IPC preserves the patched native message, but drops custom error fields.
+      if (
+        /\bCBErrorDomain:14(?:\s|$)/.test(message) ||
+        reason.includes('Peer removed pairing information') ||
+        reason.includes('GATT_INSUF_AUTHENTICATION')
+      ) {
+        return true;
+      }
+      pending.push(e.originalError, e.err);
+    }
+  }
+  return false;
+}
+
+// Other BLE pairing failures (DMK-native, ble-plx, our own) map to
 // `code: BlePairingTimeout` so batch fail-closes uniformly. User-cancel of
 // the system pairing dialog also lands here — to the user it's the same
 // "didn't pair" outcome, no need to disambiguate.
@@ -301,11 +357,11 @@ export function isBlePairingFailureError(err: unknown): boolean {
 // "Connection is broken" — next call can't reuse the session. Used by
 // Layer 2 fail-closed gate.
 const CONNECTION_LEVEL_TAGS: Set<string> = new Set([
-  ERROR_TAG.DeviceLocked,
   ERROR_TAG.DeviceNotAdvertising,
   ERROR_TAG.BlePairingTimeout,
   ERROR_TAG.BleGattBondingFailed,
   ERROR_TAG.PairingRefused,
+  ERROR_TAG.PeerRemovedPairing,
   ERROR_TAG.DeviceNotRecognized,
   ERROR_TAG.NoAccessibleDevice,
   ERROR_TAG.UnknownDevice,
@@ -313,6 +369,7 @@ const CONNECTION_LEVEL_TAGS: Set<string> = new Set([
   ERROR_TAG.DeviceSessionRefresher,
   ERROR_TAG.DeviceNotInitialized,
   ERROR_TAG.OpeningConnection,
+  ERROR_TAG.OpeningConnectionLegacy,
   ERROR_TAG.DeviceDisconnectedBeforeSendingApdu,
   ERROR_TAG.DeviceDisconnectedWhileSending,
   ERROR_TAG.Disconnect,
@@ -329,7 +386,12 @@ const DEVICE_NOT_FOUND_TAGS: Set<string> = new Set([
   ERROR_TAG.DeviceNotInDiscoveryCache,
 ]);
 
-const DEVICE_BUSY_TAGS: Set<string> = new Set([ERROR_TAG.OpeningConnection]);
+// HID-shaped reading of the opening tag: the device is held by another page.
+// BLE callers wrap it as a pairing failure before it reaches here.
+const DEVICE_BUSY_TAGS: Set<string> = new Set([
+  ERROR_TAG.OpeningConnection,
+  ERROR_TAG.OpeningConnectionLegacy,
+]);
 
 const DEVICE_DISCONNECTED_TAGS: Set<string> = new Set([
   ERROR_TAG.DeviceNotRecognized,
@@ -343,20 +405,23 @@ const DEVICE_DISCONNECTED_TAGS: Set<string> = new Set([
 ]);
 
 export function isConnectionLevelError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const tag = (err as { _tag?: string })._tag;
-  if (tag && CONNECTION_LEVEL_TAGS.has(tag)) return true;
-  // Recurse into nested DMK error envelopes (originalError / error.{_tag})
-  const e = err as Record<string, unknown>;
-  if (e.originalError != null && isConnectionLevelError(e.originalError)) return true;
-  if (e.error != null && e._tag && isConnectionLevelError(e.error)) return true;
-  return false;
+  return hasErrorTag(err, CONNECTION_LEVEL_TAGS);
 }
 
 /** Expose for connector — used to decide whether to pass an error through
  *  unchanged or wrap as BleGattBondingFailed. */
 export function isKnownConnectionTag(tag: unknown): boolean {
   return typeof tag === 'string' && CONNECTION_LEVEL_TAGS.has(tag);
+}
+
+// Every DMK transport's catch-all for a failed connect: busy device on HID, generic
+// GATT/pairing failure on BLE, so BLE callers must classify it themselves.
+const CONNECTION_OPENING_TAGS: ReadonlySet<string> = new Set<string>([
+  ERROR_TAG.OpeningConnection,
+  ERROR_TAG.OpeningConnectionLegacy,
+]);
+export function isConnectionOpeningTag(tag: unknown): boolean {
+  return typeof tag === 'string' && CONNECTION_OPENING_TAGS.has(tag);
 }
 
 /** Check if a status/error code exists in the given set, crawling the error chain. */
@@ -402,31 +467,33 @@ function hasInvalidArgumentCode(err: unknown): boolean {
   return false;
 }
 
-function isDeviceNotFoundError(err: unknown): boolean {
+/** Does this error, or anything it wraps, carry one of `tags` as its `_tag`? */
+function hasErrorTag(err: unknown, tags: ReadonlySet<string>): boolean {
   if (!err || typeof err !== 'object') return false;
-  const tag = (err as { _tag?: string })._tag;
-  if (tag && DEVICE_NOT_FOUND_TAGS.has(tag)) return true;
   const e = err as Record<string, unknown>;
-  if (e.originalError != null && isDeviceNotFoundError(e.originalError)) return true;
-  if (e.error != null && e._tag && isDeviceNotFoundError(e.error)) return true;
+  if (typeof e._tag === 'string' && tags.has(e._tag)) return true;
+  if (e.originalError != null && hasErrorTag(e.originalError, tags)) return true;
+  if (e.error != null && e._tag && hasErrorTag(e.error, tags)) return true;
   return false;
+}
+
+function isDeviceNotFoundError(err: unknown): boolean {
+  return hasErrorTag(err, DEVICE_NOT_FOUND_TAGS);
 }
 
 function isDeviceBusyError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const tag = (err as { _tag?: string })._tag;
-  if (tag && DEVICE_BUSY_TAGS.has(tag)) return true;
-  const e = err as Record<string, unknown>;
-  if (e.originalError != null && isDeviceBusyError(e.originalError)) return true;
-  if (e.error != null && e._tag && isDeviceBusyError(e.error)) return true;
-  return false;
+  return hasErrorTag(err, DEVICE_BUSY_TAGS);
 }
 
-/** Check for user rejection (denied on device). */
+/** User rejection. RefusedByUserDAError (install decline) has no `message`, so match by tag. */
+const USER_REJECTED_TAGS: ReadonlySet<string> = new Set<string>([
+  ERROR_TAG.UserRefusedOnDevice,
+  ERROR_TAG.RefusedByUserDA,
+]);
 export function isUserRejectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
-  if (e._tag === ERROR_TAG.UserRefusedOnDevice) return true;
+  if (hasErrorTag(err, USER_REJECTED_TAGS)) return true;
   if (typeof e.message === 'string' && /denied|rejected|refused/i.test(e.message)) return true;
   if (hasStatusCode(err, USER_REJECTED_CODES)) return true;
   return false;
@@ -465,17 +532,43 @@ export function isAppNotInstalledError(err: unknown): boolean {
 }
 
 /** DMK install ran out of space on the device. Identified by the DMK error tag. */
+const OUT_OF_MEMORY_TAGS = new Set<string>([ERROR_TAG.OutOfMemoryDA]);
 export function isOutOfMemoryError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as Record<string, unknown>;
-  return e._tag === 'OutOfMemoryDAError';
+  return hasErrorTag(err, OUT_OF_MEMORY_TAGS);
+}
+
+/** Install refused because the app is already present on the device. */
+const APP_ALREADY_INSTALLED_TAGS = new Set<string>([ERROR_TAG.AppAlreadyInstalledDA]);
+export function isAppAlreadyInstalledError(err: unknown): boolean {
+  return hasErrorTag(err, APP_ALREADY_INSTALLED_TAGS);
+}
+
+/** Device has no seed yet: install and every OS action need an onboarded device. */
+const DEVICE_NOT_ONBOARDED_TAGS = new Set<string>([ERROR_TAG.DeviceNotOnboarded]);
+export function isDeviceNotOnboardedError(err: unknown): boolean {
+  return hasErrorTag(err, DEVICE_NOT_ONBOARDED_TAGS);
+}
+
+/** manager-api answered with unparseable metadata: not a connectivity failure. */
+const FIRMWARE_METADATA_TAGS: ReadonlySet<string> = new Set<string>([
+  ERROR_TAG.InvalidFirmwareMetadataResponse,
+  ERROR_TAG.ApplicationsMetadataTask,
+]);
+export function isFirmwareMetadataError(err: unknown): boolean {
+  return hasErrorTag(err, FIRMWARE_METADATA_TAGS);
+}
+
+/** The secure channel relaying install APDUs to the device broke. */
+const SECURE_CHANNEL_TAGS = new Set<string>([ERROR_TAG.SecureChannel]);
+export function isSecureChannelError(err: unknown): boolean {
+  return hasErrorTag(err, SECURE_CHANNEL_TAGS);
 }
 
 /** Remote network failure reaching Ledger's servers (HTTP or WS). Crawls the error chain. */
-const NETWORK_ERROR_TAGS = new Set<string>([
+const NETWORK_ERROR_TAGS: ReadonlySet<string> = new Set<string>([
   ERROR_TAG.WebSocketConnection,
   ERROR_TAG.HttpFetch,
-  ERROR_TAG.InvalidFirmwareMetadataResponse,
+  ERROR_TAG.NetworkDA,
 ]);
 export function isNetworkError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -549,6 +642,20 @@ export function isStuckAppStateError(err: unknown): boolean {
   return isAppStuckByApdu(err) || isTransportStuck(err);
 }
 
+// mapInstallDAErrors() builds its DA errors with no argument, leaving this literal
+// as `originalError.message`; the tag says more.
+const DMK_PLACEHOLDER_MESSAGE = 'Unknown error.';
+
+/** Readable text from a wrapped error, or undefined when it says nothing. */
+function nestedErrorMessage(nested: unknown): string | undefined {
+  if (!nested || typeof nested !== 'object') return undefined;
+  const { message } = nested as Record<string, unknown>;
+  if (typeof message !== 'string') return undefined;
+  const trimmed = message.trim();
+  if (!trimmed || trimmed === DMK_PLACEHOLDER_MESSAGE) return undefined;
+  return message;
+}
+
 /**
  * Map a Ledger DMK error to a HardwareErrorCode and human-readable message.
  * `opts.defaultAppName` fills `appName` when the raw error doesn't carry it
@@ -560,17 +667,20 @@ export function mapLedgerError(
 ): {
   code: HardwareErrorCode;
   message: string;
+  origin?: HwkErrorOrigin;
   appName?: string;
 } {
   // Order matters: check more specific errors first
 
-  // Extract the original message for fallback / enrichment
+  // DMK device-action errors have no own `message`; the readable text is on `originalError`.
   let originalMessage = 'Unknown Ledger error';
   if (err instanceof Error) {
     originalMessage = err.message;
   } else if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;
-    originalMessage = String(e.message ?? e._tag ?? e.type ?? JSON.stringify(err));
+    originalMessage = String(
+      e.message ?? nestedErrorMessage(e.originalError) ?? e._tag ?? e.type ?? JSON.stringify(err)
+    );
   }
 
   let code: HardwareErrorCode;
@@ -580,10 +690,14 @@ export function mapLedgerError(
     code = HardwareErrorCode.DeviceLocked;
   } else if (isDeviceNotAdvertisingError(err) || isDeviceNotFoundError(err)) {
     code = HardwareErrorCode.DeviceNotFound;
+  } else if (isBleBondInvalidError(err)) {
+    code = HardwareErrorCode.BleBondInvalid;
+  } else if (isBlePairingFailureError(err)) {
+    // Must precede isDeviceBusyError, which would match the raw transport error
+    // the BLE wrapper keeps on `originalError`.
+    code = HardwareErrorCode.BlePairingTimeout;
   } else if (isDeviceBusyError(err)) {
     code = HardwareErrorCode.DeviceBusy;
-  } else if (isBlePairingFailureError(err)) {
-    code = HardwareErrorCode.BlePairingTimeout;
   } else if (isUserAbortedError(err)) {
     // SDK-level abort (e.g. user declined the install prompt). Distinct from
     // on-device UserRejected — surface UserAborted so callers can tell apart
@@ -597,11 +711,21 @@ export function mapLedgerError(
     code = HardwareErrorCode.WrongApp;
   } else if (isAppNotInstalledError(err)) {
     code = HardwareErrorCode.AppNotInstalled;
+  } else if (isAppAlreadyInstalledError(err)) {
+    code = HardwareErrorCode.AppAlreadyInstalled;
   } else if (isOutOfMemoryError(err)) {
     code = HardwareErrorCode.DeviceOutOfMemory;
+  } else if (isDeviceNotOnboardedError(err)) {
+    code = HardwareErrorCode.DeviceNotInitialized;
+  } else if (isFirmwareMetadataError(err)) {
+    // Keep off NetworkError so transport-level recovery never fires for it.
+    code = HardwareErrorCode.LedgerFirmwareMetadataError;
   } else if (isNetworkError(err)) {
     // Must precede isDeviceDisconnectedError — its message-substring match can trip on network errors.
     code = HardwareErrorCode.NetworkError;
+  } else if (isSecureChannelError(err)) {
+    // Last remote-side class: what mapInstallDAErrors() did not attribute to the device.
+    code = HardwareErrorCode.LedgerSecureChannelError;
   } else if (isDeviceDisconnectedError(err)) {
     code = HardwareErrorCode.DeviceDisconnected;
   } else if (isTimeoutError(err)) {
@@ -624,5 +748,11 @@ export function mapLedgerError(
       : undefined;
   const appName = errAppName ?? opts?.defaultAppName;
 
-  return { code, message: enrichErrorMessage(code, originalMessage), appName };
+  // Every code above has an unambiguous origin; OperationTimeout / UnknownError map to undefined.
+  return {
+    code,
+    message: enrichErrorMessage(code, originalMessage),
+    origin: defaultOriginForCode(code),
+    appName,
+  };
 }

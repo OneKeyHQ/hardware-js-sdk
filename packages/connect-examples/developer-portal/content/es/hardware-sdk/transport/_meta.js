@@ -6,5 +6,5 @@ export default {
   android: "Android (nativo)",
   ios: "iOS (nativo)",
   flutter: "Flutter (nativo)",
-  reconnect: "Reconexión y liberación de recursos",
+  reconnect: "Desconexiones y reconexión",
 };

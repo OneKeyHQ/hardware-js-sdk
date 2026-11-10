@@ -83,6 +83,24 @@ export type SearchDevice = {
   deviceType: IDeviceType;
   name: string;
   commType: OneKeyDeviceCommType;
+  /**
+   * React Native and Electron BLE discovery only. Serial-number color letter ('A'-'Z')
+   * advertised by Pro2 / Neo, possibly remembered from an earlier advertisement in this
+   * process. Absent when unknown; the letter's meaning depends on deviceType.
+   */
+  bleColorCode?: string;
+};
+
+/** Identity confirmed over USB. The descriptor path is only a transport address. */
+export type UsbDeviceIdentity = {
+  path: string;
+  serialNo: string | null;
+  deviceId: string | null;
+  deviceType: IDeviceType;
+  connectProtocol: HardwareConnectProtocol;
+  commType: 'webusb' | 'bridge';
+  /** Mode confirmed by the device response; absent when discovery cannot establish it. */
+  mode?: DeviceStateMode;
 };
 
 // export type UnknownDevice = {

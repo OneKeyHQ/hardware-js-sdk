@@ -1,15 +1,13 @@
 ---
 description: "Recupera conexiones, conserva vinculaciones de cartera y cierra el SDK sin repetir efectos secundarios."
-title: "Reconexión y liberación de recursos"
+title: "Desconexiones y reconexión"
 ---
 
 <span id="reconnect-and-dispose" />
 
-# Reconexión y liberación de recursos
+# Desconexiones y reconexión [#reconexión-y-liberación-de-recursos]
 
-Las interrupciones del transporte son normales: desconexión USB, alcance BLE, reinicio de Bluetooth del sistema o del firmware. Hardware SDK 1.2.0 recupera la **conexión**. Tu aplicación todavía debe recuperar la **llamada**.
-
-Esta página define el contrato de integración. No describe los números de secuencia de Protocol V2 ni la generación del transporte.
+Desconectar el USB, perder la señal BLE, restablecer Bluetooth o reiniciar el firmware puede interrumpir una conexión. Sigue estos pasos para finalizar la operación interrumpida, reconectar el dispositivo y reutilizar la cartera seleccionada de forma segura.
 
 ## Qué hace ya el SDK [#what-the-sdk-already-does]
 

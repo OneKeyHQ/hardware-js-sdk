@@ -59,7 +59,7 @@ sequenceDiagram
 | `connectId` | どの接続か | `searchDevices()` | USB の再接続、BLE の再ペアリング、トランスポートの切り替え |
 | `deviceId` | どのシードの存続期間か | `getDeviceState` (`getFeatures` は非推奨) | 消去、復元、シードの切り替え |
 
-USB と BLE の `connectId` 値は同じ機器でも異なるため、別々にキャッシュしてください。参照: [識別子](/ja/hardware-sdk/concepts/identifiers) および [再接続と破棄](/ja/hardware-sdk/transport/reconnect).
+USB と BLE の `connectId` 値は同じ機器でも異なるため、別々にキャッシュしてください。参照: [識別子](/ja/hardware-sdk/concepts/identifiers) および [切断と再接続](/ja/hardware-sdk/transport/reconnect).
 
 **実行環境の要件**
 
@@ -110,7 +110,7 @@ const address = await HardwareSDK.evmGetAddress(connectId, deviceId, {
 if (!address.success) throw new Error(address.payload.error);
 ```
 
-デバイスごとに直列化します。デバイスの切り替え後は `getDeviceState` で状態を更新し、アンマウント時にはリスナーを削除します。`HardwareSDK.dispose()` はトランスポートの終了時にのみ呼び出します。[再接続と破棄](/ja/hardware-sdk/transport/reconnect)を参照してください。
+デバイスごとに直列化します。デバイスの切り替え後は `getDeviceState` で状態を更新し、アンマウント時にはリスナーを削除します。`HardwareSDK.dispose()` はトランスポートの終了時にのみ呼び出します。[切断と再接続](/ja/hardware-sdk/transport/reconnect)を参照してください。
 
 ## 共通パラメーター [#common-params]
 
