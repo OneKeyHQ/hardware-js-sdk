@@ -304,7 +304,7 @@ export function isBleGattBondingFailedError(err: unknown): boolean {
 }
 
 /** DMK keeps native BLE errors in `err`, which may differ from `originalError`. */
-export function isBleBondInvalidError(err: unknown): boolean {
+function someErrorInChain(err: unknown, matches: (e: Record<string, unknown>) => boolean): boolean {
   const pending: unknown[] = [err];
   const seen = new Set<object>();
   while (pending.length > 0) {
@@ -312,28 +312,44 @@ export function isBleBondInvalidError(err: unknown): boolean {
     if (candidate && typeof candidate === 'object' && !seen.has(candidate)) {
       seen.add(candidate);
       const e = candidate as Record<string, unknown>;
-      if (
-        e._tag === ERROR_TAG.PeerRemovedPairing ||
-        e.iosErrorCode === 14 ||
-        e.attErrorCode === 5 ||
-        (e.nativeErrorDomain === 'CBErrorDomain' && e.nativeErrorCode === 14)
-      ) {
-        return true;
-      }
-      const reason = typeof e.reason === 'string' ? e.reason : '';
-      const message = typeof e.message === 'string' ? e.message : '';
-      // Electron IPC preserves the patched native message, but drops custom error fields.
-      if (
-        /\bCBErrorDomain:14(?:\s|$)/.test(message) ||
-        reason.includes('Peer removed pairing information') ||
-        reason.includes('GATT_INSUF_AUTHENTICATION')
-      ) {
-        return true;
-      }
+      if (matches(e)) return true;
       pending.push(e.originalError, e.err);
     }
   }
   return false;
+}
+
+export function isBleBondInvalidError(err: unknown): boolean {
+  return someErrorInChain(err, e => {
+    if (
+      e._tag === ERROR_TAG.PeerRemovedPairing ||
+      e.iosErrorCode === 14 ||
+      e.attErrorCode === 5 ||
+      (e.nativeErrorDomain === 'CBErrorDomain' && e.nativeErrorCode === 14)
+    ) {
+      return true;
+    }
+    const reason = typeof e.reason === 'string' ? e.reason : '';
+    const message = typeof e.message === 'string' ? e.message : '';
+    // Electron IPC preserves the patched native message, but drops custom error fields.
+    // On Windows a stale bond fails the notification subscribe with AsyncStatus::Error.
+    return (
+      /\bCBErrorDomain:14(?:\s|$)/.test(message) ||
+      /'\$onekey-3p-ble-subscribe': Error: status: 3$/.test(message) ||
+      reason.includes('Peer removed pairing information') ||
+      reason.includes('GATT_INSUF_AUTHENTICATION')
+    );
+  });
+}
+
+/** The Electron BLE handler's timeout while connecting by id to a device its scan never saw. */
+export function isBleNotAdvertisingTimeoutError(err: unknown): boolean {
+  return someErrorInChain(
+    err,
+    e =>
+      typeof e.message === 'string' &&
+      /connect timed out after \d+ms: device not advertising$/.test(e.message)
+  );
 }
 
 // Other BLE pairing failures (DMK-native, ble-plx, our own) map to

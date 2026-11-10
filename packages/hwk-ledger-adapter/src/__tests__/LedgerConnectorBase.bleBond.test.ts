@@ -40,6 +40,12 @@ const staleBondErrors = [
       )
     ),
   ],
+  [
+    'Windows IPC subscribe failure',
+    new OpeningConnectionError(
+      new Error("Error invoking remote method '$onekey-3p-ble-subscribe': Error: status: 3")
+    ),
+  ],
 ] as const;
 
 function connectorWithConnectFailure(error: unknown) {
@@ -156,11 +162,48 @@ describe('Ledger stale Bluetooth pairing', () => {
       ),
     ],
     ['a longer native code', new OpeningConnectionError(new Error('CBErrorDomain:140 failed'))],
+    [
+      'a Windows write failure',
+      new OpeningConnectionError(
+        new Error("Error invoking remote method '$onekey-3p-ble-write': Error: status: 3")
+      ),
+    ],
+    [
+      'another Windows subscribe status',
+      new OpeningConnectionError(
+        new Error("Error invoking remote method '$onekey-3p-ble-subscribe': Error: status: 2")
+      ),
+    ],
+    [
+      'a timeout on a device the scan saw',
+      new OpeningConnectionError(
+        new Error(
+          "Error invoking remote method '$onekey-3p-ble-connect': Error: connect timed out after 31000ms"
+        )
+      ),
+    ],
   ])('keeps %s in the existing pairing-failure category', async (_name, cause) => {
     const { connector, manager } = connectorWithConnectFailure(cause);
     const error = await connector.connect('ledger-test').catch((caught: unknown) => caught);
 
     expect(mapLedgerError(error).code).toBe(HardwareErrorCode.BlePairingTimeout);
+    expect(manager.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a timeout on a device the scan never saw as not advertising', async () => {
+    const cause = new OpeningConnectionError(
+      new Error(
+        "Error invoking remote method '$onekey-3p-ble-connect': Error: connect timed out after 31000ms: device not advertising"
+      )
+    );
+    const { connector, manager } = connectorWithConnectFailure(cause);
+    const error = await connector.connect('ledger-test').catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      _tag: ERROR_TAG.DeviceNotAdvertising,
+      code: HardwareErrorCode.DeviceNotFound,
+    });
+    expect(mapLedgerError(error).code).toBe(HardwareErrorCode.DeviceNotFound);
     expect(manager.connect).toHaveBeenCalledTimes(1);
   });
 });

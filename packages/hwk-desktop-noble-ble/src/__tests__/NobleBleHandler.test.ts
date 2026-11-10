@@ -757,7 +757,9 @@ describe('NobleBleHandler connect release', () => {
     });
     const handler = makeHandler(native, { connectTimeoutMs: 6000 });
     const connecting = handler.connect('id-1', PADDED_PROFILE);
-    const rejected = expect(connecting).rejects.toThrow(/timed out/);
+    const rejected = expect(connecting).rejects.toThrow(
+      'connect timed out after 6000ms: device not advertising'
+    );
     await settle();
     jest.advanceTimersByTime(SCAN_WINDOW_MS);
     await flush();
@@ -789,7 +791,8 @@ describe('NobleBleHandler connect release', () => {
     const handler = makeHandler(new FakeNoble([peripheral]), { connectTimeoutMs: 1000 });
     await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
     const connecting = handler.connect('id-1', PADDED_PROFILE);
-    const rejected = expect(connecting).rejects.toThrow(/timed out/);
+    // The scan saw it, so the timeout does not claim it is silent.
+    const rejected = expect(connecting).rejects.toThrow(/^connect timed out after 1000ms$/);
     await settle();
     expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
 

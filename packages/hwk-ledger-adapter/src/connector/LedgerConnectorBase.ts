@@ -12,6 +12,7 @@ import {
   ERROR_TAG,
   isAppStuckByApdu,
   isBleBondInvalidError,
+  isBleNotAdvertisingTimeoutError,
   isConnectionOpeningTag,
   isKnownConnectionTag,
   isTransportStuck,
@@ -619,6 +620,7 @@ export class LedgerConnectorBase implements IConnector {
             _tag: ERROR_TAG.PeerRemovedPairing,
           });
         }
+        if (isBleNotAdvertisingTimeoutError(err)) throwNotAdvertising();
         const tag = (err as { _tag?: string } | null | undefined)?._tag;
 
         // If DMK already gave a recognized tag (locked / disconnected / pairing

@@ -93,6 +93,8 @@ interface ConnectClaim {
   abandoned: boolean;
   cancelScan?: () => void;
   cancelNative?: () => void;
+  /** Connecting by id to a device the scan never saw. */
+  directPending?: boolean;
 }
 
 interface DeviceEntry {
@@ -703,7 +705,9 @@ export class NobleBleHandler {
       };
     });
     const timer = setTimeout(() => {
-      abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`));
+      // Connectors tell a silent device from one that would not connect by this suffix.
+      const reason = claim.directPending ? ': device not advertising' : '';
+      abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms${reason}`));
       // A link a committed connection owns stays up, same guard as abortIfAbandoned.
       if (this._connected.has(id)) return;
       // Like cancelPairing: a native connect left pending completes whenever the
@@ -788,7 +792,9 @@ export class NobleBleHandler {
       // peripheral CoreBluetooth cannot retrieve (`NobleMac::Connect`).
       const native = this._requireNoble();
       claim.cancelNative = () => native.cancelConnect?.(id);
+      claim.directPending = true;
       peripheral = await this._directConnect(id);
+      claim.directPending = false;
       // A cancelled direct connect returns undefined; report it as abandoned, not missing.
       await abortIfAbandoned('direct');
     }
