@@ -118,10 +118,11 @@ const BLE_NAME_MATCH_MAX_LENGTH = 64;
 const matchesPeripheral = (
   p: NoblePeripheralLike,
   profile: ThirdPartyBleVendorProfile,
-  narrowTo?: Set<string>
+  narrowTo?: Set<string>,
+  remembered?: ReadonlySet<string>
 ): boolean => {
   const adv = p.advertisement ?? {};
-  const advertised = adv.serviceUuids ?? [];
+  const advertised = [...(adv.serviceUuids ?? []), ...(remembered ?? [])];
   if (
     advertised.some(
       uuid =>
@@ -235,6 +236,13 @@ export class NobleBleHandler {
   // id -> last advertisement time (snapshot TTL).
   private readonly _lastSeen = new Map<string, number>();
 
+  // id -> service UUIDs seen since the device was last forgotten. noble-win replaces them with
+  // every packet, so a scan response without them would hide the device; CoreBluetooth merges.
+  private readonly _advertisedUuids = new Map<string, Set<string>>();
+
+  // Devices a scan kept only by their remembered UUIDs; logged once each.
+  private readonly _keptByMemory = new Set<string>();
+
   private readonly _connected = new Map<string, DeviceEntry>();
 
   private _discoverHandler?: (peripheral: NoblePeripheralLike) => void;
@@ -312,6 +320,7 @@ export class NobleBleHandler {
       this._discoverHandler ??= peripheral => {
         this._discovered.set(peripheral.id, peripheral);
         this._lastSeen.set(peripheral.id, Date.now());
+        this._rememberServiceUuids(peripheral);
       };
       this._noble.removeListener('discover', this._discoverHandler);
       this._noble.on('discover', this._discoverHandler);
@@ -384,6 +393,19 @@ export class NobleBleHandler {
     return devices;
   }
 
+  private _rememberServiceUuids(peripheral: NoblePeripheralLike): void {
+    const uuids = peripheral.advertisement?.serviceUuids;
+    if (!uuids?.length) return;
+    let seen = this._advertisedUuids.get(peripheral.id);
+    if (!seen) {
+      seen = new Set<string>();
+      this._advertisedUuids.set(peripheral.id, seen);
+    }
+    for (const uuid of uuids) {
+      if (typeof uuid === 'string') seen.add(uuid);
+    }
+  }
+
   /**
    * In-range devices matching the caller, minus TTL-expired ones. `_discovered`
    * is only a cache; a missing device can still be reached by `_directConnect`.
@@ -399,9 +421,17 @@ export class NobleBleHandler {
       if (now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS) {
         this._discovered.delete(id);
         this._lastSeen.delete(id);
+        this._advertisedUuids.delete(id);
+        this._keptByMemory.delete(id);
         continue;
       }
-      if (!matchesPeripheral(peripheral, profile, narrowTo)) continue;
+      if (!matchesPeripheral(peripheral, profile, narrowTo, this._advertisedUuids.get(id))) {
+        continue;
+      }
+      if (!this._keptByMemory.has(id) && !matchesPeripheral(peripheral, profile, narrowTo)) {
+        this._keptByMemory.add(id);
+        this._log('info', 'scan.keptByMemory', { id });
+      }
       result.push(peripheralToInfo(peripheral));
     }
     // A linked device stops advertising and ages out above, so merge held links
@@ -461,6 +491,8 @@ export class NobleBleHandler {
       this._scanning = false;
       this._discovered.clear();
       this._lastSeen.clear();
+      this._advertisedUuids.clear();
+      this._keptByMemory.clear();
       await this._waitForPoweredOn(THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS);
       this._log('warn', 'noble.recover.done', { state: this._noble?.state });
     } catch (error) {
@@ -521,6 +553,8 @@ export class NobleBleHandler {
     this._scanOwners.clear();
     this._discovered.clear();
     this._lastSeen.clear();
+    this._advertisedUuids.clear();
+    this._keptByMemory.clear();
     await this._pauseScan();
   }
 
@@ -540,7 +574,13 @@ export class NobleBleHandler {
   getDevice(id: string): ThirdPartyBleDeviceInfo | null {
     const p = this._discovered.get(id);
     // The scan cache holds every advertiser in range; only a registered vendor's device is exposed.
-    if (!p || ![...this._vendors.values()].some(profile => matchesPeripheral(p, profile))) {
+    const remembered = this._advertisedUuids.get(id);
+    if (
+      !p ||
+      ![...this._vendors.values()].some(profile =>
+        matchesPeripheral(p, profile, undefined, remembered)
+      )
+    ) {
       return null;
     }
     return peripheralToInfo(p);
@@ -762,6 +802,7 @@ export class NobleBleHandler {
   ): Promise<{ id: string; name?: string }> {
     let route: 'cache' | 'scan' | 'direct' | 'none' = 'cache';
     let peripheral: NoblePeripheralLike | undefined;
+    const startedAt = Date.now();
     // Stops the flow before it commits an unowned link; the rejection itself is
     // unobservable because Promise.race already settled.
     const abortIfAbandoned = async (stage: string) => {
@@ -825,9 +866,11 @@ export class NobleBleHandler {
       route,
       wasConnected,
       name: peripheral.advertisement?.localName,
+      elapsedMs: Date.now() - startedAt,
     });
     if (!wasConnected) {
       await peripheral.connectAsync();
+      this._log('info', 'connect.linked', { id, elapsedMs: Date.now() - startedAt });
       await abortIfAbandoned('link');
     }
 
@@ -862,7 +905,11 @@ export class NobleBleHandler {
         vendor: options.vendor,
         write: options.write,
       });
-      this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
+      this._log('info', 'connect.done', {
+        id,
+        name: peripheral.advertisement.localName,
+        elapsedMs: Date.now() - startedAt,
+      });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
       // Don't leak a GATT link this call opened. A direct connect opened one even
@@ -897,7 +944,12 @@ export class NobleBleHandler {
     };
     entry.notifyHandler = handler;
     entry.notifyChar.on('data', handler);
-    await entry.notifyChar.subscribeAsync();
+    try {
+      await entry.notifyChar.subscribeAsync();
+    } catch (error) {
+      this._log('warn', 'subscribe.error', { id, error: String(error) });
+      throw error;
+    }
   }
 
   async unsubscribe(id: string): Promise<void> {
@@ -995,6 +1047,8 @@ export class NobleBleHandler {
       } finally {
         this._discovered.clear();
         this._lastSeen.clear();
+        this._advertisedUuids.clear();
+        this._keptByMemory.clear();
         this._initialized = false;
       }
     })();

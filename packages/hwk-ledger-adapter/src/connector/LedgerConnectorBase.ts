@@ -270,6 +270,20 @@ async function _getDeviceApps(ctx: ConnectorContext, sessionId: string): Promise
  * require routing `connectionType` from `descriptor.transport` per-device
  * and updating every `this.connectionType` branch in this file.
  */
+/** `a <- b <- c`: the frames that called the function where `error` was created. */
+function describeCaller(error: Error): string {
+  return (error.stack ?? '')
+    .split('\n')
+    .slice(2, 6)
+    .map(frame =>
+      frame
+        .trim()
+        .replace(/^at /, '')
+        .replace(/ \(.*\)$/, '')
+    )
+    .join(' <- ');
+}
+
 export class LedgerConnectorBase implements IConnector {
   private _deviceManager: LedgerDeviceManager | null = null;
 
@@ -661,6 +675,8 @@ export class LedgerConnectorBase implements IConnector {
 
   async disconnect(sessionId: string): Promise<void> {
     if (!this._deviceManager) return;
+    // Names the caller, so a teardown nobody asked for can be traced in support logs.
+    debugLog('[DMK] disconnect requested', { sessionId, caller: describeCaller(new Error()) });
 
     const deviceId = this._deviceManager.getDeviceId(sessionId);
     this._signerManager?.invalidate(sessionId);

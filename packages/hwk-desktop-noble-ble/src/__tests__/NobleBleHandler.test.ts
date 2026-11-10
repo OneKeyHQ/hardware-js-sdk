@@ -2,7 +2,11 @@ import { EventEmitter } from 'events';
 
 import { NobleBleHandler } from '../NobleBleHandler';
 import { initThirdPartyBleSupport } from '../main';
-import { THIRD_PARTY_BLE_CHANNELS, THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS } from '../constants';
+import {
+  THIRD_PARTY_BLE_CHANNELS,
+  THIRD_PARTY_BLE_DEVICE_TTL_MS,
+  THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS,
+} from '../constants';
 
 import type { NobleBleHandlerOptions, NoblePeripheralLike } from '../NobleBleHandler';
 
@@ -732,6 +736,43 @@ describe('initThirdPartyBleSupport', () => {
 
     await handle.dispose();
     expect(ipcMain.handlers.size).toBe(0);
+  });
+});
+
+describe('NobleBleHandler service UUID memory', () => {
+  const LEDGER_SCAN = { vendor: 'ledger', match: { serviceUuids: [LEDGER_NANO_X.serviceUuid] } };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('keeps a Ledger whose latest packet carried no service UUID', async () => {
+    const ledger = ledgerPeripheral('ledger-1');
+    const noble = new FakeNoble([ledger]);
+    const handler = makeHandler(noble);
+    expect((await handler.scan(LEDGER_SCAN)).map(device => device.id)).toEqual(['ledger-1']);
+
+    // noble-win replaces the advertisement with each packet; a scan response has no UUIDs.
+    ledger.advertisement.serviceUuids = [];
+    noble.emit('discover', ledger);
+    expect((await handler.scan(LEDGER_SCAN)).map(device => device.id)).toEqual(['ledger-1']);
+    expect(handler.getDevice('ledger-1')).toMatchObject({ id: 'ledger-1' });
+    await handler.stopScan();
+  });
+
+  test('forgets the remembered UUIDs once the device ages out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const ledger = ledgerPeripheral('ledger-1');
+    const noble = new FakeNoble([ledger]);
+    const handler = makeHandler(noble);
+    expect((await handler.scan(LEDGER_SCAN)).map(device => device.id)).toEqual(['ledger-1']);
+
+    jest.advanceTimersByTime(THIRD_PARTY_BLE_DEVICE_TTL_MS + 1);
+    expect(await handler.scan(LEDGER_SCAN)).toEqual([]);
+    ledger.advertisement.serviceUuids = [];
+    noble.emit('discover', ledger);
+    expect(await handler.scan(LEDGER_SCAN)).toEqual([]);
+    await handler.stopScan();
   });
 });
 

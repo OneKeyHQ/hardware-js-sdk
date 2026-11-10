@@ -200,6 +200,7 @@ export class LedgerAdapter implements IHardwareWallet {
   private readonly _operations = new OperationRegistry({
     vendor: 'ledger',
     onEnded: (operation, reason) => {
+      debugLog('[LedgerAdapter] operation ended', { operationId: operation.operationId, reason });
       this._discardPendingBinding(this._pendingOperationBindings.get(operation.operationId));
       this._pendingOperationBindings.delete(operation.operationId);
       this.emitter.emit(SDK.OPERATION_ENDED, {
