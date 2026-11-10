@@ -1,6 +1,7 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import EVMSignTypedData from '../src/api/evm/EVMSignTypedData';
+import { getEIP712Hashes } from '../src/api/evm/eip712Hash';
 
 import type { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../src/types';
 
@@ -38,6 +39,40 @@ function createMethod(
   } as any;
   method.init();
   return method;
+}
+
+function createRunnableMethod(
+  data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>,
+  deviceType: EDeviceType,
+  typedCall: jest.Mock,
+  firmwareVersion = '4.2.0'
+): EVMSignTypedData {
+  const method = createMethod(data);
+  method.device = {
+    features: {},
+    commands: { typedCall },
+    getCurrentDeviceType: jest.fn(() => deviceType),
+    getCurrentFirmwareVersionString: jest.fn(() => firmwareVersion),
+    isProtocolV2: jest.fn(() => false),
+  } as any;
+  return method;
+}
+
+function buildLongStringData(
+  textLength: number
+): EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> {
+  return {
+    types: {
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+      ],
+      SpotTerms: [{ name: 'terms', type: 'string' }],
+    },
+    primaryType: 'SpotTerms',
+    domain: { name: 'OneKey', version: '1' },
+    message: { terms: 'a'.repeat(textLength) },
+  } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
 }
 
 function baseDomain(): { EIP712Domain: { name: string; type: string }[] } {
@@ -618,4 +653,221 @@ describe('EVMSignTypedData — Protocol V2 data size routing', () => {
       expect(method.hasBiggerData(data)).toBe(true);
     }
   );
+});
+
+describe('EIP-712 typed hash helpers', () => {
+  it('computes the canonical EIP-712 Mail domain separator and message hash', () => {
+    const data = {
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        Person: [
+          { name: 'name', type: 'string' },
+          { name: 'wallet', type: 'address' },
+        ],
+        Mail: [
+          { name: 'from', type: 'Person' },
+          { name: 'to', type: 'Person' },
+          { name: 'contents', type: 'string' },
+        ],
+      },
+      primaryType: 'Mail',
+      domain: {
+        name: 'Ether Mail',
+        version: '1',
+        chainId: 1,
+        verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+      },
+      message: {
+        from: { name: 'Cow', wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826' },
+        to: { name: 'Bob', wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB' },
+        contents: 'Hello, Bob!',
+      },
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+    expect(getEIP712Hashes(data)).toEqual({
+      domainHash: '0xf2cee375fa42b42143804025fc449deafd50cc031ca257e0b194a650a912090f',
+      messageHash: '0xc52c0ee5d84264471806290a3f2c4cecfc5490626bf912d01f240d7a274b371e',
+    });
+  });
+
+  it('matches MetaMask V4 and strict EIP-712 struct-array encodings', () => {
+    const data = {
+      types: {
+        EIP712Domain: [{ name: 'name', type: 'string' }],
+        Item: [
+          { name: 'a', type: 'uint256' },
+          { name: 'b', type: 'address' },
+        ],
+        Root: [{ name: 'items', type: 'Item[]' }],
+      },
+      primaryType: 'Root',
+      domain: { name: 'x' },
+      message: {
+        items: [
+          { a: 1, b: '0x1111111111111111111111111111111111111111' },
+          { a: 2, b: '0x2222222222222222222222222222222222222222' },
+        ],
+      },
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+    expect(getEIP712Hashes(data, true).messageHash).toBe(
+      '0x3351c3c6f8a97b850e32f88f996059bd577774380e01941048e77d8b2e5c52d6'
+    );
+    expect(getEIP712Hashes(data, false).messageHash).toBe(
+      '0xa07452a3a3d4c2ca88f7ce454a0ce82148b2612a87e6c8a55f236627edba474c'
+    );
+  });
+
+  it('returns only the domain hash for a domain-only payload', () => {
+    const data = {
+      types: { EIP712Domain: [{ name: 'name', type: 'string' }] },
+      primaryType: 'EIP712Domain',
+      domain: { name: 'x' },
+      message: {},
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+    expect(getEIP712Hashes(data)).toEqual({
+      domainHash: '0xb1b277d1bb978b94696ae7c475e4f8953aa39b5d19a386e45f299e1604ae66ff',
+    });
+  });
+
+  it('rejects integer values outside the declared type width', () => {
+    const data = {
+      types: {
+        EIP712Domain: [{ name: 'name', type: 'string' }],
+        Value: [{ name: 'v', type: 'uint8' }],
+      },
+      primaryType: 'Value',
+      domain: { name: 'x' },
+      message: { v: 256 },
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+    expect(() => getEIP712Hashes(data)).toThrow('out of range for uint8');
+  });
+
+  it('does not infer domain fields when the domain type is declared empty', () => {
+    const data = {
+      types: { EIP712Domain: [] },
+      primaryType: 'EIP712Domain',
+      domain: { name: 'x' },
+      message: {},
+    } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+    expect(getEIP712Hashes(data)).toEqual({
+      domainHash: '0x6192106f129ce05c9075d319c1fa6ea9b3ae37cbd0c1ef92e2be7137bb07baa1',
+    });
+  });
+});
+
+describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
+  const signatureMessage = {
+    address: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+    signature: '0xabcd',
+  };
+
+  test.each([
+    'Failure_DataError,Invalid length, bigger than 1536',
+    'Failure_DataError,Invalid length, bigger than 1024',
+    'Failure_ProcessError,Not enough memory',
+    'Failure_DataError,Out of memory',
+    'Failure_ProcessError,MemoryError',
+    'Failure_ProcessError,memory allocation failed',
+  ])('falls back to typed hash after Pro rejects with "%s"', async errorMessage => {
+    const data = buildLongStringData(2048);
+    const typedCall = jest
+      .fn()
+      .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.RuntimeError, errorMessage))
+      .mockResolvedValueOnce({
+        type: 'EthereumTypedDataSignatureOneKey',
+        message: signatureMessage,
+      });
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+    const expectedHashes = getEIP712Hashes(data);
+
+    const result = await method.run();
+
+    expect(result).toEqual(signatureMessage);
+    expect(typedCall).toHaveBeenCalledTimes(2);
+    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+    expect(typedCall).toHaveBeenNthCalledWith(
+      2,
+      'EthereumSignTypedHashOneKey',
+      'EthereumTypedDataSignatureOneKey',
+      expect.objectContaining({
+        domain_separator_hash: expectedHashes.domainHash,
+        message_hash: expectedHashes.messageHash,
+      })
+    );
+  });
+
+  it('does not fall back when the user cancels', async () => {
+    const data = buildLongStringData(2048);
+    const cancellation = ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
+    const typedCall = jest.fn().mockRejectedValueOnce(cancellation);
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    await expect(method.run()).rejects.toBe(cancellation);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+  });
+
+  it('does not fall back when the PIN is invalid', async () => {
+    const data = buildLongStringData(2048);
+    const pinError = ERRORS.TypedError(HardwareErrorCode.PinInvalid);
+    const typedCall = jest.fn().mockRejectedValueOnce(pinError);
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    await expect(method.run()).rejects.toBe(pinError);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the structured path for normal-length data', async () => {
+    const data = buildLongStringData(64);
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'EthereumTypedDataSignatureOneKey',
+      message: signatureMessage,
+    });
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    const result = await method.run();
+
+    expect(result).toEqual(signatureMessage);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+    expect(typedCall.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ primary_type: 'SpotTerms' })
+    );
+  });
+
+  it('does not retry non-Pro devices with the same firmware error', async () => {
+    const data = buildLongStringData(2048);
+    const overflowError = ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Failure_DataError,Invalid length, bigger than 1536'
+    );
+    const typedCall = jest.fn().mockRejectedValueOnce(overflowError);
+    const method = createRunnableMethod(data, EDeviceType.Touch, typedCall);
+
+    await expect(method.run()).rejects.toBe(overflowError);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the firmware error when the fallback hash cannot be computed', async () => {
+    const data = buildLongStringData(2048);
+    data.types.SpotTerms = [{ name: 'terms', type: 'unsupported' }];
+    const overflowError = ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Failure_DataError,Invalid length, bigger than 1536'
+    );
+    const typedCall = jest.fn().mockRejectedValueOnce(overflowError);
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    await expect(method.run()).rejects.toBe(overflowError);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
 });
