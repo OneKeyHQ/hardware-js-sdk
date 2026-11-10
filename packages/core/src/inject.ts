@@ -506,6 +506,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
   zcashGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'zcashGetAddress' }),
+  zcashGetFullViewingKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'zcashGetFullViewingKey' }),
   zcashSignPczt: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'zcashSignPczt' }),
 

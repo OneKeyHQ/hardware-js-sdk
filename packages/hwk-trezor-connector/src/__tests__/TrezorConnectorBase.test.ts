@@ -2225,6 +2225,49 @@ describe('TrezorConnectorBase', () => {
     ]);
   });
 
+  test.each([
+    {
+      features: { model: '1', major_version: 1, minor_version: 12, patch_version: 1 },
+      command: 'EthereumSignTypedHash',
+    },
+    { features: { model: '1', internal_model: 'T1B1' }, command: 'EthereumSignTypedHash' },
+    { features: { model: 'T', internal_model: 'T2T1' }, command: 'EthereumSignTypedData' },
+    { features: { model: 'T' }, command: 'EthereumSignTypedData' },
+  ])('evmSignTypedData selects $command for $features', async ({ features, command }) => {
+    const connector = new SessionBackedTestTrezorConnector(
+      [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor' }],
+      { vendor: 'trezor.io', device_id: 'device-1', ...features },
+      [{ type: 'EthereumTypedDataSignature', message: { signature: 'aabbcc', address: '0xabc' } }]
+    );
+    const session = await connector.connect('device-1');
+
+    await callConnector(connector, session.sessionId, 'evmSignTypedData', {
+      path: "m/44'/60'/0'/0/0",
+      data: {
+        domain: { name: 'X' },
+        types: {
+          EIP712Domain: [{ name: 'name', type: 'string' }],
+          Mail: [{ name: 'subject', type: 'string' }],
+        },
+        primaryType: 'Mail',
+        message: { subject: 'Hello' },
+      },
+      metamaskV4Compat: true,
+      domainSeparatorHash: `0x${'11'.repeat(32)}`,
+      messageHash: `0x${'22'.repeat(32)}`,
+    });
+
+    expect(connector.fakeSessions[0].calls).toHaveLength(1);
+    expect(connector.fakeSessions[0].calls[0].name).toBe(command);
+    if (command === 'EthereumSignTypedHash') {
+      expect(connector.fakeSessions[0].calls[0].data).toEqual({
+        address_n: [2147483692, 2147483708, 2147483648, 0, 0],
+        domain_separator_hash: '11'.repeat(32),
+        message_hash: '22'.repeat(32),
+      });
+    }
+  });
+
   test('T1B1 full-mode typed-data fallback forwards static Ethereum network definition', async () => {
     const connector = new SessionBackedTestTrezorConnector(
       [{ connectId: 'device-1', deviceId: 'device-1', name: 'Trezor One', model: 'T1B1' }],

@@ -1864,10 +1864,12 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
-// noble/mac never resolves for an id CoreBluetooth cannot retrieve.
+// Bound probes while a native backend is still waiting for the device.
 const DIRECT_CONNECT_TIMEOUT_MS = 2000;
 // Floor after a timeout: do not pay the probe on every attempt.
 const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
+const pendingDirectNativeConnections = new Set<string>();
+const deviceConnectionPromises = new Map<string, Promise<void>>();
 
 /**
  * Connect straight by id, skipping the ~650ms targeted scan. Both native
@@ -1886,6 +1888,8 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
     | null;
   if (!nobleInstance?.connectAsync) return undefined;
 
+  // Retain the original listener and late cleanup until the native attempt settles.
+  if (pendingDirectNativeConnections.has(deviceId)) return undefined;
   const cooldownUntil = directConnectCooldownUntil.get(deviceId) ?? 0;
   if (Date.now() < cooldownUntil) return undefined;
 
@@ -1895,18 +1899,21 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   try {
     // The late-orphan guard must attach to THIS pending connect.
     const directPromise = nobleInstance.connectAsync(deviceId);
+    pendingDirectNativeConnections.add(deviceId);
     trackNativeConnection(
-      directPromise.then(async late => {
-        if ((!abandoned && !disposing) || nativeReleased) return;
-        const peripheral = late ?? discoveredDevices.get(deviceId);
-        if (peripheral?.state === 'connected' && !connectedDevices.has(deviceId)) {
-          peripheral.removeAllListeners('disconnect');
-          await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
-            timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
-            timeoutBehavior: 'resolve',
-          });
-        }
-      }),
+      directPromise
+        .then(async late => {
+          if ((!abandoned && !disposing) || nativeReleased) return;
+          const peripheral = late ?? discoveredDevices.get(deviceId);
+          if (peripheral?.state === 'connected' && !connectedDevices.has(deviceId)) {
+            peripheral.removeAllListeners('disconnect');
+            await runBleCallbackOperation(callback => peripheral.disconnect(() => callback()), {
+              timeoutMs: BLE_DISCONNECT_CONFIRM_TIMEOUT_MS,
+              timeoutBehavior: 'resolve',
+            });
+          }
+        })
+        .finally(() => pendingDirectNativeConnections.delete(deviceId)),
       () => nobleInstance.cancelConnect?.(deviceId)
     );
     const raced = await Promise.race([
@@ -1946,7 +1953,18 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
 }
 
 // Connect to device - supports both discovered and direct connection modes
-async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+  // Share the whole attempt so a scan fallback cannot race another caller's native probe.
+  const pending = deviceConnectionPromises.get(deviceId);
+  if (pending) return pending;
+  const connecting = connectDeviceOnce(deviceId, webContents).finally(() => {
+    deviceConnectionPromises.delete(deviceId);
+  });
+  deviceConnectionPromises.set(deviceId, connecting);
+  return connecting;
+}
+
+async function connectDeviceOnce(deviceId: string, webContents: WebContents): Promise<void> {
   // A new acquire is a fresh pairing attempt: deliver the previous cancel's
   // error to the flow that owned it, not to this one.
   pairingCanceledDevices.delete(deviceId);

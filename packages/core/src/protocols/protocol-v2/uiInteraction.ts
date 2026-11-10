@@ -71,7 +71,7 @@ const getDisplayState = (value: unknown) => {
   return { seen, enabled };
 };
 
-const createMethodInteraction = (
+export const createMethodInteraction = (
   reason: 'address-confirmation' | 'public-key-confirmation' | 'signing-confirmation',
   operation: string
 ): ProtocolV2InteractionDescriptor => ({

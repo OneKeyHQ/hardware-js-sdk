@@ -2,6 +2,7 @@ import { BaseMethod } from '../BaseMethod';
 import { serializedPath, validateStrictPath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { createMethodInteraction } from '../../protocols/protocol-v2/uiInteraction';
 import { decodeMoneroAddress, getMoneroVersionRange, validateMoneroNetworkType } from './helpers';
 
 import type { MoneroGetWatchKey as HardwareMoneroGetWatchKey } from '@onekeyfe/hd-transport';
@@ -18,6 +19,11 @@ export default class MoneroGetWatchKey extends BaseMethod<HardwareMoneroGetWatch
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.strictCheckDeviceSupport = true;
+    // The name matches no Protocol V2 confirmation rule, so the export prompt is declared here.
+    this.protocolV2UiInteraction = createMethodInteraction(
+      'public-key-confirmation',
+      'moneroGetWatchKey'
+    );
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

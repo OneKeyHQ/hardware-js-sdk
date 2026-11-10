@@ -12,12 +12,14 @@ export const LogBlockEvent: Set<string> = new Set([
 // or log events can retain them, regardless of whether debug output is enabled.
 const LogPayloadBlockMethod: Set<string> = new Set([
   'btcDeriveContextHash',
+  'btcSignMessage',
   'deviceUploadNft',
   'deviceUploadWallpaper',
   'uploadPortfolio',
   'fileWrite',
   'fileRead',
   'zcashGetAddress',
+  'zcashGetFullViewingKey',
   'zcashSignPczt',
   'moneroGetAddress',
   'moneroGetWatchKey',

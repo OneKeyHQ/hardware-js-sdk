@@ -63,11 +63,17 @@ describe('getLogBlockLabel', () => {
     }
   );
 
-  it('logs signing requests and responses as-is', () => {
+  it.each([false, true])('redacts btcSignMessage logs with debug=%s', enabled => {
+    const method = 'btcSignMessage';
+    const prefix = `sensitive-btc-sign-message-${enabled}`;
+    const logger = initLog(prefix, enabled);
+    const postMessage = jest.fn();
+    setLoggerPostMessage(postMessage);
+    const consoleLog = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const request = {
-      method: 'btcSignMessage',
+      method,
       path: "m/44'/0'/0'/0/0",
-      messageHex: '68656c6c6f',
+      messageHex: Buffer.from('synthetic-message-marker').toString('hex'),
       coin: 'Bitcoin',
     };
     const iframeRequest = {
@@ -77,15 +83,39 @@ describe('getLogBlockLabel', () => {
     const response = {
       success: true,
       payload: {
-        signature: 'signature-bytes',
-        address: 'bc1qexample',
+        signature: 'synthetic-signature-marker',
+        address: 'synthetic-address-marker',
       },
     };
+    const task = { id: 7, method: { name: method, payload: request } };
+    const originals = JSON.stringify([request, iframeRequest, response, task]);
+    const blockLabel = getLogBlockLabel(iframeRequest);
 
-    expect(getLogBlockLabel(request)).toBeUndefined();
-    expect(getLogBlockLabel(iframeRequest)).toBeUndefined();
-    expect(getSafeLogPayload(request)).toBe(request);
-    expect(getSafeLogPayload(response)).toBe(response);
+    try {
+      expect(getLogBlockLabel(request)).toBe(method);
+      expect(blockLabel).toBe(method);
+      logger.debug('request:', getSafeLogPayload(iframeRequest, blockLabel));
+      logger.debug('response:', getSafeLogPayload(response, blockLabel));
+      logger.debug('Cancel Api connect task: ', getSafeLogTask(task));
+
+      const cached = getLog().filter(entry => entry.prefix === prefix);
+      expect(cached.map(entry => entry.message[1])).toEqual([
+        { method, payload: '[REDACTED]' },
+        { method, payload: '[REDACTED]' },
+        { id: task.id, method, payload: '[REDACTED]' },
+      ]);
+      expect(postMessage).toHaveBeenCalledTimes(3);
+      expect(consoleLog).toHaveBeenCalledTimes(enabled ? 3 : 0);
+      for (const output of [cached, postMessage.mock.calls, consoleLog.mock.calls]) {
+        const serialized = JSON.stringify(output);
+        expect(serialized).not.toContain('synthetic-');
+        expect(serialized).not.toContain(request.messageHex);
+      }
+      expect(JSON.stringify([request, iframeRequest, response, task])).toBe(originals);
+    } finally {
+      consoleLog.mockRestore();
+      setLoggerPostMessage(jest.fn());
+    }
   });
 
   it('keeps ordinary API requests and responses visible', () => {
@@ -108,7 +138,7 @@ describe('getLogBlockLabel', () => {
     expect(getLogBlockLabel({ event: 'DEVICE_EVENT', type: 'device-connect' })).toBeUndefined();
   });
 
-  it.each(['zcashGetAddress', 'zcashSignPczt'])(
+  it.each(['zcashGetAddress', 'zcashGetFullViewingKey', 'zcashSignPczt'])(
     'keeps %s wallet data out of logger caches and events with debug disabled',
     method => {
       const postMessage = jest.fn();
@@ -117,7 +147,7 @@ describe('getLogBlockLabel', () => {
       setLoggerPostMessage(postMessage);
       const request = {
         event: 'iframe-call',
-        payload: { method, pczt: 'synthetic-pczt-marker', includeUfvk: true },
+        payload: { method, pczt: 'synthetic-pczt-marker', path: 'synthetic-path-marker' },
       };
       const response = {
         success: true,
@@ -383,7 +413,7 @@ describe('getLogBlockLabel', () => {
   it('logs other queued tasks as before', () => {
     const task = {
       id: 8,
-      method: { name: 'btcSignMessage', payload: { method: 'btcSignMessage' } },
+      method: { name: 'getDeviceState', payload: { method: 'getDeviceState' } },
     };
     expect(getSafeLogTask(task)).toBe(task);
     expect(getSafeLogTask(undefined)).toBeUndefined();

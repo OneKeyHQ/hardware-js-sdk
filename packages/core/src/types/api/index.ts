@@ -155,6 +155,7 @@ import type { benfenSignMessage } from './benfenSignMessage';
 import type { neoGetAddress } from './neoGetAddress';
 import type { neoSignTransaction } from './neoSignTransaction';
 import type { zcashGetAddress } from './zcashGetAddress';
+import type { zcashGetFullViewingKey } from './zcashGetFullViewingKey';
 import type { zcashSignPczt } from './zcashSignPczt';
 import type { moneroGetAddress } from './moneroGetAddress';
 import type { moneroGetWatchKey } from './moneroGetWatchKey';
@@ -483,6 +484,7 @@ export type CoreApi = {
    * Zcash
    */
   zcashGetAddress: typeof zcashGetAddress;
+  zcashGetFullViewingKey: typeof zcashGetFullViewingKey;
   zcashSignPczt: typeof zcashSignPczt;
 
   /**

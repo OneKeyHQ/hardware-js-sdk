@@ -1,9 +1,10 @@
 import { ZcashAddressScope, ZcashAddressType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
-import { serializedPath, toHardened, validateStrictPath } from '../helpers/pathUtils';
+import { serializedPath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { validateZcashAccountPath } from './helpers';
 
 import type { ZcashGetAddress as HardwareZcashGetAddress } from '@onekeyfe/hd-transport';
 import type { ZcashAddress, ZcashGetAddressParams } from '../../types/api/zcashGetAddress';
@@ -28,16 +29,7 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
 
     this.params = [];
     payload.bundle.forEach((batch: ZcashGetAddressParams) => {
-      // ZIP-32 account path: m/32'/133'/account'
-      const addressN = validateStrictPath(batch.path, 3);
-      if (
-        addressN.length !== 3 ||
-        addressN[0] !== toHardened(32) ||
-        addressN[1] !== toHardened(133) ||
-        addressN[2] < toHardened(0)
-      ) {
-        throw invalidParameter("Zcash requires a ZIP-32 account path m/32'/133'/account'");
-      }
+      const addressN = validateZcashAccountPath(batch.path);
       const addressType = batch.addressType ?? ZcashAddressType.UNIFIED_ORCHARD_P2PKH;
       const scope = batch.scope ?? ZcashAddressScope.EXTERNAL;
       const diversifierIndex = batch.diversifierIndex ?? 0;
@@ -63,7 +55,6 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
-        { name: 'includeUfvk', type: 'boolean' },
         { name: 'includeSeedFingerprint', type: 'boolean' },
       ]);
 
@@ -73,7 +64,6 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
         scope,
         diversifier_index: diversifierIndex,
         show_display: batch.showOnOneKey ?? true,
-        include_ufvk: batch.includeUfvk ?? false,
         include_seed_fingerprint: batch.includeSeedFingerprint ?? false,
       });
     });
@@ -99,11 +89,10 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
 
       const path = serializedPath(param.address_n);
       // The V2 decoder returns null for absent optional fields; omit them instead.
-      const { address, ufvk, seed_fingerprint: seedFingerprint } = res.message;
+      const { address, seed_fingerprint: seedFingerprint } = res.message;
       responses.push({
         path,
         address,
-        ...(ufvk ? { ufvk } : {}),
         ...(seedFingerprint ? { seedFingerprint } : {}),
       });
 

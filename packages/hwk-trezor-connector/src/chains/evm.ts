@@ -512,7 +512,10 @@ export async function evmSignTypedData(
 }
 
 function isTrezorOne(ctx: TrezorChainContext): boolean {
-  return ctx.deviceSession.features?.internal_model === 'T1B1';
+  const { features } = ctx.deviceSession;
+  // Older Trezor One firmware reports only the legacy model identifier.
+  const model = features?.internal_model ?? features?.model;
+  return model === 'T1B1' || model === '1';
 }
 
 function getCallerProvidedTypedDataHashes(
