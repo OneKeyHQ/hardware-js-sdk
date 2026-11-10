@@ -1,5 +1,4 @@
 import semver from 'semver';
-import { getOwnedUsbDeviceIdentity } from '../api/SearchDevices';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
@@ -26,6 +25,7 @@ import {
   createNewFirmwareUnReleaseHardwareError,
 } from '@onekeyfe/hd-shared';
 
+import { getOwnedUsbDeviceIdentity } from '../api/SearchDevices';
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
 import {
   findDefectiveBatchDevice,

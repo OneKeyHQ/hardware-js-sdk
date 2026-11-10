@@ -1,7 +1,6 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { Buffer } from 'buffer';
 import {
-  BleError,
   BleErrorCode,
   BleManager as BlePlxManager,
   ConnectionPriority,
@@ -57,7 +56,7 @@ import timer from './utils/timer';
 import { bleLogger, setBleLogger } from './logger';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
+import type { BleError, Characteristic, Device, Subscription } from 'react-native-ble-plx';
 import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
 
