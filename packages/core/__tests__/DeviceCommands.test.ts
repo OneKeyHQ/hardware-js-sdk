@@ -39,6 +39,27 @@ describe('DeviceCommands failure mapping', () => {
     }
   );
 
+  it.each([
+    // Touch and Pro under strict safety checks; Classic 1S adds a trailing period.
+    ['Forbidden key path', HardwareErrorCode.ForbiddenKeyPath],
+    ['Forbidden key path.', HardwareErrorCode.ForbiddenKeyPath],
+    // Touch and Pro on Monero's Cake path.
+    ['Non-hardened paths unsupported on Ed25519', HardwareErrorCode.DeviceNotSupportPath],
+    // Classic 1S on a path off the chain's pattern.
+    ['Invalid path', HardwareErrorCode.DeviceNotSupportPath],
+  ])('maps path refusal "%s" to its own code', async (message, errorCode) => {
+    const commands = createCommands();
+    await expect(
+      commands._filterCommonTypes(
+        {
+          type: 'Failure',
+          message: { code: 'Failure_DataError', message },
+        } as any,
+        'MoneroGetAddress'
+      )
+    ).rejects.toMatchObject({ errorCode, message });
+  });
+
   it('logs passphrase request and canonical response without exposing the passphrase', async () => {
     const commands = createCommands();
     const log = getLogger(LoggerNames.DeviceCommands);

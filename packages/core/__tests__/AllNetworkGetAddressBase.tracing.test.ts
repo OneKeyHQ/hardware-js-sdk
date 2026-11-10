@@ -1,4 +1,9 @@
-import { EDeviceType, HardwareErrorCode, HardwareErrorCodeMessage } from '@onekeyfe/hd-shared';
+import {
+  EDeviceType,
+  ERRORS,
+  HardwareErrorCode,
+  HardwareErrorCodeMessage,
+} from '@onekeyfe/hd-shared';
 
 import AllNetworkGetAddressBase from '../src/api/allnetwork/AllNetworkGetAddressBase';
 import AllNetworkGetAddress from '../src/api/allnetwork/AllNetworkGetAddress';
@@ -16,6 +21,10 @@ jest.mock('../src/data/config', () => ({
 jest.mock('../src/api/utils', () => ({
   findMethod: jest.fn(),
 }));
+
+// What DeviceCommands raises when the firmware refuses a path under strict safety checks.
+const forbiddenKeyPathError = () =>
+  ERRORS.TypedError(HardwareErrorCode.ForbiddenKeyPath, 'Forbidden key path');
 
 class TestAllNetworkMethod extends AllNetworkGetAddressBase {
   async getAllNetworkAddress() {
@@ -515,7 +524,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       .fn()
       .mockImplementation((_type: string, _response: string, params: { address_n: number[] }) => {
         const index = params.address_n[2] - 0x80000000;
-        if (index === 1) return Promise.reject(new Error('Forbidden key path'));
+        if (index === 1) return Promise.reject(forbiddenKeyPathError());
         return Promise.resolve({ message: { address: `address-${index}` } });
       });
     method.device.commands.typedCall = typedCall;
@@ -536,7 +545,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
       expect(result.map(item => item.path)).toEqual(bundle.map(item => item.path));
       expect(result[0].payload).toMatchObject({ address: 'address-0', rootFingerprint: 7 });
       expect(result[1].payload).toMatchObject({
-        code: HardwareErrorCode.CallMethodInvalidParameter,
+        code: HardwareErrorCode.ForbiddenKeyPath,
       });
       expect(result[2].payload).toMatchObject({ address: 'address-2', rootFingerprint: 7 });
       expect(typedCall.mock.calls.map(([, , params]) => params.address_n[2] - 0x80000000)).toEqual(
@@ -624,7 +633,7 @@ describe('AllNetworkGetAddressBase tracing', () => {
     const { method, typedCall } = createGroupedAddressHarness(false);
     typedCall.mockImplementationOnce(() => {
       method.abortController?.abort();
-      return Promise.reject(new Error('Forbidden key path'));
+      return Promise.reject(forbiddenKeyPathError());
     });
 
     await expect(method.getAllNetworkAddress(7)).rejects.toThrow(

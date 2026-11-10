@@ -295,6 +295,11 @@ export const HardwareErrorCode = {
   DefectiveFirmware: 418,
 
   /**
+   * Device cannot derive this path, whatever the safety checks say
+   */
+  DeviceNotSupportPath: 435,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -604,6 +609,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
   [HardwareErrorCode.RepeatUnlocking]: 'Repeat unlocking',
   [HardwareErrorCode.DefectiveFirmware]: 'Device firmware is defective, please update immediately',
+  [HardwareErrorCode.DeviceNotSupportPath]: 'Device not support this path',
 
   /**
    * Network Errors
