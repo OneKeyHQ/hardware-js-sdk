@@ -52,7 +52,7 @@
     "@ledgerhq/device-signer-kit-zcash": "0.7.1",
     "@ledgerhq/hw-transport": "6.35.0",
     "@onekeyfe/hwk-adapter-core": "1.2.8-alpha.135",
-    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.1",
+    "bitcoinjs-lib": "npm:@onekeyfe/bitcoinjs-lib@7.0.2",
     "bs58": "6.0.0",
     "rxjs": "7.8.2"
   },
