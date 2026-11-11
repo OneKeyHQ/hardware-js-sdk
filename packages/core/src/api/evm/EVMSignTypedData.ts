@@ -1,7 +1,7 @@
 import semver from 'semver';
 import { get } from 'lodash';
 import BigNumber from 'bignumber.js';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
 
 import { UI_REQUEST } from '../../constants/ui-request';
@@ -10,11 +10,13 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
 import { existCapability } from '../../utils/capabilitieUtils';
+import { LoggerNames, getLogger } from '../../utils/logger';
 import {
   DeviceModelToTypes,
   type EthereumSignTypedDataMessage,
   type EthereumSignTypedDataTypes,
 } from '../../types';
+import { getEIP712Hashes } from './eip712Hash';
 import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash';
 import { shouldUseLegacyV1EvmMessages } from './protocol';
 import { signTypedHash } from './latest/signTypedHash';
@@ -54,6 +56,24 @@ const MINI_MAX_NAME_LENGTH = 63;
 const MINI_MAX_DYNAMIC_VALUE_BYTES = 1536;
 const MINI_MAX_ARRAY_TYPE_FIELDS = 24;
 const MINI_MAX_ARRAY_ELEMENTS = 24;
+
+const Log = getLogger(LoggerNames.Method);
+
+// OneKey Pro firmware rejects a typed-data value above MAX_VALUE_BYTE_SIZE with
+// wire.DataError("Invalid length, bigger than 1536"), surfaced by Core as
+// "Failure_DataError,Invalid length, bigger than 1536". The memory patterns are
+// defensive: some Pro firmware builds fail before reaching the size validation.
+const PRO_TYPED_DATA_OVERFLOW_PATTERNS = [
+  /Invalid length, bigger than \d+/i,
+  /\b(?:not enough memory|out of memory|memory\s*error)\b/i,
+  /\b(?:memory allocation|alloc(?:ation)?)\s+failed\b/i,
+  /\bfailed to allocate\b/i,
+];
+
+const isProTypedDataOverflowError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return PRO_TYPED_DATA_OVERFLOW_PATTERNS.some(pattern => pattern.test(message));
+};
 
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
   getSupportedProtocols() {
@@ -552,6 +572,53 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return true;
   }
 
+  isOneKeyPro() {
+    return this.device.getCurrentDeviceType() === EDeviceType.Pro;
+  }
+
+  /**
+   * OneKey Pro parses and hashes the typed data on-device. Payloads above the
+   * firmware value limit fail after the request starts, so retry once with the
+   * typed-hash (blind signing) route instead of forcing the user to shrink the
+   * message. Only Pro is retried here: Touch is outside this issue's scope and
+   * Pro2/Neo use Protocol V2 with their own large-payload routing. Any other
+   * failure (cancel, PIN, disconnect) is rethrown.
+   */
+  async signTypedDataWithTypedHashFallback() {
+    try {
+      return await this.signTypedData();
+    } catch (error) {
+      if (!isProTypedDataOverflowError(error)) {
+        throw error;
+      }
+
+      Log.error(
+        'EIP-712 structured signing was rejected by OneKey Pro firmware, retrying with typed hash',
+        error
+      );
+
+      let hashes;
+      try {
+        hashes = getEIP712Hashes(this.params.data, this.params.metamaskV4Compat);
+      } catch (hashError) {
+        // Keep the original firmware failure when this payload cannot produce a
+        // typed-hash digest, so the caller is not misled by a hashing error.
+        Log.error('Unable to compute EIP-712 hashes for typed-hash fallback', hashError);
+        throw error;
+      }
+
+      const response = await this.signTypedHash({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN: this.params.addressN,
+        domainHash: hashes.domainHash,
+        messageHash: hashes.messageHash,
+        chainId: this.params.chainId,
+      });
+
+      return response.message;
+    }
+  }
+
   async run() {
     if (!this.device.features) {
       throw ERRORS.TypedError(
@@ -630,6 +697,9 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     }
 
     // For Touch、Pro we use EthereumSignTypedData
+    if (this.isOneKeyPro()) {
+      return this.signTypedDataWithTypedHashFallback();
+    }
     return this.signTypedData();
   }
 }

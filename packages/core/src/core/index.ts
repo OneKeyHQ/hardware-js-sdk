@@ -1,5 +1,4 @@
 import semver from 'semver';
-import { getOwnedUsbDeviceIdentity } from '../api/SearchDevices';
 import EventEmitter from 'events';
 import {
   DeviceSessionPinType,
@@ -26,6 +25,7 @@ import {
   createNewFirmwareUnReleaseHardwareError,
 } from '@onekeyfe/hd-shared';
 
+import { getOwnedUsbDeviceIdentity } from '../api/SearchDevices';
 import { LoggerNames, enableLog, getLogger, setLoggerPostMessage, wait } from '../utils';
 import {
   findDefectiveBatchDevice,
@@ -1352,6 +1352,11 @@ const ensureConnected = async (
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleDeviceBondError,
             HardwareErrorCode.BleDeviceBondedCanceled,
+            // A stale host bond after a device wipe is a terminal recovery
+            // signal: retrying cannot repair it and the App must show the
+            // re-pair guidance instead of a generic connect timeout.
+            HardwareErrorCode.BlePeerRemovedPairingInformation,
+            HardwareErrorCode.BleBondInvalid,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleTimeoutError,
             // A transport setup reset must also stop this outer poll.
