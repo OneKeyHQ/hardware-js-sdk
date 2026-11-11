@@ -66,12 +66,13 @@ const DEVICE_CONTROL_CALLS = new Set([
   'DeviceMiscUsbMscControl',
 ]);
 
-// Paths the firmware can never derive, whatever the safety checks say.
+// Paths the firmware can never derive, whatever the safety checks say. Lowercase: matched
+// case-insensitively, as firmware wording varies.
 const UNSUPPORTED_PATH_FAILURES = [
   // Ed25519 derives hardened levels only (Touch, Pro), e.g. Monero's Cake path m/44'/128'/x'/0/0.
-  'Non-hardened paths unsupported on Ed25519',
+  'non-hardened paths unsupported on ed25519',
   // Classic 1S refuses paths off a chain's fixed pattern.
-  'Invalid path',
+  'invalid path',
 ];
 
 // Older Protocol V2 firmware may omit the cancellation subcode, so retain a
@@ -542,11 +543,12 @@ export class DeviceCommands {
             count: detailMatch?.[1],
           });
         }
+        const lowerMessage = message?.toLowerCase() ?? '';
         // Strict safety checks refuse a path outside the chain's standard ones.
-        if (message?.includes('Forbidden key path')) {
+        if (lowerMessage.includes('forbidden key path')) {
           error = ERRORS.TypedError(HardwareErrorCode.ForbiddenKeyPath, message);
         }
-        if (UNSUPPORTED_PATH_FAILURES.some(text => message?.includes(text))) {
+        if (UNSUPPORTED_PATH_FAILURES.some(text => lowerMessage.includes(text))) {
           error = ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPath, message);
         }
       }

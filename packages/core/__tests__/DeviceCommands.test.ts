@@ -47,6 +47,10 @@ describe('DeviceCommands failure mapping', () => {
     ['Non-hardened paths unsupported on Ed25519', HardwareErrorCode.DeviceNotSupportPath],
     // Classic 1S on a path off the chain's pattern.
     ['Invalid path', HardwareErrorCode.DeviceNotSupportPath],
+    // Wording varies in case across firmware.
+    ['forbidden key path', HardwareErrorCode.ForbiddenKeyPath],
+    ['Invalid Path', HardwareErrorCode.DeviceNotSupportPath],
+    ['invalid path', HardwareErrorCode.DeviceNotSupportPath],
   ])('maps path refusal "%s" to its own code', async (message, errorCode) => {
     const commands = createCommands();
     await expect(
