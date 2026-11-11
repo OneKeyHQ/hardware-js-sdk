@@ -1,6 +1,10 @@
 import { Buffer } from 'buffer';
 
-export type ManualSigningMethod = 'btcGetPublicKey' | 'zcashGetAddress' | 'moneroGetAddress';
+export type ManualSigningMethod =
+  | 'btcGetPublicKey'
+  | 'zcashGetAddress'
+  | 'moneroGetAddress'
+  | 'solGetAddress';
 
 export type ManualSigningCall = (
   method: ManualSigningMethod,
