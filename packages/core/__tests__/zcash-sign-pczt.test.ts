@@ -457,7 +457,7 @@ describe('Zcash address protocol selection', () => {
       id: 1,
       payload: { method: 'zcashGetAddress', path: "m/32'/133'/0'", ...params },
     });
-  test('supports only Pro2 and protocol V2', () => {
+  test('supports only Pro2 firmware 1.0.4 and later, on protocol V2', () => {
     for (const method of [
       createAddress(),
       createSignMethod(hex(1, 1)),
@@ -470,7 +470,7 @@ describe('Zcash address protocol selection', () => {
       expect(method.supportsProtocol('V1')).toBe(false);
       expect(method.supportsProtocol('V2')).toBe(true);
       expect(method.strictCheckDeviceSupport).toBe(true);
-      expect(Object.keys(method.getVersionRange())).toEqual(['model_pro2']);
+      expect(method.getVersionRange()).toEqual({ model_pro2: { min: '1.0.4' } });
     }
   });
   test.each([0, 1, 2])('maps address type %s with internal scope and index', async addressType => {
