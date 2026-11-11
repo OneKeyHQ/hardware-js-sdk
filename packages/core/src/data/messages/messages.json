@@ -10286,7 +10286,7 @@
         "required_signers": {
           "rule": "repeated",
           "type": "bytes",
-          "id": 7
+          "id": 6
         }
       }
     },
