@@ -72,7 +72,7 @@ export default class ZcashGetAddress extends BaseMethod<HardwareZcashGetAddress[
   getVersionRange(): DeviceFirmwareRange {
     return {
       model_pro2: {
-        min: '0.0.0',
+        min: '1.0.4',
       },
     };
   }
