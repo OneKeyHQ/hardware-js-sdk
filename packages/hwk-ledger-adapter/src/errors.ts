@@ -3,6 +3,7 @@ import {
   defaultOriginForCode,
   defaultRecoveryForCode,
   enrichErrorMessage,
+  isHardwareErrorCode,
 } from '@onekeyfe/hwk-adapter-core';
 
 import type { Failure, HwkErrorOrigin, HwkRecoveryHint } from '@onekeyfe/hwk-adapter-core';
@@ -297,14 +298,19 @@ export function isDeviceNotAdvertisingError(err: unknown): boolean {
   return (err as { _tag?: string })._tag === ERROR_TAG.DeviceNotAdvertising;
 }
 
-// GATT bonding failed (non-timeout). Not auto-retryable.
+// A BLE connect that failed for a cause nobody identified. Not auto-retryable.
 export function isBleGattBondingFailedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
-  return (err as { _tag?: string })._tag === ERROR_TAG.BleGattBondingFailed;
+  if ((err as { _tag?: string })._tag === ERROR_TAG.BleGattBondingFailed) return true;
+  const orig = (err as { originalError?: unknown }).originalError;
+  return orig != null && isBleGattBondingFailedError(orig);
 }
 
 /** DMK keeps native BLE errors in `err`, which may differ from `originalError`. */
-export function isBleBondInvalidError(err: unknown): boolean {
+function findErrorInChain(
+  err: unknown,
+  matches: (e: Record<string, unknown>) => boolean
+): Record<string, unknown> | undefined {
   const pending: unknown[] = [err];
   const seen = new Set<object>();
   while (pending.length > 0) {
@@ -312,28 +318,50 @@ export function isBleBondInvalidError(err: unknown): boolean {
     if (candidate && typeof candidate === 'object' && !seen.has(candidate)) {
       seen.add(candidate);
       const e = candidate as Record<string, unknown>;
-      if (
-        e._tag === ERROR_TAG.PeerRemovedPairing ||
-        e.iosErrorCode === 14 ||
-        e.attErrorCode === 5 ||
-        (e.nativeErrorDomain === 'CBErrorDomain' && e.nativeErrorCode === 14)
-      ) {
-        return true;
-      }
-      const reason = typeof e.reason === 'string' ? e.reason : '';
-      const message = typeof e.message === 'string' ? e.message : '';
-      // Electron IPC preserves the patched native message, but drops custom error fields.
-      if (
-        /\bCBErrorDomain:14(?:\s|$)/.test(message) ||
-        reason.includes('Peer removed pairing information') ||
-        reason.includes('GATT_INSUF_AUTHENTICATION')
-      ) {
-        return true;
-      }
+      if (matches(e)) return e;
       pending.push(e.originalError, e.err);
     }
   }
-  return false;
+  return undefined;
+}
+
+function someErrorInChain(err: unknown, matches: (e: Record<string, unknown>) => boolean): boolean {
+  return findErrorInChain(err, matches) !== undefined;
+}
+
+/** A failure the desktop BLE host already mapped, however DMK wrapped it. */
+export function findCanonicalBleError(err: unknown): Error | undefined {
+  return findErrorInChain(err, e => isHardwareErrorCode(e.code)) as Error | undefined;
+}
+
+export function isBleBondInvalidError(err: unknown): boolean {
+  return someErrorInChain(err, e => {
+    if (
+      // Already canonical: the desktop BLE host or a connector mapped the native signal.
+      e.code === HardwareErrorCode.BleBondInvalid ||
+      e._tag === ERROR_TAG.PeerRemovedPairing ||
+      e.iosErrorCode === 14 ||
+      e.attErrorCode === 5 ||
+      (e.nativeErrorDomain === 'CBErrorDomain' && e.nativeErrorCode === 14)
+    ) {
+      return true;
+    }
+    const reason = typeof e.reason === 'string' ? e.reason : '';
+    return (
+      reason.includes('Peer removed pairing information') ||
+      reason.includes('GATT_INSUF_AUTHENTICATION')
+    );
+  });
+}
+
+/** The Electron BLE host could not reach a device no scan surfaced. */
+export function isBleNotAdvertisingTimeoutError(err: unknown): boolean {
+  return someErrorInChain(
+    err,
+    e =>
+      e.code === HardwareErrorCode.DeviceNotFound &&
+      (e.params as { notAdvertising?: unknown } | undefined)?.notAdvertising === true
+  );
 }
 
 // Other BLE pairing failures (DMK-native, ble-plx, our own) map to
@@ -342,7 +370,6 @@ export function isBleBondInvalidError(err: unknown): boolean {
 // "didn't pair" outcome, no need to disambiguate.
 const PAIRING_FAILURE_TAGS = new Set<string>([
   ERROR_TAG.BlePairingTimeout,
-  ERROR_TAG.BleGattBondingFailed,
   ERROR_TAG.PairingRefused,
 ]);
 export function isBlePairingFailureError(err: unknown): boolean {
@@ -696,6 +723,9 @@ export function mapLedgerError(
     // Must precede isDeviceBusyError, which would match the raw transport error
     // the BLE wrapper keeps on `originalError`.
     code = HardwareErrorCode.BlePairingTimeout;
+  } else if (isBleGattBondingFailedError(err)) {
+    // Same reason to precede isDeviceBusyError.
+    code = HardwareErrorCode.BleConnectFailed;
   } else if (isDeviceBusyError(err)) {
     code = HardwareErrorCode.DeviceBusy;
   } else if (isUserAbortedError(err)) {

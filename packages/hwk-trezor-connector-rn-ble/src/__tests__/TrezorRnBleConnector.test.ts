@@ -188,7 +188,23 @@ describe('TrezorRnBleConnector', () => {
     );
   });
 
-  it('reports DeviceNotFound when a direct BLE connectId is stale', async () => {
+  it('passes on the code the transport gave a stale connectId', async () => {
+    const notFound = Object.assign(new Error('Trezor BLE device did not answer'), {
+      code: HardwareErrorCode.DeviceNotFound,
+    });
+    const transport: TrezorBleTransport = {
+      scan: jest.fn().mockResolvedValue([]),
+      connect: jest.fn().mockRejectedValue(notFound),
+      disconnect: jest.fn(),
+    };
+    const connector = new TrezorRnBleConnector({
+      transportFactory: async () => transport,
+    });
+
+    await expect(connector.connect('62:79:4D:55:37:8F')).rejects.toBe(notFound);
+  });
+
+  it('reads no text from an uncoded transport failure', async () => {
     const transport: TrezorBleTransport = {
       scan: jest.fn().mockResolvedValue([]),
       connect: jest.fn().mockRejectedValue(new Error('native BLE device not found')),
@@ -199,8 +215,22 @@ describe('TrezorRnBleConnector', () => {
     });
 
     await expect(connector.connect('62:79:4D:55:37:8F')).rejects.toMatchObject({
-      code: HardwareErrorCode.DeviceNotFound,
-      message: 'Trezor BLE device not found: 62:79:4D:55:37:8F',
+      code: HardwareErrorCode.BleConnectFailed,
+    });
+  });
+
+  it('does not pass a foreign numeric code through as a HardwareErrorCode', async () => {
+    const transport: TrezorBleTransport = {
+      scan: jest.fn().mockResolvedValue([]),
+      connect: jest.fn().mockRejectedValue(Object.assign(new Error('aborted'), { code: 20 })),
+      disconnect: jest.fn(),
+    };
+    const connector = new TrezorRnBleConnector({
+      transportFactory: async () => transport,
+    });
+
+    await expect(connector.connect('62:79:4D:55:37:8F')).rejects.toMatchObject({
+      code: HardwareErrorCode.BleConnectFailed,
     });
   });
 

@@ -235,6 +235,47 @@ describe('TrezorCore', () => {
     }
   });
 
+  // The vendored transport code would report these by text; the code the byte transport set wins.
+  describe('keeps the error a byte transport threw', () => {
+    const linkDropped = Object.assign(new Error('BLE link dropped during write'), { code: 10101 });
+
+    test('when a v1 continuation read fails', async () => {
+      const responseBytes = buildMessage({
+        name: 'Features',
+        data: {
+          vendor: 'trezor.io',
+          major_version: 2,
+          minor_version: 8,
+          patch_version: 10,
+          label: 'x'.repeat(180),
+        },
+        protocol: protocolV1,
+      });
+      const [, responseChunkHeader] = protocolV1.getHeaders(responseBytes);
+      const [firstChunk] = createChunks(responseBytes, responseChunkHeader, 64);
+      const transport = new MemoryByteTransport([firstChunk]);
+      transport.read = jest
+        .fn<Promise<Buffer>, []>()
+        .mockResolvedValueOnce(firstChunk)
+        .mockRejectedValueOnce(linkDropped);
+      const core = new TrezorCore({ transport, protocol: protocolV1, chunkSize: 64 });
+
+      await expect(core.call('Initialize', {})).rejects.toBe(linkDropped);
+    });
+
+    test.each(['read', 'write'] as const)('when a THP %s fails', async side => {
+      const thpState = new protocolThp.ThpState();
+      thpState.setChannel(Buffer.from('ffff', 'hex'));
+      const transport = new MemoryByteTransport([]);
+      transport[side] = jest.fn().mockRejectedValue(linkDropped);
+      const core = new TrezorCore({ transport, protocol: protocolV2, chunkSize: 64 });
+
+      await expect(
+        core.call('ThpCreateChannelRequest', { nonce: 'cb263fc1c42de1ac' }, { thpState })
+      ).rejects.toBe(linkDropped);
+    });
+  });
+
   test('unwraps THP abort options before forwarding signals to the byte transport', async () => {
     const thpState = new protocolThp.ThpState();
     const responseBytes = Buffer.from(

@@ -1,3 +1,5 @@
+import { HardwareErrorCode, createHwkError, isHardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+
 import { type BleDebugLogLevel, type BleDebugLogger, redactBleDebugLogData } from './debugLog';
 import {
   THIRD_PARTY_BLE_DEVICE_TTL_MS,
@@ -93,6 +95,8 @@ interface ConnectClaim {
   abandoned: boolean;
   cancelScan?: () => void;
   cancelNative?: () => void;
+  /** Connecting by id to a device the scan never saw. */
+  directPending?: boolean;
 }
 
 interface DeviceEntry {
@@ -103,7 +107,7 @@ interface DeviceEntry {
   writeChar?: NobleCharacteristicLike;
   notifyChar?: NobleCharacteristicLike;
   notifyHandler?: (data: Buffer, isNotification: boolean) => void;
-  disconnectHandler?: () => void;
+  disconnectHandler?: (reason?: unknown) => void;
 }
 
 // Longer than any real vendor name, and bounds the work a vendor name rule does per advertisement.
@@ -116,10 +120,11 @@ const BLE_NAME_MATCH_MAX_LENGTH = 64;
 const matchesPeripheral = (
   p: NoblePeripheralLike,
   profile: ThirdPartyBleVendorProfile,
-  narrowTo?: Set<string>
+  narrowTo?: Set<string>,
+  remembered?: ReadonlySet<string>
 ): boolean => {
   const adv = p.advertisement ?? {};
-  const advertised = adv.serviceUuids ?? [];
+  const advertised = [...(adv.serviceUuids ?? []), ...(remembered ?? [])];
   if (
     advertised.some(
       uuid =>
@@ -170,6 +175,101 @@ const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
 
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
+type NativeBleError = Error & { nativeErrorDomain?: string; nativeErrorCode?: number };
+
+const nativeErrorFields = (error: unknown) => {
+  const { nativeErrorDomain, nativeErrorCode } = (error ?? {}) as NativeBleError;
+  return { nativeErrorDomain, nativeErrorCode };
+};
+
+type BlePhase = 'connect' | 'subscribe' | 'write';
+
+const shuttingDownError = () =>
+  createHwkError({
+    code: HardwareErrorCode.UnknownError,
+    message: 'Desktop BLE is shutting down',
+  });
+
+const invariantError = (message: string) =>
+  createHwkError({ code: HardwareErrorCode.UnknownError, message });
+
+/** Not just `poweredOff`: an adapter without permission or support cannot be used either. */
+const bluetoothUnavailableError = (state: string) =>
+  createHwkError({
+    code: HardwareErrorCode.DevicePermissionDenied,
+    message: `Bluetooth is unavailable (state: ${state})`,
+    params: {
+      permissionDeniedReason: state === 'unauthorized' ? 'permissionDenied' : 'bluetoothTurnedOff',
+      bluetoothState: state,
+    },
+  });
+
+const BLE_UNUSABLE_STATES = new Set(['poweredOff', 'unauthorized', 'unsupported']);
+
+/**
+ * Native failure → HardwareErrorCode, at the only layer that sees the native fields. Messages
+ * avoid "disconnected" / "not found": the Ledger adapter still retries on those words.
+ */
+const toCanonicalBleError = (
+  error: unknown,
+  phase: BlePhase,
+  { linkLost = false, facts }: { linkLost?: boolean; facts?: Record<string, unknown> } = {}
+): Error => {
+  if (isHardwareErrorCode((error as { code?: unknown } | null)?.code)) return error as Error;
+  const native = nativeErrorFields(error);
+  const params = { phase, ...native, ...facts };
+  if (native.nativeErrorDomain === 'CBErrorDomain' && native.nativeErrorCode === 14) {
+    return createHwkError({
+      code: HardwareErrorCode.BleBondInvalid,
+      message: 'The device removed its Bluetooth pairing with this computer',
+      params,
+    });
+  }
+  // Apple reports a failed, rejected, cancelled and timed-out pairing alike.
+  if (native.nativeErrorDomain === 'CBATTErrorDomain' && native.nativeErrorCode === 15) {
+    return createHwkError({
+      code: HardwareErrorCode.BlePairingTimeout,
+      message: 'Bluetooth pairing did not complete',
+      params,
+    });
+  }
+  if (linkLost || phase === 'write') {
+    return createHwkError({
+      code: HardwareErrorCode.DeviceDisconnected,
+      message: `BLE link dropped during ${phase}`,
+      params,
+    });
+  }
+  return createHwkError({
+    code: HardwareErrorCode.BleConnectFailed,
+    message: `BLE ${phase} failed`,
+    params,
+  });
+};
+
+/**
+ * noble settles only a pending connect when the link drops, so discovery or subscribe would
+ * wait out the connect timeout. Fail them with the drop's native error (macOS sends one).
+ */
+async function failOnNativeLinkLoss<T>(
+  peripheral: NoblePeripheralLike,
+  operation: Promise<T>,
+  phase: BlePhase
+): Promise<T> {
+  let onDisconnect!: (reason?: unknown) => void;
+  const linkLost = new Promise<never>((_, reject) => {
+    onDisconnect = reason => {
+      if (reason instanceof Error) reject(toCanonicalBleError(reason, phase, { linkLost: true }));
+    };
+  });
+  peripheral.on('disconnect', onDisconnect);
+  try {
+    return await Promise.race([operation, linkLost]);
+  } finally {
+    peripheral.removeListener('disconnect', onDisconnect);
+  }
+}
+
 /** Waits for `work` or `ms`, whichever comes first; never rejects on timeout. */
 const raceTimeout = async (
   work: Promise<unknown> | undefined,
@@ -199,6 +299,10 @@ const BLE_CONNECT_SETTLE_MS = 300;
 const BLE_CONNECT_TIMEOUT_MS = 31_000;
 // Cap on a cleanup disconnectAsync, which hangs on a just-failed connect.
 const BLE_DISCONNECT_TIMEOUT_MS = 2_000;
+// CoreBluetooth answers a subscribe only once the pairing it triggers settles; an unanswered
+// pairing fails on its own (ATT 15) after ~30s, and a slow passkey confirmation has succeeded at
+// 35s. This only catches a subscribe the OS never answers.
+const BLE_SUBSCRIBE_TIMEOUT_MS = 60_000;
 
 /** Floor between noble rebuilds, so a persistent failure can't thrash. */
 const NOBLE_RECOVER_COOLDOWN_MS = 10_000;
@@ -208,6 +312,8 @@ export interface NobleBleHandlerOptions {
   nobleFactory?: NobleFactory;
   /** Override the overall connect timeout (tests only; defaults to 31s). */
   connectTimeoutMs?: number;
+  /** Override the subscribe timeout (tests only; defaults to 60s). */
+  subscribeTimeoutMs?: number;
   logger?: BleDebugLogger;
   /**
    * Vendors served over IPC, keyed by the `vendor` the renderer sends. Replaces the default map
@@ -224,6 +330,8 @@ export class NobleBleHandler {
 
   private readonly _connectTimeoutMs: number;
 
+  private readonly _subscribeTimeoutMs: number;
+
   private readonly _logger?: NobleBleHandlerOptions['logger'];
 
   private readonly _vendors: ReadonlyMap<string, ThirdPartyBleVendorProfile>;
@@ -232,6 +340,13 @@ export class NobleBleHandler {
 
   // id -> last advertisement time (snapshot TTL).
   private readonly _lastSeen = new Map<string, number>();
+
+  // id -> service UUIDs seen since the device was last forgotten. noble-win replaces them with
+  // every packet, so a scan response without them would hide the device; CoreBluetooth merges.
+  private readonly _advertisedUuids = new Map<string, Set<string>>();
+
+  // Devices a scan kept only by their remembered UUIDs; logged once each.
+  private readonly _keptByMemory = new Set<string>();
 
   private readonly _connected = new Map<string, DeviceEntry>();
 
@@ -278,6 +393,7 @@ export class NobleBleHandler {
   constructor(options: NobleBleHandlerOptions = {}) {
     this._factory = options.nobleFactory ?? DEFAULT_NOBLE_FACTORY;
     this._connectTimeoutMs = options.connectTimeoutMs ?? BLE_CONNECT_TIMEOUT_MS;
+    this._subscribeTimeoutMs = options.subscribeTimeoutMs ?? BLE_SUBSCRIBE_TIMEOUT_MS;
     this._logger = options.logger;
     // A Map, so an IPC vendor like `__proto__` cannot reach an inherited property.
     this._vendors = new Map(Object.entries(options.vendors ?? DEFAULT_THIRD_PARTY_BLE_VENDORS));
@@ -288,7 +404,7 @@ export class NobleBleHandler {
     profile: ThirdPartyBleVendorProfile;
   } {
     const profile = typeof vendor === 'string' ? this._vendors.get(vendor) : undefined;
-    if (typeof vendor !== 'string' || !profile) throw new Error('Unsupported BLE vendor');
+    if (typeof vendor !== 'string' || !profile) throw invariantError('Unsupported BLE vendor');
     return { vendor, profile };
   }
 
@@ -310,6 +426,7 @@ export class NobleBleHandler {
       this._discoverHandler ??= peripheral => {
         this._discovered.set(peripheral.id, peripheral);
         this._lastSeen.set(peripheral.id, Date.now());
+        this._rememberServiceUuids(peripheral);
       };
       this._noble.removeListener('discover', this._discoverHandler);
       this._noble.on('discover', this._discoverHandler);
@@ -382,6 +499,19 @@ export class NobleBleHandler {
     return devices;
   }
 
+  private _rememberServiceUuids(peripheral: NoblePeripheralLike): void {
+    const uuids = peripheral.advertisement?.serviceUuids;
+    if (!uuids?.length) return;
+    let seen = this._advertisedUuids.get(peripheral.id);
+    if (!seen) {
+      seen = new Set<string>();
+      this._advertisedUuids.set(peripheral.id, seen);
+    }
+    for (const uuid of uuids) {
+      if (typeof uuid === 'string') seen.add(uuid);
+    }
+  }
+
   /**
    * In-range devices matching the caller, minus TTL-expired ones. `_discovered`
    * is only a cache; a missing device can still be reached by `_directConnect`.
@@ -397,9 +527,17 @@ export class NobleBleHandler {
       if (now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS) {
         this._discovered.delete(id);
         this._lastSeen.delete(id);
+        this._advertisedUuids.delete(id);
+        this._keptByMemory.delete(id);
         continue;
       }
-      if (!matchesPeripheral(peripheral, profile, narrowTo)) continue;
+      if (!matchesPeripheral(peripheral, profile, narrowTo, this._advertisedUuids.get(id))) {
+        continue;
+      }
+      if (!this._keptByMemory.has(id) && !matchesPeripheral(peripheral, profile, narrowTo)) {
+        this._keptByMemory.add(id);
+        this._log('info', 'scan.keptByMemory', { id });
+      }
       result.push(peripheralToInfo(peripheral));
     }
     // A linked device stops advertising and ages out above, so merge held links
@@ -459,6 +597,8 @@ export class NobleBleHandler {
       this._scanning = false;
       this._discovered.clear();
       this._lastSeen.clear();
+      this._advertisedUuids.clear();
+      this._keptByMemory.clear();
       await this._waitForPoweredOn(THIRD_PARTY_BLE_POWER_ON_TIMEOUT_MS);
       this._log('warn', 'noble.recover.done', { state: this._noble?.state });
     } catch (error) {
@@ -519,6 +659,8 @@ export class NobleBleHandler {
     this._scanOwners.clear();
     this._discovered.clear();
     this._lastSeen.clear();
+    this._advertisedUuids.clear();
+    this._keptByMemory.clear();
     await this._pauseScan();
   }
 
@@ -538,7 +680,13 @@ export class NobleBleHandler {
   getDevice(id: string): ThirdPartyBleDeviceInfo | null {
     const p = this._discovered.get(id);
     // The scan cache holds every advertiser in range; only a registered vendor's device is exposed.
-    if (!p || ![...this._vendors.values()].some(profile => matchesPeripheral(p, profile))) {
+    const remembered = this._advertisedUuids.get(id);
+    if (
+      !p ||
+      ![...this._vendors.values()].some(profile =>
+        matchesPeripheral(p, profile, undefined, remembered)
+      )
+    ) {
       return null;
     }
     return peripheralToInfo(p);
@@ -560,7 +708,13 @@ export class NobleBleHandler {
       (vendor === options.vendor && (options.id === undefined || id === options.id));
     for (const attempt of this._connectAttempts) {
       if (!matches(attempt.id, attempt.vendor)) continue;
-      attempt.abandon(new Error(`connect cancelled: ${attempt.id}`));
+      attempt.abandon(
+        createHwkError({
+          code: HardwareErrorCode.BlePairingCancelled,
+          message: `connect cancelled: ${attempt.id}`,
+          params: { phase: 'connect' },
+        })
+      );
       try {
         attempt.cancelNative();
       } catch (error) {
@@ -670,8 +824,7 @@ export class NobleBleHandler {
     );
   }
 
-  // One timeout covers connect and service discovery; the connector maps
-  // `timed out` (unreachable) and `connection failed` (stale bond) differently.
+  // One timeout covers connect and service discovery.
   async connect(
     id: string,
     options: ElectronBleConnectOptions
@@ -683,11 +836,11 @@ export class NobleBleHandler {
         uuid => typeof uuid === 'string' && /^[0-9a-f]{32}$/i.test(normalizeBleUuid(uuid))
       )
     ) {
-      throw new Error('Invalid BLE GATT profile');
+      throw invariantError('Invalid BLE GATT profile');
     }
     // Before any native work: only a registered vendor's own GATT profile and framing.
     if (!this._resolveVendor(options.vendor).profile.acceptsConnect(options)) {
-      throw new Error(`BLE GATT profile not allowed for ${options.vendor}`);
+      throw invariantError(`BLE GATT profile not allowed for ${options.vendor}`);
     }
     this._assertActive();
     // Promise.race cannot stop _connectInner; the claim makes a late success tear
@@ -702,10 +855,29 @@ export class NobleBleHandler {
         claim.cancelScan?.();
       };
     });
-    const timer = setTimeout(
-      () => abandon(new Error(`connect timed out after ${this._connectTimeoutMs}ms`)),
-      this._connectTimeoutMs
-    );
+    const timer = setTimeout(() => {
+      abandon(
+        createHwkError({
+          code: HardwareErrorCode.DeviceNotFound,
+          message: `connect timed out after ${this._connectTimeoutMs}ms`,
+          // A device no scan surfaced is not advertising; the Ledger adapter retries that one.
+          params: {
+            phase: 'connect',
+            timedOut: true,
+            ...(claim.directPending ? { notAdvertising: true } : {}),
+          },
+        })
+      );
+      // A link a committed connection owns stays up, same guard as abortIfAbandoned.
+      if (this._connected.has(id)) return;
+      // Like cancelPairing: a native connect left pending completes whenever the
+      // device returns, and its late teardown can then drop the next attempt's link.
+      try {
+        claim.cancelNative?.();
+      } catch (error) {
+        this._log('warn', 'connect.timeout.cancelConnect.error', { id, error: String(error) });
+      }
+    }, this._connectTimeoutMs);
     const attempt = {
       id,
       vendor: options.vendor,
@@ -722,7 +894,12 @@ export class NobleBleHandler {
         const peripheral = this._discovered.get(id);
         // Tear down only a link nobody owns, same guard as _connectInner.abortIfAbandoned.
         if (peripheral && !this._connected.has(id)) await this._safeDisconnect(peripheral);
-        throw error;
+        this._log('warn', 'connect.error', {
+          id,
+          error: String(error),
+          ...nativeErrorFields(error),
+        });
+        throw toCanonicalBleError(error, 'connect');
       } finally {
         clearTimeout(timer);
       }
@@ -750,6 +927,7 @@ export class NobleBleHandler {
   ): Promise<{ id: string; name?: string }> {
     let route: 'cache' | 'scan' | 'direct' | 'none' = 'cache';
     let peripheral: NoblePeripheralLike | undefined;
+    const startedAt = Date.now();
     // Stops the flow before it commits an unowned link; the rejection itself is
     // unobservable because Promise.race already settled.
     const abortIfAbandoned = async (stage: string) => {
@@ -780,7 +958,11 @@ export class NobleBleHandler {
       // peripheral CoreBluetooth cannot retrieve (`NobleMac::Connect`).
       const native = this._requireNoble();
       claim.cancelNative = () => native.cancelConnect?.(id);
+      claim.directPending = true;
       peripheral = await this._directConnect(id);
+      claim.directPending = false;
+      // A cancelled direct connect returns undefined; report it as abandoned, not missing.
+      await abortIfAbandoned('direct');
     }
     if (!peripheral) {
       // discoveredCount=0 points at the radio/scan; counts only, see scan.empty.
@@ -789,7 +971,11 @@ export class NobleBleHandler {
         route: 'none',
         discoveredCount: this._discovered.size,
       });
-      throw new Error(`BLE device not found: ${id}`);
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceNotFound,
+        message: `BLE device not found: ${id}`,
+        params: { phase: 'connect', notAdvertising: true },
+      });
     }
 
     await abortIfAbandoned('resolve');
@@ -809,31 +995,47 @@ export class NobleBleHandler {
       route,
       wasConnected,
       name: peripheral.advertisement?.localName,
+      elapsedMs: Date.now() - startedAt,
     });
     if (!wasConnected) {
       await peripheral.connectAsync();
+      this._log('info', 'connect.linked', { id, elapsedMs: Date.now() - startedAt });
       await abortIfAbandoned('link');
     }
+    const linkedAt = Date.now();
 
     try {
-      const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
-        [options.serviceUuid],
-        [options.writeUuid, options.notifyUuid]
+      const { characteristics } = await failOnNativeLinkLoss(
+        peripheral,
+        peripheral.discoverSomeServicesAndCharacteristicsAsync(
+          [options.serviceUuid],
+          [options.writeUuid, options.notifyUuid]
+        ),
+        'connect'
       );
       const writeUuid = normalizeBleUuid(options.writeUuid);
       const notifyUuid = normalizeBleUuid(options.notifyUuid);
       const writeChar = characteristics.find(c => normalizeBleUuid(c.uuid) === writeUuid);
       const notifyChar = characteristics.find(c => normalizeBleUuid(c.uuid) === notifyUuid);
       if (!writeChar || !notifyChar) {
-        throw new Error(`BLE characteristics not found on device ${id}`);
+        throw createHwkError({
+          code: HardwareErrorCode.BleConnectFailed,
+          message: `BLE device ${id} lacks the expected characteristics`,
+          params: { phase: 'connect' },
+        });
       }
       // Last gate before commit: service discovery can also outlast the timeout.
       await abortIfAbandoned('discovery');
 
-      const disconnectHandler = () => {
+      const disconnectHandler = (reason?: unknown) => {
         // One peripheral outlives many links; a stale handler must not report
         // the current link as unexpectedly dropped.
         if (this._connected.get(id)?.disconnectHandler !== disconnectHandler) return;
+        this._log('warn', 'disconnect.reason', {
+          id,
+          reason: String(reason),
+          ...nativeErrorFields(reason),
+        });
         this._cleanupDevice(id, /* unexpected */ true);
       };
       peripheral.on('disconnect', disconnectHandler);
@@ -846,12 +1048,25 @@ export class NobleBleHandler {
         vendor: options.vendor,
         write: options.write,
       });
-      this._log('info', 'connect.done', { id, name: peripheral.advertisement.localName });
+      this._log('info', 'connect.done', {
+        id,
+        name: peripheral.advertisement.localName,
+        elapsedMs: Date.now() - startedAt,
+      });
       return { id, name: peripheral.advertisement.localName };
     } catch (error) {
-      // Don't leak a GATT link this call opened.
-      if (!wasConnected) await this._safeDisconnect(peripheral);
-      throw error;
+      // Don't leak a GATT link this call opened. A direct connect opened one even
+      // though the peripheral arrives connected, unless a committed link owns it.
+      const openedLink = !wasConnected || (route === 'direct' && !this._connected.has(id));
+      if (openedLink) await this._safeDisconnect(peripheral);
+      // noble-win names an unreachable GATT only in its text. The app weighs how soon the
+      // link failed against the bond Windows holds, which the host cannot see.
+      const unreachable = error instanceof Error && /\bunreachable\b/i.test(error.message);
+      throw toCanonicalBleError(error, 'connect', {
+        facts: unreachable
+          ? { gattUnreachable: true, msSinceLink: Date.now() - linkedAt }
+          : undefined,
+      });
     }
   }
 
@@ -872,14 +1087,69 @@ export class NobleBleHandler {
 
   async subscribe(id: string): Promise<void> {
     const entry = this._requireEntry(id);
-    if (!entry.notifyChar) throw new Error(`BLE notify characteristic missing for ${id}`);
+    if (!entry.notifyChar) throw invariantError(`BLE notify characteristic missing for ${id}`);
     if (entry.notifyHandler) return;
     const handler = (data: Buffer) => {
       this._onNotification?.(id, data.toString('hex'));
     };
     entry.notifyHandler = handler;
     entry.notifyChar.on('data', handler);
-    await entry.notifyChar.subscribeAsync();
+    try {
+      await failOnNativeLinkLoss(
+        entry.peripheral,
+        this._withSubscribeTimeout(entry.notifyChar.subscribeAsync()),
+        'subscribe'
+      );
+    } catch (error) {
+      this._log('warn', 'subscribe.error', {
+        id,
+        error: String(error),
+        ...nativeErrorFields(error),
+      });
+      throw this._toSubscribeError(error, entry.peripheral);
+    }
+  }
+
+  private async _withSubscribeTimeout(subscribing: Promise<void>): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancel: (() => void) | undefined;
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          createHwkError({
+            code: HardwareErrorCode.BleConnectFailed,
+            message: `subscribe timed out after ${this._subscribeTimeoutMs}ms`,
+            params: { phase: 'subscribe' },
+          })
+        );
+      }, this._subscribeTimeoutMs);
+      cancel = () => reject(shuttingDownError());
+      this._pendingCancellations.add(cancel);
+    });
+    try {
+      await Promise.race([subscribing, expired]);
+    } finally {
+      clearTimeout(timer);
+      if (cancel) this._pendingCancellations.delete(cancel);
+    }
+  }
+
+  /**
+   * noble-win reports a failed subscribe only as `status: <AsyncStatus>`. Error (3) on a live
+   * link is a device refusing the bond Windows holds; a link already gone fails it the same way.
+   */
+  private _toSubscribeError(error: unknown, peripheral: NoblePeripheralLike): Error {
+    if (!(error instanceof Error) || error.message !== 'status: 3') {
+      return toCanonicalBleError(error, 'subscribe');
+    }
+    if (peripheral.state !== 'connected') {
+      return toCanonicalBleError(error, 'subscribe', { linkLost: true });
+    }
+    return createHwkError({
+      code: HardwareErrorCode.BleBondInvalid,
+      message: 'The device refused the Bluetooth pairing this computer holds',
+      params: { phase: 'subscribe', asyncStatus: 3 },
+    });
   }
 
   async unsubscribe(id: string): Promise<void> {
@@ -898,24 +1168,33 @@ export class NobleBleHandler {
 
   async write(id: string, hexData: string): Promise<void> {
     const entry = this._requireEntry(id);
-    if (!entry.writeChar) throw new Error(`BLE write characteristic missing for ${id}`);
+    const { writeChar } = entry;
+    if (!writeChar) throw invariantError(`BLE write characteristic missing for ${id}`);
     const buffer = Buffer.from(hexData, 'hex');
     const framing = entry.write;
-    if (!framing) throw new Error(`No BLE write framing recorded for ${id}`);
+    if (!framing) throw invariantError(`No BLE write framing recorded for ${id}`);
+    const writeChunk = async (chunk: Buffer) => {
+      try {
+        await writeChar.writeAsync(chunk, false);
+      } catch (error) {
+        this._log('warn', 'write.error', { id, error: String(error), ...nativeErrorFields(error) });
+        throw toCanonicalBleError(error, 'write');
+      }
+    };
 
     if (framing.mode === 'raw') {
       // Self-framed, so padding corrupts it. Ledger negotiates the size per link
       // (0x08 handshake) in one byte, so it never exceeds 255.
       const maxLength = framing.maxLength ?? buffer.length;
       if (!/^(?:[0-9a-f]{2})+$/i.test(hexData) || buffer.length > maxLength) {
-        throw new Error(`Invalid BLE frame for ${entry.vendor ?? 'device'}`);
+        throw invariantError(`Invalid BLE frame for ${entry.vendor ?? 'device'}`);
       }
-      await entry.writeChar.writeAsync(buffer, false);
+      await writeChunk(buffer);
       return;
     }
 
     const { chunkSize } = framing;
-    if (!chunkSize) throw new Error(`Padded BLE writes need a chunkSize for ${id}`);
+    if (!chunkSize) throw invariantError(`Padded BLE writes need a chunkSize for ${id}`);
     for (let offset = 0; offset < buffer.length; offset += chunkSize) {
       this._assertActive();
       const slice = buffer.subarray(offset, offset + chunkSize);
@@ -924,7 +1203,7 @@ export class NobleBleHandler {
       const chunk = Buffer.alloc(chunkSize);
       slice.copy(chunk);
       // OneKey uses writeWithResponse for stability; mirror that.
-      await entry.writeChar.writeAsync(chunk, false);
+      await writeChunk(chunk);
       if (offset + chunkSize < buffer.length && framing.chunkDelayMs) {
         await delay(framing.chunkDelayMs);
       }
@@ -941,7 +1220,7 @@ export class NobleBleHandler {
     this._onDeviceDisconnected = undefined;
     const connections = Array.from(this._connectAttempts);
     for (const attempt of connections) {
-      attempt.abandon(new Error('Desktop BLE is shutting down'));
+      attempt.abandon(shuttingDownError());
       try {
         attempt.cancelNative();
       } catch (error) {
@@ -977,6 +1256,8 @@ export class NobleBleHandler {
       } finally {
         this._discovered.clear();
         this._lastSeen.clear();
+        this._advertisedUuids.clear();
+        this._keptByMemory.clear();
         this._initialized = false;
       }
     })();
@@ -1010,7 +1291,7 @@ export class NobleBleHandler {
   }
 
   private _assertActive(): void {
-    if (this._disposed) throw new Error('Desktop BLE is shutting down');
+    if (this._disposed) throw shuttingDownError();
   }
 
   private _cleanupDevice(id: string, unexpected: boolean, expected?: DeviceEntry): void {
@@ -1036,13 +1317,18 @@ export class NobleBleHandler {
   private _requireEntry(id: string): DeviceEntry {
     this._assertActive();
     const entry = this._connected.get(id);
-    if (!entry) throw new Error(`BLE device is not connected: ${id}`);
+    if (!entry) {
+      throw createHwkError({
+        code: HardwareErrorCode.DeviceDisconnected,
+        message: `BLE device is not connected: ${id}`,
+      });
+    }
     return entry;
   }
 
   private _requireNoble(): NobleLike {
     this._assertActive();
-    if (!this._noble) throw new Error('Desktop BLE: noble was not initialized');
+    if (!this._noble) throw invariantError('Desktop BLE: noble was not initialized');
     return this._noble;
   }
 
@@ -1066,6 +1352,8 @@ export class NobleBleHandler {
   private async _waitForPoweredOn(timeoutMs: number): Promise<void> {
     const noble = this._requireNoble();
     if (noble.state === 'poweredOn') return;
+    // A radio that is off fails now; only an unknown or resetting adapter is worth waiting for.
+    if (BLE_UNUSABLE_STATES.has(noble.state)) throw bluetoothUnavailableError(noble.state);
     await new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         clearTimeout(timer);
@@ -1074,23 +1362,19 @@ export class NobleBleHandler {
       };
       const cancel = () => {
         cleanup();
-        reject(new Error('Desktop BLE is shutting down'));
+        reject(shuttingDownError());
       };
       const timer = setTimeout(() => {
         cleanup();
-        reject(
-          new Error(
-            `Desktop BLE: noble did not reach poweredOn within ${timeoutMs}ms (last state: ${noble.state})`
-          )
-        );
+        reject(bluetoothUnavailableError(noble.state));
       }, timeoutMs);
       const handler = (state: string) => {
         if (state === 'poweredOn') {
           cleanup();
           resolve();
-        } else if (state === 'unsupported' || state === 'unauthorized') {
+        } else if (BLE_UNUSABLE_STATES.has(state)) {
           cleanup();
-          reject(new Error(`Desktop BLE: noble state ${state}`));
+          reject(bluetoothUnavailableError(state));
         }
       };
       this._pendingCancellations.add(cancel);

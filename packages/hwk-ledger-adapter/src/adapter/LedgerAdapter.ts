@@ -200,6 +200,7 @@ export class LedgerAdapter implements IHardwareWallet {
   private readonly _operations = new OperationRegistry({
     vendor: 'ledger',
     onEnded: (operation, reason) => {
+      debugLog('[LedgerAdapter] operation ended', { operationId: operation.operationId, reason });
       this._discardPendingBinding(this._pendingOperationBindings.get(operation.operationId));
       this._pendingOperationBindings.delete(operation.operationId);
       this.emitter.emit(SDK.OPERATION_ENDED, {
@@ -2458,10 +2459,17 @@ export class LedgerAdapter implements IHardwareWallet {
   ): Promise<string> {
     const result = await this._connectTarget(chosenConnectId, preserveOperationId, signal);
     if (!result.success) {
-      // _tag must survive — _doConnect's catch is _tag-based.
-      const payload = result.payload as { error: string; code: number; _tag?: string };
+      // _tag must survive — _doConnect's catch is _tag-based. params carry what the
+      // app reads, such as the reason permission was denied.
+      const payload = result.payload as {
+        error: string;
+        code: number;
+        _tag?: string;
+        params?: Record<string, unknown>;
+      };
       const rethrow = Object.assign(new Error(payload.error), {
         code: payload.code,
+        ...(payload.params ? { params: payload.params } : {}),
       }) as Error & { _tag?: string };
       if (payload._tag !== undefined) {
         rethrow._tag = payload._tag;
@@ -3229,9 +3237,11 @@ export class LedgerAdapter implements IHardwareWallet {
     const { granted, reason, message } = response;
 
     if (!granted) {
-      throw Object.assign(new Error(message ?? 'Device permission denied'), {
+      // Where Trezor and the BLE host put it, so the host reads one field everywhere.
+      throw createHwkError({
         code: HardwareErrorCode.DevicePermissionDenied,
-        reason,
+        message: message ?? 'Device permission denied',
+        ...(reason ? { params: { permissionDeniedReason: reason } } : {}),
       });
     }
   }
@@ -3258,20 +3268,15 @@ export class LedgerAdapter implements IHardwareWallet {
         code: number;
         message?: string;
         appName?: string;
-        reason?: string;
         params?: Record<string, unknown>;
         recovery?: unknown;
       };
-      const params =
-        e.code === HardwareErrorCode.DevicePermissionDenied && e.reason
-          ? { permissionDeniedReason: e.reason }
-          : e.params;
       return ledgerFailure(
         e.code,
         e.message ?? 'Unknown error',
         e.appName,
         tag,
-        params,
+        e.params,
         undefined,
         isHwkRecoveryHint(e.recovery) ? e.recovery : undefined
       );

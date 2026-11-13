@@ -1,4 +1,4 @@
-import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, createHwkError, isHardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import {
   TREZOR_BLE_UUIDS,
   isTrezorBleServiceUuid,
@@ -21,8 +21,17 @@ import type {
 const disconnectError = (message: string): Error =>
   createHwkError({ code: HardwareErrorCode.DeviceDisconnected, message });
 
-const transportError = (message: string): Error =>
-  createHwkError({ code: HardwareErrorCode.TransportError, message });
+const connectFailedError = (message: string): Error =>
+  createHwkError({ code: HardwareErrorCode.BleConnectFailed, message });
+
+// react-native-ble-plx BleErrorCode values this transport tells apart.
+const BLE_PLX_ERROR = {
+  operationCancelled: 2,
+  operationTimedOut: 3,
+  deviceDisconnected: 201,
+  deviceNotFound: 204,
+  deviceMtuChangeFailed: 206,
+} as const;
 
 type BlePlxDevice = {
   id: string;
@@ -136,7 +145,9 @@ function waitForPoweredOn(manager: BlePlxManager, ms = BLE_POWERED_ON_TIMEOUT_MS
       disposers.forEach(d => d());
       fn();
     };
+    let lastState: string | undefined;
     const subscription = manager.onStateChange!(state => {
+      lastState = state;
       if (state === 'PoweredOn') finish(resolve);
     }, true);
     disposers.push(() => subscription.remove());
@@ -146,7 +157,14 @@ function waitForPoweredOn(manager: BlePlxManager, ms = BLE_POWERED_ON_TIMEOUT_MS
           reject(
             createHwkError({
               code: HardwareErrorCode.DevicePermissionDenied,
-              message: 'BluetoothLE did not reach PoweredOn state',
+              message: `BluetoothLE did not reach PoweredOn state (last: ${
+                lastState ?? 'unknown'
+              })`,
+              params: {
+                permissionDeniedReason:
+                  lastState === 'Unauthorized' ? 'permissionDenied' : 'bluetoothTurnedOff',
+                bluetoothState: lastState,
+              },
             })
           )
         ),
@@ -378,7 +396,18 @@ export class RNBlePlxTrezorTransport implements TrezorBleTransport {
     for (let offset = 0; offset < data.length; offset += TREZOR_BLE_PACKET_SIZE) {
       const chunk = new Uint8Array(TREZOR_BLE_PACKET_SIZE);
       chunk.set(data.slice(offset, offset + TREZOR_BLE_PACKET_SIZE));
-      await this._writeChunk(connectId, chunk, 'write', false);
+      try {
+        await this._writeChunk(connectId, chunk, 'write', false);
+      } catch (error) {
+        this._log('error', 'ble.write.error', { connectId, error: errorToLog(error) });
+        // Like the desktop BLE host: a failed GATT write mid-session is a lost link.
+        if (isStandardHwkError(error)) throw error;
+        throw createHwkError({
+          code: HardwareErrorCode.DeviceDisconnected,
+          message: `Trezor BLE write failed: ${connectId}`,
+          params: { connectId, nativeError: nativeErrorFields(error) },
+        });
+      }
     }
   }
 
@@ -718,10 +747,10 @@ export class RNBlePlxTrezorTransport implements TrezorBleTransport {
     );
 
     if (!writeCharacteristic) {
-      throw transportError('Trezor BLE write characteristic not found.');
+      throw connectFailedError('Trezor BLE write characteristic not found.');
     }
     if (!notifyCharacteristic) {
-      throw transportError('Trezor BLE notify characteristic not found.');
+      throw connectFailedError('Trezor BLE notify characteristic not found.');
     }
 
     await this._pairingProbe(connectId, writeCharacteristic);
@@ -857,7 +886,7 @@ export class RNBlePlxTrezorTransport implements TrezorBleTransport {
     });
 
     if (!subscription) {
-      throw transportError(`Trezor BLE ${name} characteristic does not support monitor.`);
+      throw connectFailedError(`Trezor BLE ${name} characteristic does not support monitor.`);
     }
     return subscription;
   }
@@ -992,32 +1021,63 @@ function managerCapabilities(manager: BlePlxManager): Record<string, boolean> {
 }
 
 function isMtuChangeFailure(error: unknown): boolean {
-  const maybeError = error as { errorCode?: unknown; message?: unknown };
-  if (maybeError?.errorCode === 'DeviceMTUChangeFailed') return true;
-  if (maybeError?.errorCode !== 201 || isDeviceDisconnected(error)) return false;
-  return String(maybeError?.message ?? '')
-    .toLowerCase()
-    .includes('mtu');
+  const { errorCode } = (error ?? {}) as { errorCode?: unknown };
+  return errorCode === BLE_PLX_ERROR.deviceMtuChangeFailed || errorCode === 'DeviceMTUChangeFailed';
 }
 
 function isOperationCancelled(error: unknown): boolean {
   const maybeError = error as { errorCode?: unknown };
-  return maybeError?.errorCode === 'OperationCancelled' || maybeError?.errorCode === 2;
+  return (
+    maybeError?.errorCode === 'OperationCancelled' ||
+    maybeError?.errorCode === BLE_PLX_ERROR.operationCancelled
+  );
 }
 
 function isDeviceDisconnected(error: unknown): boolean {
   const maybeError = error as { errorCode?: unknown; message?: unknown };
   return (
     maybeError?.errorCode === 'DeviceDisconnected' ||
-    maybeError?.errorCode === 201 ||
+    maybeError?.errorCode === BLE_PLX_ERROR.deviceDisconnected ||
     String(maybeError?.message ?? '')
       .toLowerCase()
       .includes('disconnected')
   );
 }
 
+/** The device never answered: the OS does not know it, or the connect timed out. */
+function isDeviceUnreachable(error: unknown): boolean {
+  const { errorCode } = (error ?? {}) as { errorCode?: unknown };
+  return (
+    errorCode === BLE_PLX_ERROR.deviceNotFound || errorCode === BLE_PLX_ERROR.operationTimedOut
+  );
+}
+
+// ATT 15 (insufficient encryption): iOS reports a failed, refused, cancelled or timed-out
+// pairing alike; ATT 137 (GATT_AUTH_FAIL): Android's failed pairing.
+function isPairingFailure(error: unknown): boolean {
+  const { attErrorCode } = (error ?? {}) as { attErrorCode?: unknown };
+  return attErrorCode === 15 || attErrorCode === 137;
+}
+
+/** Native fields only: no stack in error params. */
+function nativeErrorFields(error: unknown): Record<string, unknown> {
+  const e = (error ?? {}) as Record<string, unknown>;
+  const fields: Record<string, unknown> = {};
+  for (const key of [
+    'message',
+    'errorCode',
+    'attErrorCode',
+    'iosErrorCode',
+    'androidErrorCode',
+    'reason',
+  ]) {
+    if (e[key] !== undefined && e[key] !== null) fields[key] = e[key];
+  }
+  return fields;
+}
+
 function isStandardHwkError(error: unknown): error is Error & { code: number } {
-  return typeof (error as { code?: unknown })?.code === 'number';
+  return isHardwareErrorCode((error as { code?: unknown })?.code);
 }
 
 // Stale/invalid OS bond: Android GATT_INSUF_AUTHENTICATION (ATT error 5), iOS
@@ -1039,33 +1099,40 @@ function isBleBondInvalid(error: unknown): boolean {
 
 function normalizeConnectError(connectId: string, error: unknown): Error {
   if (isStandardHwkError(error)) return error;
+  const params = { connectId, nativeError: nativeErrorFields(error) };
   if (isBleBondInvalid(error)) {
     return createHwkError({
       code: HardwareErrorCode.BleBondInvalid,
       message: `Trezor BLE bond is invalid; re-pair required: ${connectId}`,
-      params: {
-        connectId,
-        originalError: errorToLog(error),
-      },
+      params,
+    });
+  }
+  if (isPairingFailure(error)) {
+    return createHwkError({
+      code: HardwareErrorCode.BlePairingTimeout,
+      message: `Trezor BLE pairing did not complete: ${connectId}`,
+      params,
     });
   }
   if (isDeviceDisconnected(error)) {
     return createHwkError({
       code: HardwareErrorCode.DeviceDisconnected,
       message: `Trezor BLE device disconnected during connect: ${connectId}`,
-      params: {
-        connectId,
-        originalError: errorToLog(error),
-      },
+      params,
     });
   }
+  if (isDeviceUnreachable(error)) {
+    return createHwkError({
+      code: HardwareErrorCode.DeviceNotFound,
+      message: `Trezor BLE device did not answer: ${connectId}`,
+      params,
+    });
+  }
+  // One generic code for a cause nobody identified, as on desktop.
   return createHwkError({
-    code: HardwareErrorCode.TransportError,
+    code: HardwareErrorCode.BleConnectFailed,
     message: `Trezor BLE connect failed: ${connectId}`,
-    params: {
-      connectId,
-      originalError: errorToLog(error),
-    },
+    params,
   });
 }
 

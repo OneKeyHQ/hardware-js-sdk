@@ -2,6 +2,7 @@ import {
   EConnectorInteraction,
   HardwareErrorCode,
   createHwkError,
+  isHardwareErrorCode,
   isKnownNonTargetHardwareVendor,
   serializeConnectorError,
 } from '@onekeyfe/hwk-adapter-core';
@@ -10,8 +11,10 @@ import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
 import {
   ERROR_TAG,
+  findCanonicalBleError,
   isAppStuckByApdu,
   isBleBondInvalidError,
+  isBleNotAdvertisingTimeoutError,
   isConnectionOpeningTag,
   isKnownConnectionTag,
   isTransportStuck,
@@ -136,10 +139,6 @@ function withOpenAppName<K extends ConnectorEventType>(
   }
   return { ...uiEvent, payload: { ...uiEvent.payload, appName } } as ConnectorEventMap[K];
 }
-
-const HARDWARE_ERROR_CODE_VALUES = new Set<number>(
-  Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
-);
 
 // Slow-advertising peripherals (screensaver, post-unpair) can advertise on
 // ~1s intervals, so the 800ms list-scan window is too tight at connect time.
@@ -269,6 +268,20 @@ async function _getDeviceApps(ctx: ConnectorContext, sessionId: string): Promise
  * require routing `connectionType` from `descriptor.transport` per-device
  * and updating every `this.connectionType` branch in this file.
  */
+/** `a <- b <- c`: the frames that called the function where `error` was created. */
+function describeCaller(error: Error): string {
+  return (error.stack ?? '')
+    .split('\n')
+    .slice(2, 6)
+    .map(frame =>
+      frame
+        .trim()
+        .replace(/^at /, '')
+        .replace(/ \(.*\)$/, '')
+    )
+    .join(' <- ');
+}
+
 export class LedgerConnectorBase implements IConnector {
   private _deviceManager: LedgerDeviceManager | null = null;
 
@@ -619,6 +632,10 @@ export class LedgerConnectorBase implements IConnector {
             _tag: ERROR_TAG.PeerRemovedPairing,
           });
         }
+        if (isBleNotAdvertisingTimeoutError(err)) throwNotAdvertising();
+        // The desktop BLE host already mapped the native cause.
+        const canonical = findCanonicalBleError(err);
+        if (canonical) throw canonical;
         const tag = (err as { _tag?: string } | null | undefined)?._tag;
 
         // If DMK already gave a recognized tag (locked / disconnected / pairing
@@ -630,15 +647,17 @@ export class LedgerConnectorBase implements IConnector {
           throw err;
         }
 
-        // Untagged failure — wrap as BleGattBondingFailed so upstream still
-        // has a code path. Original error preserved on `originalError`.
-        const wrapped = new Error(
-          'Ledger Bluetooth pairing failed. Make sure the device is unlocked and nearby, then try again.'
-        ) as Error & { _tag?: string; code?: number; originalError?: unknown };
-        wrapped._tag = ERROR_TAG.BleGattBondingFailed;
-        wrapped.code = HardwareErrorCode.BlePairingTimeout;
-        wrapped.originalError = err;
-        throw wrapped;
+        // Nobody identified the cause: one generic BleConnectFailed, as for Trezor.
+        // The tag keeps it connection-level; `originalError` keeps the raw cause.
+        throw Object.assign(
+          createHwkError({
+            code: HardwareErrorCode.BleConnectFailed,
+            message:
+              'Ledger Bluetooth connection failed. Make sure the device is unlocked and nearby, then try again.',
+            _tag: ERROR_TAG.BleGattBondingFailed,
+          }),
+          { originalError: err }
+        );
       }
 
       // USB/HID: typed errors flow through unchanged so APDU/transport
@@ -659,6 +678,8 @@ export class LedgerConnectorBase implements IConnector {
 
   async disconnect(sessionId: string): Promise<void> {
     if (!this._deviceManager) return;
+    // Names the caller, so a teardown nobody asked for can be traced in support logs.
+    debugLog('[DMK] disconnect requested', { sessionId, caller: describeCaller(new Error()) });
 
     const deviceId = this._deviceManager.getDeviceId(sessionId);
     this._signerManager?.invalidate(sessionId);
@@ -1271,11 +1292,9 @@ export class LedgerConnectorBase implements IConnector {
 
   private _wrapError(err: unknown, opts?: WrapErrorOptions): Error {
     const src = (err && typeof err === 'object' ? err : {}) as Record<string, unknown>;
-    const hasSerializedCode =
-      typeof src.code === 'number' && HARDWARE_ERROR_CODE_VALUES.has(src.code);
-    const mapped = hasSerializedCode
+    const mapped = isHardwareErrorCode(src.code)
       ? {
-          code: src.code as HardwareErrorCode,
+          code: src.code,
           message: typeof src.message === 'string' ? src.message : 'Unknown Ledger error',
           appName: typeof src.appName === 'string' ? src.appName : opts?.defaultAppName,
         }

@@ -1,4 +1,4 @@
-import { HardwareErrorCode, UI_REQUEST, UI_RESPONSE } from '../index';
+import { HardwareErrorCode, UI_REQUEST, UI_RESPONSE, isHardwareErrorCode } from '../index';
 
 import type {
   DeviceEventListener,
@@ -86,6 +86,13 @@ void typeOnlyEvmSignTxShapes;
  * is >= 10000, disjoint from legacy `@onekeyfe/shared` which tops out at 902.
  */
 describe('HardwareErrorCode contract', () => {
+  it('isHardwareErrorCode rejects the numeric codes DOMExceptions and hosts carry', () => {
+    expect(isHardwareErrorCode(HardwareErrorCode.BleConnectFailed)).toBe(true);
+    for (const foreign of [0, 8, 20, -99999, '10100', undefined]) {
+      expect(isHardwareErrorCode(foreign)).toBe(false);
+    }
+  });
+
   it('every code is 5-digit (>= 10000)', () => {
     for (const [name, value] of Object.entries(HardwareErrorCode)) {
       if (typeof value === 'number') {

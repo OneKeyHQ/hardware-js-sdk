@@ -1,8 +1,22 @@
 import { EventEmitter } from 'events';
+import {
+  HardwareErrorCode,
+  createHwkError,
+  rehydrateElectronBleErrors,
+} from '@onekeyfe/hwk-adapter-core';
 
 import { NobleBleHandler } from '../NobleBleHandler';
-import { initThirdPartyBleSupport } from '../main';
-import { THIRD_PARTY_BLE_CHANNELS, THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS } from '../constants';
+import {
+  createThirdPartyBleIpcErrorResponse,
+  initThirdPartyBleSupport,
+  withThirdPartyBleIpcErrors,
+} from '../main';
+import {
+  THIRD_PARTY_BLE_CHANNELS,
+  THIRD_PARTY_BLE_DEVICE_TTL_MS,
+  THIRD_PARTY_BLE_SCAN_IDLE_STOP_MS,
+  isThirdPartyBleIpcErrorResponse,
+} from '../constants';
 
 import type { NobleBleHandlerOptions, NoblePeripheralLike } from '../NobleBleHandler';
 
@@ -735,6 +749,172 @@ describe('initThirdPartyBleSupport', () => {
   });
 });
 
+describe('NobleBleHandler service UUID memory', () => {
+  const LEDGER_SCAN = { vendor: 'ledger', match: { serviceUuids: [LEDGER_NANO_X.serviceUuid] } };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('keeps a Ledger whose latest packet carried no service UUID', async () => {
+    const ledger = ledgerPeripheral('ledger-1');
+    const noble = new FakeNoble([ledger]);
+    const handler = makeHandler(noble);
+    expect((await handler.scan(LEDGER_SCAN)).map(device => device.id)).toEqual(['ledger-1']);
+
+    // noble-win replaces the advertisement with each packet; a scan response has no UUIDs.
+    ledger.advertisement.serviceUuids = [];
+    noble.emit('discover', ledger);
+    expect((await handler.scan(LEDGER_SCAN)).map(device => device.id)).toEqual(['ledger-1']);
+    expect(handler.getDevice('ledger-1')).toMatchObject({ id: 'ledger-1' });
+    await handler.stopScan();
+  });
+
+  test('forgets the remembered UUIDs once the device ages out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const ledger = ledgerPeripheral('ledger-1');
+    const noble = new FakeNoble([ledger]);
+    const handler = makeHandler(noble);
+    expect((await handler.scan(LEDGER_SCAN)).map(device => device.id)).toEqual(['ledger-1']);
+
+    jest.advanceTimersByTime(THIRD_PARTY_BLE_DEVICE_TTL_MS + 1);
+    expect(await handler.scan(LEDGER_SCAN)).toEqual([]);
+    ledger.advertisement.serviceUuids = [];
+    noble.emit('discover', ledger);
+    expect(await handler.scan(LEDGER_SCAN)).toEqual([]);
+    await handler.stopScan();
+  });
+});
+
+describe('NobleBleHandler connect release', () => {
+  afterEach(() => jest.useRealTimers());
+
+  // The scan window before a direct connect; matches THIRD_PARTY_BLE_SCAN_DURATION_MS.
+  const SCAN_WINDOW_MS = 5000;
+
+  test('cancels the pending native direct connect when the connect times out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    let rejectConnect: (error: Error) => void = () => undefined;
+    const connectAsync = jest.fn(
+      () =>
+        new Promise<NoblePeripheralLike>((_, reject) => {
+          rejectConnect = reject;
+        })
+    );
+    const native = Object.assign(new FakeNoble([]), {
+      connectAsync,
+      // noble.cancelConnect settles the pending connect with an error.
+      cancelConnect: jest.fn(() => rejectConnect(new Error('connection canceled!'))),
+    });
+    const handler = makeHandler(native, { connectTimeoutMs: 6000 });
+    const connecting = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(connecting).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceNotFound,
+      message: 'connect timed out after 6000ms',
+      params: { phase: 'connect', timedOut: true, notAdvertising: true },
+    });
+    await settle();
+    jest.advanceTimersByTime(SCAN_WINDOW_MS);
+    await flush();
+    await flush();
+    expect(connectAsync).toHaveBeenCalledWith('id-1');
+    expect(native.cancelConnect).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1000);
+    await flush();
+    await rejected;
+    expect(native.cancelConnect).toHaveBeenCalledWith('id-1');
+    await flush();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('cancels a peripheral connect still in flight when the connect times out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    let rejectConnect: (error: Error) => void = () => undefined;
+    const peripheral = Object.assign(new FakePeripheral('id-1', { localName: 'Trezor Safe 7' }), {
+      cancelConnect: jest.fn(() => rejectConnect(new Error('connection canceled!'))),
+    });
+    peripheral.connectAsync.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          peripheral.state = 'connecting';
+          rejectConnect = reject;
+        })
+    );
+    const handler = makeHandler(new FakeNoble([peripheral]), { connectTimeoutMs: 1000 });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    const connecting = handler.connect('id-1', PADDED_PROFILE);
+    // The scan saw it, so the timeout does not claim it is silent.
+    const rejected = expect(connecting).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceNotFound,
+      params: { phase: 'connect', timedOut: true },
+    });
+    await settle();
+    expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(700);
+    await flush();
+    await rejected;
+    await expect(connecting).rejects.not.toHaveProperty('params.notAdvertising');
+    expect(peripheral.cancelConnect).toHaveBeenCalledTimes(1);
+    await handler.stopScan();
+  });
+
+  test('leaves a committed link up when a second connect to it times out', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const native = Object.assign(new FakeNoble([peripheral]), { cancelConnect: jest.fn() });
+    const handler = makeHandler(native, { connectTimeoutMs: 1000 });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    const first = handler.connect('id-1', PADDED_PROFILE);
+    await settle();
+    await first;
+
+    // The second connect reuses the live link and stalls in service discovery.
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockImplementationOnce(
+      () => new Promise(() => undefined)
+    );
+    const second = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(second).rejects.toThrow(/timed out/);
+    await settle();
+    jest.advanceTimersByTime(700);
+    await flush();
+    await rejected;
+    expect(native.cancelConnect).not.toHaveBeenCalled();
+    expect(peripheral.disconnectAsync).not.toHaveBeenCalled();
+    expect(peripheral.state).toBe('connected');
+    await handler.stopScan();
+  });
+
+  test('tears down the link a direct connect opened when service discovery fails', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockRejectedValueOnce(
+      new Error('Device is unreachable while discovering services')
+    );
+    const native = Object.assign(new FakeNoble([]), {
+      // A direct connect hands the peripheral back already connected.
+      connectAsync: jest.fn(async (): Promise<NoblePeripheralLike> => {
+        peripheral.state = 'connected';
+        return peripheral;
+      }),
+    });
+    const handler = makeHandler(native);
+    const connecting = handler.connect('id-1', PADDED_PROFILE);
+    const rejected = expect(connecting).rejects.toMatchObject({
+      code: HardwareErrorCode.BleConnectFailed,
+      params: { phase: 'connect', gattUnreachable: true, msSinceLink: expect.any(Number) },
+    });
+    await settle();
+    jest.advanceTimersByTime(SCAN_WINDOW_MS);
+    await flush();
+    await flush();
+    await rejected;
+    expect(peripheral.disconnectAsync).toHaveBeenCalledTimes(1);
+    expect(peripheral.state).toBe('disconnected');
+  });
+});
+
 describe('Trezor BLE process shutdown', () => {
   afterEach(() => jest.useRealTimers());
 
@@ -895,6 +1075,49 @@ describe('Trezor BLE process shutdown', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  test.each([
+    ['poweredOff', 'bluetoothTurnedOff'],
+    ['unsupported', 'bluetoothTurnedOff'],
+    ['unauthorized', 'permissionDenied'],
+  ])('fails at once while Bluetooth is %s', async (state, permissionDeniedReason) => {
+    const handler = makeHandler(Object.assign(new FakeNoble(), { state }));
+    await expect(handler.scan(PADDED_VENDOR)).rejects.toMatchObject({
+      code: HardwareErrorCode.DevicePermissionDenied,
+      params: { permissionDeniedReason, bluetoothState: state },
+    });
+  });
+
+  test('fails init as soon as a cold noble reports Bluetooth off', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const native = Object.assign(new FakeNoble(), { state: 'unknown' });
+    const handler = makeHandler(native);
+    const initializing = handler.init();
+    const rejected = expect(initializing).rejects.toMatchObject({
+      code: HardwareErrorCode.DevicePermissionDenied,
+      params: { permissionDeniedReason: 'bluetoothTurnedOff' },
+    });
+    await Promise.resolve();
+    native.emit('stateChange', 'poweredOff');
+    await rejected;
+    expect(native.listenerCount('stateChange')).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('reports a noble that never powers on as unavailable', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    const native = Object.assign(new FakeNoble(), { state: 'unknown' });
+    const handler = makeHandler(native);
+    const initializing = handler.init();
+    const rejected = expect(initializing).rejects.toMatchObject({
+      code: HardwareErrorCode.DevicePermissionDenied,
+      params: { permissionDeniedReason: 'bluetoothTurnedOff', bluetoothState: 'unknown' },
+    });
+    await Promise.resolve();
+    jest.advanceTimersByTime(10_000);
+    await rejected;
+    expect(native.listenerCount('stateChange')).toBe(0);
+  });
+
   test('cancels power-on waits without leaving a timer or listener', async () => {
     jest.useFakeTimers({ doNotFake: ['performance'] });
     const native = Object.assign(new FakeNoble(), { state: 'unknown', stop: jest.fn() });
@@ -1032,7 +1255,10 @@ describe('reconnect scan ownership', () => {
     const handler = makeHandler(noble);
     try {
       const connection = handler.connect('offline', PADDED_PROFILE);
-      const rejected = expect(connection).rejects.toThrow('connect cancelled');
+      const rejected = expect(connection).rejects.toMatchObject({
+        code: HardwareErrorCode.BlePairingCancelled,
+        message: 'connect cancelled: offline',
+      });
       await flush();
       await handler.cancelPairing({ vendor: PADDED_VENDOR.vendor, id: 'offline' });
       await rejected;
@@ -1094,5 +1320,267 @@ describe('reconnect scan ownership', () => {
     } finally {
       await handler.dispose();
     }
+  });
+});
+
+describe('native link loss', () => {
+  const nativeError = (code: number, description: string) =>
+    Object.assign(new Error(`CBErrorDomain:${code} ${description}`), {
+      nativeErrorDomain: 'CBErrorDomain',
+      nativeErrorCode: code,
+    });
+  const peerRemovedPairing = () => nativeError(14, 'Peer removed pairing information');
+
+  // noble leaves the operation pending; only the peripheral's disconnect event reports the drop.
+  const dropLinkDuring = (peripheral: FakePeripheral, reason?: unknown) => () => {
+    setImmediate(() => peripheral.emit('disconnect', reason));
+    return new Promise<never>(() => undefined);
+  };
+
+  async function scannedHandler(peripheral: FakePeripheral, connectTimeoutMs = 60_000) {
+    const handler = makeHandler(new FakeNoble([peripheral]), { connectTimeoutMs });
+    await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+    return handler;
+  }
+
+  test('a pairing the device removed fails discovery at once as BleBondInvalid', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockImplementationOnce(
+      dropLinkDuring(peripheral, peerRemovedPairing())
+    );
+    const handler = await scannedHandler(peripheral);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toMatchObject({
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'connect', nativeErrorDomain: 'CBErrorDomain', nativeErrorCode: 14 },
+    });
+    expect(peripheral.listenerCount('disconnect')).toBe(0);
+  });
+
+  test('another native drop reason fails discovery at once as DeviceDisconnected', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    const timedOut = nativeError(6, 'The connection has timed out unexpectedly.');
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockImplementationOnce(
+      dropLinkDuring(peripheral, timedOut)
+    );
+    const handler = await scannedHandler(peripheral);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceDisconnected,
+      params: { phase: 'connect', nativeErrorDomain: 'CBErrorDomain', nativeErrorCode: 6 },
+    });
+  });
+
+  test('a discovery failure other than unreachable carries no reachability fact', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockRejectedValueOnce(
+      new Error('Device is busy')
+    );
+    const handler = await scannedHandler(peripheral);
+    const error = await handler.connect('id-1', PADDED_PROFILE).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: HardwareErrorCode.BleConnectFailed });
+    expect(error).not.toHaveProperty('params.gattUnreachable');
+  });
+
+  test('a connect CoreBluetooth fails for another reason maps to BleConnectFailed', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.connectAsync.mockRejectedValueOnce(nativeError(10, 'Connection failed'));
+    const handler = await scannedHandler(peripheral);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toMatchObject({
+      code: HardwareErrorCode.BleConnectFailed,
+      params: { phase: 'connect', nativeErrorCode: 10 },
+    });
+  });
+
+  test('a drop without a native reason (noble-win) still waits for the connect timeout', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.discoverSomeServicesAndCharacteristicsAsync.mockImplementationOnce(
+      dropLinkDuring(peripheral, 'unknown')
+    );
+    const handler = await scannedHandler(peripheral, 800);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toThrow(/timed out/);
+  });
+
+  test('a connect CoreBluetooth fails for a removed pairing maps to BleBondInvalid', async () => {
+    const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+    peripheral.connectAsync.mockRejectedValueOnce(peerRemovedPairing());
+    const handler = await scannedHandler(peripheral);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toMatchObject({
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'connect', nativeErrorCode: 14 },
+    });
+  });
+
+  test('a pairing the device removed fails subscribe at once as BleBondInvalid', async () => {
+    const { peripheral, handler } = await connectedHandler();
+    peripheral.notifyChar.subscribeAsync.mockImplementationOnce(
+      dropLinkDuring(peripheral, peerRemovedPairing())
+    );
+    await expect(handler.subscribe('id-1')).rejects.toMatchObject({
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'subscribe', nativeErrorCode: 14 },
+    });
+  });
+
+  test('Windows status 3 on a live link is a refused bond and leaves only the link handler', async () => {
+    const { peripheral, handler } = await connectedHandler();
+    peripheral.notifyChar.subscribeAsync.mockRejectedValueOnce(new Error('status: 3'));
+    await expect(handler.subscribe('id-1')).rejects.toMatchObject({
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'subscribe', asyncStatus: 3 },
+    });
+    expect(peripheral.listenerCount('disconnect')).toBe(1);
+  });
+
+  test('Windows status 3 after the link dropped is a disconnect, not a refused bond', async () => {
+    const { peripheral, handler } = await connectedHandler();
+    peripheral.notifyChar.subscribeAsync.mockImplementationOnce(async () => {
+      peripheral.state = 'disconnected';
+      throw new Error('status: 3');
+    });
+    await expect(handler.subscribe('id-1')).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceDisconnected,
+      params: { phase: 'subscribe' },
+    });
+  });
+
+  test('a pairing CoreBluetooth could not complete fails subscribe as BlePairingTimeout', async () => {
+    const { peripheral, handler } = await connectedHandler();
+    peripheral.notifyChar.subscribeAsync.mockRejectedValueOnce(
+      Object.assign(new Error('CBATTErrorDomain:15 Encryption is insufficient.'), {
+        nativeErrorDomain: 'CBATTErrorDomain',
+        nativeErrorCode: 15,
+      })
+    );
+    await expect(handler.subscribe('id-1')).rejects.toMatchObject({
+      code: HardwareErrorCode.BlePairingTimeout,
+      params: { phase: 'subscribe', nativeErrorCode: 15 },
+    });
+  });
+
+  describe('subscribe timeout', () => {
+    afterEach(() => jest.useRealTimers());
+
+    async function linkedHandler() {
+      const peripheral = new FakePeripheral('id-1', { localName: 'Trezor Safe 7' });
+      const handler = makeHandler(new FakeNoble([peripheral]), { subscribeTimeoutMs: 1000 });
+      await handler.scan({ ...PADDED_VENDOR, durationMs: 0 });
+      await handler.connect('id-1', PADDED_PROFILE);
+      jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+      return { peripheral, handler };
+    }
+
+    test('fails a subscribe the OS never answers', async () => {
+      const { peripheral, handler } = await linkedHandler();
+      peripheral.notifyChar.subscribeAsync.mockReturnValueOnce(new Promise(() => undefined));
+      const subscribing = expect(handler.subscribe('id-1')).rejects.toMatchObject({
+        code: HardwareErrorCode.BleConnectFailed,
+        message: 'subscribe timed out after 1000ms',
+        params: { phase: 'subscribe' },
+      });
+      await flush();
+      jest.advanceTimersByTime(1000);
+      await subscribing;
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    test('ends the wait at dispose without leaving a timer', async () => {
+      const { peripheral, handler } = await linkedHandler();
+      peripheral.notifyChar.subscribeAsync.mockReturnValueOnce(new Promise(() => undefined));
+      const subscribing = expect(handler.subscribe('id-1')).rejects.toThrow('shutting down');
+      await flush();
+      const disposing = handler.dispose();
+      await subscribing;
+      await disposing;
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    test('clears the timer once the subscribe is answered', async () => {
+      const { handler } = await linkedHandler();
+      await handler.subscribe('id-1');
+      expect(jest.getTimerCount()).toBe(0);
+    });
+  });
+
+  test('a failed GATT write is a lost link', async () => {
+    const { peripheral, handler } = await connectedHandler();
+    peripheral.writeChar.writeAsync.mockRejectedValueOnce(new Error('Unreachable'));
+    await expect(handler.write('id-1', '00')).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceDisconnected,
+      params: { phase: 'write' },
+    });
+  });
+});
+
+describe('third-party BLE IPC errors', () => {
+  test('a wrapped handler resolves a throw as an envelope the renderer can restore', async () => {
+    const ipcMain = new FakeIpcMain();
+    const wrapped = withThirdPartyBleIpcErrors(ipcMain);
+    wrapped.handle('ok', async () => ({ id: 'id-1' }));
+    const thrown = createHwkError({
+      code: HardwareErrorCode.BleBondInvalid,
+      message: 'The device removed its Bluetooth pairing',
+      params: { phase: 'subscribe', nativeErrorDomain: 'CBErrorDomain', nativeErrorCode: 14 },
+    });
+    wrapped.handle('fails', async () => {
+      throw thrown;
+    });
+
+    const ok = await ipcMain.invoke('ok');
+    expect(ok).toEqual({ id: 'id-1' });
+    expect(isThirdPartyBleIpcErrorResponse(ok)).toBe(false);
+
+    const response = await ipcMain.invoke('fails');
+    if (!isThirdPartyBleIpcErrorResponse(response))
+      throw new Error('expected an IPC error envelope');
+    // What the preload rejects with, restored the way the renderer transports restore it.
+    const restored = await rehydrateElectronBleErrors({
+      fails: async () => Promise.reject(structuredClone(response.error)),
+    })
+      .fails()
+      .catch((error: unknown) => error);
+    expect(restored).toEqual(thrown);
+    expect(restored).toMatchObject({ code: thrown.code, params: thrown.params });
+
+    wrapped.removeHandler('ok');
+    expect(ipcMain.handlers.has('ok')).toBe(false);
+  });
+
+  test('the envelope survives structured clone even when the error carries a function', () => {
+    const error = Object.assign(new Error('boom'), { params: { retry: { run: () => undefined } } });
+    const response = createThirdPartyBleIpcErrorResponse(error);
+    expect(structuredClone(response)).toEqual(response);
+    expect(response.error).toEqual({ message: 'boom', params: { retry: {} } });
+  });
+
+  test('the envelope carries only the message, our code and params', () => {
+    const error = Object.assign(
+      createHwkError({
+        code: HardwareErrorCode.DeviceNotFound,
+        message: 'connect timed out after 31000ms',
+        params: { phase: 'connect', notAdvertising: true },
+      }),
+      { _tag: 'SomeTag', statusCode: 0x6985 }
+    );
+    expect(createThirdPartyBleIpcErrorResponse(error).error).toEqual({
+      message: 'connect timed out after 31000ms',
+      code: HardwareErrorCode.DeviceNotFound,
+      params: { phase: 'connect', notAdvertising: true },
+    });
+  });
+
+  test('the envelope drops a code that is not a HardwareErrorCode', () => {
+    const error = Object.assign(new Error('only allowed from the main window'), { code: -99999 });
+    expect(createThirdPartyBleIpcErrorResponse(error).error).toEqual({
+      message: 'only allowed from the main window',
+    });
+  });
+
+  test.each([
+    undefined,
+    null,
+    [],
+    { id: 'id-1' },
+    { type: 'ThirdPartyBleIpcError', success: true },
+  ])('treats %p as a success value', value => {
+    expect(isThirdPartyBleIpcErrorResponse(value)).toBe(false);
   });
 });

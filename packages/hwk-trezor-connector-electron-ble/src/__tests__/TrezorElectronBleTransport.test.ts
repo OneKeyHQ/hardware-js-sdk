@@ -295,35 +295,67 @@ describe('TrezorElectronBleConnector', () => {
     expect(Buffer.from(data).toString('hex')).toBe('01020304');
   });
 
-  test('connect by stale BLE connectId reports DeviceNotFound', async () => {
+  // The host codes what it can identify; the connector reads no text.
+  test.each([
+    [
+      {
+        message: 'The device removed its Bluetooth pairing with this computer',
+        code: HardwareErrorCode.BleBondInvalid,
+        params: { phase: 'connect', nativeErrorDomain: 'CBErrorDomain', nativeErrorCode: 14 },
+      },
+      HardwareErrorCode.BleBondInvalid,
+    ],
+    [
+      {
+        message: 'BLE device not found: BLE-STALE',
+        code: HardwareErrorCode.DeviceNotFound,
+        params: { phase: 'connect', notAdvertising: true },
+      },
+      HardwareErrorCode.DeviceNotFound,
+    ],
+    // cancelPairing abandoned the connect: the user stopped it, the device is not unreachable.
+    [
+      {
+        message: 'connect cancelled: BLE-1',
+        code: HardwareErrorCode.BlePairingCancelled,
+        params: { phase: 'connect' },
+      },
+      HardwareErrorCode.BlePairingCancelled,
+    ],
+    // Text alone no longer decides anything.
+    [{ message: 'connect cancelled: BLE-1' }, HardwareErrorCode.BleConnectFailed],
+    [{ message: 'remote BLE device not found' }, HardwareErrorCode.BleConnectFailed],
+    // A host's own code is not ours.
+    [{ message: 'host failure', code: -99999 }, HardwareErrorCode.BleConnectFailed],
+  ])('a serialized host rejection %p reports %p', async (rejection, code) => {
     const bridge = new FakeBridge();
     bridge.scan.mockResolvedValueOnce([]);
-    bridge.connect.mockRejectedValueOnce(new Error('remote BLE device not found'));
+    bridge.connect.mockRejectedValueOnce(rejection);
     const transport = new TrezorElectronBleTransport({ bridge });
     const connector = new TrezorElectronBleConnector({ transport });
 
-    await expect(connector.connect('BLE-STALE')).rejects.toMatchObject({
-      code: HardwareErrorCode.DeviceNotFound,
-      message: 'Trezor BLE device not found: BLE-STALE',
-    });
+    await expect(connector.connect('BLE-1')).rejects.toMatchObject({ code });
   });
 
-  // The user stopping the flow is not a connect failure: cancelPairing abandons
-  // the in-flight connect, and that must not read as an unreachable device.
-  test('a cancelled pairing reports BlePairingCancelled', async () => {
+  test('keeps the reason the host gave for Bluetooth being unavailable', async () => {
     const bridge = new FakeBridge();
     bridge.scan.mockResolvedValueOnce([]);
-    bridge.connect.mockRejectedValueOnce(new Error('connect cancelled: BLE-1'));
+    bridge.connect.mockRejectedValueOnce({
+      message: 'Bluetooth is unavailable (state: poweredOff)',
+      code: HardwareErrorCode.DevicePermissionDenied,
+      params: { permissionDeniedReason: 'bluetoothTurnedOff', bluetoothState: 'poweredOff' },
+    });
     const transport = new TrezorElectronBleTransport({ bridge });
     const connector = new TrezorElectronBleConnector({ transport });
 
     await expect(connector.connect('BLE-1')).rejects.toMatchObject({
-      code: HardwareErrorCode.BlePairingCancelled,
+      code: HardwareErrorCode.DevicePermissionDenied,
+      params: { permissionDeniedReason: 'bluetoothTurnedOff' },
     });
   });
 
-  // noble drops the real CoreBluetooth reason, so a GATT "connection failed"
-  // and a connect timeout both collapse to one generic BleConnectFailed.
+  // A failure the host could not attribute: a GATT "connection failed" and a
+  // connect timeout both collapse to one generic BleConnectFailed.
   test('connect "connection failed" reports BleConnectFailed', async () => {
     const bridge = new FakeBridge();
     bridge.scan.mockResolvedValueOnce([]);

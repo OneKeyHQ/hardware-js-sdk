@@ -1,3 +1,5 @@
+import type { ConnectorSerializedError } from '@onekeyfe/hwk-adapter-core';
+
 /**
  * Renderer/main IPC channels shared by every third-party BLE vendor; prefixed to
  * avoid clashing with the OneKey handler (`$onekey-noble-ble-*`) in one app.
@@ -22,6 +24,28 @@ export const THIRD_PARTY_BLE_CHANNELS = {
 
 export type ThirdPartyBleChannel =
   (typeof THIRD_PARTY_BLE_CHANNELS)[keyof typeof THIRD_PARTY_BLE_CHANNELS];
+
+export const THIRD_PARTY_BLE_IPC_ERROR_TYPE = 'ThirdPartyBleIpcError';
+
+/** What a handler wrapped by `withThirdPartyBleIpcErrors` returns instead of throwing. */
+export interface ThirdPartyBleIpcErrorResponse {
+  type: typeof THIRD_PARTY_BLE_IPC_ERROR_TYPE;
+  success: false;
+  error: ConnectorSerializedError;
+}
+
+/** For the preload, which imports this entry: rethrow `response.error` when this matches. */
+export function isThirdPartyBleIpcErrorResponse(
+  response: unknown
+): response is ThirdPartyBleIpcErrorResponse {
+  if (!response || typeof response !== 'object') return false;
+  const candidate = response as Partial<ThirdPartyBleIpcErrorResponse>;
+  return (
+    candidate.type === THIRD_PARTY_BLE_IPC_ERROR_TYPE &&
+    candidate.success === false &&
+    typeof candidate.error?.message === 'string'
+  );
+}
 
 /** Reconnect scan window for `connect(id)`. */
 export const THIRD_PARTY_BLE_SCAN_DURATION_MS = 5_000;

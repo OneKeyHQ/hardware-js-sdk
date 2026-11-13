@@ -517,6 +517,23 @@ describe('TrezorWebUsbConnector', () => {
     });
   });
 
+  // A browser DOMException is an Error with a legacy numeric `code` (8, 18, even 0) that
+  // must not pass as ours. Built by hand: Jest's DOMException is not an Error in its realm.
+  test.each([
+    ['NotFoundError', 8, HardwareErrorCode.UserAborted],
+    ['NotAllowedError', 0, HardwareErrorCode.DevicePermissionDenied],
+    ['SecurityError', 18, HardwareErrorCode.DevicePermissionDenied],
+  ])('requestDevice maps a DOMException %s (code %p) to %p', async (name, domCode, code) => {
+    const usb = new FakeUSB([]);
+    usb.requestDevice.mockRejectedValueOnce(
+      Object.assign(new Error('picker failed'), { name, code: domCode })
+    );
+    const transport = new TrezorWebUsbTransport({ usb: usb as unknown as USB });
+    const connector = new TrezorWebUsbConnector({ transport });
+
+    await expect(connector.requestDevice()).rejects.toMatchObject({ code });
+  });
+
   test('requestDevice rejects a known non-Trezor WebUSB selection as DeviceMismatch', async () => {
     const device = new FakeUSBDevice({
       serialNumber: 'ONEKEY-PICKED',
