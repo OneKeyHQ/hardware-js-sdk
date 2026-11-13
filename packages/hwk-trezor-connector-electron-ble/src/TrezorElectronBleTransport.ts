@@ -1,5 +1,9 @@
 import { Buffer } from 'buffer';
-import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
+import {
+  HardwareErrorCode,
+  createHwkError,
+  rehydrateElectronBleErrors,
+} from '@onekeyfe/hwk-adapter-core';
 import {
   type TrezorDebugLogLevel,
   type TrezorDebugLogger,
@@ -69,7 +73,7 @@ export class TrezorElectronBleTransport {
   private readonly _logger?: TrezorElectronBleTransportOptions['logger'];
 
   constructor(options: TrezorElectronBleTransportOptions = {}) {
-    this._bridge = resolveBridge(options);
+    this._bridge = rehydrateElectronBleErrors(resolveBridge(options));
     this._logger = options.logger;
     this._wireGlobalListeners();
   }

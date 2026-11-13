@@ -556,7 +556,7 @@ describe('LedgerConnectorBase connect() opening-tag classification', () => {
   }
 
   it.each([
-    ['ble', HardwareErrorCode.BlePairingTimeout],
+    ['ble', HardwareErrorCode.BleConnectFailed],
     ['usb', HardwareErrorCode.DeviceBusy],
   ] as const)('classifies a %s opening failure as code %s', async (connectionType, code) => {
     const { connector, connect } = connectorWithFailingDmConnect(connectionType);

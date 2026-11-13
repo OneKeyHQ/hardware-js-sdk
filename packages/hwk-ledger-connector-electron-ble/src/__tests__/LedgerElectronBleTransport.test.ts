@@ -5,6 +5,7 @@ import {
 } from '@ledgerhq/device-management-kit';
 import { Nothing } from 'purify-ts';
 import { filter, firstValueFrom } from 'rxjs';
+import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 
 import { LEDGER_BLE_MAX_FRAME_SIZE, LEDGER_BLE_VENDOR } from '../bleProfile';
 import { LedgerElectronBleTransport } from '../LedgerElectronBleTransport';
@@ -341,5 +342,43 @@ describe('Ledger Electron BLE lifecycle', () => {
     expect(connected.isRight()).toBe(true);
     await transport.cancelPairing();
     expect(cancelPairing).not.toHaveBeenCalled();
+  });
+});
+
+describe('Ledger Electron BLE errors', () => {
+  const openingCause = async (connect: () => ReturnType<LedgerElectronBleTransport['connect']>) => {
+    const result = await connect();
+    expect(result.isLeft()).toBe(true);
+    return (result.extract() as { originalError?: unknown }).originalError;
+  };
+
+  // The host maps a Windows subscribe refused over a held bond; the transport only passes it on.
+  it('passes a subscribe failure the host mapped through with its code', async () => {
+    const { connect, bridge } = fixture();
+    bridge.subscribe.mockRejectedValueOnce({
+      message: 'The device refused the Bluetooth pairing this computer holds',
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'subscribe', asyncStatus: 3 },
+    });
+    expect(await openingCause(connect)).toMatchObject({
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'subscribe', asyncStatus: 3 },
+    });
+    expect(bridge.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a serialized host rejection with its code and native fields', async () => {
+    const { connect, bridge } = fixture();
+    bridge.connect.mockRejectedValueOnce({
+      message: 'The device removed its Bluetooth pairing with this computer',
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'connect', nativeErrorDomain: 'CBErrorDomain', nativeErrorCode: 14 },
+    });
+    const cause = await openingCause(connect);
+    expect(cause).toBeInstanceOf(Error);
+    expect(cause).toMatchObject({
+      code: HardwareErrorCode.BleBondInvalid,
+      params: { phase: 'connect', nativeErrorCode: 14 },
+    });
   });
 });

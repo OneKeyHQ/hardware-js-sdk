@@ -1,3 +1,7 @@
+import { createHwkError, isHardwareErrorCode } from './errors';
+
+import type { ConnectorSerializedError } from './connector';
+
 /** Serializable BLE transport data shared by Electron main and renderer runtimes. */
 export interface ElectronBleDeviceInfo {
   id: string;
@@ -59,4 +63,41 @@ export interface ElectronBleApi {
   onDeviceDisconnected(handler: (id: string) => void): () => void;
   /** Abandon an in-flight connect in the main process. Optional for hosts that cannot cancel. */
   cancelPairing?(options?: { vendor: string; id?: string }): Promise<void>;
+}
+
+const isSerializedError = (value: unknown): value is ConnectorSerializedError =>
+  typeof value === 'object' &&
+  value !== null &&
+  !(value instanceof Error) &&
+  typeof (value as { message?: unknown }).message === 'string';
+
+/** The same shape the host threw, so `params` readers work on either side of IPC. */
+const restoreHostError = ({ message, code, params }: ConnectorSerializedError): Error =>
+  isHardwareErrorCode(code)
+    ? createHwkError({ code, message, ...(params ? { params } : {}) })
+    : new Error(message);
+
+/**
+ * Electron IPC keeps only an Error's message, so a host can reject bridge calls with
+ * `ConnectorSerializedError` data instead. Restores those as `createHwkError` errors; any other
+ * rejection passes through unchanged.
+ */
+export function rehydrateElectronBleErrors<T extends object>(bridge: T): T {
+  // A contextBridge object may be frozen, which rules out patching or proxying it.
+  const wrapped = Object.create(bridge) as T;
+  for (const key of Object.keys(bridge) as Array<keyof T>) {
+    if (typeof bridge[key] === 'function') {
+      Object.defineProperty(wrapped, key, {
+        value: (...args: unknown[]) => {
+          const method = bridge[key] as (...params: unknown[]) => unknown;
+          const result = method.apply(bridge, args);
+          if (typeof (result as PromiseLike<unknown> | null)?.then !== 'function') return result;
+          return Promise.resolve(result).catch((error: unknown) => {
+            throw isSerializedError(error) ? restoreHostError(error) : error;
+          });
+        },
+      });
+    }
+  }
+  return wrapped;
 }

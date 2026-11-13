@@ -322,7 +322,7 @@ describe('RNBlePlxTrezorTransport', () => {
     expect(manager.connectToDevice).not.toHaveBeenCalled();
   });
 
-  it('reports missing BLE write characteristic as standard TransportError', async () => {
+  it('reports missing BLE write characteristic as BleConnectFailed', async () => {
     const device = createConnectedDevice('safe-7', [
       createCharacteristic(TREZOR_BLE_UUIDS.notify),
       createCharacteristic(TREZOR_BLE_UUIDS.push),
@@ -340,7 +340,7 @@ describe('RNBlePlxTrezorTransport', () => {
     const transport = new RNBlePlxTrezorTransport({ manager });
 
     await expect(transport.connect('safe-7')).rejects.toMatchObject({
-      code: HardwareErrorCode.TransportError,
+      code: HardwareErrorCode.BleConnectFailed,
       message: 'Trezor BLE write characteristic not found.',
     });
   });
@@ -377,7 +377,7 @@ describe('RNBlePlxTrezorTransport', () => {
     });
   });
 
-  it('reports unsupported BLE push monitor as standard TransportError', async () => {
+  it('reports unsupported BLE push monitor as BleConnectFailed', async () => {
     const writeCharacteristic = createCharacteristic(TREZOR_BLE_UUIDS.write);
     const notifyCharacteristic = createCharacteristic(TREZOR_BLE_UUIDS.notify);
     const pushCharacteristic = {
@@ -403,7 +403,7 @@ describe('RNBlePlxTrezorTransport', () => {
     const transport = new RNBlePlxTrezorTransport({ manager });
 
     await expect(transport.connect('safe-7')).rejects.toMatchObject({
-      code: HardwareErrorCode.TransportError,
+      code: HardwareErrorCode.BleConnectFailed,
       message: 'Trezor BLE push characteristic does not support monitor.',
     });
   });
@@ -464,6 +464,107 @@ describe('RNBlePlxTrezorTransport', () => {
     expect(manager.cancelDeviceConnection).toHaveBeenCalledWith('safe-7');
     expect(manager.connectToDevice).toHaveBeenCalledWith('safe-7');
     expect(cachedDevice.connect).toHaveBeenCalledTimes(1);
+  });
+
+  // What the OS said, mapped once here; the connector and adapter only pass it on.
+  describe('maps a native connect failure', () => {
+    const managerFailingConnect = (error: unknown) => ({
+      startDeviceScan: jest.fn(),
+      stopDeviceScan: jest.fn(),
+      connectToDevice: jest.fn().mockRejectedValue(error),
+      cancelDeviceConnection: jest.fn(),
+      writeCharacteristicWithResponseForDevice: jest.fn().mockResolvedValue({}),
+      writeCharacteristicWithoutResponseForDevice: jest.fn().mockResolvedValue({}),
+      monitorCharacteristicForDevice: jest.fn(() => ({ remove: jest.fn() })),
+      destroy: jest.fn(),
+    });
+
+    it.each([
+      [
+        'an iOS pairing that did not complete (ATT 15)',
+        { attErrorCode: 15 },
+        HardwareErrorCode.BlePairingTimeout,
+      ],
+      [
+        'an Android pairing failure (ATT 137)',
+        { attErrorCode: 137 },
+        HardwareErrorCode.BlePairingTimeout,
+      ],
+      ['a device the OS does not know', { errorCode: 204 }, HardwareErrorCode.DeviceNotFound],
+      ['a connect timeout', { errorCode: 3 }, HardwareErrorCode.DeviceNotFound],
+      ['an unidentified failure', { errorCode: 200 }, HardwareErrorCode.BleConnectFailed],
+    ])('%s', async (_name, fields, code) => {
+      const native = Object.assign(new Error('Device safe-7 connection failed'), fields);
+      const transport = new RNBlePlxTrezorTransport({ manager: managerFailingConnect(native) });
+
+      const error = await transport.connect('safe-7').catch((e: unknown) => e);
+      expect(error).toMatchObject({ code, params: { nativeError: fields } });
+      expect(error).not.toHaveProperty('params.nativeError.stack');
+    });
+
+    it('retries without MTU when the MTU request fails (206)', async () => {
+      const mtuFailed = Object.assign(new Error('MTU change failed'), { errorCode: 206 });
+      const manager = {
+        ...managerFailingConnect(mtuFailed),
+        connectToDevice: jest
+          .fn()
+          .mockRejectedValueOnce(mtuFailed)
+          .mockResolvedValueOnce(createConnectedDevice('safe-7')),
+      };
+      const transport = new RNBlePlxTrezorTransport({ manager });
+
+      await transport.connect('safe-7');
+      expect(manager.connectToDevice).toHaveBeenLastCalledWith('safe-7');
+    });
+  });
+
+  it('reports a failed write mid-session as a lost link', async () => {
+    const writeCharacteristic = createCharacteristic(TREZOR_BLE_UUIDS.write);
+    const device = createConnectedDevice('safe-7', [
+      writeCharacteristic,
+      createCharacteristic(TREZOR_BLE_UUIDS.notify),
+      createCharacteristic(TREZOR_BLE_UUIDS.push),
+    ]);
+    const manager = {
+      startDeviceScan: jest.fn(),
+      stopDeviceScan: jest.fn(),
+      connectToDevice: jest.fn().mockResolvedValue(device),
+      cancelDeviceConnection: jest.fn(),
+      writeCharacteristicWithResponseForDevice: jest.fn().mockResolvedValue({}),
+      writeCharacteristicWithoutResponseForDevice: jest.fn().mockResolvedValue({}),
+      monitorCharacteristicForDevice: jest.fn(() => ({ remove: jest.fn() })),
+      destroy: jest.fn(),
+    };
+    const transport = new RNBlePlxTrezorTransport({ manager });
+    await transport.connect('safe-7');
+    writeCharacteristic.writeWithoutResponse.mockRejectedValue(
+      Object.assign(new Error('write failed'), { errorCode: 401 })
+    );
+
+    await expect(transport.write('safe-7', new Uint8Array([1, 2, 3]))).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceDisconnected,
+      params: { connectId: 'safe-7', nativeError: { errorCode: 401 } },
+    });
+  });
+
+  it('says why Bluetooth never came on', async () => {
+    const manager = {
+      onStateChange: jest.fn((listener: (state: string) => void) => {
+        void Promise.resolve().then(() => listener('PoweredOff'));
+        return { remove: jest.fn() };
+      }),
+      startDeviceScan: jest.fn(),
+      stopDeviceScan: jest.fn(),
+      connectToDevice: jest.fn(),
+      cancelDeviceConnection: jest.fn(),
+      destroy: jest.fn(),
+    };
+    const transport = new RNBlePlxTrezorTransport({ manager });
+
+    await expect(transport.connect('safe-7')).rejects.toMatchObject({
+      code: HardwareErrorCode.DevicePermissionDenied,
+      params: { permissionDeniedReason: 'bluetoothTurnedOff', bluetoothState: 'PoweredOff' },
+    });
   });
 
   it('reports cached device GATT disconnect during no-MTU fallback as DeviceDisconnected', async () => {

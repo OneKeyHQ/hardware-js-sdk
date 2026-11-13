@@ -82,6 +82,29 @@ export type TrezorCallOptions = {
 
 type TrezorTransportAbortOptions = AbortSignal | { signal?: AbortSignal };
 
+/**
+ * The vendored transport code turns a thrown transport error into a result coded by its text,
+ * dropping the code our byte transports set. Keep the first one to rethrow if the call fails.
+ */
+function trackTransportFailure() {
+  let failure: { error: unknown } | undefined;
+  return {
+    run: async <T>(io: () => Promise<T>): Promise<T> => {
+      try {
+        return await io();
+      } catch (error) {
+        failure ??= { error };
+        throw error;
+      }
+    },
+    rethrow: (): void => {
+      // Rethrowing the transport's own error (typed `unknown`) as-is is intentional.
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      if (failure) throw failure.error;
+    },
+  };
+}
+
 const unwrapTransportAbortSignal = (
   options?: TrezorTransportAbortOptions
 ): AbortSignal | undefined => {
@@ -173,16 +196,21 @@ export class TrezorCore {
 
     if (this.protocol.name === 'v2') {
       const previousNonce = thpState?.sendNonce;
+      const transportFailure = trackTransportFailure();
       const response = await callThpMessage({
         thpState,
         chunks,
         apiWrite: async (chunk, options) => {
-          await this.transport.write(chunk, unwrapTransportAbortSignal(options));
+          await transportFailure.run(() =>
+            this.transport.write(chunk, unwrapTransportAbortSignal(options))
+          );
 
           return { success: true as const, payload: undefined };
         },
         apiRead: async options => {
-          const payload = await this.transport.read(unwrapTransportAbortSignal(options));
+          const payload = await transportFailure.run(() =>
+            this.transport.read(unwrapTransportAbortSignal(options))
+          );
 
           return { success: true as const, payload: toRuntimeBuffer(payload) };
         },
@@ -190,6 +218,7 @@ export class TrezorCore {
       });
 
       if (!response.success) {
+        transportFailure.rethrow();
         throw new Error(response.error.message ?? response.error.code);
       }
 
@@ -240,8 +269,9 @@ export class TrezorCore {
   async receive(
     options: TrezorCallOptions & { name?: TrezorMessageName } = {}
   ): Promise<TrezorMessageResponse> {
+    const transportFailure = trackTransportFailure();
     const response = await receiveAndParse(async () => {
-      const payload = await this.transport.read(options.signal);
+      const payload = await transportFailure.run(() => this.transport.read(options.signal));
 
       return {
         success: true as const,
@@ -250,6 +280,7 @@ export class TrezorCore {
     }, this.protocol);
 
     if (!response.success) {
+      transportFailure.rethrow();
       throw new TrezorProtocolError(response.error.code, response.error.message);
     }
 
@@ -324,16 +355,17 @@ export class TrezorThpProtocol {
 
     const previousNonce = this.thpState.sendNonce;
     const chunk = toRuntimeBuffer(this.encode(params));
+    const transportFailure = trackTransportFailure();
     const result = await callThpMessage({
       thpState: this.thpState,
       chunks: [chunk],
       skipAck: params.skipAck,
       apiWrite: async data => {
-        await transport.write?.(connectId, Uint8Array.from(data));
+        await transportFailure.run(async () => transport.write?.(connectId, Uint8Array.from(data)));
         return { success: true, payload: undefined };
       },
       apiRead: async () => {
-        const data = await transport.read?.(connectId);
+        const data = await transportFailure.run(async () => transport.read?.(connectId));
         if (!data) {
           return {
             success: false,
@@ -345,6 +377,7 @@ export class TrezorThpProtocol {
     });
 
     if (!result.success) {
+      transportFailure.rethrow();
       throw new Error(result.error.message ?? result.error.code);
     }
 

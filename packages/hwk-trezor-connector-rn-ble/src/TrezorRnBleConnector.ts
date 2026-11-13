@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, createHwkError, isHardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import {
   TrezorConnectorBase,
   type TrezorConnectorBaseOptions,
@@ -20,7 +20,7 @@ import type { TrezorBleDescriptor, TrezorBleTransportFactory } from '@onekeyfe/h
 import type { RNBlePlxTrezorTransportOptions } from './RNBlePlxTrezorTransport';
 
 const isStandardHwkError = (error: unknown): error is { code: number } =>
-  typeof (error as { code?: unknown })?.code === 'number';
+  isHardwareErrorCode((error as { code?: unknown })?.code);
 
 export interface TrezorRnBleConnectorOptions {
   transportFactory?: TrezorBleTransportFactory;
@@ -96,18 +96,8 @@ export class TrezorRnBleConnector extends TrezorConnectorBase {
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       if (isStandardHwkError(error)) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      // Raw connect failure loses the cause — generic BleConnectFailed unless
-      // it's a clear "device not found".
-      if (/device not found/i.test(reason)) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: `Trezor BLE device not found: ${device.connectId}`,
-          params: {
-            connectId: device.connectId,
-            originalError: { message: reason },
-          },
-        });
-      }
+      // The bundled transport codes every failure; a custom one that does not
+      // gets the generic code rather than a guess from its text.
       throw createHwkError({
         code: HardwareErrorCode.BleConnectFailed,
         message: `Trezor BLE connect failed: ${device.connectId} (${reason})`,
