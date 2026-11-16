@@ -837,6 +837,42 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
 
+  test('detects a V2-only device on first acquire without a protocol hint', async () => {
+    const device = { id: 'v2-only-no-hint-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+    let responseSeq = 0;
+    nobleBle.onNotification.mockImplementation(handler => {
+      notificationHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementation(() => {
+      const writeCount = nobleBle.write.mock.calls.length;
+      if (writeCount === 1) {
+        return Promise.resolve();
+      }
+      responseSeq += 1;
+      const response = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+      );
+      setTimeout(() => notificationHandler?.(device.id, bytesToHex(response)), 0);
+      return Promise.resolve();
+    });
+    const transport = configureTransport(nobleBle);
+
+    await expect(transport.acquire({ uuid: device.id })).resolves.toMatchObject({
+      uuid: device.id,
+      protocolType: 'V2',
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(2);
+    expect(nobleBle.connect).toHaveBeenCalledTimes(1);
+    expect(nobleBle.subscribe).toHaveBeenCalledTimes(1);
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+  });
+
   test('keeps a first expected Protocol V2 probe miss retryable', async () => {
     const device = { id: 'first-v2-id', name: 'OneKey Pro 2' };
     const nobleBle = createNobleBle(device);

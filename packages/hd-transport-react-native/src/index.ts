@@ -1688,6 +1688,17 @@ export default class ReactNativeBleTransport {
           Log?.debug('monitor error ignored for stale transport: ', uuid, notifyTransactionId);
           return;
         }
+        if (Platform.OS === 'ios' && isIosPeerRemovedPairingInformation(error)) {
+          const staleBondError = toIosStaleBondError(error);
+          if (this.getActiveProtocol(uuid) === 'V2') {
+            this.rejectProtocolV2Frames(uuid, staleBondError);
+            return;
+          }
+          if (this.runPromise && this.runPromiseDeviceId === uuid) {
+            this.runPromise.reject(staleBondError);
+          }
+          return;
+        }
         if (Platform.OS === 'android' && isStaleGattTableNotifyReason(error.reason)) {
           this.androidGattCacheRefreshes.add(uuid);
         }

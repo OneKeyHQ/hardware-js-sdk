@@ -1,9 +1,15 @@
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import transport from '@onekeyfe/hd-transport';
 
 import EVMSignTypedData from '../src/api/evm/EVMSignTypedData';
 import { getEIP712Hashes } from '../src/api/evm/eip712Hash';
+import { formatAnyHex } from '../src/api/helpers/hexUtils';
+import messagesJson from '../src/data/messages/messages.json';
 
 import type { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../src/types';
+
+const { createMessageFromName, decodeProtobuf, encodeProtobuf, parseConfigure } = transport;
+const typedHashMessages = parseConfigure(messagesJson as never);
 
 // Mock the config module to avoid package.json resolution issues
 jest.mock('../src/data/config', () => ({
@@ -790,17 +796,35 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     const expectedHashes = getEIP712Hashes(data);
 
     const result = await method.run();
+    const domainHash = formatAnyHex(expectedHashes.domainHash);
+    const messageHash = formatAnyHex(expectedHashes.messageHash);
+    const fallbackPayload = typedCall.mock.calls[1][2] as {
+      domain_separator_hash: string;
+      message_hash: string;
+    };
+    const { Message } = createMessageFromName(typedHashMessages, 'EthereumSignTypedHashOneKey');
+    const encoded = encodeProtobuf(Message, fallbackPayload);
+    const decoded = decodeProtobuf(Message, encoded);
 
     expect(result).toEqual(signatureMessage);
     expect(typedCall).toHaveBeenCalledTimes(2);
     expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+    expect(domainHash).toHaveLength(64);
+    expect(messageHash).toHaveLength(64);
+    expect(domainHash.startsWith('0x')).toBe(false);
+    expect(Buffer.from(fallbackPayload.domain_separator_hash, 'hex')).toHaveLength(32);
+    expect(Buffer.from(fallbackPayload.message_hash, 'hex')).toHaveLength(32);
+    expect(Buffer.from(String(decoded.domain_separator_hash), 'hex')).toHaveLength(32);
+    expect(Buffer.from(String(decoded.message_hash), 'hex')).toHaveLength(32);
+    expect(String(decoded.domain_separator_hash).replace(/^0x/i, '')).toBe(domainHash);
+    expect(String(decoded.message_hash).replace(/^0x/i, '')).toBe(messageHash);
     expect(typedCall).toHaveBeenNthCalledWith(
       2,
       'EthereumSignTypedHashOneKey',
       'EthereumTypedDataSignatureOneKey',
       expect.objectContaining({
-        domain_separator_hash: expectedHashes.domainHash,
-        message_hash: expectedHashes.messageHash,
+        domain_separator_hash: domainHash,
+        message_hash: messageHash,
       })
     );
   });

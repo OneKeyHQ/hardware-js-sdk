@@ -610,8 +610,9 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       const response = await this.signTypedHash({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
         addressN: this.params.addressN,
-        domainHash: hashes.domainHash,
-        messageHash: hashes.messageHash,
+        domainHash: formatAnyHex(hashes.domainHash),
+        messageHash:
+          hashes.messageHash === undefined ? undefined : formatAnyHex(hashes.messageHash),
         chainId: this.params.chainId,
       });
 

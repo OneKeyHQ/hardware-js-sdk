@@ -325,20 +325,23 @@ const DEFAULT_WRITE_PACING_DELAY_MS = 5;
 const RETRY_CONFIG = { MAX_ATTEMPTS: 15, WRITE_TIMEOUT: 2000 } as const;
 const IS_WINDOWS = process.platform === 'win32';
 /**
- * WinRT reports a failed GATT write or notify as `AsyncStatus::Error`
- * ("status: 3"). That covers both a cancelled system pairing prompt and a host
- * bond the device no longer holds; the two are told apart by process state, not
- * by this text. The remaining patterns are the GattCommunicationStatus strings
- * that can reach the same handling.
+ * Pairing-specific WinRT / GATT authentication failures that always indicate a
+ * pairing failure regardless of connection state.
  */
 const WINDOWS_PAIRING_FAILURE_PATTERNS = [
-  /status:\s*3/i,
   /access\s+denied/i,
   /protocol\s+error/i,
   /insufficient\s+authentication/i,
   /insufficient\s+encryption/i,
   /gatt_insuf/i,
 ];
+/**
+ * WinRT reports both a cancelled system pairing prompt and a stale host bond as
+ * `AsyncStatus::Error` ("status: 3"), which is also used for generic GATT errors
+ * after pairing. Only treat a bare `status: 3` as a pairing failure while in
+ * pairing context (before the device is paired).
+ */
+const WINDOWS_ASYNC_STATUS_ERROR_PATTERN = /status:\s*3\b/i;
 
 export function resolveNobleBleWritePacingDelay(options?: NobleBleWriteOptions) {
   return typeof options?.pacingDelayMs === 'number' && Number.isFinite(options.pacingDelayMs)
@@ -360,8 +363,18 @@ export function isWindowsPairingFailureText(text: string): boolean {
   return WINDOWS_PAIRING_FAILURE_PATTERNS.some(pattern => pattern.test(text));
 }
 
-function isWindowsPairingFailure(error: unknown): boolean {
-  return IS_WINDOWS && isWindowsPairingFailureText(nativeBleErrorText(error));
+export function isWindowsPairingFailureInContext(text: string, pairingContext: boolean): boolean {
+  return (
+    isWindowsPairingFailureText(text) ||
+    (pairingContext && WINDOWS_ASYNC_STATUS_ERROR_PATTERN.test(text))
+  );
+}
+
+function isWindowsPairingFailure(error: unknown, options: { pairingContext: boolean }): boolean {
+  return (
+    IS_WINDOWS &&
+    isWindowsPairingFailureInContext(nativeBleErrorText(error), options.pairingContext)
+  );
 }
 
 /**
@@ -976,10 +989,7 @@ async function attemptWindowsWriteUntilPaired(
     // The user cancelled while a write or the inter-attempt wait was running.
     // This is an abort, not a link loss: Core must not retry it automatically.
     if (pairingCanceledDevices.has(deviceId)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.BleDeviceBondedCanceled,
-        'Bluetooth pairing canceled'
-      );
+      throw createPairingCanceledError();
     }
     // If disconnected, abort
     if (!connectedDevices.has(deviceId)) {
@@ -1016,7 +1026,7 @@ async function attemptWindowsWriteUntilPaired(
       // Abort immediately on a Windows pairing/authentication failure. It is
       // never repaired by another write: either the user cancelled the system
       // prompt or the host bond no longer matches the device.
-      if (isWindowsPairingFailure(e)) {
+      if (isWindowsPairingFailure(e, { pairingContext: !pairedDevices.has(deviceId) })) {
         const pairingError = createWindowsPairingError(deviceId, e, 'write');
         await abortWindowsPairing(deviceId);
         logger?.info('[NobleBLE] Windows pairing failed, reset link state', {
@@ -1069,11 +1079,10 @@ async function attemptWindowsWriteUntilPaired(
     }
   }
 
-  // No notification ever arrived, so pairing never completed. Do not leave a
-  // half-paired link and subscription behind: the next attempt must cold-connect.
-  const pairingError = createWindowsPairingNoResponseError(deviceId);
-  await abortWindowsPairing(deviceId);
-  throw pairingError;
+  // No notification arrived. Keep the GATT link: a Protocol V1 probe miss on a
+  // healthy V2 device takes this path, and the following V2 probe still needs
+  // the same characteristics. Confirmed pairing failures abort above.
+  throw createWindowsPairingNoResponseError(deviceId);
 }
 
 async function transmitHexDataToDevice(
@@ -1868,8 +1877,24 @@ async function setupConnectionAndDiscoverServices(
 const DIRECT_CONNECT_TIMEOUT_MS = 2000;
 // Floor after a timeout: do not pay the probe on every attempt.
 const DIRECT_CONNECT_COOLDOWN_MS = 15_000;
-const pendingDirectNativeConnections = new Set<string>();
+type PendingDirectNativeConnection = {
+  cancelNative: () => void;
+  abort: (error: unknown) => void;
+};
+const pendingDirectNativeConnections = new Map<string, PendingDirectNativeConnection>();
 const deviceConnectionPromises = new Map<string, Promise<void>>();
+
+function createPairingCanceledError() {
+  return ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled, 'Bluetooth pairing canceled');
+}
+
+function isPairingCanceledError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    (error as { errorCode?: unknown }).errorCode === HardwareErrorCode.BleDeviceBondedCanceled
+  );
+}
 
 /**
  * Connect straight by id, skipping the ~650ms targeted scan. Both native
@@ -1896,10 +1921,26 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancel: (() => void) | undefined;
   let abandoned = false;
+  let abortDirect: ((error: unknown) => void) | undefined;
   try {
     // The late-orphan guard must attach to THIS pending connect.
     const directPromise = nobleInstance.connectAsync(deviceId);
-    pendingDirectNativeConnections.add(deviceId);
+    let pairingAbortSettled = false;
+    const pairingAbort = new Promise<never>((_, reject) => {
+      abortDirect = error => {
+        if (pairingAbortSettled) return;
+        pairingAbortSettled = true;
+        reject(error);
+      };
+    });
+    pairingAbort.catch(() => undefined);
+    pendingDirectNativeConnections.set(deviceId, {
+      cancelNative: () => nobleInstance.cancelConnect?.(deviceId),
+      abort: error => {
+        abandoned = true;
+        abortDirect?.(error);
+      },
+    });
     trackNativeConnection(
       directPromise
         .then(async late => {
@@ -1916,18 +1957,35 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
         .finally(() => pendingDirectNativeConnections.delete(deviceId)),
       () => nobleInstance.cancelConnect?.(deviceId)
     );
-    const raced = await Promise.race([
-      directPromise,
-      new Promise<'timeout'>(resolve => {
+    type DirectRace =
+      | { kind: 'timeout' }
+      | { kind: 'result'; value: Peripheral | undefined }
+      | { kind: 'error'; error: unknown };
+    const raced = await Promise.race<DirectRace>([
+      directPromise.then(
+        value => ({ kind: 'result', value }),
+        error => ({ kind: 'error', error })
+      ),
+      pairingAbort.then(
+        () => ({ kind: 'error', error: createPairingCanceledError() }),
+        error => ({ kind: 'error', error })
+      ),
+      new Promise<DirectRace>(resolve => {
         cancel = () => {
           abandoned = true;
-          resolve('timeout');
+          resolve({ kind: 'timeout' });
         };
         pendingCancellations.add(cancel);
         timer = setTimeout(cancel, DIRECT_CONNECT_TIMEOUT_MS);
       }),
     ]);
-    if (raced === 'timeout' || disposing) {
+    if (pairingCanceledDevices.has(deviceId)) {
+      throw createPairingCanceledError();
+    }
+    if (raced.kind === 'error') {
+      throw raced.error;
+    }
+    if (raced.kind === 'timeout' || disposing) {
       directConnectCooldownUntil.set(deviceId, Date.now() + DIRECT_CONNECT_COOLDOWN_MS);
       logger?.info('[NobleBLE] Direct connect-by-id timed out, falling back to scan', {
         deviceId,
@@ -1935,11 +1993,18 @@ async function tryDirectConnectById(deviceId: string): Promise<Peripheral | unde
       return undefined;
     }
     // Backends emit `discover` as a side effect, so the cache may hold it.
-    const peripheral = raced ?? discoveredDevices.get(deviceId);
+    const peripheral = raced.value ?? discoveredDevices.get(deviceId);
     if (!peripheral || peripheral.state !== 'connected') return undefined;
     logger?.info('[NobleBLE] Direct connect-by-id succeeded', { deviceId });
     return peripheral;
   } catch (error) {
+    if (isPairingCanceledError(error) || pairingCanceledDevices.has(deviceId)) {
+      throw isPairingCanceledError(error) ? error : createPairingCanceledError();
+    }
+    const nativeError = error as NobleBleNativeError;
+    if (isCoreBluetoothPeerRemovedPairingError(nativeError)) {
+      throw createNobleBleConnectionError(nativeError);
+    }
     logger?.info('[NobleBLE] Direct connect-by-id failed, falling back to scan', {
       deviceId,
       error: String(error),
@@ -2026,10 +2091,16 @@ async function connectDeviceOnce(deviceId: string, webContents: WebContents): Pr
     };
 
     peripheral = byIdFirst ? await connectById() : await scanForPeripheral();
+    if (pairingCanceledDevices.has(deviceId)) {
+      throw createPairingCanceledError();
+    }
     if (!peripheral) {
       // The preferred route came up empty: not advertising (held elsewhere, or
       // silent), or not reachable by id. Try the other one before giving up.
       peripheral = byIdFirst ? await scanForPeripheral() : await connectById();
+    }
+    if (pairingCanceledDevices.has(deviceId)) {
+      throw createPairingCanceledError();
     }
   }
 
@@ -2318,6 +2389,12 @@ async function subscribeNotifications(
 
     assertBleActive();
     notifyCharacteristic.on('data', (data: Buffer) => {
+      // A user abort stays attached until the write loop observes it. A
+      // notification during that window must not look like a successful pair.
+      if (pairingCanceledDevices.has(deviceId)) {
+        emitRawNotification(deviceId, data);
+        return;
+      }
       // Windows BLE pairing detection: receiving any data means the link is
       // encrypted, i.e. the device and the host share a valid bond.
       if (!pairedDevices.has(deviceId)) {
@@ -2325,7 +2402,6 @@ async function subscribeNotifications(
         logger?.info('[NobleBLE] Device paired successfully', { deviceId });
       }
       bondedDevices.add(deviceId);
-      pairingCanceledDevices.delete(deviceId);
 
       emitRawNotification(deviceId, data);
     });
@@ -2342,7 +2418,7 @@ async function subscribeNotifications(
     });
   } catch (error) {
     const nativeError = error as NobleBleNativeError;
-    if (isWindowsPairingFailure(nativeError)) {
+    if (isWindowsPairingFailure(nativeError, { pairingContext: !pairedDevices.has(deviceId) })) {
       const pairingError = createWindowsPairingError(deviceId, nativeError, 'subscribe');
       await abortWindowsPairing(deviceId);
       throw pairingError;
@@ -2520,6 +2596,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         ...connectedDevices.keys(),
         ...connectingDevices.keys(),
         ...pairedDevices,
+        ...pendingDirectNativeConnections.keys(),
       ]);
       logger?.info('[NobleBLE] Cancel pairing invoked', {
         platform: process.platform,
@@ -2530,13 +2607,19 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         try {
           pairingCanceledDevices.add(deviceId);
           clearIdleDisconnect(deviceId);
+          const pairingCanceled = createPairingCanceledError();
+          const pendingDirect = pendingDirectNativeConnections.get(deviceId);
+          pendingDirect?.abort(pairingCanceled);
+          try {
+            pendingDirect?.cancelNative();
+          } catch (error) {
+            logger?.debug('[NobleBLE] Direct connect cancellation failed', {
+              deviceId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
           const pendingConnection = connectingDevices.get(deviceId);
-          pendingConnection?.cancel(
-            ERRORS.TypedError(
-              HardwareErrorCode.BleDeviceBondedCanceled,
-              'Bluetooth pairing canceled'
-            )
-          );
+          pendingConnection?.cancel(pairingCanceled);
           if (typeof pendingConnection?.peripheral.cancelConnect === 'function') {
             try {
               pendingConnection.peripheral.cancelConnect();

@@ -299,6 +299,9 @@ const createV1Harness = ({
     device,
     bleManager,
     writeCharacteristic,
+    emitMonitorError(error: Error & { reason?: string; iosErrorCode?: number }) {
+      notifyCallback?.(error, null);
+    },
     notifySubscriptionRemovers,
     disconnectSubscriptionRemovers,
   };
@@ -1980,6 +1983,56 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
 
     await expect(call).rejects.toMatchObject({
       errorCode: HardwareErrorCode.BleCharacteristicNotifyError,
+    });
+  });
+
+  test('maps an iOS stale bond from the V2 notification monitor', async () => {
+    setPlatformOS('ios');
+    const harness = createHarness();
+    const { transport, uuid, sentSeqs } = harness;
+    await transport.acquire({ uuid, expectedProtocol: 'V2' });
+    harness.setShouldRespond(false);
+
+    const call = transport.call(uuid, 'Ping', { message: 'stale-bond' }, { timeoutMs: 50 });
+    while (sentSeqs.length < 1) {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    }
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+    harness.emitMonitorError(
+      Object.assign(new Error('Device was disconnected'), {
+        iosErrorCode: 14,
+        reason: 'Peer removed pairing information',
+      })
+    );
+
+    await expect(call).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+    });
+  });
+
+  test('maps an iOS stale bond from the V1 notification monitor', async () => {
+    setPlatformOS('ios');
+    const harness = createV1Harness({ respondOnWriteCount: [] });
+    const { transport, uuid } = harness;
+    await transport.acquire({ uuid, expectedProtocol: 'V1' });
+
+    const call = transport.call(uuid, 'Initialize', {}, { timeoutMs: 200 });
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+    harness.emitMonitorError(
+      Object.assign(new Error('Device was disconnected'), {
+        iosErrorCode: 14,
+        reason: 'Peer removed pairing information',
+      })
+    );
+
+    await expect(call).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
     });
   });
 
