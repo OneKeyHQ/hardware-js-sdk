@@ -14,23 +14,28 @@ export const ONEKEY_USB_DEVICE_DETACHED = 'OneKeyUsbDeviceDetached';
 export const USB_PACKET_ENCODING = 'base64' as const;
 
 export type NativeUsbDeviceInfo = {
-  path: string;
+  handle: string;
   vendorId: number;
   productId: number;
+  productName?: string | null;
+  manufacturerName?: string | null;
   serialNumber?: string | null;
+  hasPermission: boolean;
 };
 
-export type NativeUsbDeviceEvent = NativeUsbDeviceInfo;
+export type NativeUsbDeviceEvent = Omit<NativeUsbDeviceInfo, 'hasPermission'> & {
+  hasPermission?: boolean;
+};
 
 type OneKeyUsbNativeModule = {
   getDevices(): Promise<NativeUsbDeviceInfo[]>;
-  hasPermission(path: string): Promise<boolean>;
-  requestPermission(path: string): Promise<boolean>;
-  open(path: string): Promise<void>;
-  close(path: string): Promise<void>;
-  transferOut(path: string, data: string, timeoutMs: number): Promise<void>;
-  transferIn(path: string, length: number, timeoutMs: number): Promise<string>;
-  cancel(path: string): Promise<void>;
+  hasPermission(handle: string): Promise<boolean>;
+  requestPermission(handle: string): Promise<boolean>;
+  open(handle: string): Promise<void>;
+  close(handle: string): Promise<void>;
+  transferOut(handle: string, data: string, timeoutMs: number): Promise<void>;
+  transferIn(handle: string, length: number, timeoutMs: number): Promise<string>;
+  cancel(handle: string): Promise<void>;
 };
 
 const UNSUPPORTED_MESSAGE =

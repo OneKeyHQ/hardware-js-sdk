@@ -46,7 +46,7 @@ private val ONEKEY_USB_FILTER = listOf(
 )
 
 private const val ACTION_USB_PERMISSION = "so.onekey.hardware.usb.USB_PERMISSION"
-private const val EXTRA_DEVICE_NAME = "so.onekey.hardware.usb.EXTRA_DEVICE_NAME"
+private const val EXTRA_DEVICE_HANDLE = "so.onekey.hardware.usb.EXTRA_DEVICE_HANDLE"
 private const val EVENT_ATTACHED = "OneKeyUsbDeviceAttached"
 private const val EVENT_DETACHED = "OneKeyUsbDeviceDetached"
 private const val INTERFACE_NUMBER = 0
@@ -73,7 +73,7 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     private val usbManager: UsbManager =
         reactContext.getSystemService(Context.USB_SERVICE) as UsbManager
 
-    // Keyed by UsbDevice.deviceName, which is stable for one plug session.
+    // Keyed by native handle (UsbDevice.deviceName), which is stable for one plug session.
     private val openConnections = ConcurrentHashMap<String, OpenConnection>()
     private val lifecycleLock = Any()
     private val closingLocks = ConcurrentHashMap<String, CountDownLatch>()
@@ -87,13 +87,13 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
             when (intent.action) {
                 ACTION_USB_PERMISSION -> {
                     val device: UsbDevice? = extraDevice(intent)
-                    val deviceName = device?.deviceName ?: intent.getStringExtra(EXTRA_DEVICE_NAME)
+                    val handle = device?.deviceName ?: intent.getStringExtra(EXTRA_DEVICE_HANDLE)
                     val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
                     val promises: List<Promise> = synchronized(permissionLock) {
-                        if (deviceName != null) {
-                            permissionPromises.remove(deviceName)?.toList() ?: emptyList()
+                        if (handle != null) {
+                            permissionPromises.remove(handle)?.toList() ?: emptyList()
                         } else if (permissionPromises.size == 1) {
-                            // If both EXTRA_DEVICE and EXTRA_DEVICE_NAME are missing and only one
+                            // If both EXTRA_DEVICE and EXTRA_DEVICE_HANDLE are missing and only one
                             // device has a pending request, resolve false rather than guessing.
                             val onlyKey = permissionPromises.keys.first()
                             permissionPromises.remove(onlyKey)?.toList() ?: emptyList()
@@ -101,7 +101,7 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
                             emptyList()
                         }
                     }
-                    val result = if (deviceName != null) granted else false
+                    val result = if (handle != null) granted else false
                     promises.forEach { it.resolve(result) }
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
@@ -114,12 +114,12 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                     extraDevice(intent)?.let { device ->
                         if (isOneKeyDevice(device)) {
-                            val path = device.deviceName
+                            val handle = device.deviceName
                             val pending = synchronized(permissionLock) {
-                                permissionPromises.remove(path)?.toList() ?: emptyList()
+                                permissionPromises.remove(handle)?.toList() ?: emptyList()
                             }
                             pending.forEach { it.resolve(false) }
-                            closeDeviceInternal(path)
+                            closeDeviceInternal(handle)
                             emit(EVENT_DETACHED, deviceToMap(device))
                         }
                     }
@@ -185,8 +185,8 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun hasPermission(path: String, promise: Promise) {
-        val device = findDevice(path)
+    fun hasPermission(handle: String, promise: Promise) {
+        val device = findDevice(handle)
         if (device == null) {
             promise.reject("USB_NOT_FOUND", "USB device not found")
             return
@@ -195,8 +195,8 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun requestPermission(path: String, promise: Promise) {
-        val device = findDevice(path)
+    fun requestPermission(handle: String, promise: Promise) {
+        val device = findDevice(handle)
         if (device == null) {
             promise.reject("USB_NOT_FOUND", "USB device not found")
             return
@@ -222,7 +222,7 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
         }
         val intent = Intent(ACTION_USB_PERMISSION)
             .setPackage(reactContext.packageName)
-            .putExtra(EXTRA_DEVICE_NAME, key)
+            .putExtra(EXTRA_DEVICE_HANDLE, key)
         val pending = PendingIntent.getBroadcast(
             reactContext,
             permissionRequestCode.getAndIncrement(),
@@ -233,13 +233,13 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun open(path: String, promise: Promise) {
+    fun open(handle: String, promise: Promise) {
         val closingLatch = synchronized(lifecycleLock) {
-            if (openConnections.containsKey(path)) {
+            if (openConnections.containsKey(handle)) {
                 promise.resolve(null)
                 return
             }
-            closingLocks[path]
+            closingLocks[handle]
         }
         if (closingLatch != null) {
             try {
@@ -251,24 +251,24 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
                         false
                     }
                     val stillClosing = synchronized(lifecycleLock) {
-                        closingLocks.containsKey(path)
+                        closingLocks.containsKey(handle)
                     }
                     if (!finished || stillClosing) {
                         promise.reject("USB_OPEN_FAILED", "USB device close in progress")
                         return@execute
                     }
-                    openInternal(path, promise)
+                    openInternal(handle, promise)
                 }
             } catch (_: RejectedExecutionException) {
                 promise.reject("USB_OPEN_FAILED", "USB module invalidated")
             }
             return
         }
-        openInternal(path, promise)
+        openInternal(handle, promise)
     }
 
-    private fun openInternal(path: String, promise: Promise) {
-        val device = findDevice(path)
+    private fun openInternal(handle: String, promise: Promise) {
+        val device = findDevice(handle)
         if (device == null) {
             promise.reject("USB_NOT_FOUND", "USB device not found")
             return
@@ -346,15 +346,15 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun close(path: String, promise: Promise) {
-        closeDeviceInternal(path) {
+    fun close(handle: String, promise: Promise) {
+        closeDeviceInternal(handle) {
             promise.resolve(null)
         }
     }
 
     @ReactMethod
-    fun transferOut(path: String, data: String, timeoutMs: Int, promise: Promise) {
-        val open = openConnections[path]
+    fun transferOut(handle: String, data: String, timeoutMs: Int, promise: Promise) {
+        val open = openConnections[handle]
         if (open == null || open.closed.get()) {
             promise.reject("USB_NOT_FOUND", "USB device is not open")
             return
@@ -420,12 +420,12 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun transferIn(path: String, length: Int, timeoutMs: Int, promise: Promise) {
+    fun transferIn(handle: String, length: Int, timeoutMs: Int, promise: Promise) {
         if (length <= 0) {
             promise.reject("USB_TRANSFER_IN", "Invalid USB transfer length: $length")
             return
         }
-        val open = openConnections[path]
+        val open = openConnections[handle]
         if (open == null || open.closed.get()) {
             promise.reject("USB_NOT_FOUND", "USB device is not open")
             return
@@ -471,8 +471,8 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun cancel(path: String, promise: Promise) {
-        val open = openConnections[path]
+    fun cancel(handle: String, promise: Promise) {
+        val open = openConnections[handle]
         if (open != null && !open.closed.get()) {
             val seq = open.cancelSeq.incrementAndGet()
             open.cancelled.set(true)
@@ -524,22 +524,22 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun isDeviceConnected(path: String): Boolean {
-        return usbManager.deviceList.values.any { it.deviceName == path }
+    private fun isDeviceConnected(handle: String): Boolean {
+        return usbManager.deviceList.values.any { it.deviceName == handle }
     }
 
-    private fun closeDeviceInternal(path: String, onComplete: (() -> Unit)? = null) {
+    private fun closeDeviceInternal(handle: String, onComplete: (() -> Unit)? = null) {
         val latch = CountDownLatch(1)
         val open: OpenConnection?
         val previousLatch: CountDownLatch?
         synchronized(lifecycleLock) {
-            open = openConnections.remove(path)
+            open = openConnections.remove(handle)
             if (open != null) {
                 open.closed.set(true)
                 open.cancelled.set(true)
-                previousLatch = closingLocks.put(path, latch)
+                previousLatch = closingLocks.put(handle, latch)
             } else {
-                previousLatch = closingLocks[path]
+                previousLatch = closingLocks[handle]
             }
         }
 
@@ -593,8 +593,8 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
                 }
             } finally {
                 synchronized(lifecycleLock) {
-                    if (closingLocks[path] === latch) {
-                        closingLocks.remove(path)
+                    if (closingLocks[handle] === latch) {
+                        closingLocks.remove(handle)
                     }
                 }
                 latch.countDown()
@@ -609,9 +609,9 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun findDevice(path: String): UsbDevice? {
+    private fun findDevice(handle: String): UsbDevice? {
         return usbManager.deviceList.values.firstOrNull { device ->
-            isOneKeyDevice(device) && device.deviceName == path
+            isOneKeyDevice(device) && device.deviceName == handle
         }
     }
 
@@ -666,11 +666,24 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
 
     private fun deviceToMap(device: UsbDevice): WritableMap {
         val map = Arguments.createMap()
-        map.putString("path", device.deviceName)
+        val hasPermission = usbManager.hasPermission(device)
+        map.putString("handle", device.deviceName)
         map.putInt("vendorId", device.vendorId)
         map.putInt("productId", device.productId)
+        val productName = device.productName
+        if (productName.isNullOrBlank()) {
+            map.putNull("productName")
+        } else {
+            map.putString("productName", productName)
+        }
+        val manufacturerName = device.manufacturerName
+        if (manufacturerName.isNullOrBlank()) {
+            map.putNull("manufacturerName")
+        } else {
+            map.putString("manufacturerName", manufacturerName)
+        }
         val serial = try {
-            if (usbManager.hasPermission(device)) device.serialNumber else null
+            if (hasPermission) device.serialNumber else null
         } catch (_: SecurityException) {
             null
         }
@@ -679,6 +692,7 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
         } else {
             map.putString("serialNumber", serial)
         }
+        map.putBoolean("hasPermission", hasPermission)
         return map
     }
 

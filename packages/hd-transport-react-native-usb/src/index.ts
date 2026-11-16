@@ -17,6 +17,8 @@ import {
   HardwareErrorCode,
   ONEKEY_WEBUSB_FILTER,
   inferProtocolHintFromUsbId,
+  isKnownTrezorWebUsbDevice,
+  resolveOneKeyUsbDevicePath,
   wait,
 } from '@onekeyfe/hd-shared';
 
@@ -40,6 +42,7 @@ import type {
   ProtocolV2Schemas,
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
+import type { NativeUsbDeviceEvent, NativeUsbDeviceInfo } from './nativeModule';
 
 const { parseConfigure, ProtocolV1, check } = transport;
 
@@ -49,17 +52,23 @@ const PAYLOAD_SIZE = PROTOCOL_V1_CHUNK_PAYLOAD_SIZE;
 const HEADER_LENGTH = PROTOCOL_V1_MESSAGE_HEADER_SIZE;
 
 const TRANSFER_TIMEOUT_MS = 30000;
+const PERMISSION_REQUEST_TIMEOUT_MS = 30000;
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
 const PROTOCOL_PROBE_TIMEOUT = 5000;
+const SHARED_TREZOR_PIDS = new Set([0x53c0, 0x53c1]);
 
 /**
- * Public `path` is always the Android `UsbDevice.getDeviceName()` (`/dev/bus/usb/...`).
- * The path is stable for one plug session; re-plug yields a new path, like the
- * BLE/WebUSB reconnect flow where core re-matches by device features.
+ * Public `path` (exposed as `connectId` by Core for USB envs) is derived from
+ * the USB serial number via `resolveOneKeyUsbDevicePath`, matching WebUSB.
+ * All-zero placeholder serials are kept as-is so Core's `DevicePool.canPathIdentifyDevice`
+ * treats them as non-identifying; `usb-<vid4>-<pid4>-<product>` only applies when
+ * the serial is empty/unreadable after permission.
+ * Android `UsbDevice.getDeviceName()` is kept internal as `handle`.
  */
 interface OpenDevice {
   path: string;
+  handle: string;
   vendorId: number;
   productId: number;
 }
@@ -75,8 +84,40 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 
-function matchesOneKeyFilter(vendorId: number, productId: number): boolean {
-  return ONEKEY_WEBUSB_FILTER.some(f => vendorId === f.vendorId && productId === f.productId);
+function isSharedTrezorPidWithUnknownManufacturer(device: {
+  vendorId: number;
+  productId: number;
+  manufacturerName?: string | null;
+}): boolean {
+  return (
+    device.vendorId === 0x1209 &&
+    SHARED_TREZOR_PIDS.has(device.productId) &&
+    !device.manufacturerName?.trim()
+  );
+}
+
+function matchesOneKeyDevice(device: {
+  vendorId: number;
+  productId: number;
+  manufacturerName?: string | null;
+}): boolean {
+  const isOneKey = ONEKEY_WEBUSB_FILTER.some(
+    f => device.vendorId === f.vendorId && device.productId === f.productId
+  );
+  if (!isOneKey || isKnownTrezorWebUsbDevice(device)) {
+    return false;
+  }
+  // Trezor shares 0x1209:0x53c0 and 0x1209:0x53c1; if manufacturerName is null/unknown,
+  // exclude the device rather than prompting or listing a potential Trezor.
+  // OneKey-only PIDs (0x4f4a/0x4f4b/0x4f4c) are unaffected.
+  if (isSharedTrezorPidWithUnknownManufacturer(device)) {
+    return false;
+  }
+  return true;
+}
+
+export interface ReactNativeUsbTransportOptions {
+  permissionRequestTimeoutMs?: number;
 }
 
 export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<string> {
@@ -100,6 +141,28 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
 
   private openDevices = new Map<string, OpenDevice>();
 
+  private pathToHandle = new Map<string, string>();
+
+  private handleToPath = new Map<string, string>();
+
+  // Retains path for handles that disappeared from getDevices() until their detach broadcast is processed.
+  private vanishedHandleToPath = new Map<string, string>();
+
+  private deniedHandles = new Set<string>();
+
+  private permissionRequests = new Map<string, Promise<boolean>>();
+
+  private permissionTimeouts = new Map<string, () => void>();
+
+  // In-flight native requestPermission Promises, kept until they settle even after the JS timeout.
+  // JS cannot dismiss the Android system dialog; starting another request would stack dialogs.
+  // Kotlin promises stay until the permission broadcast, detach, or invalidate().
+  private nativePermissionFlight:
+    | { handle: string; promise: Promise<void>; settle: () => void }
+    | undefined;
+
+  private pathResolutionLocks = new Map<string, Promise<NativeUsbDeviceInfo>>();
+
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
   private reconnectLocks = new Map<string, Promise<OpenDevice>>();
@@ -110,12 +173,16 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
 
   private nativeSubscriptions: EmitterSubscription[] = [];
 
-  constructor() {
+  protected readonly permissionRequestTimeoutMs: number;
+
+  constructor(options?: ReactNativeUsbTransportOptions) {
     super({
       router: PROTOCOL_V2_CHANNEL_USB,
       maxFrameBytes: PROTOCOL_V2_FRAME_MAX_BYTES,
       logPrefix: 'ProtocolV2 ReactNativeUSB',
     });
+    this.permissionRequestTimeoutMs =
+      options?.permissionRequestTimeoutMs ?? PERMISSION_REQUEST_TIMEOUT_MS;
   }
 
   init(logger: ReactNativeUsbTransport['Log'], emitter?: EventEmitter) {
@@ -158,16 +225,29 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     this.nativeEventEmitter = createUsbEventEmitter();
     this.nativeSubscriptions = subscribeUsbDeviceEvents(this.nativeEventEmitter, {
       onAttached: device => {
-        if (!matchesOneKeyFilter(device.vendorId, device.productId)) {
+        if (!matchesOneKeyDevice(device)) {
           return;
+        }
+        this.deniedHandles.delete(device.handle);
+        if (device.serialNumber?.trim() || device.hasPermission === true) {
+          const path = resolveOneKeyUsbDevicePath(device);
+          if (path) {
+            this.registerDeviceMapping(path, device.handle);
+          }
         }
         this.Log?.debug?.('[ReactNativeUsbTransport] USB device attached');
       },
       onDetached: device => {
-        if (!matchesOneKeyFilter(device.vendorId, device.productId)) {
+        const isTrackedHandle =
+          this.handleToPath.has(device.handle) ||
+          this.vanishedHandleToPath.has(device.handle) ||
+          this.deniedHandles.has(device.handle) ||
+          this.permissionRequests.has(device.handle) ||
+          Array.from(this.openDevices.values()).some(d => d.handle === device.handle);
+        if (!isTrackedHandle && !matchesOneKeyDevice(device)) {
           return;
         }
-        this.handleDeviceDetached(device.path).catch(error =>
+        this.handleDeviceDetached(device).catch(error =>
           this.Log?.debug?.('[ReactNativeUsbTransport] detach cleanup failed:', error)
         );
       },
@@ -178,6 +258,18 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     this.cancelled = true;
     this.clearNativeSubscriptions();
 
+    this.permissionTimeouts.forEach(cancel => cancel());
+    this.permissionTimeouts.clear();
+
+    // Unblock acquire waiters sitting on a leftover native dialog. Do not cancel the
+    // Kotlin permission Promise on JS timeout (that would allow a second dialog while
+    // the first is still on screen); only release the JS waiter on stop().
+    if (this.nativePermissionFlight) {
+      const flight = this.nativePermissionFlight;
+      this.nativePermissionFlight = undefined;
+      flight.settle();
+    }
+
     try {
       await this.disposeProtocolV2UsbLinks('React Native USB transport stopped');
     } catch (error) {
@@ -185,10 +277,17 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     }
 
     await Promise.allSettled(this.reconnectLocks.values());
+    await Promise.allSettled(this.pathResolutionLocks.values());
     await Promise.all(Array.from(this.openDevices.keys(), p => this.closeOpenDevice(p)));
 
     this.reconnectLocks.clear();
     this.deviceProtocol.clear();
+    this.pathToHandle.clear();
+    this.handleToPath.clear();
+    this.vanishedHandleToPath.clear();
+    this.deniedHandles.clear();
+    this.permissionRequests.clear();
+    this.pathResolutionLocks.clear();
   }
 
   async post(path: string, name: string, data: Record<string, unknown>): Promise<void> {
@@ -220,17 +319,69 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     }
 
     try {
-      const native = getOneKeyUsbModule();
-      const devices = await native.getDevices();
-      return devices
-        .filter(d => matchesOneKeyFilter(d.vendorId, d.productId))
-        .map(d => ({
-          path: d.path,
-          id: d.path,
-          name: 'OneKey',
-          commType: 'usb' as const,
-          debug: false,
-        }));
+      const initialDevices = await this.getOneKeyDevices();
+      this.refreshDeviceMappings(initialDevices);
+
+      const devicesNeedingPermission = initialDevices.filter(
+        d => !d.hasPermission && !this.deniedHandles.has(d.handle)
+      );
+
+      let finalDevices = initialDevices;
+      if (devicesNeedingPermission.length > 0) {
+        // Intentional divergence from WebUSB (where the app calls navigator.usb.requestDevice()):
+        // Android 10+ restricts UsbDevice.getSerialNumber() until USB permission is granted, so
+        // an unpermitted device cannot be listed under a stable serial-based connectId.
+        // Prompt ONE device at a time (sequentially, never stacked dialogs) and skip deniedHandles.
+        // Apps declaring the USB_DEVICE_ATTACHED intent filter receive pre-granted permission so
+        // no dialog appears during enumerate().
+        for (const d of devicesNeedingPermission) {
+          if (!this.deniedHandles.has(d.handle)) {
+            // After a JS timeout the native dialog may still be up; do not start a
+            // prompt for a *different* handle (that would stack system dialogs).
+            // Concurrent enumerate of the same handle still awaits the shared JS promise.
+            if (
+              this.hasOutstandingNativePermission() &&
+              this.nativePermissionFlight?.handle !== d.handle &&
+              !this.permissionRequests.has(d.handle)
+            ) {
+              break;
+            }
+            try {
+              await this.requestPermissionForHandle(d.handle);
+            } catch (error) {
+              this.Log?.debug?.(
+                `[ReactNativeUsbTransport] requestPermission failed for handle=${d.handle}:`,
+                error
+              );
+            }
+          }
+        }
+        finalDevices = await this.getOneKeyDevices();
+        this.refreshDeviceMappings(finalDevices);
+      }
+
+      return finalDevices.flatMap(d => {
+        if (!d.hasPermission) {
+          this.Log?.debug?.(
+            `[ReactNativeUsbTransport] skipping unauthorized USB device handle=${d.handle}`
+          );
+          return [];
+        }
+        const path = resolveOneKeyUsbDevicePath(d);
+        if (!path) {
+          return [];
+        }
+        this.registerDeviceMapping(path, d.handle);
+        return [
+          {
+            path,
+            id: path,
+            name: 'OneKey',
+            commType: 'usb' as const,
+            debug: false,
+          },
+        ];
+      });
     } catch (error) {
       this.Log?.debug?.('[ReactNativeUsbTransport] enumerate failed:', error);
       return [];
@@ -254,8 +405,11 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     try {
       await this.rotateProtocolV2UsbGeneration(path, 'React Native USB transport acquired');
       await this.closeOpenDevice(path);
-      await this.ensurePermission(path);
-      await this.openDevice(path);
+      const nativeDevice = await this.resolveDeviceForAcquire(path);
+      if (this.cancelled) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
+      }
+      await this.openDevice(path, nativeDevice);
       const openDev = this.getOpenDevice(path);
       const protocolHint = input.expectedProtocol
         ? undefined
@@ -326,8 +480,8 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
 
   cancel() {
     this.cancelled = true;
-    this.openDevices.forEach((_dev, path) => {
-      this.nativeCancel(path).catch(() => undefined);
+    this.openDevices.forEach((dev, path) => {
+      this.nativeCancel(path, dev.handle).catch(() => undefined);
     });
   }
 
@@ -412,89 +566,427 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     return message.includes('timeout') || message.includes('timed_out');
   }
 
-  private async ensurePermission(path: string): Promise<void> {
+  private registerDeviceMapping(path: string, handle: string) {
+    this.vanishedHandleToPath.delete(handle);
+    const previousHandle = this.pathToHandle.get(path);
+    if (previousHandle && previousHandle !== handle) {
+      this.handleToPath.delete(previousHandle);
+      this.vanishedHandleToPath.set(previousHandle, path);
+    }
+    const previousPath = this.handleToPath.get(handle);
+    if (previousPath && previousPath !== path) {
+      this.pathToHandle.delete(previousPath);
+    }
+    this.pathToHandle.set(path, handle);
+    this.handleToPath.set(handle, path);
+  }
+
+  private async getOneKeyDevices(): Promise<NativeUsbDeviceInfo[]> {
+    const native = getOneKeyUsbModule();
+    const devices = await native.getDevices();
+    return devices.filter(d => {
+      if (isSharedTrezorPidWithUnknownManufacturer(d)) {
+        this.Log?.debug?.(
+          `[ReactNativeUsbTransport] skipping device on shared 0x1209:${d.productId.toString(
+            16
+          )} PID with unknown manufacturerName handle=${d.handle}`
+        );
+        return false;
+      }
+      return matchesOneKeyDevice(d);
+    });
+  }
+
+  private refreshDeviceMappings(devices: NativeUsbDeviceInfo[]) {
+    const activeHandles = new Set(devices.map(d => d.handle));
+
+    this.deniedHandles.forEach(handle => {
+      if (!activeHandles.has(handle)) {
+        this.deniedHandles.delete(handle);
+      }
+    });
+
+    this.handleToPath.forEach((path, handle) => {
+      if (!activeHandles.has(handle)) {
+        this.vanishedHandleToPath.set(handle, path);
+      }
+    });
+    activeHandles.forEach(handle => {
+      this.vanishedHandleToPath.delete(handle);
+    });
+
+    this.pathToHandle.clear();
+    this.handleToPath.clear();
+
+    devices.forEach(device => {
+      if (device.hasPermission) {
+        this.deniedHandles.delete(device.handle);
+        const path = resolveOneKeyUsbDevicePath(device);
+        if (path) {
+          this.registerDeviceMapping(path, device.handle);
+        }
+      } else if (device.serialNumber?.trim()) {
+        const path = resolveOneKeyUsbDevicePath(device);
+        if (path) {
+          this.registerDeviceMapping(path, device.handle);
+        }
+      }
+    });
+  }
+
+  private hasOutstandingNativePermission(): boolean {
+    return this.nativePermissionFlight != null;
+  }
+
+  private async awaitNativePermissionIdle(): Promise<void> {
+    while (this.nativePermissionFlight && !this.cancelled) {
+      await this.nativePermissionFlight.promise;
+    }
+  }
+
+  private trackNativePermissionFlight(handle: string, nativePromise: Promise<unknown>): void {
+    let settle!: () => void;
+    const promise = new Promise<void>(resolve => {
+      settle = resolve;
+    });
+    this.nativePermissionFlight = { handle, promise, settle };
+    const finish = () => {
+      if (this.nativePermissionFlight?.promise === promise) {
+        this.nativePermissionFlight = undefined;
+      }
+      settle();
+    };
+    nativePromise.then(finish, finish);
+  }
+
+  private requestPermissionForHandle(handle: string): Promise<boolean> {
+    const existing = this.permissionRequests.get(handle);
+    if (existing) {
+      return existing;
+    }
+
+    const native = getOneKeyUsbModule();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let settled = false;
+
+    const cleanup = () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      this.permissionTimeouts.delete(handle);
+    };
+
+    const requestPromise = new Promise<boolean>((resolve, reject) => {
+      const cancelForStop = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        if (this.permissionRequests.get(handle) === requestPromise) {
+          this.permissionRequests.delete(handle);
+        }
+        resolve(false);
+      };
+      this.permissionTimeouts.set(handle, cancelForStop);
+
+      timer = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        this.deniedHandles.add(handle);
+        this.Log?.debug?.(
+          `[ReactNativeUsbTransport] USB permission request timed out after ${this.permissionRequestTimeoutMs}ms for handle=${handle}`
+        );
+        if (this.permissionRequests.get(handle) === requestPromise) {
+          this.permissionRequests.delete(handle);
+        }
+        resolve(false);
+      }, this.permissionRequestTimeoutMs);
+
+      const nativePromise = native.requestPermission(handle);
+      this.trackNativePermissionFlight(handle, nativePromise);
+      nativePromise.then(
+        granted => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          cleanup();
+          if (granted) {
+            this.deniedHandles.delete(handle);
+          } else {
+            this.deniedHandles.add(handle);
+            this.Log?.debug?.(
+              `[ReactNativeUsbTransport] USB permission denied for handle=${handle}`
+            );
+          }
+          resolve(granted);
+        },
+        error => {
+          if (settled) {
+            // Ignore late rejections from a timed-out or stopped request.
+            return;
+          }
+          settled = true;
+          cleanup();
+          reject(error);
+        }
+      );
+    }).finally(() => {
+      cleanup();
+      if (this.permissionRequests.get(handle) === requestPromise) {
+        this.permissionRequests.delete(handle);
+      }
+    });
+
+    this.permissionRequests.set(handle, requestPromise);
+    return requestPromise;
+  }
+
+  private async ensurePermissionForHandle(handle: string): Promise<boolean> {
     const native = getOneKeyUsbModule();
     let granted = false;
     try {
-      granted = await native.hasPermission(path);
+      granted = await native.hasPermission(handle);
     } catch (error) {
       mapNativeUsbError(error);
     }
     if (granted) {
-      return;
+      return false;
     }
     let requested = false;
     try {
-      requested = await native.requestPermission(path);
+      requested = await this.requestPermissionForHandle(handle);
     } catch (error) {
       mapNativeUsbError(error);
     }
     if (!requested) {
       throw ERRORS.TypedError(HardwareErrorCode.WebUsbDeviceAccessError, 'USB permission denied');
     }
+    return true;
   }
 
-  private async openDevice(path: string): Promise<void> {
-    const existing = this.openDevices.get(path);
-    if (existing) return;
+  private resolveDeviceForAcquire(path: string): Promise<NativeUsbDeviceInfo> {
+    const existing = this.pathResolutionLocks.get(path);
+    if (existing) {
+      return existing;
+    }
+    const resolutionPromise = this.resolveDeviceForAcquireInternal(path).finally(() => {
+      if (this.pathResolutionLocks.get(path) === resolutionPromise) {
+        this.pathResolutionLocks.delete(path);
+      }
+    });
+    this.pathResolutionLocks.set(path, resolutionPromise);
+    return resolutionPromise;
+  }
 
+  private findPermittedDeviceForPath(devices: NativeUsbDeviceInfo[], path: string) {
+    const mappedHandle = this.pathToHandle.get(path);
+    const matched = mappedHandle
+      ? devices.find(d => d.handle === mappedHandle && d.hasPermission)
+      : undefined;
+    if (matched) {
+      return matched;
+    }
+    return devices.find(d => d.hasPermission && resolveOneKeyUsbDevicePath(d) === path);
+  }
+
+  private async resolveDeviceForAcquireInternal(path: string): Promise<NativeUsbDeviceInfo> {
+    let devices = await this.getOneKeyDevices();
+    this.refreshDeviceMappings(devices);
+
+    const mappedHandle = this.pathToHandle.get(path);
+    const matched = mappedHandle ? devices.find(d => d.handle === mappedHandle) : undefined;
+
+    if (matched) {
+      const newlyGranted = await this.ensurePermissionForHandle(matched.handle);
+      if (!newlyGranted && matched.hasPermission) {
+        return matched;
+      }
+      devices = await this.getOneKeyDevices();
+      this.refreshDeviceMappings(devices);
+      const refreshedHandle = this.pathToHandle.get(path);
+      const refreshed = refreshedHandle
+        ? devices.find(d => d.handle === refreshedHandle)
+        : undefined;
+      if (!refreshed) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not found: ${path}`);
+      }
+      return refreshed;
+    }
+
+    const candidates = devices.filter(d => {
+      if (d.hasPermission || this.deniedHandles.has(d.handle)) {
+        return false;
+      }
+      const mappedPath = this.handleToPath.get(d.handle);
+      return !mappedPath || mappedPath === path;
+    });
+    if (candidates.length === 0) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not found: ${path}`);
+    }
+
+    let sawPermissionDenied = false;
+    for (const candidate of candidates) {
+      // Wait for a timed-out native dialog to settle before prompting the next candidate.
+      await this.awaitNativePermissionIdle();
+      if (this.cancelled) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
+      }
+      devices = await this.getOneKeyDevices();
+      this.refreshDeviceMappings(devices);
+      const alreadyMatched = this.findPermittedDeviceForPath(devices, path);
+      if (alreadyMatched) {
+        return alreadyMatched;
+      }
+
+      const existingMappedPath = this.handleToPath.get(candidate.handle);
+      if (
+        !this.deniedHandles.has(candidate.handle) &&
+        (!existingMappedPath || existingMappedPath === path)
+      ) {
+        let candidateHasPermission = false;
+        try {
+          await this.ensurePermissionForHandle(candidate.handle);
+          candidateHasPermission = true;
+        } catch (error) {
+          const errorCode =
+            error && typeof error === 'object' && 'errorCode' in error
+              ? (error as { errorCode?: unknown }).errorCode
+              : undefined;
+          if (errorCode === HardwareErrorCode.WebUsbDeviceAccessError) {
+            sawPermissionDenied = true;
+          } else if (errorCode !== HardwareErrorCode.DeviceNotFound) {
+            throw error;
+          }
+        }
+
+        if (candidateHasPermission) {
+          devices = await this.getOneKeyDevices();
+          this.refreshDeviceMappings(devices);
+          const resolvedMatch = this.findPermittedDeviceForPath(devices, path);
+          if (resolvedMatch) {
+            return resolvedMatch;
+          }
+        }
+      }
+    }
+
+    if (sawPermissionDenied) {
+      throw ERRORS.TypedError(HardwareErrorCode.WebUsbDeviceAccessError, 'USB permission denied');
+    }
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not found: ${path}`);
+  }
+
+  private async openDevice(path: string, nativeDevice: NativeUsbDeviceInfo): Promise<void> {
+    if (this.cancelled) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
+    }
+    const existing = this.openDevices.get(path);
+    if (existing && existing.handle === nativeDevice.handle) return;
+    if (existing && existing.handle !== nativeDevice.handle) {
+      await this.closeOpenDevice(path, existing.handle);
+    }
+
+    const { handle, vendorId, productId } = nativeDevice;
     const native = getOneKeyUsbModule();
     try {
-      await native.open(path);
+      await native.open(handle);
     } catch (error) {
       mapNativeUsbError(error);
     }
 
-    let vendorId = 0;
-    let productId = 0;
-    try {
-      const devices = await native.getDevices();
-      const match = devices.find(d => d.path === path);
-      if (match) {
-        vendorId = match.vendorId;
-        productId = match.productId;
-      }
-    } catch {
-      /* identity is optional after a successful open */
-    }
-
-    await this.drainStaleInput(path);
-    this.openDevices.set(path, { path, vendorId, productId });
+    await this.drainStaleInput(handle);
+    this.openDevices.set(path, { path, handle, vendorId, productId });
   }
 
-  private async closeOpenDevice(path: string): Promise<void> {
-    if (!this.openDevices.has(path) && !isNativeUsbAvailable()) {
+  private async closeOpenDevice(path: string, expectedHandle?: string): Promise<void> {
+    const openDev = this.openDevices.get(path);
+    if (expectedHandle && openDev && openDev.handle !== expectedHandle) {
+      if (isNativeUsbAvailable()) {
+        try {
+          await getOneKeyUsbModule().close(expectedHandle);
+        } catch {
+          /* ignore close errors during cleanup */
+        }
+      }
+      return;
+    }
+
+    const handle = openDev?.handle ?? expectedHandle ?? this.pathToHandle.get(path);
+    if (!openDev && !isNativeUsbAvailable()) {
       return;
     }
     this.openDevices.delete(path);
-    if (!isNativeUsbAvailable()) {
+    if (!isNativeUsbAvailable() || !handle) {
       return;
     }
     try {
-      await getOneKeyUsbModule().close(path);
+      await getOneKeyUsbModule().close(handle);
     } catch {
       /* ignore close errors during cleanup */
     }
   }
 
-  private async nativeCancel(path: string): Promise<void> {
+  private async nativeCancelByHandle(handle: string): Promise<void> {
     if (!isNativeUsbAvailable()) {
       return;
     }
     try {
-      await getOneKeyUsbModule().cancel(path);
+      await getOneKeyUsbModule().cancel(handle);
     } catch {
       /* ignore */
     }
   }
 
-  private async handleDeviceDetached(path: string): Promise<void> {
-    await this.nativeCancel(path);
+  private async nativeCancel(path: string, explicitHandle?: string): Promise<void> {
+    const handle =
+      explicitHandle ?? this.openDevices.get(path)?.handle ?? this.pathToHandle.get(path);
+    if (!handle) {
+      return;
+    }
+    await this.nativeCancelByHandle(handle);
+  }
+
+  private async handleDeviceDetached(device: NativeUsbDeviceEvent): Promise<void> {
+    const { handle } = device;
+    this.deniedHandles.delete(handle);
+
+    const mappedPath = this.handleToPath.get(handle) ?? this.vanishedHandleToPath.get(handle);
+    const serialPath = device.serialNumber?.trim() ? resolveOneKeyUsbDevicePath(device) : undefined;
+    const path = mappedPath ?? serialPath;
+    this.handleToPath.delete(handle);
+    this.vanishedHandleToPath.delete(handle);
+
+    await this.nativeCancelByHandle(handle);
+
+    if (!path) {
+      return;
+    }
+
+    const openDev = this.openDevices.get(path);
+    const currentHandle = this.pathToHandle.get(path);
+    if (currentHandle && currentHandle !== handle) {
+      if (openDev && openDev.handle === handle) {
+        await this.invalidateProtocolV2UsbLink(path, 'USB device detached');
+        await this.closeOpenDevice(path, handle);
+        this.deviceProtocol.delete(path);
+      }
+      return;
+    }
+    if (currentHandle === handle) {
+      this.pathToHandle.delete(path);
+    }
+
     await this.invalidateProtocolV2UsbLink(path, 'USB device detached');
-    await this.closeOpenDevice(path);
+    await this.closeOpenDevice(path, handle);
     this.deviceProtocol.delete(path);
     this.emitter?.emit(TRANSPORT_EVENT.DEVICE_DISCONNECT, {
-      name: '',
+      name: device.productName?.trim() || '',
       id: path,
       connectId: path,
     });
@@ -535,9 +1027,8 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
         this.Log?.debug?.('[ReactNativeUsbTransport] release before retry error:', releaseError);
       }
 
-      await this.enumerate();
-      await this.ensurePermission(path);
-      await this.openDevice(path);
+      const nativeDevice = await this.resolveDeviceForAcquire(path);
+      await this.openDevice(path, nativeDevice);
 
       const openDev = this.openDevices.get(path);
       if (!openDev) {
@@ -636,13 +1127,13 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     throw new Error(this.getErrorMessage(lastError));
   }
 
-  private async transferInOnce(
-    path: string,
+  private async transferInByHandle(
+    handle: string,
     length: number,
     timeoutMs = TRANSFER_TIMEOUT_MS
   ): Promise<Uint8Array> {
     try {
-      const encoded = await getOneKeyUsbModule().transferIn(path, length, timeoutMs);
+      const encoded = await getOneKeyUsbModule().transferIn(handle, length, timeoutMs);
       const packet = decodeUsbPacket(encoded);
       if (packet.byteLength <= 0) {
         throw new Error('Empty USB transfer');
@@ -656,9 +1147,19 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     }
   }
 
+  private transferInOnce(
+    path: string,
+    length: number,
+    timeoutMs = TRANSFER_TIMEOUT_MS
+  ): Promise<Uint8Array> {
+    const { handle } = this.getOpenDevice(path);
+    return this.transferInByHandle(handle, length, timeoutMs);
+  }
+
   private async transferOutOnce(path: string, data: Uint8Array): Promise<void> {
+    const { handle } = this.getOpenDevice(path);
     try {
-      await getOneKeyUsbModule().transferOut(path, encodeUsbPacket(data), TRANSFER_TIMEOUT_MS);
+      await getOneKeyUsbModule().transferOut(handle, encodeUsbPacket(data), TRANSFER_TIMEOUT_MS);
     } catch (error) {
       if (error && typeof error === 'object' && 'errorCode' in error) {
         throw error;
@@ -667,10 +1168,10 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     }
   }
 
-  private async drainStaleInput(path: string): Promise<void> {
+  private async drainStaleInput(handle: string): Promise<void> {
     for (let index = 0; index < 16; index += 1) {
       try {
-        await this.transferInOnce(path, PACKET_SIZE, 50);
+        await this.transferInByHandle(handle, PACKET_SIZE, 50);
       } catch {
         break;
       }
@@ -740,9 +1241,8 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
       this.Log?.debug?.('[ReactNativeUsbTransport] close after protocol probe error:', error);
     }
 
-    await this.enumerate();
-    await this.ensurePermission(path);
-    await this.openDevice(path);
+    const nativeDevice = await this.resolveDeviceForAcquire(path);
+    await this.openDevice(path, nativeDevice);
   }
 
   private async withProtocolReadTimeout<T>(

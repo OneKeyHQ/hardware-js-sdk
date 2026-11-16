@@ -136,7 +136,7 @@ This avoids misclassification caused by shared PIDs or unstable descriptors, and
 
 V1 devices can still switch to a firmware-version-matched schema after `Initialize` via `TransportManager.reconfigure(features)`. V2 devices do not go through `Initialize/GetFeatures`, so they do not reselect protocol based on features; protocol selection is returned by the transport's `getProtocolType(path)`.
 
-Supported `env` values include `webusb`, `desktop-webusb`, `desktop-web-ble`, `react-native` (BLE), `react-native-usb` (Android USB host), `node-usb`, `lowlevel`, and bridge/HTTP defaults. `react-native-usb` is a USB transport (path-based `connectId`, USB firmware chunking, Pro2/Neo USB signing cooldown) and is not BLE.
+Supported `env` values include `webusb`, `desktop-webusb`, `desktop-web-ble`, `react-native` (BLE), `react-native-usb` (Android USB host), `node-usb`, `lowlevel`, and bridge/HTTP defaults. `react-native-usb` is a USB transport (USB-serial path-based `connectId`, USB firmware chunking, Pro2/Neo USB signing cooldown) and is not BLE.
 
 ## Device Layer Responsibilities
 
