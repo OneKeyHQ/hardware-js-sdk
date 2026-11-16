@@ -1295,6 +1295,41 @@ export default class ReactNativeBleTransport {
   }
 
   /**
+   * stop() aborts bonding and marks the transport closed. Match other acquire
+   * paths: report BleDeviceDisconnected so callers do not treat this as a
+   * pairing failure that should pop another system dialog.
+   */
+  private throwIfBondingStopped(): void {
+    if (this.stopped || this.bondAbortController.signal.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    }
+  }
+
+  /** Retry delay that rejects as soon as stop() aborts the bond controller. */
+  private delayUnlessBondingStopped(ms: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const { signal } = this.bondAbortController;
+      if (this.stopped || signal.aborted) {
+        reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+        return;
+      }
+      const timeout = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        if (this.stopped || signal.aborted) {
+          reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+          return;
+        }
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timeout);
+        reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  /**
    * Android must bond before GATT so the peripheral cannot trigger its own
    * pairing mid-session. Three cases:
    * - The authoritative bonded list already has the device (OK-66336): skip
@@ -1306,10 +1341,12 @@ export default class ReactNativeBleTransport {
    *   previously observed bonded, otherwise keep the "never paired" error.
    */
   private async ensureAndroidBond(uuid: string): Promise<void> {
+    this.throwIfBondingStopped();
     const key = normalizeBleMac(uuid);
 
     try {
       const bonded = await findBondedDevice(uuid);
+      this.throwIfBondingStopped();
       if (bonded) {
         this.knownBondedDevices.add(key);
         Log?.debug(
@@ -1319,6 +1356,7 @@ export default class ReactNativeBleTransport {
         return;
       }
     } catch (error) {
+      this.throwIfBondingStopped();
       // getBondedDevices can fail on older native builds or a transient adapter
       // error; fall back to the legacy pairDevice path below.
       Log?.debug('[ReactNativeBleTransport] Android bonded list query failed, using pairDevice:', {
@@ -1328,11 +1366,20 @@ export default class ReactNativeBleTransport {
     }
 
     for (let attempt = 0; attempt < ANDROID_BOND_ATTEMPTS; attempt += 1) {
-      const bondState = await pairDevice(uuid);
+      this.throwIfBondingStopped();
+      let bondState;
+      try {
+        bondState = await pairDevice(uuid);
+      } catch (error) {
+        this.throwIfBondingStopped();
+        throw error;
+      }
+      this.throwIfBondingStopped();
       if (bondState.bonding) {
         await onDeviceBondState(uuid, this.bondAbortController.signal, {
           systemInitiated: bondState.initiated === false,
         });
+        this.throwIfBondingStopped();
         this.knownBondedDevices.add(key);
         return;
       }
@@ -1343,10 +1390,11 @@ export default class ReactNativeBleTransport {
       // { bonded: false, bonding: false }: createBond() could not start. Give the
       // device a moment to become visible/connectable before the next attempt.
       if (attempt + 1 < ANDROID_BOND_ATTEMPTS) {
-        await delay(ANDROID_BOND_RETRY_DELAY_MS);
+        await this.delayUnlessBondingStopped(ANDROID_BOND_RETRY_DELAY_MS);
       }
     }
 
+    this.throwIfBondingStopped();
     if (this.knownBondedDevices.has(key)) {
       throw ERRORS.TypedError(
         HardwareErrorCode.BleDeviceBondError,

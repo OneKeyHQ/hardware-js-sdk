@@ -706,6 +706,56 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(device.isConnected).not.toHaveBeenCalled();
   });
 
+  test('does not retry pairDevice after stop during Android bond delay', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    pairDeviceMock.mockClear();
+    pairDeviceMock.mockResolvedValueOnce({ bonded: false, bonding: false });
+    device.connect = jest.fn().mockResolvedValue(device);
+
+    const acquiring = transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const rejection = expect(acquiring).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+
+    await transport.stop();
+    await rejection;
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+    expect(device.connect).not.toHaveBeenCalled();
+  });
+
+  test('does not call pairDevice when stop happens before the first Android bond attempt', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const getBondedDevicesMock = jest.requireMock('../BleManager').getBondedDevices as jest.Mock;
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    const bondedList = createDeferred<unknown[]>();
+    getBondedDevicesMock.mockImplementationOnce(() => bondedList.promise);
+    pairDeviceMock.mockClear();
+    device.connect = jest.fn().mockResolvedValue(device);
+
+    const acquiring = transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const rejection = expect(acquiring).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    expect(pairDeviceMock).not.toHaveBeenCalled();
+
+    const stopping = transport.stop();
+    bondedList.resolve([]);
+    await rejection;
+    await stopping;
+    expect(pairDeviceMock).not.toHaveBeenCalled();
+    expect(device.connect).not.toHaveBeenCalled();
+  });
+
   test('does not connect after stop while Android bonding is pending', async () => {
     setPlatformOS('android');
     const { transport, uuid, bleManager } = createHarness();
