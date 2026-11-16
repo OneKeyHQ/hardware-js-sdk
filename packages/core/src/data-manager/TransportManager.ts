@@ -15,6 +15,8 @@ const BleLogger = getLogger(LoggerNames.HdBleTransport);
 const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
 const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
 const NodeUsbLogger = getLogger(LoggerNames.HdTransportNodeUsb);
+const ReactNativeUsbLogger = getLogger(LoggerNames.HdTransportReactNativeUsb);
+const ReactNativeCombinedLogger = getLogger(LoggerNames.HdTransportReactNativeCombined);
 const WebBleLogger = getLogger(LoggerNames.HdWebBleTransport);
 const WebUsbLogger = getLogger(LoggerNames.HdTransportWebUsb);
 const REACT_NATIVE_BLE_SCAN_TIMEOUT_MS = 3000;
@@ -71,6 +73,10 @@ export default class TransportManager {
       } else if (env === 'node-usb') {
         // NodeUsbTransport handles USB I/O directly — no plugin needed
         await this.transport.init(NodeUsbLogger, DevicePool.emitter);
+      } else if (env === 'react-native-usb') {
+        await this.transport.init(ReactNativeUsbLogger, DevicePool.emitter);
+      } else if (env === 'react-native-combined') {
+        await this.transport.init(ReactNativeCombinedLogger, DevicePool.emitter);
       } else if (env === 'lowlevel') {
         if (!this.plugin) {
           throw ERRORS.TypedError(
@@ -141,8 +147,8 @@ export default class TransportManager {
       );
     }
     const env = DataManager.getSettings('env');
-    if (env === 'react-native') {
-      /** Actually initializes the ReactNativeTransport */
+    if (env === 'react-native' || env === 'react-native-combined') {
+      /** Actually initializes the ReactNativeTransport or ReactNativeCombinedTransport */
       this.transport = new TransportConstructor({
         scanTimeout: REACT_NATIVE_BLE_SCAN_TIMEOUT_MS,
       }) as unknown as Transport;

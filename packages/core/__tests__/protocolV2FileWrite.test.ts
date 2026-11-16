@@ -455,6 +455,52 @@ describe('writeProtocolV2File', () => {
       ).rejects.toThrow('before the complete file was confirmed');
       expect(typedCall).toHaveBeenCalledTimes(1);
     });
+
+    test('follows device originalDescriptor.commType for asset pipeline and chunk limit', async () => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native-combined');
+      jest.spyOn(DataManager, 'isBleConnect').mockRestore();
+
+      // USB device keeps USB chunking and serial transfer even if activeCommType is 'ble'.
+      DataManager.setActiveCommType('ble');
+      const { commands: usbCommands, typedCall: usbTypedCall } = createCommands(EDeviceType.Pro2);
+      (
+        usbCommands.device as unknown as { originalDescriptor: { commType: string } }
+      ).originalDescriptor = { commType: 'usb' };
+      await writeProtocolV2File({
+        commands: usbCommands,
+        path: 'vol1:/wallpapers/wallpaper.okpkg',
+        data: new Uint8Array(3601),
+        overwrite: true,
+        bleChunkSizeLimit: 1960,
+      });
+      expect(usbTypedCall).toHaveBeenCalledTimes(1);
+      expect(usbTypedCall.mock.calls[0][3]).not.toHaveProperty('fileWritePipeline');
+
+      // BLE device keeps BLE pipeline even if activeCommType is 'usb'.
+      DataManager.setActiveCommType('usb');
+      const {
+        commands: bleCommands,
+        typedCall: bleTypedCall,
+        requests,
+      } = createCommands(EDeviceType.Pro2);
+      (
+        bleCommands.device as unknown as { originalDescriptor: { commType: string } }
+      ).originalDescriptor = { commType: 'ble' };
+      await writeProtocolV2File({
+        commands: bleCommands,
+        path: 'vol1:/wallpapers/wallpaper.okpkg',
+        data: new Uint8Array(3601),
+        overwrite: true,
+        bleChunkSizeLimit: 1960,
+      });
+      expect(bleTypedCall).toHaveBeenCalledTimes(1);
+      expect(bleTypedCall.mock.calls[0][3]).toMatchObject({
+        writeWithResponse: false,
+        fileWritePipeline: { next: expect.any(Function), onResponse: expect.any(Function) },
+      });
+      expect(requests.map(request => request.file.data.byteLength)).toEqual([1800, 1800, 1]);
+      DataManager.setActiveCommType(undefined);
+    });
   });
 
   test('allows a verified caller-specific BLE chunk limit', async () => {

@@ -15,6 +15,7 @@ flowchart TD
   WebUSB["WebUSB"]
   ElectronBLE["Electron BLE"]
   RNBLE["React Native BLE"]
+  RNUSB["React Native USB"]
   NodeUSB["Node USB"]
   Bridge["HTTP Bridge"]
   Other["Lowlevel / Emulator"]
@@ -24,12 +25,14 @@ flowchart TD
   Transport --> WebUSB
   Transport --> ElectronBLE
   Transport --> RNBLE
+  Transport --> RNUSB
   Transport --> NodeUSB
   Transport --> Bridge
   Transport --> Other
   WebUSB --> Hardware
   ElectronBLE --> Hardware
   RNBLE --> Hardware
+  RNUSB --> Hardware
   NodeUSB --> Hardware
   Bridge --> Hardware
   Other --> Hardware
@@ -133,6 +136,8 @@ This avoids misclassification caused by shared PIDs or unstable descriptors, and
 
 V1 devices can still switch to a firmware-version-matched schema after `Initialize` via `TransportManager.reconfigure(features)`. V2 devices do not go through `Initialize/GetFeatures`, so they do not reselect protocol based on features; protocol selection is returned by the transport's `getProtocolType(path)`.
 
+Supported `env` values include `webusb`, `desktop-webusb`, `desktop-web-ble`, `react-native` (BLE), `react-native-usb` (Android USB host), `node-usb`, `lowlevel`, and bridge/HTTP defaults. `react-native-usb` is a USB transport (USB-serial path-based `connectId`, USB firmware chunking, Pro2/Neo USB signing cooldown) and is not BLE.
+
 ## Device Layer Responsibilities
 
 After `Device.acquire()` completes, the detected protocol type is read from the transport and written back to
@@ -205,13 +210,15 @@ Local files must not be used as a remote Plan override to bypass remote receipt 
 | `packages/hd-transport`              | protobuf loading, V1/V2 encode/decode, Protocol Session, type definitions |
 | `packages/hd-transport-web-device`   | WebUSB and Electron BLE transport                              |
 | `packages/hd-transport-react-native` | React Native BLE transport                                     |
+| `packages/hd-transport-react-native-usb` | React Native Android USB host (OTG) transport; iOS unsupported |
+| `packages/hd-transport-usb`          | Node libusb transport                                          |
 | `packages/hd-common-connect-sdk`     | Select transport by env and expose a unified entry to desktop/Web examples |
 | `submodules/firmware-pro2`           | Source of Pro2 protobuf schema                                 |
 
 ## Design Principles
 
 - Protocol decisions must be based on post-connect device responses, not static PID, name, or descriptor.
-- Current Pro2 supports USB and BLE; WebUSB, Electron BLE, and React Native BLE should all select
+- Current Pro2 supports USB and BLE; WebUSB, Electron BLE, React Native BLE, Node USB, and React Native Android USB should all select
   Protocol V2 from live responses, and must not assume Pro always uses V1.
 - Protocol probing, V2 frame reassembly, and V2 call routing should reuse the Protocol Session layer, avoiding duplicated implementations in concrete transports.
 - The default Electron BLE entry is `desktop-web-ble`; env aliases split by device model are no longer provided.

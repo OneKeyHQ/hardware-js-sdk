@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep in sync with ONEKEY_WEBUSB_FILTER in packages/shared/src/constants.ts and ONEKEY_USB_FILTER in OneKeyUsbModule.kt -->
+<!-- Vendor 0x1209 (4617): 0x53c0=21440, 0x53c1=21441, 0x4f4a=20298, 0x4f4b=20299, 0x4f4c=20300 -->
+<!-- Restrict 0x53c0 and 0x53c1 by manufacturer-name because Trezor shares these pid.codes IDs with OneKey. -->
+<!-- Keep 0x4f4a, 0x4f4b, and 0x4f4c without manufacturer-name because those PIDs are OneKey-only. -->
+<resources>
+    <usb-device vendor-id="4617" product-id="21440" manufacturer-name="OneKey" /> <!-- 0x1209:0x53c0 (Classic/Classic 1S/Pro firmware) -->
+    <usb-device vendor-id="4617" product-id="21440" manufacturer-name="OneKey Limited" /> <!-- 0x1209:0x53c0 (Pro bootloader, Pro 2/Neo) -->
+    <usb-device vendor-id="4617" product-id="21441" manufacturer-name="OneKey" /> <!-- 0x1209:0x53c1 (Classic/Classic 1S/Pro firmware) -->
+    <usb-device vendor-id="4617" product-id="21441" manufacturer-name="OneKey Limited" /> <!-- 0x1209:0x53c1 (Pro bootloader, Pro 2/Neo) -->
+    <usb-device vendor-id="4617" product-id="20298" /> <!-- 0x1209:0x4f4a -->
+    <usb-device vendor-id="4617" product-id="20299" /> <!-- 0x1209:0x4f4b -->
+    <usb-device vendor-id="4617" product-id="20300" /> <!-- 0x1209:0x4f4c -->
+</resources>

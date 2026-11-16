@@ -10,6 +10,7 @@ import {
   isProtocolV2LinkDisabledFailure,
 } from '@onekeyfe/hd-transport';
 
+import DataManager from '../data-manager/DataManager';
 import TransportManager from '../data-manager/TransportManager';
 import { LoggerNames, getLogger, patchFeatures, wait } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
@@ -294,11 +295,13 @@ export class DeviceCommands {
       ]);
     } finally {
       if (timer) clearTimeout(timer);
-      if (
-        timedOut &&
-        this.transport.name === 'ReactNativeBleTransport' &&
-        this.transport.disconnect
-      ) {
+      const isBleTransport =
+        this.transport.name === 'ReactNativeBleTransport' ||
+        (this.transport.name === 'ReactNativeCombinedTransport' &&
+          (this.device.originalDescriptor?.commType
+            ? this.device.originalDescriptor.commType === 'ble'
+            : DataManager.isBleConnect(DataManager.getSettings('env'))));
+      if (timedOut && isBleTransport && this.transport.disconnect) {
         await this.transport.disconnect(this.mainId).catch(error => {
           Log.debug('BLE cancellation timeout disconnect error (ignored)', error);
         });

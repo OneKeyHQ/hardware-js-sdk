@@ -15,12 +15,15 @@ jest.mock('../src/data-manager', () => ({
   DataManager: {
     getSettings: jest.fn(() => 'desktop-web-ble'),
     isBleConnect: jest.fn(() => true),
+    getActiveCommType: jest.fn(() => undefined),
   },
 }));
 
 jest.mock('../src/device/DevicePool', () => ({
   DevicePool: {
     setConnector: jest.fn(),
+    reportDeviceChange: jest.fn(),
+    devicesCache: {},
   },
 }));
 
@@ -101,5 +104,83 @@ describe('DeviceConnector protocol validation', () => {
         firmwareMessage: 'link disabled',
       },
     });
+  });
+
+  it('decides uuid-vs-path from descriptor commType and passes both for combined unknown commType', async () => {
+    const dataManagerMock = jest.requireMock('../src/data-manager');
+    const acquire = jest.fn().mockResolvedValue('SN_PRO2_USB');
+    const enumerate = jest.fn().mockResolvedValue([
+      { id: 'SN_PRO2_USB', path: 'SN_PRO2_USB', commType: 'usb', protocolType: 'V2' },
+      { id: 'BLE_MAC_1', path: 'BLE_MAC_1', commType: 'ble', protocolType: 'V2' },
+    ]);
+    transportManagerMock.default.getTransport.mockReturnValue({
+      enumerate,
+      acquire,
+      getProtocolType: jest.fn(() => 'V2'),
+    });
+
+    dataManagerMock.DataManager.getSettings.mockReturnValue('react-native-combined');
+    dataManagerMock.DataManager.getActiveCommType.mockReturnValue(undefined);
+    dataManagerMock.DataManager.isBleConnect.mockReturnValue(false);
+
+    const connector = new DeviceConnector();
+
+    // 1. Explicit commType='ble' overrides unknown/usb activeCommType
+    acquire.mockResolvedValueOnce({ uuid: 'BLE_MAC_1', protocolType: 'V2' });
+    await connector.acquire(
+      'BLE_MAC_1',
+      undefined,
+      true,
+      'V2',
+      undefined,
+      undefined,
+      undefined,
+      'ble'
+    );
+    expect(acquire).toHaveBeenLastCalledWith(
+      expect.objectContaining({ uuid: 'BLE_MAC_1', expectedProtocol: 'V2' })
+    );
+    expect(acquire.mock.calls[0][0]).not.toHaveProperty('path');
+
+    // 2. Explicit commType='usb' overrides ble activeCommType
+    dataManagerMock.DataManager.getActiveCommType.mockReturnValue('ble');
+    dataManagerMock.DataManager.isBleConnect.mockReturnValue(true);
+    acquire.mockResolvedValueOnce('SN_PRO2_USB');
+    await connector.acquire(
+      'SN_PRO2_USB',
+      null,
+      undefined,
+      'V2',
+      undefined,
+      undefined,
+      undefined,
+      'usb'
+    );
+    expect(acquire).toHaveBeenLastCalledWith(
+      expect.objectContaining({ path: 'SN_PRO2_USB', expectedProtocol: 'V2' })
+    );
+    expect(acquire.mock.calls[1][0]).not.toHaveProperty('uuid');
+
+    // 3. Looked up from connector.upcoming after enumerate when commType arg is omitted
+    await connector.enumerate();
+    acquire.mockResolvedValueOnce('SN_PRO2_USB');
+    await connector.acquire('SN_PRO2_USB', null, undefined, 'V2');
+    expect(acquire).toHaveBeenLastCalledWith(
+      expect.objectContaining({ path: 'SN_PRO2_USB', expectedProtocol: 'V2' })
+    );
+    expect(acquire.mock.calls[2][0]).not.toHaveProperty('uuid');
+
+    // 4. Combined + missing commType + unknown activeCommType routes with both path and uuid
+    dataManagerMock.DataManager.getActiveCommType.mockReturnValue(undefined);
+    dataManagerMock.DataManager.isBleConnect.mockReturnValue(false);
+    acquire.mockResolvedValueOnce('SN_UNKNOWN_USB');
+    await connector.acquire('SN_UNKNOWN_USB', null, undefined, 'V2');
+    expect(acquire).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        path: 'SN_UNKNOWN_USB',
+        uuid: 'SN_UNKNOWN_USB',
+        expectedProtocol: 'V2',
+      })
+    );
   });
 });

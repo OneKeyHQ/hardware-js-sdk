@@ -53,6 +53,7 @@ import {
 } from '../types';
 import { DEVICE, UI_REQUEST } from '../events';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import {
@@ -359,7 +360,6 @@ export class Device extends EventEmitter {
 
     this.deviceBeforeWipe = null;
 
-    const env = DataManager.getSettings('env');
     const deviceType = this.getCurrentDeviceType();
 
     const bleName = this.getCurrentBleName();
@@ -373,7 +373,7 @@ export class Device extends EventEmitter {
 
     return {
       /** Android uses a MAC address, while iOS and USB use transport-specific identifiers. */
-      connectId: DataManager.isBleConnect(env) ? this.mainId || null : connectId,
+      connectId: this.isBleConnection() ? this.mainId || null : connectId,
       /** Persist this after the first active probe so later calls do not need to guess. */
       connectProtocol: this.originalDescriptor.protocolType,
       /** Stable physical-device identity. */
@@ -408,6 +408,18 @@ export class Device extends EventEmitter {
   }
 
   /**
+   * Prefer the device's own `originalDescriptor.commType` over the env-global
+   * helper so an in-flight USB or BLE device cannot flip comm semantics mid-life.
+   */
+  private isBleConnection(): boolean {
+    const commType = this.originalDescriptor?.commType;
+    if (commType) {
+      return isBleCommType(commType);
+    }
+    return DataManager.isBleConnect(DataManager.getSettings('env'));
+  }
+
+  /**
    * Device connect
    * @returns {Promise<boolean>}
    */
@@ -415,10 +427,9 @@ export class Device extends EventEmitter {
     connectProtocol?: HardwareConnectProtocol,
     options?: { forceProtocolDetection?: boolean }
   ) {
-    const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async (resolve, reject) => {
-      if (DataManager.isBleConnect(env)) {
+      if (this.isBleConnection()) {
         if (this.hasDeviceAcquire() && this.commands && !this.commands.disposed) {
           resolve(true);
           return;
@@ -457,7 +468,7 @@ export class Device extends EventEmitter {
     this.throwIfInterruptedByUser();
     this.releasedBleConnection = false;
     const env = DataManager.getSettings('env');
-    const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
+    const isBleAtStart = this.isBleConnection();
     const previousProtocol = this.originalDescriptor.protocolType;
     // A protocol stored after a successful probe is authoritative. Only the explicit
     // first-connection/recovery path may bypass it and probe both protocols again.
@@ -466,30 +477,71 @@ export class Device extends EventEmitter {
       : expectedProtocol ?? this.originalDescriptor.protocolType;
     try {
       let acquireResult: unknown;
-      if (DataManager.isBleConnect(env)) {
+      if (isBleAtStart) {
         // acquire starts a new BLE session. Any previous runPromise belongs to a dead
         // session, such as an interrupted probe or firmware-update reboot, and would
         // otherwise block the new session. Device cannot distinguish recovery from a
         // regular acquire, so BLE always clears it intentionally.
-        acquireResult = await this.deviceConnector?.acquire(
-          this.originalDescriptor.id,
-          undefined,
-          true,
-          strictProtocol,
-          undefined,
-          options?.forceProtocolDetection
-        );
-        this.mainId = (acquireResult as any)?.uuid ?? '';
+        acquireResult =
+          env === 'react-native-combined'
+            ? await this.deviceConnector?.acquire(
+                this.originalDescriptor.id || this.originalDescriptor.path,
+                undefined,
+                true,
+                strictProtocol,
+                undefined,
+                options?.forceProtocolDetection,
+                undefined,
+                this.originalDescriptor.commType
+              )
+            : await this.deviceConnector?.acquire(
+                this.originalDescriptor.id || this.originalDescriptor.path,
+                undefined,
+                true,
+                strictProtocol,
+                undefined,
+                options?.forceProtocolDetection
+              );
+      } else {
+        acquireResult =
+          env === 'react-native-combined'
+            ? await this.deviceConnector?.acquire(
+                this.originalDescriptor.path || this.originalDescriptor.id,
+                this.originalDescriptor.session,
+                undefined,
+                strictProtocol,
+                undefined,
+                options?.forceProtocolDetection,
+                undefined,
+                this.originalDescriptor.commType
+              )
+            : await this.deviceConnector?.acquire(
+                this.originalDescriptor.path || this.originalDescriptor.id,
+                this.originalDescriptor.session,
+                undefined,
+                strictProtocol,
+                undefined,
+                options?.forceProtocolDetection
+              );
+      }
+      if (env === 'react-native-combined' && !this.originalDescriptor.commType) {
+        if (typeof acquireResult === 'string') {
+          this.originalDescriptor.commType = 'usb';
+          this.originalDescriptor.path = this.originalDescriptor.path || acquireResult;
+        } else if (acquireResult && typeof acquireResult === 'object' && 'uuid' in acquireResult) {
+          this.originalDescriptor.commType = 'ble';
+          this.originalDescriptor.id =
+            this.originalDescriptor.id ||
+            (acquireResult as { uuid?: string }).uuid ||
+            this.originalDescriptor.path;
+        }
+      }
+      const isBle = this.isBleConnection();
+      const mainIdKey = isBle ? 'id' : 'session';
+      if (isBle) {
+        this.mainId = (acquireResult as { uuid?: string } | undefined)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {
-        acquireResult = await this.deviceConnector?.acquire(
-          this.originalDescriptor.path,
-          this.originalDescriptor.session,
-          undefined,
-          strictProtocol,
-          undefined,
-          options?.forceProtocolDetection
-        );
         this.mainId = acquireResult as string | undefined;
         Log.debug('Expected session id:', this.mainId);
       }
@@ -497,7 +549,7 @@ export class Device extends EventEmitter {
       const detectedProtocol =
         (acquireResult as { protocolType?: HardwareConnectProtocol } | undefined)?.protocolType ??
         TransportManager.transport?.getProtocolType?.(
-          DataManager.isBleConnect(env) ? this.originalDescriptor.id : this.originalDescriptor.path
+          isBle ? this.originalDescriptor.id : this.originalDescriptor.path
         );
       if (options?.forceProtocolDetection && !detectedProtocol) {
         throw ERRORS.TypedError(
@@ -543,7 +595,7 @@ export class Device extends EventEmitter {
             Log.debug('Failed to release an unsuccessful protocol probe', releaseError);
           }
         }
-        if (!DataManager.isBleConnect(env)) {
+        if (!this.isBleConnection()) {
           this.mainId = null;
           this.updateDescriptor({ session: null } as DeviceDescriptor);
         }
@@ -562,10 +614,8 @@ export class Device extends EventEmitter {
 
   async release() {
     const env = DataManager.getSettings('env');
-    if (
-      (this.isUsedHere() && !this.keepSession && this.mainId) ||
-      (this.mainId && DataManager.isBleConnect(env))
-    ) {
+    const isBle = this.isBleConnection();
+    if ((this.isUsedHere() && !this.keepSession && this.mainId) || (this.mainId && isBle)) {
       this.releasedBleConnection = false;
       // wait for callback tasks to complete before releasing device
       if (this.pendingCallbackPromise) {
@@ -592,7 +642,9 @@ export class Device extends EventEmitter {
       try {
         const deviceType = this.getCurrentDeviceType();
         const keepBleConnection =
-          (env === 'react-native' || env === 'desktop-web-ble') &&
+          (env === 'react-native' ||
+            env === 'desktop-web-ble' ||
+            (env === 'react-native-combined' && isBle)) &&
           this.isProtocolV2() &&
           (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo);
         // BLE releases even when keepSession is set, so forward the intent.
@@ -1459,8 +1511,7 @@ export class Device extends EventEmitter {
    * @param descriptor
    */
   updateDescriptor(descriptor: DeviceDescriptor, forceUpdate = false) {
-    const env = DataManager.getSettings('env');
-    if (DataManager.isBleConnect(env)) {
+    if (this.isBleConnection()) {
       return;
     }
     const originalSession = this.originalDescriptor.session;
@@ -1536,12 +1587,14 @@ export class Device extends EventEmitter {
     };
 
     const env = DataManager.getSettings('env');
-    if (options.forceProtocolDetection && env !== 'react-native' && this.isUsedHere()) {
+    const isReactNativeBle =
+      env === 'react-native' || (env === 'react-native-combined' && this.isBleConnection());
+    if (options.forceProtocolDetection && !isReactNativeBle && this.isUsedHere()) {
       await this.release();
     }
 
     if (options.forceProtocolDetection || !this.isUsedHere() || this.commands.disposed) {
-      if (env !== 'react-native') {
+      if (!isReactNativeBle) {
         try {
           await this.acquire(options.connectProtocol, {
             forceProtocolDetection: options.forceProtocolDetection,
@@ -1573,12 +1626,10 @@ export class Device extends EventEmitter {
           );
           return;
         }
-      } else if (env === 'react-native') {
+      } else if (this.commands) {
         // TODO: implement react-native acquire
         // cancel input pin or passphrase on device request, then the following requests will report an error
-        if (this.commands) {
-          this.commands.disposed = false;
-        }
+        this.commands.disposed = false;
       }
     }
 
@@ -1770,23 +1821,24 @@ export class Device extends EventEmitter {
     }
     const env = DataManager.getSettings('env');
     return (
+      this.isBleConnection() ||
       DataManager.isBleConnect(env) ||
       DataManager.isBrowserWebUsb(env) ||
-      DataManager.isDesktopWebUsb(env)
+      DataManager.isDesktopWebUsb(env) ||
+      env === 'react-native-usb' ||
+      env === 'react-native-combined'
     );
   }
 
   hasDeviceAcquire() {
-    const env = DataManager.getSettings('env');
-    if (DataManager.isBleConnect(env)) {
+    if (this.isBleConnection()) {
       return this.deviceAcquired;
     }
     return this.isUsed() && this.deviceAcquired;
   }
 
   isUsedHere() {
-    const env = DataManager.getSettings('env');
-    if (DataManager.isBleConnect(env)) {
+    if (this.isBleConnection()) {
       return this.deviceAcquired;
     }
     return this.isUsed() && this.originalDescriptor.session === this.mainId;

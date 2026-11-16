@@ -11,8 +11,10 @@ import {
   initCore,
 } from '@onekeyfe/hd-core';
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+import ReactNativeUsbTransport from '@onekeyfe/hd-transport-react-native-usb';
 
-import sdkExport, { messagePromises } from '../src';
+import sdkExport, { ReactNativeCombinedTransport, messagePromises } from '../src';
 
 jest.mock('../../core/src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0-test'),
@@ -24,7 +26,24 @@ jest.mock('@onekeyfe/hd-core', () => ({
   default: (options: unknown) => options,
   initCore: jest.fn(),
 }));
-jest.mock('@onekeyfe/hd-transport-react-native', () => ({}));
+jest.mock('@onekeyfe/hd-transport-react-native', () => {
+  function ReactNativeTransport() {}
+  return { __esModule: true, default: ReactNativeTransport };
+});
+jest.mock('@onekeyfe/hd-transport-react-native-usb', () => {
+  function ReactNativeUsbTransport() {}
+  return {
+    __esModule: true,
+    default: ReactNativeUsbTransport,
+    TRANSPORT_EVENT: { DEVICE_DISCONNECT: 'transport-device-disconnect' },
+    ONEKEY_USB_DEVICE_ATTACHED: 'OneKeyUsbDeviceAttached',
+    ONEKEY_USB_DEVICE_DETACHED: 'OneKeyUsbDeviceDetached',
+    createUsbEventEmitter: jest.fn(() => null),
+    subscribeUsbDeviceEvents: jest.fn(() => []),
+    isOneKeyUsbDevice: jest.fn(() => false),
+    setUsbPriorityMode: jest.fn(() => Promise.resolve()),
+  };
+});
 
 describe('hd-ble-sdk device state events', () => {
   test('forwards DEVICE.STATE to React Native SDK consumers', () => {
@@ -43,7 +62,57 @@ const sdk = sdkExport as unknown as {
   init(settings: Record<string, unknown>): Promise<boolean>;
   call(params: Record<string, unknown>): Promise<unknown>;
   dispose(): Promise<void>;
+  setPriorityMode(enabled: boolean): Promise<void>;
 };
+
+describe('hd-ble-sdk transport env selection', () => {
+  const core = Object.assign(new EventEmitter(), {
+    handleMessage: jest.fn(),
+    dispose: jest.fn(),
+  });
+
+  beforeEach(() => {
+    jest.mocked(initCore).mockResolvedValue(core as never);
+  });
+
+  afterEach(async () => {
+    await sdk.dispose();
+  });
+
+  test('keeps BLE transport unless env is react-native-usb', async () => {
+    await sdk.init({ debug: false });
+    expect(initCore).toHaveBeenCalledWith(
+      expect.objectContaining({ env: 'react-native' }),
+      ReactNativeTransport
+    );
+  });
+
+  test('uses ReactNativeUsbTransport when env is react-native-usb', async () => {
+    await sdk.init({ env: 'react-native-usb' });
+    expect(initCore).toHaveBeenCalledWith(
+      expect.objectContaining({ env: 'react-native-usb' }),
+      ReactNativeUsbTransport
+    );
+  });
+
+  test('uses ReactNativeCombinedTransport when env is react-native-combined and exposes setPriorityMode', async () => {
+    const spy = jest
+      .spyOn(ReactNativeCombinedTransport, 'setPriorityMode')
+      .mockResolvedValue(undefined);
+    try {
+      await sdk.init({ env: 'react-native-combined' });
+      expect(initCore).toHaveBeenCalledWith(
+        expect.objectContaining({ env: 'react-native-combined' }),
+        ReactNativeCombinedTransport
+      );
+
+      await sdk.setPriorityMode(true);
+      expect(spy).toHaveBeenCalledWith(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
 
 describe('SDK request cleanup', () => {
   const core = Object.assign(new EventEmitter(), {

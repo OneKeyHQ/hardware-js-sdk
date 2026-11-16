@@ -13,6 +13,7 @@ import {
 } from './helpers/filesystemValidation';
 import { hexToBytes, isHexString, stripHexPrefix } from './helpers/hexUtils';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 
 export type FileReadParams = {
   path: string;
@@ -24,9 +25,10 @@ export type FileReadParams = {
 
 const MIN_FILE_READ_CHUNK_SIZE = 64;
 
-function getProtocolV2FileReadChunkLimit() {
+function getProtocolV2FileReadChunkLimit(commType?: string | null) {
   const env = DataManager.getSettings('env');
-  if (env && DataManager.isBleConnect(env)) {
+  const isBle = commType ? isBleCommType(commType) : Boolean(env && DataManager.isBleConnect(env));
+  if (isBle) {
     return PROTOCOL_V2_BLE_FILE_READ_CHUNK_SIZE;
   }
   return PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
@@ -108,7 +110,10 @@ export default class FileRead extends BaseMethod<FileReadParams> {
   async run() {
     const startOffset = this.params.offset ?? 0;
     const requestedLength = Number(this.params.totalSize);
-    const chunkSize = normalizeChunkSize(this.params.chunkLen, getProtocolV2FileReadChunkLimit());
+    const chunkSize = normalizeChunkSize(
+      this.params.chunkLen,
+      getProtocolV2FileReadChunkLimit(this.device?.originalDescriptor?.commType)
+    );
     let totalLength = Number.isFinite(requestedLength) && requestedLength > 0 ? requestedLength : 0;
 
     if (totalLength === 0) {

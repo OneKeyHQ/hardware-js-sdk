@@ -23,6 +23,7 @@
   "dependencies": {
     "@onekeyfe/hd-core": "1.2.10",
     "@onekeyfe/hd-shared": "1.2.10",
-    "@onekeyfe/hd-transport-react-native": "1.2.10"
+    "@onekeyfe/hd-transport-react-native": "1.2.10",
+    "@onekeyfe/hd-transport-react-native-usb": "1.2.10"
   }
 }

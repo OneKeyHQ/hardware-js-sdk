@@ -1,0 +1,39 @@
+{
+  "name": "@onekeyfe/hd-transport-react-native-usb",
+  "version": "1.2.10",
+  "description": "OneKey hardware wallet Android USB host (OTG) transport for React Native",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "files": [
+    "dist",
+    "android/build.gradle",
+    "android/src",
+    "react-native.config.js",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "test": "jest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "1.2.10",
+    "@onekeyfe/hd-transport": "1.2.10",
+    "buffer": "^6.0.3",
+    "bytebuffer": "^5.0.1"
+  },
+  "peerDependencies": {
+    "react-native": "*"
+  }
+}

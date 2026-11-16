@@ -22,9 +22,20 @@ import HardwareSdk, {
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+import ReactNativeUsbTransport, {
+  setUsbPriorityMode,
+} from '@onekeyfe/hd-transport-react-native-usb';
+
+import ReactNativeCombinedTransport from './ReactNativeCombinedTransport';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { ConnectSettings, Core, CoreMessage, UiResponseEvent } from '@onekeyfe/hd-core';
+import type {
+  ConnectSettings,
+  Core,
+  CoreApi,
+  CoreMessage,
+  UiResponseEvent,
+} from '@onekeyfe/hd-core';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdBleSdk);
@@ -36,11 +47,15 @@ export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 const dispose = async () => {
   const core = _core;
+  const previousEnv = _settings.env;
   _core = undefined;
   eventEmitter.removeAllListeners();
   Object.keys(messagePromises).forEach(key => {
     delete messagePromises[Number(key)];
   });
+  if (previousEnv === 'react-native-combined') {
+    await ReactNativeCombinedTransport.setPriorityMode(false).catch(() => undefined);
+  }
   _settings = parseConnectSettings();
   await core?.dispose?.();
 };
@@ -138,14 +153,27 @@ async function postMessage(message: CoreMessage, usePromise = true) {
 }
 
 const init = async (settings: Partial<ConnectSettings>) => {
-  _settings = { ..._settings, ...settings, env: 'react-native' };
+  const env =
+    settings.env === 'react-native-usb' || settings.env === 'react-native-combined'
+      ? settings.env
+      : 'react-native';
+  _settings = { ..._settings, ...settings, env };
 
   enableLog(!!settings.debug);
 
   Log.debug('init');
 
   try {
-    _core = await initCore(_settings, ReactNativeTransport);
+    let Transport:
+      | typeof ReactNativeTransport
+      | typeof ReactNativeUsbTransport
+      | typeof ReactNativeCombinedTransport = ReactNativeTransport;
+    if (env === 'react-native-usb') {
+      Transport = ReactNativeUsbTransport;
+    } else if (env === 'react-native-combined') {
+      Transport = ReactNativeCombinedTransport;
+    }
+    _core = await initCore(_settings, Transport);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
 
@@ -201,15 +229,42 @@ const call = async (params: any) => {
 const updateSettings = () => Promise.resolve(true);
 const switchTransport = () => Promise.resolve({ success: true });
 
-const HardwareBleSdk = HardwareSdk({
-  eventEmitter,
-  init,
-  call,
-  cancel,
-  dispose,
-  uiResponse,
-  updateSettings,
-  switchTransport,
-});
+/**
+ * Locks transport preference to USB when enabled (so temporary detach/bootloader
+ * re-enumeration does not fall back to BLE) and forwards the flag to native OneKeyUsb.
+ * Exposed on `@onekeyfe/hd-ble-sdk` rather than CoreApi so non-RN SDKs stay unaffected.
+ */
+export const setPriorityMode = async (enabled: boolean): Promise<void> => {
+  if (_settings.env === 'react-native-combined') {
+    await ReactNativeCombinedTransport.setPriorityMode(enabled);
+    return;
+  }
+  if (typeof setUsbPriorityMode === 'function') {
+    await setUsbPriorityMode(enabled).catch(error => {
+      Log.debug('setPriorityMode native call failed:', error);
+    });
+  }
+};
 
+export type HardwareBleSdkApi = CoreApi & {
+  setPriorityMode: (enabled: boolean) => Promise<void>;
+};
+
+const HardwareBleSdk: HardwareBleSdkApi = Object.assign(
+  HardwareSdk({
+    eventEmitter,
+    init,
+    call,
+    cancel,
+    dispose,
+    uiResponse,
+    updateSettings,
+    switchTransport,
+  }),
+  {
+    setPriorityMode,
+  }
+);
+
+export { ReactNativeCombinedTransport };
 export default HardwareBleSdk;
