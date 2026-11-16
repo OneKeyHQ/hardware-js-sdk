@@ -56,7 +56,13 @@ const normalizeParams = (payload: Record<string, unknown>): OpenWalletSessionPar
       'Parameters [deviceId] and [passphraseState] are not supported by openWalletSession. Pass passphraseState on later address and signing calls.'
     );
   }
-  return { mode: payload.mode };
+  if (payload.deriveCardano !== undefined && typeof payload.deriveCardano !== 'boolean') {
+    throw invalidParameter('Parameter [deriveCardano] is of type invalid and should be [boolean].');
+  }
+  return {
+    mode: payload.mode,
+    ...(payload.deriveCardano !== undefined ? { deriveCardano: payload.deriveCardano } : {}),
+  };
 };
 
 export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParams> {
@@ -140,6 +146,9 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
               !hasAuthoritativeProtocolV2WalletStatus(state) ||
               state.status.unlockedAttachPin === true,
             mainPinSelected: this.protocolV2UnlockContext?.preflightMainPinSelected,
+            ...(this.params.deriveCardano !== undefined
+              ? { deriveCardano: this.params.deriveCardano }
+              : {}),
           })
         : await getPassphraseStateWithRefreshDeviceInfo(this.device, {
             onlyMainPin: true,
@@ -185,6 +194,9 @@ export default class OpenWalletSession extends BaseMethod<OpenWalletSessionParam
           ...(readCurrentAttachPinSession
             ? { readCurrentAttachPinSession: true }
             : { forceWalletSelection: true }),
+          ...(this.params.deriveCardano !== undefined
+            ? { deriveCardano: this.params.deriveCardano }
+            : {}),
         })
       : await getPassphraseStateWithRefreshDeviceInfo(this.device, { initSession: true });
     const refreshedState = isProtocolV2

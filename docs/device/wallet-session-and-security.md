@@ -62,7 +62,8 @@ The following rules describe the SDK's current external behavior. The investigat
   passphrase hidden wallet, the user must first lock the screen, unlock with the main PIN, and then tap "+ Hidden wallet" again. Backfilling Cardano on an Attach PIN
   uses empty Host `AskPassphrase({ seed_domains: [Standard, Cardano] })`.
 - V1 `Initialize.derive_cardano` remains per-call opt-in. V2 uses `DeviceSessionAskPassphrase.seed_domains`
-  to decide which seeds are generated this time: wallet-open and non-Cardano calls send `[Standard]`; Cardano calls send
+  to decide which seeds are generated this time: non-Cardano calls and `openWalletSession` without `deriveCardano: true`
+  send `[Standard]`; Cardano calls and `openWalletSession` with `deriveCardano: true` send
   `[Standard, Cardano]`. `DeviceSessionGet` neither carries nor generates Cardano (when passphrase is off, firmware
   Get will request Cardano itself). The `DeviceSession` response reports already-generated domains with the same enum. If Get shows Cardano is not yet
   present and the current call needs ADA: Attach PIN / standard wallet send Ask with an empty Host passphrase; hidden
