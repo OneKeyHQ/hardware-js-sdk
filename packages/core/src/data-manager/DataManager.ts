@@ -18,6 +18,9 @@ import {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 import { parseProtocolV2Resources } from '../protocols/protocol-v2/resources';
+import { getActiveCommType, setActiveCommType } from './activeCommType';
+
+import type { ActiveCommType } from './activeCommType';
 
 import type {
   AssetsMap,
@@ -439,6 +442,9 @@ export default class DataManager {
   }
 
   static async load(settings: ConnectSettings): Promise<boolean> {
+    if (this.settings && this.settings.env !== settings.env) {
+      setActiveCommType(undefined);
+    }
     this.settings = settings;
     this.protocolV2ResourcesConfigError = undefined;
     this.protocolV2NeoResourcesConfigError = undefined;
@@ -618,8 +624,18 @@ export default class DataManager {
     return this.settings;
   }
 
-  static isBleConnect = (env: ConnectSettings['env']) =>
-    env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
+  static setActiveCommType = (commType: ActiveCommType | undefined) => {
+    setActiveCommType(commType);
+  };
+
+  static getActiveCommType = (): ActiveCommType | undefined => getActiveCommType();
+
+  static isBleConnect = (env: ConnectSettings['env']) => {
+    if (env === 'react-native-combined') {
+      return this.getActiveCommType() === 'ble';
+    }
+    return env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
+  };
 
   /** Desktop WebUSB doesn't need browser permission prompt */
   static isDesktopWebUsb = (env: ConnectSettings['env']) => env === 'desktop-webusb';

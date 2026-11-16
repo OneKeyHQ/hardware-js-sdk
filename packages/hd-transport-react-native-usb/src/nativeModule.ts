@@ -36,6 +36,7 @@ type OneKeyUsbNativeModule = {
   transferOut(handle: string, data: string, timeoutMs: number): Promise<void>;
   transferIn(handle: string, length: number, timeoutMs: number): Promise<string>;
   cancel(handle: string): Promise<void>;
+  setPriorityMode?(enabled: boolean): Promise<void> | void;
 };
 
 const UNSUPPORTED_MESSAGE =
@@ -101,6 +102,16 @@ export function subscribeUsbDeviceEvents(
     );
   }
   return subscriptions;
+}
+
+export async function setUsbPriorityMode(enabled: boolean): Promise<void> {
+  if (!isNativeUsbAvailable()) {
+    return;
+  }
+  const native = getOneKeyUsbModule();
+  if (typeof native.setPriorityMode === 'function') {
+    await native.setPriorityMode(enabled);
+  }
 }
 
 export function encodeUsbPacket(data: Uint8Array): string {

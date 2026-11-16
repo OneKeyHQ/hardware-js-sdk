@@ -8,6 +8,7 @@ import { DEVICE, UI_REQUEST, createUiMessage } from '../../events';
 import { DeviceModelToTypes } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
+import { isBleCommType } from '../../data-manager/activeCommType';
 import { DevicePool } from '../../device/DevicePool';
 import { buildProtocolV1FeaturesPayload } from '../../deviceProfile';
 import { openFirmwareByteSource, readFirmwareByteSourceFully } from './FirmwareArtifactSource';
@@ -301,7 +302,9 @@ const newTouchUpdateProcess = async (
   // Write File
   const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
   const env = DataManager.getSettings('env');
-  const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
+  const commType = device?.originalDescriptor?.commType;
+  const isBle = commType ? isBleCommType(commType) : DataManager.isBleConnect(env);
+  const perPackageSize = isBle ? 16 : 128;
   const chunkSize = 1024 * perPackageSize;
   const totalChunks = Math.ceil(source.size / chunkSize);
   let offset = 0;
@@ -357,7 +360,7 @@ const newTouchUpdateProcess = async (
     // eslint-disable-next-line no-constant-condition
     // Check if timeout exceeded
     const startTime = Date.now();
-    const isBleReconnect = DataManager.isBleConnect(env);
+    const isBleReconnect = commType ? isBleCommType(commType) : DataManager.isBleConnect(env);
     while (Date.now() - startTime < timeout) {
       try {
         if (isBleReconnect) {
@@ -460,7 +463,8 @@ const emmcFileWriteWithRetry = async (
         );
       }
       const env = DataManager.getSettings('env');
-      if (DataManager.isBleConnect(env)) {
+      const commType = device?.originalDescriptor?.commType;
+      if (commType ? isBleCommType(commType) : DataManager.isBleConnect(env)) {
         await wait(3000);
         await device.deviceConnector?.acquire(
           device.originalDescriptor.id,

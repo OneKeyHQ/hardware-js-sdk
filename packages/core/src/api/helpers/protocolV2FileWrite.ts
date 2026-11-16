@@ -7,6 +7,7 @@ import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 
 import { DataManager } from '../../data-manager';
+import { isBleCommType } from '../../data-manager/activeCommType';
 import { LoggerNames, getLogger } from '../../utils/logger';
 import { runMethodWithUnlockPolicy } from '../../protocols/protocol-v2/unlockPolicyRunner';
 import { ProtocolV2UiInteractionCoordinator } from '../../protocols/protocol-v2/uiInteraction';
@@ -93,7 +94,11 @@ export function createProtocolV2AssetFileWriteRecovery(
     if (!expectedSerialNo) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError);
     }
-    if (DataManager.isBleConnect(DataManager.getSettings('env'))) {
+    const commType = device.originalDescriptor?.commType;
+    const isBle = commType
+      ? isBleCommType(commType)
+      : DataManager.isBleConnect(DataManager.getSettings('env'));
+    if (isBle) {
       // Acquire may otherwise reuse a native connection with an uncertain in-flight write.
       await device.deviceConnector?.disconnect(device.originalDescriptor.id);
       if (method.abortSignal?.aborted) {
@@ -141,7 +146,17 @@ export function createProtocolV2AssetFileWriteRecovery(
 
 function shouldPipelineAssetFileWrite(options: ProtocolV2FileWriteOptions) {
   const env = DataManager.getSettings('env');
-  if (env !== 'react-native' && env !== 'desktop-web-ble') return false;
+  const { device } = options.commands;
+  const commType = device?.originalDescriptor?.commType;
+  const supportsPipelineTransport = commType
+    ? (env === 'react-native' || env === 'desktop-web-ble' || env === 'react-native-combined') &&
+      isBleCommType(commType)
+    : env === 'react-native' ||
+      env === 'desktop-web-ble' ||
+      (env === 'react-native-combined' && DataManager.isBleConnect(env));
+  if (!supportsPipelineTransport) {
+    return false;
+  }
   if (
     options.overwrite !== true ||
     options.append ||
@@ -154,7 +169,6 @@ function shouldPipelineAssetFileWrite(options: ProtocolV2FileWriteOptions) {
   ) {
     return false;
   }
-  const { device } = options.commands;
   const deviceType = device?.getCurrentDeviceType();
   const firmwareVersion = device?.state?.versions.firmware;
   const mode = device?.state?.status.mode;
@@ -177,9 +191,11 @@ function getAverageFileTransferRate(transferredBytes: number, elapsedMs: number)
   return Math.round((Math.max(transferredBytes, 0) / elapsedMs) * 1000);
 }
 
-function getFileTransferTransport() {
+function getFileTransferTransport(device?: ProtocolV2FileWriteOptions['commands']['device']) {
   const env = DataManager.getSettings('env');
-  return env && DataManager.isBleConnect(env) ? 'BLE' : String(env ?? 'unknown');
+  const commType = device?.originalDescriptor?.commType;
+  const isBle = commType ? isBleCommType(commType) : Boolean(env && DataManager.isBleConnect(env));
+  return isBle ? 'BLE' : String(commType ?? env ?? 'unknown');
 }
 
 function logFileTransferMetrics({
@@ -239,9 +255,14 @@ export function isProtocolV2ResponseTimeout(error: unknown) {
   );
 }
 
-function getProtocolV2FileChunkLimit(bleChunkSizeLimit?: number) {
+function getProtocolV2FileChunkLimit(
+  bleChunkSizeLimit?: number,
+  device?: ProtocolV2FileWriteOptions['commands']['device']
+) {
   const env = DataManager.getSettings('env');
-  if (env && DataManager.isBleConnect(env)) {
+  const commType = device?.originalDescriptor?.commType;
+  const isBle = commType ? isBleCommType(commType) : Boolean(env && DataManager.isBleConnect(env));
+  if (isBle) {
     const configuredLimit = Number(bleChunkSizeLimit);
     return Number.isFinite(configuredLimit) && configuredLimit > 0
       ? Math.floor(configuredLimit)
@@ -307,7 +328,10 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     );
   }
 
-  const defaultChunkSizeLimit = getProtocolV2FileChunkLimit(options.bleChunkSizeLimit);
+  const defaultChunkSizeLimit = getProtocolV2FileChunkLimit(
+    options.bleChunkSizeLimit,
+    options.commands.device
+  );
   const pipelineAsset = totalSize === dataLength && shouldPipelineAssetFileWrite(options);
   const configuredChunkSizeLimit = Number(options.chunkSizeLimit);
   const chunkSizeLimit =
@@ -433,7 +457,7 @@ export async function writeProtocolV2File(options: ProtocolV2FileWriteOptions) {
     }
   };
 
-  const transport = getFileTransferTransport();
+  const transport = getFileTransferTransport(options.commands.device);
   Log.log(
     `[FileWrite] started transport=${transport} path=${options.path} bytes=${dataLength} offset=${startOffset} chunk=${chunkSize}`
   );

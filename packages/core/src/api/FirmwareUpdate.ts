@@ -17,6 +17,7 @@ import { DeviceModelToTypes, type KnownDevice } from '../types';
 import { isEnteredManuallyBoot } from './firmware/bootloaderHelper';
 import { LoggerNames, getLogger, wait } from '../utils';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 import { DevicePool } from '../device/DevicePool';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -78,7 +79,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
-    const isBleReconnect = connectId && DataManager.isBleConnect(env);
+    const commType = this.device?.originalDescriptor?.commType;
+    const isBleReconnect = Boolean(
+      connectId && (commType ? isBleCommType(commType) : DataManager.isBleConnect(env))
+    );
     // Tracks the in-flight BLE probe so interval ticks never overlap: a superseded
     // Initialize left pending on the V1 transport is exactly what later times out
     // and used to tear down the connection mid-firmware-upload.

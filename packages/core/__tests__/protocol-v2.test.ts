@@ -10449,7 +10449,7 @@ describe('Protocol V2 firmware update targets', () => {
     }
   );
 
-  test('uses USB chunk sizes for react-native-usb even when platform is native', () => {
+  test('uses USB chunk sizes for react-native-usb and react-native-combined(usb) even when platform is native', () => {
     const envSpy = jest
       .spyOn(DataManager, 'getSettings')
       .mockReturnValue('react-native-usb' as never);
@@ -10466,7 +10466,43 @@ describe('Protocol V2 firmware update targets', () => {
         (method as any).getProtocolV2FirmwareChunkSize('write', 'vol0:/application_p1.bin', true)
       ).toBe(4000);
       expect((method as any).getProtocolV2FirmwareChunkSize('read')).toBe(4000);
+
+      envSpy.mockReturnValue('react-native-combined' as never);
+      DataManager.setActiveCommType('usb');
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', 'vol0:/application_p1.bin', true)
+      ).toBe(4000);
+      expect((method as any).getProtocolV2FirmwareChunkSize('read')).toBe(4000);
+
+      DataManager.setActiveCommType('ble');
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', 'vol0:/application_p1.bin', true)
+      ).toBe(1800);
+      expect((method as any).getProtocolV2FirmwareChunkSize('read')).toBe(900);
+
+      // Device originalDescriptor.commType takes precedence over env-global activeCommType.
+      (method as any).device = stubDevice({
+        originalDescriptor: { id: 'SN-USB', path: 'SN-USB', commType: 'usb' },
+        features: { mode: 'bootloader', bootloaderMode: true, bootloaderVersion: '1.0.3' },
+      });
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', 'vol0:/application_p1.bin', true)
+      ).toBe(4000);
+      expect((method as any).getProtocolV2FirmwareChunkSize('read')).toBe(4000);
+      expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.3')).toBe(false);
+
+      DataManager.setActiveCommType('usb');
+      (method as any).device = stubDevice({
+        originalDescriptor: { id: 'BLE-MAC', path: 'BLE-MAC', commType: 'ble' },
+        features: { mode: 'bootloader', bootloaderMode: true, bootloaderVersion: '1.0.3' },
+      });
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', 'vol0:/application_p1.bin', true)
+      ).toBe(1800);
+      expect((method as any).getProtocolV2FirmwareChunkSize('read')).toBe(900);
+      expect((method as any).shouldUseProtocolV2BleFileWriteWindow('1.0.3')).toBe(true);
     } finally {
+      DataManager.setActiveCommType(undefined);
       envSpy.mockRestore();
     }
   });

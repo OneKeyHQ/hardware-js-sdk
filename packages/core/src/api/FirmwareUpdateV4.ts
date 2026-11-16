@@ -26,6 +26,7 @@ import {
 import { getSysResourceBinary } from './firmware/getBinary';
 import { normalizeFirmwarePreparationError } from './firmware/FirmwarePreparationError';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 import {
@@ -832,9 +833,13 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
-    const isBle =
-      (this.params?.platform === 'native' && env !== 'react-native-usb') ||
-      (env && DataManager.isBleConnect(env));
+    const commType = this.device?.originalDescriptor?.commType;
+    const isBle = commType
+      ? isBleCommType(commType)
+      : (this.params?.platform === 'native' &&
+          env !== 'react-native-usb' &&
+          env !== 'react-native-combined') ||
+        Boolean(env && DataManager.isBleConnect(env));
     let maxChunkSize = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
     if (isBle) {
       if (direction === 'read') {
@@ -3336,6 +3341,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ): Promise<TypedResponseMessage<'FilesystemFile'>> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     const env = DataManager.getSettings('env');
+    const commType = this.device?.originalDescriptor?.commType;
+    const useBleWriteTimeout = commType
+      ? (env === 'react-native' || env === 'react-native-combined') && isBleCommType(commType)
+      : env === 'react-native' ||
+        (env === 'react-native-combined' && DataManager.isBleConnect(env));
     const writeRes = await typedCall(
       'FilesystemFileWrite',
       'FilesystemFile',
@@ -3351,7 +3361,7 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
         ui_percentage: progress ?? undefined,
       },
       {
-        timeoutMs: env === 'react-native' ? PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT : undefined,
+        timeoutMs: useBleWriteTimeout ? PROTOCOL_V2_FILE_WRITE_RESPONSE_TIMEOUT : undefined,
         writeWithResponse: false,
         onWriteCompleted: () => undefined,
       }
@@ -3371,12 +3381,16 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
     minBootloaderVersion = PROTOCOL_V2_BLE_FILE_WRITE_WINDOW_MIN_BOOTLOADER_VERSION
   ) {
     const env = DataManager.getSettings('env');
+    const commType = this.device?.originalDescriptor?.commType;
+    const isWindowSupportedTransport = commType
+      ? (env === 'react-native' || env === 'desktop-web-ble' || env === 'react-native-combined') &&
+        isBleCommType(commType)
+      : env === 'react-native' ||
+        env === 'desktop-web-ble' ||
+        (env === 'react-native-combined' && DataManager.isBleConnect(env));
     // These adapters queue frames that arrive while no read is pending. LowLevel plugins are not
     // required to keep notifications between receive() calls, so they stay serial.
-    if (
-      (env !== 'react-native' && env !== 'desktop-web-ble') ||
-      !this.isProtocolV2BootloaderMode()
-    ) {
+    if (!isWindowSupportedTransport || !this.isProtocolV2BootloaderMode()) {
       return false;
     }
     // The transfer runs in the device's current bootloader, not the one being installed. The
@@ -3478,7 +3492,11 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   private async recoverProtocolV2FileTransfer() {
     try {
       const env = DataManager.getSettings('env');
-      if (DataManager.isBleConnect(env)) {
+      const commType = this.device?.originalDescriptor?.commType;
+      const isBle = commType
+        ? isBleCommType(commType)
+        : Boolean(env && DataManager.isBleConnect(env));
+      if (isBle) {
         await wait(3000);
       }
       await this.reconnectProtocolV2Device();

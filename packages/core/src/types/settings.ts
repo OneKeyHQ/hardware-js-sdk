@@ -13,7 +13,8 @@ export type transportEnv =
   | 'emulator'
   | 'lowlevel'
   | 'node-usb'
-  | 'react-native-usb';
+  | 'react-native-usb'
+  | 'react-native-combined';
 export type ConnectSettings = {
   connectSrc?: string;
   debug?: boolean;

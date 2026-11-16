@@ -11,6 +11,7 @@ import { DevicePool } from '../../device/DevicePool';
 import { LoggerNames, getLogger, wait } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
+import { isBleCommType } from '../../data-manager/activeCommType';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { writeFirmwareByteSource } from './FirmwareArtifactSource';
@@ -72,6 +73,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
 
   isBleReconnect(): boolean {
     const env = DataManager.getSettings('env');
+    const commType = this.device?.originalDescriptor?.commType;
+    if (commType) {
+      return Boolean(this.payload.connectId && isBleCommType(commType));
+    }
     return this.payload.connectId && DataManager.isBleConnect(env);
   }
 
@@ -160,7 +165,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
-    const isBleReconnect = connectId && DataManager.isBleConnect(env);
+    const commType = this.device?.originalDescriptor?.commType;
+    const isBleReconnect = Boolean(
+      connectId && (commType ? isBleCommType(commType) : DataManager.isBleConnect(env))
+    );
     // Tracks the in-flight BLE probe so interval ticks never overlap: a superseded
     // Initialize left pending on the V1 transport is exactly what later times out
     // and used to tear down the connection mid-firmware-upload.
@@ -435,7 +443,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       throw new Error('filePath must start with 0:');
     }
     const env = DataManager.getSettings('env');
-    const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
+    const commType = this.device?.originalDescriptor?.commType;
+    const isBle = commType ? isBleCommType(commType) : DataManager.isBleConnect(env);
+    const perPackageSize = isBle ? 16 : 128;
     const chunkSize = 1024 * perPackageSize;
     const totalChunks = Math.ceil(payload.byteLength / chunkSize);
     let offset = 0;
@@ -489,7 +499,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       throw new Error('filePath must start with 0:');
     }
     const env = DataManager.getSettings('env');
-    const chunkSize = 1024 * (DataManager.isBleConnect(env) ? 16 : 128);
+    const commType = this.device?.originalDescriptor?.commType;
+    const isBle = commType ? isBleCommType(commType) : DataManager.isBleConnect(env);
+    const chunkSize = 1024 * (isBle ? 16 : 128);
 
     await writeFirmwareByteSource({
       source,
@@ -574,7 +586,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           );
         }
         const env = DataManager.getSettings('env');
-        if (DataManager.isBleConnect(env)) {
+        const commType = this.device?.originalDescriptor?.commType;
+        if (commType ? isBleCommType(commType) : DataManager.isBleConnect(env)) {
           await wait(3000);
           await this.device.deviceConnector?.acquire(
             this.device.originalDescriptor.id,

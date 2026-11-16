@@ -1,3 +1,5 @@
+import { getActiveCommType, isBleCommType } from '../data-manager/activeCommType';
+
 export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 export * from './assets';
 export * from './versionUtils';
@@ -53,7 +55,14 @@ export type {
 
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 
-export const isBleConnect = (env: string) => env === 'react-native' || env === 'lowlevel';
+export { isBleCommType };
+
+export const isBleConnect = (env: string) => {
+  if (env === 'react-native-combined') {
+    return getActiveCommType() === 'ble';
+  }
+  return env === 'react-native' || env === 'lowlevel';
+};
 
 export {
   getHomeScreenHex,

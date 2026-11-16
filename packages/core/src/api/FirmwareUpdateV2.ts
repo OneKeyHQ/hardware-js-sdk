@@ -26,6 +26,7 @@ import { resolveDeviceBootloaderMode } from '../utils/deviceFeaturesCompat';
 import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 import { DEVICE } from '../events';
 import { type FirmwareByteSource, openFirmwareByteSource } from './firmware/FirmwareArtifactSource';
 import { resolveFirmwareUpdateHostBinding } from './firmware/FirmwareHostBinding';
@@ -275,7 +276,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
-    const isBleReconnect = connectId && DataManager.isBleConnect(env);
+    const commType = this.device?.originalDescriptor?.commType;
+    const isBleReconnect = Boolean(
+      connectId && (commType ? isBleCommType(commType) : DataManager.isBleConnect(env))
+    );
     // Bootloader probes can outlive the polling interval. Keep discovery and
     // acquire serialized so concurrent ticks never race the same connection.
     let probeInFlight = false;

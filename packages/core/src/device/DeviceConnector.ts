@@ -3,6 +3,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 import TransportManager from '../data-manager/TransportManager';
 import { DevicePool } from './DevicePool';
 import { resolveAfter } from '../utils/promiseUtils';
@@ -10,7 +11,11 @@ import { LoggerNames, getLogger } from '../utils';
 
 import type { DeviceDescriptorDiff } from './DevicePool';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
-import type { OneKeyDeviceInfo as DeviceDescriptor, Transport } from '@onekeyfe/hd-transport';
+import type {
+  OneKeyDeviceInfo as DeviceDescriptor,
+  OneKeyDeviceCommType,
+  Transport,
+} from '@onekeyfe/hd-transport';
 
 const Log = getLogger(LoggerNames.DeviceConnector);
 
@@ -90,6 +95,34 @@ export default class DeviceConnector {
     this.listening = false;
   }
 
+  private resolveCommTypeForAcquire(
+    path: string,
+    explicitCommType?: OneKeyDeviceCommType
+  ): OneKeyDeviceCommType | undefined {
+    if (explicitCommType) {
+      return explicitCommType;
+    }
+    const descriptorMatch =
+      this.upcoming.find(d => d.path === path || d.id === path) ??
+      this.current?.find(d => d.path === path || d.id === path);
+    if (descriptorMatch?.commType) {
+      return descriptorMatch.commType;
+    }
+    const pooledByPath = DevicePool.getDeviceByPath?.(path);
+    if (pooledByPath?.originalDescriptor?.commType) {
+      return pooledByPath.originalDescriptor.commType;
+    }
+    const cachedByConnectId = DevicePool.devicesCache?.[path];
+    if (cachedByConnectId?.originalDescriptor?.commType) {
+      return cachedByConnectId.originalDescriptor.commType;
+    }
+    const cachedList = DevicePool.devicesCache ? Object.values(DevicePool.devicesCache) : [];
+    const matchedCached = cachedList.find(
+      d => d.originalDescriptor?.path === path || d.originalDescriptor?.id === path
+    );
+    return matchedCached?.originalDescriptor?.commType;
+  }
+
   async acquire(
     path: string,
     session?: string | null,
@@ -97,14 +130,55 @@ export default class DeviceConnector {
     expectedProtocol?: HardwareConnectProtocol,
     protocolHint?: HardwareConnectProtocol,
     forceProtocolDetection?: boolean,
-    skipProtocolProbe?: boolean
+    skipProtocolProbe?: boolean,
+    commType?: OneKeyDeviceCommType
   ) {
     Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
     try {
       const transport = this.getActiveTransport();
+      const resolvedCommType = this.resolveCommTypeForAcquire(path, commType);
       let res;
-      if (DataManager.isBleConnect(env)) {
+      if (resolvedCommType) {
+        if (isBleCommType(resolvedCommType)) {
+          const acquireInput: Parameters<Transport['acquire']>[0] = {
+            uuid: path,
+            forceCleanRunPromise,
+            expectedProtocol,
+            protocolHint,
+            forceProtocolDetection,
+            skipProtocolProbe,
+          };
+          res = await transport.acquire(acquireInput);
+        } else {
+          res = await transport.acquire({
+            path,
+            previous: session ?? null,
+            expectedProtocol,
+            protocolHint,
+            forceProtocolDetection,
+            skipProtocolProbe,
+          });
+        }
+      } else if (
+        env === 'react-native-combined' &&
+        DataManager.getActiveCommType?.() === undefined &&
+        !DataManager.isBleConnect(env)
+      ) {
+        // When both descriptor commType and activeCommType are unknown in combined mode,
+        // pass both path and uuid so ReactNativeCombinedTransport resolves USB vs BLE
+        // via its own owner resolution instead of assuming BLE upfront.
+        res = await transport.acquire({
+          path,
+          uuid: path,
+          previous: session ?? null,
+          forceCleanRunPromise,
+          expectedProtocol,
+          protocolHint,
+          forceProtocolDetection,
+          skipProtocolProbe,
+        });
+      } else if (DataManager.isBleConnect(env)) {
         const acquireInput: Parameters<Transport['acquire']>[0] = {
           uuid: path,
           forceCleanRunPromise,

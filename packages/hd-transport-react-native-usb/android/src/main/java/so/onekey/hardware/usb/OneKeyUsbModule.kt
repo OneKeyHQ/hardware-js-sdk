@@ -67,6 +67,24 @@ private class OpenConnection(
     val cancelSeq: AtomicInteger = AtomicInteger(0),
 )
 
+/**
+ * React Native Android USB Host transport module.
+ *
+ * Device connection close policy:
+ * - Close a device connection ONLY when:
+ *   1. USB detach of that device (`ACTION_USB_DEVICE_DETACHED`),
+ *   2. Explicit `close(handle)` call from JS,
+ *   3. SDK / transport dispose (`stop()`),
+ *   4. Native module `invalidate()`,
+ *   5. Process death.
+ * - Do NOT close connections on Activity pause / app background, whether or not
+ *   `priorityMode` is enabled. The USB link must survive backgrounding (including
+ *   during firmware updates).
+ * - `setPriorityMode(enabled)` is a JS transport-preference lock (preventing fallback
+ *   to BLE on temporary detach during reboot/bootloader re-enumeration) plus a native
+ *   flag stored for forward compatibility; it is NOT what keeps the fd open in the
+ *   background (that is the default).
+ */
 class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
@@ -81,6 +99,7 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     private val permissionLock = Any()
     private val permissionPromises = mutableMapOf<String, MutableList<Promise>>()
     private val permissionRequestCode = AtomicInteger(1)
+    private val priorityMode = AtomicBoolean(false)
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -146,6 +165,7 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     }
 
     override fun invalidate() {
+        priorityMode.set(false)
         openConnections.keys.toList().forEach { closeDeviceInternal(it) }
         closeExecutor.shutdown()
         val pending = synchronized(permissionLock) {
@@ -169,6 +189,12 @@ class OneKeyUsbModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun removeListeners(@Suppress("UNUSED_PARAMETER") count: Int) {
         // Required for NativeEventEmitter on RN.
+    }
+
+    @ReactMethod
+    fun setPriorityMode(enabled: Boolean, promise: Promise) {
+        priorityMode.set(enabled)
+        promise.resolve(null)
     }
 
     @ReactMethod

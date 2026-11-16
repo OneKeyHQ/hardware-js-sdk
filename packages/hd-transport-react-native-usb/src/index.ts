@@ -23,12 +23,15 @@ import {
 } from '@onekeyfe/hd-shared';
 
 import {
+  ONEKEY_USB_DEVICE_ATTACHED,
+  ONEKEY_USB_DEVICE_DETACHED,
   createUsbEventEmitter,
   decodeUsbPacket,
   encodeUsbPacket,
   getOneKeyUsbModule,
   isNativeUsbAvailable,
   mapNativeUsbError,
+  setUsbPriorityMode,
   subscribeUsbDeviceEvents,
 } from './nativeModule';
 
@@ -173,6 +176,8 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
 
   private nativeSubscriptions: EmitterSubscription[] = [];
 
+  private priorityMode = false;
+
   protected readonly permissionRequestTimeoutMs: number;
 
   constructor(options?: ReactNativeUsbTransportOptions) {
@@ -256,6 +261,8 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
 
   async stop(): Promise<void> {
     this.cancelled = true;
+    this.priorityMode = false;
+    setUsbPriorityMode(false).catch(() => undefined);
     this.clearNativeSubscriptions();
 
     this.permissionTimeouts.forEach(cancel => cancel());
@@ -487,6 +494,40 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
 
   getProtocolType(path: string): ProtocolType | undefined {
     return this.deviceProtocol.get(path);
+  }
+
+  setPriorityMode(enabled: boolean): Promise<void> {
+    this.priorityMode = enabled;
+    return setUsbPriorityMode(enabled);
+  }
+
+  getPriorityMode(): boolean {
+    return this.priorityMode;
+  }
+
+  getPathForCurrentHandle(handle: string): string | undefined {
+    const path = this.handleToPath.get(handle) ?? this.vanishedHandleToPath.get(handle);
+    if (!path) {
+      return undefined;
+    }
+    const currentHandle = this.pathToHandle.get(path);
+    if (currentHandle && currentHandle !== handle) {
+      return undefined;
+    }
+    return path;
+  }
+
+  isSupersededHandle(handle: string): boolean {
+    const path = this.handleToPath.get(handle) ?? this.vanishedHandleToPath.get(handle);
+    if (!path) {
+      return false;
+    }
+    const currentHandle = this.pathToHandle.get(path);
+    return Boolean(currentHandle && currentHandle !== handle);
+  }
+
+  hasKnownDevice(): boolean {
+    return this.openDevices.size > 0 || this.pathToHandle.size > 0 || this.deviceProtocol.size > 0;
   }
 
   private async callProtocolV1(
@@ -1424,3 +1465,15 @@ export default class ReactNativeUsbTransport extends ProtocolV2UsbTransportBase<
     return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
   }
 }
+
+export {
+  matchesOneKeyDevice as isOneKeyUsbDevice,
+  ONEKEY_USB_DEVICE_ATTACHED,
+  ONEKEY_USB_DEVICE_DETACHED,
+  TRANSPORT_EVENT,
+  createUsbEventEmitter,
+  isNativeUsbAvailable,
+  setUsbPriorityMode,
+  subscribeUsbDeviceEvents,
+};
+export type { NativeUsbDeviceEvent, NativeUsbDeviceInfo };

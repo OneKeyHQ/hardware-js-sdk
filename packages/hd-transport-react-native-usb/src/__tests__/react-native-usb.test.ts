@@ -43,6 +43,7 @@ const mockNativeState: {
   lastOut: string[];
   closed: string[];
   cancelled: string[];
+  priorityModeCalls: boolean[];
   cancelPendingOnNextTransfer: boolean;
   transferInCalls: Array<{ handle: string; length: number; timeoutMs: number }>;
   transferInError?: Error;
@@ -62,6 +63,7 @@ const mockNativeState: {
   lastOut: [],
   closed: [],
   cancelled: [],
+  priorityModeCalls: [],
   cancelPendingOnNextTransfer: false,
   transferInCalls: [],
 };
@@ -153,6 +155,10 @@ jest.mock(
           }),
           cancel: jest.fn((handle: string) => {
             mockNativeState.cancelled.push(handle);
+            return Promise.resolve();
+          }),
+          setPriorityMode: jest.fn((enabled: boolean) => {
+            mockNativeState.priorityModeCalls.push(enabled);
             return Promise.resolve();
           }),
         };
@@ -257,6 +263,7 @@ describe('ReactNativeUsbTransport', () => {
     mockNativeState.lastOut = [];
     mockNativeState.closed = [];
     mockNativeState.cancelled = [];
+    mockNativeState.priorityModeCalls = [];
     mockNativeState.cancelPendingOnNextTransfer = false;
     mockNativeState.transferInCalls = [];
     mockNativeState.transferInError = undefined;
@@ -1284,5 +1291,18 @@ describe('ReactNativeUsbTransport', () => {
     } finally {
       await transport.stop();
     }
+  });
+
+  test('setPriorityMode forwards to native OneKeyUsb module and stop() resets it', async () => {
+    const transport = createTransport();
+    expect(transport.getPriorityMode()).toBe(false);
+
+    await transport.setPriorityMode(true);
+    expect(transport.getPriorityMode()).toBe(true);
+    expect(mockNativeState.priorityModeCalls).toEqual([true]);
+
+    await transport.stop();
+    expect(transport.getPriorityMode()).toBe(false);
+    expect(mockNativeState.priorityModeCalls).toEqual([true, false]);
   });
 });

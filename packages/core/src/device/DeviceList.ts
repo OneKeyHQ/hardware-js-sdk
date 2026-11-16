@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 
+import { DataManager } from '../data-manager';
 import { DevicePool } from './DevicePool';
 
 import type DeviceConnector from './DeviceConnector';
@@ -19,6 +20,12 @@ export class DeviceList extends EventEmitter {
     const descriptorList = deviceDiff?.descriptors ?? [];
 
     this.devices = {};
+    // In combined mode, enumerate() may discover no USB devices and switch activeCommType
+    // to 'ble'; when a specific connectId is requested, skip DevicePool initialization so
+    // the caller falls through to the BLE connect path without probing every scanned peripheral.
+    if (connectId && DataManager.isBleConnect(DataManager.getSettings('env'))) {
+      return [];
+    }
 
     const { deviceList, devices } = await DevicePool.getDevices(
       descriptorList,

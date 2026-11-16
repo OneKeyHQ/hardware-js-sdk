@@ -48,6 +48,7 @@ import { DevicePool } from '../device/DevicePool';
 import { PollingStateManager } from './PollingStateManager';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
+import { isBleCommType } from '../data-manager/activeCommType';
 import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
@@ -360,7 +361,11 @@ export function getPostCallPendingPromise(method: BaseMethod, device: Device): P
     (DataManager.isBrowserWebUsb(env) ||
       DataManager.isDesktopWebUsb(env) ||
       env === 'node-usb' ||
-      env === 'react-native-usb');
+      env === 'react-native-usb' ||
+      (env === 'react-native-combined' &&
+        (device.originalDescriptor?.commType
+          ? device.originalDescriptor.commType === 'usb'
+          : !DataManager.isBleConnect(env))));
 
   return requiresSigningCooldown
     ? cleanupPromise.then(() => wait(PRO2_USB_SIGNING_COOLDOWN_MS)).then(() => undefined)
@@ -1297,7 +1302,7 @@ const ensureConnected = async (
       }
 
       const env = DataManager.getSettings('env');
-      let device: Device;
+      let device: Device | undefined;
       try {
         if (DataManager.isBleConnect(env)) {
           device = initDeviceForBle(method);
@@ -1372,7 +1377,11 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceInterruptedFromUser,
             HardwareErrorCode.CallQueueActionCancelled,
           ].includes(error.errorCode) ||
-          (env === 'react-native' &&
+          ((env === 'react-native' ||
+            (env === 'react-native-combined' &&
+              (device?.originalDescriptor?.commType
+                ? isBleCommType(device.originalDescriptor.commType)
+                : DataManager.isBleConnect(env)))) &&
             [HardwareErrorCode.BleDeviceDisconnected, HardwareErrorCode.PollingTimeout].includes(
               error.errorCode
             )) ||
@@ -1478,7 +1487,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     // Abort every method before rejecting its queue task. Non-BLE methods also
     // use the signal to stop recovery loops after the public promise is rejected.
     requestQueue.abortAllRequests();
-    if (DataManager.isBleConnect(env)) {
+    if (DataManager.isBleConnect(env) || env === 'react-native-combined') {
       Log.debug('Cancel Api all _deviceList: ');
       const canceledDevices: Device[] = [];
       const interruptDevice = (device?: Device) => {
@@ -1504,6 +1513,13 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         }
       }
       deviceCacheMap.forEach(interruptDevice);
+      if (env === 'react-native-combined') {
+        _deviceList?.allDevices().forEach(device => {
+          if (device.hasDeviceAcquire()) {
+            interruptDevice(device);
+          }
+        });
+      }
       pollingManager.stopAll();
     } else {
       _deviceList?.allDevices().forEach(device => {
@@ -2000,6 +2016,7 @@ export default class Core extends EventEmitter {
     this.prePendingCallPromises.clear();
     this.removeAllListeners();
     cleanupSdkInstance(this.sdkInstanceId);
+    DataManager.setActiveCommType(undefined);
     if (_core === this) _core = undefined;
 
     // Transports, especially Node USB, may release native handles asynchronously.
@@ -2045,7 +2062,7 @@ export const init = async (
     initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
     const env = DataManager.getSettings('env');
-    if (env !== 'react-native' && env !== 'react-native-usb') {
+    if (env !== 'react-native' && env !== 'react-native-usb' && env !== 'react-native-combined') {
       setLoggerPostMessage(postMessage);
     }
     initCore();

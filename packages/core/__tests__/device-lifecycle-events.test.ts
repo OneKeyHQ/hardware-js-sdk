@@ -13,6 +13,7 @@ import {
   resolveBleConnectProtocol,
 } from '../src/core';
 import { DataManager } from '../src/data-manager';
+import { isBleConnect } from '../src/utils';
 import GetDeviceState from '../src/api/GetDeviceState';
 import DeviceVerify from '../src/api/device/DeviceVerify';
 import TransportManager from '../src/data-manager/TransportManager';
@@ -77,6 +78,7 @@ describe('public device lifecycle events', () => {
   afterEach(async () => {
     await core?.dispose();
     core = undefined;
+    DataManager.setActiveCommType(undefined);
     jest.restoreAllMocks();
   });
 
@@ -221,9 +223,79 @@ describe('public device lifecycle events', () => {
     }
   );
 
-  test('react-native-usb is a USB transport, not BLE', () => {
+  test('react-native-usb is a USB transport, not BLE, and react-native-combined follows activeCommType', () => {
     expect(DataManager.isBleConnect('react-native-usb')).toBe(false);
     expect(DataManager.isBleConnect('react-native')).toBe(true);
+    expect(isBleConnect('react-native-usb')).toBe(false);
+    expect(isBleConnect('react-native')).toBe(true);
+    expect(isBleConnect('lowlevel')).toBe(true);
+
+    DataManager.setActiveCommType(undefined);
+    expect(DataManager.getActiveCommType()).toBeUndefined();
+    expect(DataManager.isBleConnect('react-native-combined')).toBe(false);
+    expect(isBleConnect('react-native-combined')).toBe(false);
+
+    DataManager.setActiveCommType('usb');
+    expect(DataManager.getActiveCommType()).toBe('usb');
+    expect(DataManager.isBleConnect('react-native-combined')).toBe(false);
+    expect(isBleConnect('react-native-combined')).toBe(false);
+
+    DataManager.setActiveCommType('ble');
+    expect(DataManager.getActiveCommType()).toBe('ble');
+    expect(DataManager.isBleConnect('react-native-combined')).toBe(true);
+    expect(isBleConnect('react-native-combined')).toBe(true);
+  });
+
+  test('Device prefers originalDescriptor.commType over env-global activeCommType', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native-combined' as never);
+
+    // USB device remains non-BLE even when activeCommType defaults to/flips to ble.
+    DataManager.setActiveCommType('ble');
+    const usbDevice = Device.fromDescriptor({
+      id: 'SN-USB-1',
+      path: 'SN-USB-1',
+      commType: 'usb',
+      protocolType: 'V2',
+    } as never);
+    usbDevice.mainId = 'SN-USB-1';
+    usbDevice.originalDescriptor.session = 'SN-USB-1';
+    usbDevice.features = {
+      protocol: 'V2',
+      deviceType: 'pro2',
+      serialNo: 'SN-USB-1',
+      mode: 'normal',
+      initialized: true,
+    } as never;
+    (usbDevice as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+    expect(usbDevice.hasDeviceAcquire()).toBe(true);
+    expect(usbDevice.isUsedHere()).toBe(true);
+    expect(usbDevice.toMessageObject()?.commType).toBe('usb');
+    expect(usbDevice.toMessageObject()?.connectId).toBe('SN-USB-1');
+
+    const usbRelease = jest.fn().mockResolvedValue(undefined);
+    usbDevice.deviceConnector = { release: usbRelease } as never;
+    usbDevice.commands = {
+      disposed: false,
+      dispose: jest.fn(),
+    } as never;
+    await usbDevice.release();
+    expect(usbRelease).toHaveBeenCalledWith('SN-USB-1', false, false);
+
+    // BLE device remains BLE even when activeCommType flips to usb.
+    DataManager.setActiveCommType('usb');
+    const bleDevice = createInitializedDevice('V2');
+    bleDevice.features = { ...bleDevice.features, deviceType: EDeviceType.Pro2 } as never;
+    (bleDevice as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+    const bleRelease = jest.fn().mockResolvedValue(undefined);
+    bleDevice.deviceConnector = { release: bleRelease } as never;
+    bleDevice.commands = {
+      disposed: false,
+      dispose: jest.fn(),
+    } as never;
+    expect(bleDevice.toMessageObject()?.commType).toBe('ble');
+    expect(bleDevice.toMessageObject()?.connectId).toBe('ble-connect-id');
+    await bleDevice.release();
+    expect(bleRelease).toHaveBeenCalledWith('ble-connect-id', false, true);
   });
 
   test.each([
@@ -231,8 +303,12 @@ describe('public device lifecycle events', () => {
     ['desktop-webusb', EDeviceType.Pro2],
     ['node-usb', EDeviceType.Neo],
     ['react-native-usb', EDeviceType.Pro2],
+    ['react-native-combined', EDeviceType.Pro2],
   ] as const)('waits one second after %s signing on %s', async (env, deviceType) => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+    if (env === 'react-native-combined') {
+      DataManager.setActiveCommType('usb');
+    }
     const cooldown = createDeferred<void>();
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback, delay) => {
       cooldown.promise.then(() => callback());
@@ -262,11 +338,15 @@ describe('public device lifecycle events', () => {
 
   test.each([
     ['react-native', EDeviceType.Pro2, 'evmSignTransaction'],
+    ['react-native-combined', EDeviceType.Pro2, 'evmSignTransaction'],
     ['react-native-usb', EDeviceType.Classic, 'evmSignTransaction'],
     ['webusb', EDeviceType.Classic, 'evmSignTransaction'],
     ['webusb', EDeviceType.Pro2, 'evmGetAddress'],
   ] as const)('does not add a signing cooldown for %s, %s, %s', async (env, deviceType, name) => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+    if (env === 'react-native-combined') {
+      DataManager.setActiveCommType('ble');
+    }
     const cleanup = createDeferred<void>();
     const pending = getPostCallPendingPromise(
       { name } as never,
@@ -845,6 +925,7 @@ describe('public device lifecycle events', () => {
       const messages: CoreMessage[] = [];
       core.on(CORE_EVENT, message => messages.push(message));
       const device = createInitializedDevice(protocol);
+      device.originalDescriptor.commType = 'webusb';
       const connectId = device.getConnectId();
       DevicePool.devicesCache[connectId] = device;
 
@@ -1370,4 +1451,178 @@ describe('public device lifecycle events', () => {
       expect(connectedDevice.label).toBe('OneKey Test');
     }
   );
+
+  test('react-native-combined with unknown activeCommType enumerates first so a saved USB serial connectId resolves to USB, and falls back to BLE when no USB device matches', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native-combined' as never);
+    jest.spyOn(DataManager, 'checkAndReloadData').mockResolvedValue(undefined);
+    jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+
+    const acquireCalls: Array<Record<string, unknown>> = [];
+    const transportMock = {
+      enumerate: jest.fn(),
+      acquire: jest.fn((input: Record<string, unknown>) => {
+        acquireCalls.push(input);
+        if (input.path === 'SN_SAVED_USB') {
+          return Promise.resolve('SN_SAVED_USB');
+        }
+        return Promise.resolve({ uuid: input.uuid, protocolType: 'V2' });
+      }),
+      release: jest.fn().mockResolvedValue(undefined),
+      call: jest.fn(),
+      post: jest.fn(),
+      read: jest.fn(),
+      cancel: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      getProtocolType: jest.fn(() => 'V2'),
+      configured: true,
+    };
+    TransportManager.transport = transportMock as never;
+
+    // 1. Saved USB serial connectId before any enumerate() -> enumerates USB, acquires via path
+    DataManager.setActiveCommType(undefined);
+    transportMock.enumerate.mockImplementationOnce(() => {
+      DataManager.setActiveCommType('usb');
+      return Promise.resolve([
+        { id: 'SN_SAVED_USB', path: 'SN_SAVED_USB', name: 'OneKey Pro 2', commType: 'usb' },
+      ]);
+    });
+    const initSpy = jest
+      .spyOn(Device.prototype, 'initialize')
+      .mockImplementation(function (this: Device) {
+        this.features = {
+          protocol: 'V2',
+          deviceType: EDeviceType.Pro2,
+          firmwareType: 'universal',
+          serialNo: 'SN_SAVED_USB',
+          mode: 'normal',
+          initialized: true,
+        } as never;
+        return Promise.resolve();
+      });
+    const getStateRunSpy = jest
+      .spyOn(GetDeviceState.prototype, 'run')
+      .mockResolvedValue({ mode: 'normal' } as never);
+
+    core = initCore();
+    initConnector();
+
+    await expect(
+      core.handleMessage({
+        id: 701,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: {
+          method: 'getDeviceState',
+          connectId: 'SN_SAVED_USB',
+          retryCount: 0,
+        },
+      } as CoreMessage)
+    ).resolves.toMatchObject({ success: true });
+
+    expect(transportMock.enumerate).toHaveBeenCalledTimes(1);
+    expect(acquireCalls[0]).toEqual(expect.objectContaining({ path: 'SN_SAVED_USB' }));
+    expect(acquireCalls[0]).not.toHaveProperty('uuid');
+
+    // 2. Saved BLE connectId with unknown activeCommType -> enumerate finds no USB, flips to 'ble',
+    // skips DevicePool probing of BLE scan list, and falls through to BLE acquire({ uuid }).
+    await core.dispose();
+    DevicePool.resetState();
+    acquireCalls.length = 0;
+    transportMock.enumerate.mockClear();
+    DataManager.setActiveCommType(undefined);
+
+    transportMock.enumerate.mockImplementationOnce(() => {
+      DataManager.setActiveCommType('ble');
+      return Promise.resolve([
+        { id: 'AA:BB:CC:DD:EE:FF', name: 'OneKey Pro 2', commType: 'ble' },
+        { id: '11:22:33:44:55:66', name: 'Other BLE', commType: 'ble' },
+      ]);
+    });
+    const getDevicesSpy = jest.spyOn(DevicePool, 'getDevices');
+
+    core = initCore();
+    initConnector();
+    await expect(
+      core.handleMessage({
+        id: 702,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: {
+          method: 'getDeviceState',
+          connectId: 'AA:BB:CC:DD:EE:FF',
+          retryCount: 0,
+        },
+      } as CoreMessage)
+    ).resolves.toMatchObject({ success: true });
+
+    expect(transportMock.enumerate).toHaveBeenCalledTimes(1);
+    expect(getDevicesSpy).not.toHaveBeenCalled();
+    expect(acquireCalls[0]).toEqual(expect.objectContaining({ uuid: 'AA:BB:CC:DD:EE:FF' }));
+    expect(acquireCalls[0]).not.toHaveProperty('path');
+
+    initSpy.mockRestore();
+    getStateRunSpy.mockRestore();
+  });
+
+  test('react-native-combined cancel() without connectId interrupts devices regardless of activeCommType', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native-combined' as never);
+    jest.spyOn(DataManager, 'checkAndReloadData').mockResolvedValue(undefined);
+    jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+    DataManager.setActiveCommType(undefined);
+
+    const blePending = createDeferred<unknown>();
+    const transportMock = {
+      enumerate: jest.fn().mockResolvedValue([]),
+      acquire: jest.fn(() => blePending.promise),
+      release: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn().mockResolvedValue(undefined),
+      cancel: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      getProtocolType: jest.fn(() => undefined),
+      configured: true,
+    };
+    TransportManager.transport = transportMock as never;
+
+    const cachedBleDevice = Device.fromDescriptor({
+      id: 'AA:BB:CC:DD:EE:FF',
+      commType: 'ble',
+    } as never);
+    const interruptSpy = jest
+      .spyOn(cachedBleDevice, 'interruptionFromUser')
+      .mockResolvedValue(undefined);
+    jest.spyOn(Device, 'fromDescriptor').mockReturnValue(cachedBleDevice);
+
+    core = initCore();
+    initConnector();
+
+    // Flip activeCommType to 'ble' so connectDeviceForBle enters acquire(), then reset to undefined
+    // before calling cancel() without connectId to simulate a mixed/unknown global state.
+    DataManager.setActiveCommType('ble');
+    const pendingCall = core.handleMessage({
+      id: 703,
+      event: IFRAME.CALL,
+      type: IFRAME.CALL,
+      payload: {
+        method: 'getDeviceState',
+        connectId: 'AA:BB:CC:DD:EE:FF',
+      },
+    } as CoreMessage);
+
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    DataManager.setActiveCommType(undefined);
+
+    await core.handleMessage({
+      type: IFRAME.CANCEL,
+      payload: {},
+    } as CoreMessage);
+
+    blePending.reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled));
+    await expect(pendingCall).resolves.toMatchObject({
+      success: false,
+      payload: { code: HardwareErrorCode.DeviceInterruptedFromUser },
+    });
+    expect(interruptSpy).toHaveBeenCalledTimes(1);
+  });
 });
