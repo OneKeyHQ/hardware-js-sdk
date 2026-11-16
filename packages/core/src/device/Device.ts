@@ -1772,7 +1772,8 @@ export class Device extends EventEmitter {
     return (
       DataManager.isBleConnect(env) ||
       DataManager.isBrowserWebUsb(env) ||
-      DataManager.isDesktopWebUsb(env)
+      DataManager.isDesktopWebUsb(env) ||
+      env === 'react-native-usb'
     );
   }
 

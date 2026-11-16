@@ -12,7 +12,8 @@ export type transportEnv =
   | 'desktop-web-ble'
   | 'emulator'
   | 'lowlevel'
-  | 'node-usb';
+  | 'node-usb'
+  | 'react-native-usb';
 export type ConnectSettings = {
   connectSrc?: string;
   debug?: boolean;

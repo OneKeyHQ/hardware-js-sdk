@@ -1,0 +1,5 @@
+coverage/
+dist/
+jest.config.js
+react-native.config.js
+android/

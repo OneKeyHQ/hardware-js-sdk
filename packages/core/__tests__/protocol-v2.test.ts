@@ -10449,6 +10449,28 @@ describe('Protocol V2 firmware update targets', () => {
     }
   );
 
+  test('uses USB chunk sizes for react-native-usb even when platform is native', () => {
+    const envSpy = jest
+      .spyOn(DataManager, 'getSettings')
+      .mockReturnValue('react-native-usb' as never);
+    try {
+      const method = new FirmwareUpdateV4({
+        id: 1,
+        payload: {
+          method: 'firmwareUpdateV4',
+        },
+      });
+      (method as any).params = { platform: 'native', chunkSize: 4096 };
+
+      expect(
+        (method as any).getProtocolV2FirmwareChunkSize('write', 'vol0:/application_p1.bin', true)
+      ).toBe(4000);
+      expect((method as any).getProtocolV2FirmwareChunkSize('read')).toBe(4000);
+    } finally {
+      envSpy.mockRestore();
+    }
+  });
+
   test('keeps confirmation active after the Request write until terminal Success arrives', async () => {
     const method = new FirmwareUpdateV4({
       id: 1,

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep in sync with ONEKEY_WEBUSB_FILTER in packages/shared/src/constants.ts and ONEKEY_USB_FILTER in OneKeyUsbModule.kt -->
+<!-- Vendor 0x1209 (4617): 0x53c0=21440, 0x53c1=21441, 0x4f4a=20298, 0x4f4b=20299, 0x4f4c=20300 -->
+<resources>
+    <usb-device vendor-id="4617" product-id="21440" /> <!-- 0x1209:0x53c0 -->
+    <usb-device vendor-id="4617" product-id="21441" /> <!-- 0x1209:0x53c1 -->
+    <usb-device vendor-id="4617" product-id="20298" /> <!-- 0x1209:0x4f4a -->
+    <usb-device vendor-id="4617" product-id="20299" /> <!-- 0x1209:0x4f4b -->
+    <usb-device vendor-id="4617" product-id="20300" /> <!-- 0x1209:0x4f4c -->
+</resources>

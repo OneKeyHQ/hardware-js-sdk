@@ -357,7 +357,10 @@ export function getPostCallPendingPromise(method: BaseMethod, device: Device): P
   const requiresSigningCooldown =
     method.name.includes('Sign') &&
     (deviceType === EDeviceType.Pro2 || deviceType === EDeviceType.Neo) &&
-    (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env) || env === 'node-usb');
+    (DataManager.isBrowserWebUsb(env) ||
+      DataManager.isDesktopWebUsb(env) ||
+      env === 'node-usb' ||
+      env === 'react-native-usb');
 
   return requiresSigningCooldown
     ? cleanupPromise.then(() => wait(PRO2_USB_SIGNING_COOLDOWN_MS)).then(() => undefined)
@@ -2041,7 +2044,8 @@ export const init = async (
     await DataManager.load(settings);
     initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
-    if (DataManager.getSettings('env') !== 'react-native') {
+    const env = DataManager.getSettings('env');
+    if (env !== 'react-native' && env !== 'react-native-usb') {
       setLoggerPostMessage(postMessage);
     }
     initCore();

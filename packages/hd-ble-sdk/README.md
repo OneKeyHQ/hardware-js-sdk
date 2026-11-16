@@ -1,6 +1,6 @@
 # `@onekeyfe/hd-ble-sdk`
 
-`@onekeyfe/hd-ble-sdk` is a library provided for mobild client. Its dependency on `@onekeyfe/hd-transport-react-native`. We recommend using this libarary in ReactNative applications.
+`@onekeyfe/hd-ble-sdk` is a library provided for mobile clients. It uses `@onekeyfe/hd-transport-react-native` (BLE) by default. Pass `env: 'react-native-usb'` to `init()` to use Android USB host transport (`@onekeyfe/hd-transport-react-native-usb`); any other env keeps BLE.
 
 ## Installation
 

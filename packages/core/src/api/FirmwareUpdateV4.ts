@@ -832,7 +832,9 @@ export default class FirmwareUpdateV4 extends FirmwareUpdateBaseMethod<FirmwareU
   ) {
     const payloadChunkSize = Number(this.params?.chunkSize);
     const env = DataManager.getSettings('env');
-    const isBle = this.params?.platform === 'native' || (env && DataManager.isBleConnect(env));
+    const isBle =
+      (this.params?.platform === 'native' && env !== 'react-native-usb') ||
+      (env && DataManager.isBleConnect(env));
     let maxChunkSize = PROTOCOL_V2_WEBUSB_FILE_CHUNK_SIZE;
     if (isBle) {
       if (direction === 'read') {

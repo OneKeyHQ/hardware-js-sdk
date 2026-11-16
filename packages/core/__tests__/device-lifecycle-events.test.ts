@@ -221,10 +221,16 @@ describe('public device lifecycle events', () => {
     }
   );
 
+  test('react-native-usb is a USB transport, not BLE', () => {
+    expect(DataManager.isBleConnect('react-native-usb')).toBe(false);
+    expect(DataManager.isBleConnect('react-native')).toBe(true);
+  });
+
   test.each([
     ['webusb', EDeviceType.Pro2],
     ['desktop-webusb', EDeviceType.Pro2],
     ['node-usb', EDeviceType.Neo],
+    ['react-native-usb', EDeviceType.Pro2],
   ] as const)('waits one second after %s signing on %s', async (env, deviceType) => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
     const cooldown = createDeferred<void>();
@@ -256,6 +262,7 @@ describe('public device lifecycle events', () => {
 
   test.each([
     ['react-native', EDeviceType.Pro2, 'evmSignTransaction'],
+    ['react-native-usb', EDeviceType.Classic, 'evmSignTransaction'],
     ['webusb', EDeviceType.Classic, 'evmSignTransaction'],
     ['webusb', EDeviceType.Pro2, 'evmGetAddress'],
   ] as const)('does not add a signing cooldown for %s, %s, %s', async (env, deviceType, name) => {
@@ -955,7 +962,7 @@ describe('public device lifecycle events', () => {
     }
   );
 
-  test.each(['react-native', 'webusb', 'desktop-webusb'] as const)(
+  test.each(['react-native', 'react-native-usb', 'webusb', 'desktop-webusb'] as const)(
     'sends a fallback Cancel for an acquired Protocol V2 %s call with an open UI',
     async env => {
       jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
@@ -980,7 +987,7 @@ describe('public device lifecycle events', () => {
     }
   );
 
-  test.each(['react-native', 'webusb', 'desktop-webusb'] as const)(
+  test.each(['react-native', 'react-native-usb', 'webusb', 'desktop-webusb'] as const)(
     'does not send Cancel for an acquired Protocol V2 %s connect without an open UI',
     async env => {
       jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);

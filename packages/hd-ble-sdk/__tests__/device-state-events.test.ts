@@ -11,6 +11,8 @@ import {
   initCore,
 } from '@onekeyfe/hd-core';
 import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+import ReactNativeUsbTransport from '@onekeyfe/hd-transport-react-native-usb';
 
 import sdkExport, { messagePromises } from '../src';
 
@@ -24,7 +26,14 @@ jest.mock('@onekeyfe/hd-core', () => ({
   default: (options: unknown) => options,
   initCore: jest.fn(),
 }));
-jest.mock('@onekeyfe/hd-transport-react-native', () => ({}));
+jest.mock('@onekeyfe/hd-transport-react-native', () => {
+  function ReactNativeTransport() {}
+  return { __esModule: true, default: ReactNativeTransport };
+});
+jest.mock('@onekeyfe/hd-transport-react-native-usb', () => {
+  function ReactNativeUsbTransport() {}
+  return { __esModule: true, default: ReactNativeUsbTransport };
+});
 
 describe('hd-ble-sdk device state events', () => {
   test('forwards DEVICE.STATE to React Native SDK consumers', () => {
@@ -44,6 +53,37 @@ const sdk = sdkExport as unknown as {
   call(params: Record<string, unknown>): Promise<unknown>;
   dispose(): Promise<void>;
 };
+
+describe('hd-ble-sdk transport env selection', () => {
+  const core = Object.assign(new EventEmitter(), {
+    handleMessage: jest.fn(),
+    dispose: jest.fn(),
+  });
+
+  beforeEach(() => {
+    jest.mocked(initCore).mockResolvedValue(core as never);
+  });
+
+  afterEach(async () => {
+    await sdk.dispose();
+  });
+
+  test('keeps BLE transport unless env is react-native-usb', async () => {
+    await sdk.init({ debug: false });
+    expect(initCore).toHaveBeenCalledWith(
+      expect.objectContaining({ env: 'react-native' }),
+      ReactNativeTransport
+    );
+  });
+
+  test('uses ReactNativeUsbTransport when env is react-native-usb', async () => {
+    await sdk.init({ env: 'react-native-usb' });
+    expect(initCore).toHaveBeenCalledWith(
+      expect.objectContaining({ env: 'react-native-usb' }),
+      ReactNativeUsbTransport
+    );
+  });
+});
 
 describe('SDK request cleanup', () => {
   const core = Object.assign(new EventEmitter(), {

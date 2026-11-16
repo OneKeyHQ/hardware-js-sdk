@@ -22,6 +22,7 @@ import HardwareSdk, {
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+import ReactNativeUsbTransport from '@onekeyfe/hd-transport-react-native-usb';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
 import type { ConnectSettings, Core, CoreMessage, UiResponseEvent } from '@onekeyfe/hd-core';
@@ -138,14 +139,16 @@ async function postMessage(message: CoreMessage, usePromise = true) {
 }
 
 const init = async (settings: Partial<ConnectSettings>) => {
-  _settings = { ..._settings, ...settings, env: 'react-native' };
+  const env = settings.env === 'react-native-usb' ? 'react-native-usb' : 'react-native';
+  _settings = { ..._settings, ...settings, env };
 
   enableLog(!!settings.debug);
 
   Log.debug('init');
 
   try {
-    _core = await initCore(_settings, ReactNativeTransport);
+    const Transport = env === 'react-native-usb' ? ReactNativeUsbTransport : ReactNativeTransport;
+    _core = await initCore(_settings, Transport);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
 

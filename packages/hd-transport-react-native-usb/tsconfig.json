@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@onekeyfe/hd-transport": ["../hd-transport/dist"],
+      "@onekeyfe/hd-shared": ["../shared/dist"]
+    }
+  },
+  "include": ["./src"]
+}
