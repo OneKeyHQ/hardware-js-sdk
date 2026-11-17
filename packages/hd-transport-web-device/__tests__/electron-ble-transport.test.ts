@@ -1,5 +1,10 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
-import { EBleDisconnectReason, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import {
+  EBleDisconnectReason,
+  ERRORS,
+  HardwareErrorCode,
+  createDeferred,
+} from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
 import ElectronBleTransport from '../src/electron-ble-transport';
@@ -1065,6 +1070,72 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
   });
+
+  test.each([
+    HardwareErrorCode.BleDeviceBondError,
+    HardwareErrorCode.BleDeviceBondedCanceled,
+    HardwareErrorCode.BlePeerRemovedPairingInformation,
+    HardwareErrorCode.BleBondInvalid,
+  ])('preserves pairing-recovery error %s during undeclared Protocol V1 probe', async errorCode => {
+    const device = { id: `undeclared-v1-${errorCode}`, name: 'Unknown BLE Device' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.write.mockRejectedValueOnce({
+      name: 'HardwareError',
+      message: `Pairing failure ${errorCode}`,
+      errorCode,
+    });
+    const bleTransport = configureTransport(nobleBle);
+    const probeProtocolV2 = jest.spyOn(bleTransport as any, 'probeProtocolV2');
+
+    await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({ errorCode });
+
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+  });
+
+  test.each([
+    HardwareErrorCode.BleDeviceBondError,
+    HardwareErrorCode.BleDeviceBondedCanceled,
+    HardwareErrorCode.BlePeerRemovedPairingInformation,
+    HardwareErrorCode.BleBondInvalid,
+  ])(
+    'preserves pairing-recovery error %s during undeclared Protocol V2 probe after V1 miss',
+    async errorCode => {
+      const device = { id: `undeclared-v2-${errorCode}`, name: 'OneKey Pro 2' };
+      const nobleBle = createNobleBle(device);
+      let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+      nobleBle.onNotification.mockImplementation(handler => {
+        notificationHandler = handler;
+        return jest.fn();
+      });
+      if (errorCode === HardwareErrorCode.BleDeviceBondedCanceled) {
+        nobleBle.write.mockImplementationOnce(() => {
+          setTimeout(() => notificationHandler?.(device.id, 'PAIRING_REJECTED'), 0);
+          return Promise.resolve();
+        });
+      } else {
+        nobleBle.write.mockRejectedValueOnce({
+          name: 'HardwareError',
+          message: `Pairing failure ${errorCode}`,
+          errorCode,
+        });
+      }
+      const bleTransport = configureTransport(nobleBle);
+      jest
+        .spyOn(bleTransport as any, 'callProtocolV1')
+        .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError));
+
+      await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({ errorCode });
+
+      expect(nobleBle.write).toHaveBeenCalledTimes(1);
+      expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+      expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+      expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+    }
+  );
 
   test('does not take a Protocol V2 hint from the BLE name', async () => {
     const device = { id: 'named-pro2-id', name: 'OneKey Pro 2' };

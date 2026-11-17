@@ -1069,6 +1069,8 @@ async function attemptWindowsWriteUntilPaired(
         subscriptionOperations,
         subscribedDevices,
         pairedDevices,
+        bondedDevices,
+        pairingCanceledDevices,
         onNotificationData: emitRawNotification,
         logger,
       });
@@ -1812,6 +1814,17 @@ async function discoverServicesAndCharacteristicsWithRetry(
   );
 }
 
+function shouldRethrowConnectionSetupError(error: unknown): boolean {
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  return (
+    code === HardwareErrorCode.BleDeviceDisconnected ||
+    code === HardwareErrorCode.BleDeviceBondError ||
+    code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
+    code === HardwareErrorCode.BleBondInvalid
+  );
+}
+
 /**
  * Setup connection and discover services for a peripheral.
  * Common logic extracted from connectDevice to avoid duplication.
@@ -1836,9 +1849,7 @@ async function setupConnectionAndDiscoverServices(
   try {
     await forceReconnectPeripheral(peripheral, deviceId);
   } catch (resetError) {
-    if (
-      (resetError as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleDeviceDisconnected
-    ) {
+    if (shouldRethrowConnectionSetupError(resetError)) {
       throw resetError;
     }
     // A failed reset must not abort the attempt: discovery on the existing
@@ -1846,11 +1857,20 @@ async function setupConnectionAndDiscoverServices(
     logger?.error('[NobleBLE] Connection reset before discovery failed, continuing', resetError);
   }
   assertBleActive();
+  if (pairingCanceledDevices.has(deviceId)) {
+    throw createPairingCanceledError();
+  }
   setupDisconnectListener(peripheral, deviceId, webContents);
 
   try {
     return await discoverServicesAndCharacteristicsWithRetry(peripheral, deviceId);
   } catch (discoveryError) {
+    if (pairingCanceledDevices.has(deviceId)) {
+      throw createPairingCanceledError();
+    }
+    if (shouldRethrowConnectionSetupError(discoveryError)) {
+      throw discoveryError;
+    }
     // A connected peripheral does not advertise, so the fresh scan below would
     // only run out its timeout. Drop the link first, then rescan: the cold
     // reconnect is what recovers a device whose stack stopped serving its

@@ -41,6 +41,8 @@ export interface SoftRefreshParams {
   subscriptionOperations: Map<string, 'subscribing' | 'unsubscribing' | 'idle'>;
   subscribedDevices: Map<string, boolean>;
   pairedDevices: Set<string>;
+  bondedDevices: Set<string>;
+  pairingCanceledDevices?: Set<string>;
   onNotificationData: (deviceId: string, data: Buffer) => void;
   logger: Logger | null;
 }
@@ -52,6 +54,8 @@ export async function softRefreshSubscription(params: SoftRefreshParams): Promis
     subscriptionOperations,
     subscribedDevices,
     pairedDevices,
+    bondedDevices,
+    pairingCanceledDevices,
     onNotificationData,
     logger,
   } = params;
@@ -76,10 +80,15 @@ export async function softRefreshSubscription(params: SoftRefreshParams): Promis
 
   notifyCharacteristic.removeAllListeners('data');
   notifyCharacteristic.on('data', (data: Buffer) => {
+    if (pairingCanceledDevices?.has(deviceId)) {
+      onNotificationData(deviceId, data);
+      return;
+    }
     if (!pairedDevices.has(deviceId)) {
       pairedDevices.add(deviceId);
       logger?.info('[BLE-OPS] Device paired successfully', { deviceId });
     }
+    bondedDevices.add(deviceId);
 
     onNotificationData(deviceId, data);
   });

@@ -216,8 +216,11 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   return (
     isNativeBleDisconnectError(error) ||
     code === HardwareErrorCode.BleDeviceNotBonded ||
+    code === HardwareErrorCode.BleDeviceBondError ||
     code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
     code === HardwareErrorCode.BleDeviceDisconnected ||
+    code === HardwareErrorCode.BleBondInvalid ||
     code === HardwareErrorCode.BleCharacteristicNotifyError ||
     code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
     code === HardwareErrorCode.BleWriteCharacteristicError
@@ -731,7 +734,7 @@ export default class ReactNativeBleTransport {
 
   stopped = false;
 
-  private readonly bondAbortController = new AbortController();
+  private readonly activeBondControllers = new Map<string, Set<AbortController>>();
 
   /** When a scan last saw each device on iOS; a fresh sighting earns one longer connect. */
   private iosLastAdvertisedAt = new Map<string, number>();
@@ -1318,38 +1321,67 @@ export default class ReactNativeBleTransport {
     return this.runLifecycleOperation(uuid, () => this.acquireUnlocked(input));
   }
 
+  private createBondAbortController(uuid: string): AbortController {
+    const controller = new AbortController();
+    let controllers = this.activeBondControllers.get(uuid);
+    if (!controllers) {
+      controllers = new Set();
+      this.activeBondControllers.set(uuid, controllers);
+    }
+    controllers.add(controller);
+    return controller;
+  }
+
+  private releaseBondAbortController(uuid: string, controller: AbortController): void {
+    const controllers = this.activeBondControllers.get(uuid);
+    if (!controllers) return;
+    controllers.delete(controller);
+    if (controllers.size === 0) {
+      this.activeBondControllers.delete(uuid);
+    }
+  }
+
+  private abortActiveBonding(uuid?: string): void {
+    if (uuid !== undefined) {
+      this.activeBondControllers.get(uuid)?.forEach(controller => controller.abort());
+      return;
+    }
+    this.activeBondControllers.forEach(controllers => {
+      controllers.forEach(controller => controller.abort());
+    });
+  }
+
   /**
-   * stop() aborts bonding and marks the transport closed. Match other acquire
+   * stop(), cancel(), or disconnect() aborts bonding. Match other acquire
    * paths: report BleDeviceDisconnected so callers do not treat this as a
    * pairing failure that should pop another system dialog.
    */
-  private throwIfBondingStopped(): void {
-    if (this.stopped || this.bondAbortController.signal.aborted) {
+  private throwIfBondingStopped(signal?: AbortSignal): void {
+    if (this.stopped || signal?.aborted) {
       throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
     }
   }
 
-  /** Retry delay that rejects as soon as stop() aborts the bond controller. */
-  private delayUnlessBondingStopped(ms: number): Promise<void> {
+  /** Retry delay that rejects as soon as stop() or cancel() aborts bonding. */
+  private delayUnlessBondingStopped(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
-      const { signal } = this.bondAbortController;
-      if (this.stopped || signal.aborted) {
+      if (this.stopped || signal?.aborted) {
         reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
         return;
       }
+      const onAbort = () => {
+        clearTimeout(timeout);
+        reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+      };
       const timeout = setTimeout(() => {
-        signal.removeEventListener('abort', onAbort);
-        if (this.stopped || signal.aborted) {
+        signal?.removeEventListener('abort', onAbort);
+        if (this.stopped || signal?.aborted) {
           reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
           return;
         }
         resolve();
       }, ms);
-      const onAbort = () => {
-        clearTimeout(timeout);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
-      };
-      signal.addEventListener('abort', onAbort, { once: true });
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
   }
 
@@ -1364,446 +1396,470 @@ export default class ReactNativeBleTransport {
    * - Retries exhausted: report a re-pairing error for a device this transport
    *   previously observed bonded, otherwise keep the "never paired" error.
    */
-  private async ensureAndroidBond(uuid: string): Promise<void> {
-    this.throwIfBondingStopped();
-    const key = normalizeBleMac(uuid);
-
+  private async ensureAndroidBond(uuid: string, acquireSignal?: AbortSignal): Promise<void> {
+    const localController = acquireSignal ? undefined : this.createBondAbortController(uuid);
+    const signal = acquireSignal ?? localController?.signal;
     try {
-      const bonded = await findBondedDevice(uuid);
-      this.throwIfBondingStopped();
-      if (bonded) {
-        this.knownBondedDevices.add(key);
-        Log?.debug(
-          '[ReactNativeBleTransport] Android device already bonded, skipping createBond:',
-          uuid
-        );
-        return;
-      }
-    } catch (error) {
-      this.throwIfBondingStopped();
-      // getBondedDevices can fail on older native builds or a transient adapter
-      // error; fall back to the legacy pairDevice path below.
-      Log?.debug('[ReactNativeBleTransport] Android bonded list query failed, using pairDevice:', {
-        uuid,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+      this.throwIfBondingStopped(signal);
+      const key = normalizeBleMac(uuid);
 
-    for (let attempt = 0; attempt < ANDROID_BOND_ATTEMPTS; attempt += 1) {
-      this.throwIfBondingStopped();
-      let bondState;
       try {
-        bondState = await pairDevice(uuid);
+        const bonded = await findBondedDevice(uuid);
+        this.throwIfBondingStopped(signal);
+        if (bonded) {
+          this.knownBondedDevices.add(key);
+          Log?.debug(
+            '[ReactNativeBleTransport] Android device already bonded, skipping createBond:',
+            uuid
+          );
+          return;
+        }
       } catch (error) {
-        this.throwIfBondingStopped();
-        throw error;
+        this.throwIfBondingStopped(signal);
+        // getBondedDevices can fail on older native builds or a transient adapter
+        // error; fall back to the legacy pairDevice path below.
+        Log?.debug(
+          '[ReactNativeBleTransport] Android bonded list query failed, using pairDevice:',
+          {
+            uuid,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
       }
-      this.throwIfBondingStopped();
-      if (bondState.bonding) {
-        await onDeviceBondState(uuid, this.bondAbortController.signal, {
-          systemInitiated: bondState.initiated === false,
-        });
-        this.throwIfBondingStopped();
-        this.knownBondedDevices.add(key);
-        return;
-      }
-      if (bondState.bonded) {
-        this.knownBondedDevices.add(key);
-        return;
-      }
-      // { bonded: false, bonding: false }: createBond() could not start. Give the
-      // device a moment to become visible/connectable before the next attempt.
-      if (attempt + 1 < ANDROID_BOND_ATTEMPTS) {
-        await this.delayUnlessBondingStopped(ANDROID_BOND_RETRY_DELAY_MS);
-      }
-    }
 
-    this.throwIfBondingStopped();
-    if (this.knownBondedDevices.has(key)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.BleDeviceBondError,
-        'Bluetooth pairing could not be restarted for a previously paired device',
-        { phase: 'bond', reason: 'peer_removed_pairing', attempts: ANDROID_BOND_ATTEMPTS }
-      );
+      for (let attempt = 0; attempt < ANDROID_BOND_ATTEMPTS; attempt += 1) {
+        this.throwIfBondingStopped(signal);
+        let bondState;
+        try {
+          bondState = await pairDevice(uuid);
+        } catch (error) {
+          this.throwIfBondingStopped(signal);
+          throw error;
+        }
+        this.throwIfBondingStopped(signal);
+        if (bondState.bonding) {
+          await onDeviceBondState(uuid, signal, {
+            systemInitiated: bondState.initiated === false,
+          });
+          this.throwIfBondingStopped(signal);
+          this.knownBondedDevices.add(key);
+          return;
+        }
+        if (bondState.bonded) {
+          this.knownBondedDevices.add(key);
+          return;
+        }
+        // { bonded: false, bonding: false }: createBond() could not start. Give the
+        // device a moment to become visible/connectable before the next attempt.
+        if (attempt + 1 < ANDROID_BOND_ATTEMPTS) {
+          await this.delayUnlessBondingStopped(ANDROID_BOND_RETRY_DELAY_MS, signal);
+        }
+      }
+
+      this.throwIfBondingStopped(signal);
+      if (this.knownBondedDevices.has(key)) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.BleDeviceBondError,
+          'Bluetooth pairing could not be restarted for a previously paired device',
+          { phase: 'bond', reason: 'peer_removed_pairing', attempts: ANDROID_BOND_ATTEMPTS }
+        );
+      }
+      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
+    } finally {
+      if (localController) {
+        this.releaseBondAbortController(uuid, localController);
+      }
     }
-    throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
   }
 
   private async acquireUnlocked(input: FirmwareInstallBleAcquireInput) {
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    this.throwIfBondingStopped();
     const { uuid, forceCleanRunPromise, expectedProtocol, skipProtocolProbe } = input;
-    const cachedTransport = transportCache[uuid];
-    if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
-      Log?.debug(
-        '[ReactNativeBleTransport] refresh uncached BLE connection for firmware install:',
-        uuid
-      );
-      const manager = this.blePlxManager;
-      await this.runNativeTeardown(uuid, manager, async () => {
-        await this.runBestEffortNativeOperation(
-          'firmware install reconnect: cancel uncached device connection',
-          () => manager.cancelDeviceConnection(uuid)
-        );
-      });
-    }
-    if (cachedTransport) {
-      if (skipProtocolProbe) {
+    const bondController = this.createBondAbortController(uuid);
+    const bondSignal = bondController.signal;
+    try {
+      const cachedTransport = transportCache[uuid];
+      if (skipProtocolProbe && !cachedTransport && this.blePlxManager) {
         Log?.debug(
-          '[ReactNativeBleTransport] refresh cached BLE connection for firmware install:',
+          '[ReactNativeBleTransport] refresh uncached BLE connection for firmware install:',
           uuid
         );
         const manager = this.blePlxManager;
-        await this.releaseUnlocked(uuid, true);
         await this.runNativeTeardown(uuid, manager, async () => {
-          const operations: Promise<unknown>[] = [];
-          if (manager) {
+          await this.runBestEffortNativeOperation(
+            'firmware install reconnect: cancel uncached device connection',
+            () => manager.cancelDeviceConnection(uuid)
+          );
+        });
+      }
+      if (cachedTransport) {
+        if (skipProtocolProbe) {
+          Log?.debug(
+            '[ReactNativeBleTransport] refresh cached BLE connection for firmware install:',
+            uuid
+          );
+          const manager = this.blePlxManager;
+          await this.releaseUnlocked(uuid, true);
+          await this.runNativeTeardown(uuid, manager, async () => {
+            const operations: Promise<unknown>[] = [];
+            if (manager) {
+              operations.push(
+                this.runBestEffortNativeOperation(
+                  'firmware install reconnect: cancel device connection',
+                  () => manager.cancelDeviceConnection(uuid)
+                )
+              );
+            }
             operations.push(
               this.runBestEffortNativeOperation(
-                'firmware install reconnect: cancel device connection',
-                () => manager.cancelDeviceConnection(uuid)
+                'firmware install reconnect: device cancel connection',
+                () => cachedTransport.device.cancelConnection()
               )
             );
+            await Promise.all(operations);
+          });
+        } else {
+          const cachedProtocol = this.deviceProtocol.get(uuid);
+          const isCachedDeviceConnected = await cachedTransport.device
+            .isConnected()
+            .catch(() => false);
+          // A suspect GATT table is only refreshed through a new connect.
+          const isCachedAndroidLinkUsable =
+            Platform.OS !== 'android' || !this.androidGattCacheRefreshes.has(uuid);
+          if (
+            isCachedDeviceConnected &&
+            isCachedAndroidLinkUsable &&
+            cachedProtocol &&
+            (!expectedProtocol || cachedProtocol === expectedProtocol)
+          ) {
+            this.throwIfBondingStopped(bondSignal);
+            Log?.debug(
+              '[ReactNativeBleTransport] reuse cached BLE transport:',
+              uuid,
+              cachedProtocol
+            );
+            return { uuid, protocolType: cachedProtocol };
           }
-          operations.push(
-            this.runBestEffortNativeOperation(
-              'firmware install reconnect: device cancel connection',
-              () => cachedTransport.device.cancelConnection()
-            )
-          );
-          await Promise.all(operations);
-        });
-      } else {
-        const cachedProtocol = this.deviceProtocol.get(uuid);
-        const isCachedDeviceConnected = await cachedTransport.device
-          .isConnected()
-          .catch(() => false);
-        // A suspect GATT table is only refreshed through a new connect.
-        const isCachedAndroidLinkUsable =
-          Platform.OS !== 'android' || !this.androidGattCacheRefreshes.has(uuid);
-        if (
-          isCachedDeviceConnected &&
-          isCachedAndroidLinkUsable &&
-          cachedProtocol &&
-          (!expectedProtocol || cachedProtocol === expectedProtocol)
-        ) {
-          if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-          Log?.debug('[ReactNativeBleTransport] reuse cached BLE transport:', uuid, cachedProtocol);
-          return { uuid, protocolType: cachedProtocol };
+
+          /**
+           * If the transport is not reusable due to a protocol mismatch or stale
+           * connection, clean it up before creating a new transport instance.
+           */
+          Log?.debug('transport not reusable, will release: ', uuid);
+          await this.releaseUnlocked(uuid, true);
         }
-
-        /**
-         * If the transport is not reusable due to a protocol mismatch or stale
-         * connection, clean it up before creating a new transport instance.
-         */
-        Log?.debug('transport not reusable, will release: ', uuid);
-        await this.releaseUnlocked(uuid, true);
       }
-    }
 
-    let device: Device | null = null;
-    const isAndroid = Platform.OS === 'android';
-    // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
-    const refreshAndroidGattCache =
-      isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
-    let nativeConnectOptions = connectOptions;
-    let bareConnectOptions = fallbackConnectOptions;
-    let connectBackstopMs = BLE_CONNECT_TIMEOUT_MS;
-    if (isAndroid) {
-      nativeConnectOptions = refreshAndroidGattCache
-        ? androidRefreshGattConnectOptions
-        : fallbackConnectOptions;
-    } else if (this.takeIosPresentDeviceSighting(uuid, skipProtocolProbe)) {
-      const timeout = IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS;
-      nativeConnectOptions = { ...connectOptions, timeout };
-      bareConnectOptions = { ...fallbackConnectOptions, timeout };
-      connectBackstopMs = IOS_PRESENT_DEVICE_CONNECT_BACKSTOP_MS;
-    }
-    // Only a connect that carried refreshGatt clears the marker; the fallback connects drop it.
-    let androidRefreshConnectRan = false;
+      let device: Device | null = null;
+      const isAndroid = Platform.OS === 'android';
+      // A firmware-install reconnect always refreshes: the new firmware may expose a different table.
+      const refreshAndroidGattCache =
+        isAndroid && (!!skipProtocolProbe || this.androidGattCacheRefreshes.has(uuid));
+      let nativeConnectOptions = connectOptions;
+      let bareConnectOptions = fallbackConnectOptions;
+      let connectBackstopMs = BLE_CONNECT_TIMEOUT_MS;
+      if (isAndroid) {
+        nativeConnectOptions = refreshAndroidGattCache
+          ? androidRefreshGattConnectOptions
+          : fallbackConnectOptions;
+      } else if (this.takeIosPresentDeviceSighting(uuid, skipProtocolProbe)) {
+        const timeout = IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS;
+        nativeConnectOptions = { ...connectOptions, timeout };
+        bareConnectOptions = { ...fallbackConnectOptions, timeout };
+        connectBackstopMs = IOS_PRESENT_DEVICE_CONNECT_BACKSTOP_MS;
+      }
+      // Only a connect that carried refreshGatt clears the marker; the fallback connects drop it.
+      let androidRefreshConnectRan = false;
 
-    if (forceCleanRunPromise && this.runPromise) {
-      const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
-      this.runPromise.reject(error);
-      this.runPromise = null;
-      this.runPromiseDeviceId = null;
-      Log?.debug('Force clean Bluetooth run promise, forceCleanRunPromise: ', forceCleanRunPromise);
-    }
+      if (forceCleanRunPromise && this.runPromise) {
+        const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
+        this.runPromise.reject(error);
+        this.runPromise = null;
+        this.runPromiseDeviceId = null;
+        Log?.debug(
+          'Force clean Bluetooth run promise, forceCleanRunPromise: ',
+          forceCleanRunPromise
+        );
+      }
 
-    const blePlxManager = await this.getPlxManager();
-    let skipPostConnectMtu = false;
-    try {
-      await subscribeBleOn(blePlxManager);
-    } catch (error) {
-      Log?.debug('subscribeBleOn error: ', error);
-      throw error;
-    }
-
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    if (Platform.OS === 'android') {
-      // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
+      const blePlxManager = await this.getPlxManager();
+      let skipPostConnectMtu = false;
       try {
-        await this.ensureAndroidBond(uuid);
+        await subscribeBleOn(blePlxManager);
       } catch (error) {
-        await this.runNativeTeardown(uuid, blePlxManager, async () => {
-          await this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>
-            blePlxManager.cancelDeviceConnection(uuid)
-          );
-        });
+        Log?.debug('subscribeBleOn error: ', error);
         throw error;
       }
-    }
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
-    if (!device) {
-      const devices = await blePlxManager.devices([uuid]);
-      [device] = devices;
-    }
-
-    if (!device) {
-      const connectedDevice = await blePlxManager.connectedDevices(getBluetoothServiceUuids());
-      const deviceFilter = connectedDevice.filter(device => device.id === uuid);
-      Log?.debug(`found connected device count: ${deviceFilter.length}`);
-      [device] = deviceFilter;
-    }
-
-    if (!device) {
-      Log?.debug('try to connect to device: ', uuid);
-      try {
-        device = await this.connectWithTimeout(
-          uuid,
-          () => blePlxManager.connectToDevice(uuid, nativeConnectOptions),
-          connectBackstopMs
-        );
-        androidRefreshConnectRan = refreshAndroidGattCache;
-      } catch (e) {
-        Log?.debug('try to connect to device has error: ', e);
-        if (shouldRethrowBleSetupError(e)) {
-          throw e;
-        }
-        if (isMtuOrCancelledConnectError(e)) {
-          skipPostConnectMtu = true;
-          Log?.debug('first try to reconnect without params');
-          device = await this.connectWithTimeout(
-            uuid,
-            () => blePlxManager.connectToDevice(uuid, bareConnectOptions),
-            connectBackstopMs
-          );
-        } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
-          Log?.debug('device already connected');
-          throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
-        } else {
-          remapError(e);
+      this.throwIfBondingStopped(bondSignal);
+      if (Platform.OS === 'android') {
+        // Initiate bonding locally before GATT can trigger peripheral-initiated pairing.
+        try {
+          await this.ensureAndroidBond(uuid, bondSignal);
+        } catch (error) {
+          await this.runNativeTeardown(uuid, blePlxManager, async () => {
+            await this.runBestEffortNativeOperation('bond failure: cancel manager connection', () =>
+              blePlxManager.cancelDeviceConnection(uuid)
+            );
+          });
+          throw error;
         }
       }
-    }
+      this.throwIfBondingStopped(bondSignal);
 
-    if (!device) {
-      throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'unable to connect to device');
-    }
+      if (!device) {
+        const devices = await blePlxManager.devices([uuid]);
+        [device] = devices;
+      }
 
-    if (
-      refreshAndroidGattCache &&
-      !androidRefreshConnectRan &&
-      (await device.isConnected().catch(() => false))
-    ) {
-      // refreshGatt only reaches the stack through a connect. A link that is still up would
-      // skip the connect below and keep serving the stale table, so it is dropped first.
-      await this.dropAndroidLink(uuid, blePlxManager, device, 'gatt cache refresh');
-      if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    }
+      if (!device) {
+        const connectedDevice = await blePlxManager.connectedDevices(getBluetoothServiceUuids());
+        const deviceFilter = connectedDevice.filter(device => device.id === uuid);
+        Log?.debug(`found connected device count: ${deviceFilter.length}`);
+        [device] = deviceFilter;
+      }
 
-    if (!(await device.isConnected())) {
-      Log?.debug('not connected, try to connect to device: ', uuid);
-      const disconnectedDevice = device;
-
-      try {
-        device = await this.connectWithTimeout(
-          uuid,
-          () => disconnectedDevice.connect(nativeConnectOptions),
-          connectBackstopMs
-        );
-        androidRefreshConnectRan = refreshAndroidGattCache;
-      } catch (e) {
-        Log?.debug('not connected, try to connect to device has error: ', e);
-        if (shouldRethrowBleSetupError(e)) {
-          throw e;
-        }
-        if (isMtuOrCancelledConnectError(e)) {
-          skipPostConnectMtu = true;
-          Log?.debug('second try to reconnect without params');
-          try {
+      if (!device) {
+        Log?.debug('try to connect to device: ', uuid);
+        try {
+          device = await this.connectWithTimeout(
+            uuid,
+            () => blePlxManager.connectToDevice(uuid, nativeConnectOptions),
+            connectBackstopMs
+          );
+          androidRefreshConnectRan = refreshAndroidGattCache;
+        } catch (e) {
+          Log?.debug('try to connect to device has error: ', e);
+          if (shouldRethrowBleSetupError(e)) {
+            throw e;
+          }
+          if (isMtuOrCancelledConnectError(e)) {
+            skipPostConnectMtu = true;
+            Log?.debug('first try to reconnect without params');
             device = await this.connectWithTimeout(
               uuid,
-              () => disconnectedDevice.connect(bareConnectOptions),
+              () => blePlxManager.connectToDevice(uuid, bareConnectOptions),
               connectBackstopMs
             );
-          } catch (fallbackError) {
-            Log?.debug('last try to reconnect error: ', fallbackError);
-            // last try to reconnect device if this issue exists
-            // https://github.com/dotintent/react-native-ble-plx/issues/426
-            if (fallbackError.errorCode === BleErrorCode.OperationCancelled) {
-              Log?.debug('last try to reconnect');
-              await disconnectedDevice.cancelConnection();
+          } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
+            Log?.debug('device already connected');
+            throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
+          } else {
+            remapError(e);
+          }
+        }
+      }
+
+      if (!device) {
+        throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'unable to connect to device');
+      }
+
+      if (
+        refreshAndroidGattCache &&
+        !androidRefreshConnectRan &&
+        (await device.isConnected().catch(() => false))
+      ) {
+        // refreshGatt only reaches the stack through a connect. A link that is still up would
+        // skip the connect below and keep serving the stale table, so it is dropped first.
+        await this.dropAndroidLink(uuid, blePlxManager, device, 'gatt cache refresh');
+        this.throwIfBondingStopped(bondSignal);
+      }
+
+      if (!(await device.isConnected())) {
+        Log?.debug('not connected, try to connect to device: ', uuid);
+        const disconnectedDevice = device;
+
+        try {
+          device = await this.connectWithTimeout(
+            uuid,
+            () => disconnectedDevice.connect(nativeConnectOptions),
+            connectBackstopMs
+          );
+          androidRefreshConnectRan = refreshAndroidGattCache;
+        } catch (e) {
+          Log?.debug('not connected, try to connect to device has error: ', e);
+          if (shouldRethrowBleSetupError(e)) {
+            throw e;
+          }
+          if (isMtuOrCancelledConnectError(e)) {
+            skipPostConnectMtu = true;
+            Log?.debug('second try to reconnect without params');
+            try {
               device = await this.connectWithTimeout(
                 uuid,
                 () => disconnectedDevice.connect(bareConnectOptions),
                 connectBackstopMs
               );
+            } catch (fallbackError) {
+              Log?.debug('last try to reconnect error: ', fallbackError);
+              // last try to reconnect device if this issue exists
+              // https://github.com/dotintent/react-native-ble-plx/issues/426
+              if (fallbackError.errorCode === BleErrorCode.OperationCancelled) {
+                Log?.debug('last try to reconnect');
+                await disconnectedDevice.cancelConnection();
+                device = await this.connectWithTimeout(
+                  uuid,
+                  () => disconnectedDevice.connect(bareConnectOptions),
+                  connectBackstopMs
+                );
+              } else {
+                remapError(fallbackError);
+              }
+            }
+          } else {
+            remapError(e);
+          }
+        }
+      }
+
+      this.throwIfBondingStopped(bondSignal);
+      if (Platform.OS === 'android' && !(await device.isConnected().catch(() => false))) {
+        const disconnectedDevice = device;
+        await this.runNativeTeardown(uuid, blePlxManager, async () => {
+          await Promise.all([
+            this.runBestEffortNativeOperation('connect failure: cancel manager connection', () =>
+              blePlxManager.cancelDeviceConnection(uuid)
+            ),
+            this.runBestEffortNativeOperation('connect failure: cancel device connection', () =>
+              disconnectedDevice.cancelConnection()
+            ),
+          ]);
+        });
+        throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'device is not connected');
+      }
+      this.throwIfBondingStopped(bondSignal);
+      let characteristics: ResolvedBleCharacteristics | undefined;
+      if (isAndroid) {
+        if (refreshAndroidGattCache) {
+          // refreshGatt has already started a full rediscovery; let it finish before the MTU
+          // exchange so the request is not queued behind it.
+          characteristics = await this.resolveCharacteristicsWithTimeout(uuid, device);
+          if (androidRefreshConnectRan) this.androidGattCacheRefreshes.delete(uuid);
+          this.throwIfBondingStopped(bondSignal);
+        }
+        device = await this.negotiateAndroidMtu(uuid, blePlxManager, device);
+      } else if (!skipPostConnectMtu) {
+        // Match 1.1.31: MTU is a connect() best-effort. If connect already fell back
+        // without requestMTU, do not put another requestMTU on the native serial
+        // queue — that is what wedges GATT after Account#2 reconnect.
+        const mtuResult = await resolveNegotiatedMtu(device, transactionId =>
+          blePlxManager.cancelTransaction(transactionId)
+        );
+        device = mtuResult.device;
+        if (mtuResult.timedOut) {
+          this.throwIfBondingStopped(bondSignal);
+          Log?.debug(
+            '[ReactNativeBleTransport] post-connect MTU timed out, reconnecting without requesting MTU'
+          );
+          const timedOutDevice = device;
+          let mtuTeardownSettled = false;
+          await this.runNativeTeardown(uuid, blePlxManager, async () => {
+            await this.runBestEffortNativeOperation('mtu timeout: cancel device connection', () =>
+              timedOutDevice.cancelConnection()
+            );
+            mtuTeardownSettled = true;
+          });
+          this.throwIfBondingStopped(bondSignal);
+          if (!mtuTeardownSettled || this.blePlxManager !== blePlxManager) {
+            // The teardown budget expired and the manager that owned timedOutDevice was reset.
+            throw ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'BLE MTU cleanup timed out');
+          }
+          try {
+            device = await this.connectWithTimeout(
+              uuid,
+              () => timedOutDevice.connect(bareConnectOptions),
+              connectBackstopMs
+            );
+          } catch (error) {
+            if (shouldRethrowBleSetupError(error)) throw error;
+            if (
+              (error as { errorCode?: unknown })?.errorCode === BleErrorCode.DeviceAlreadyConnected
+            ) {
+              // GATT resolution and the protocol probe below still validate the retained link.
+              device = timedOutDevice;
             } else {
-              remapError(fallbackError);
+              remapError(error);
             }
           }
-        } else {
-          remapError(e);
         }
       }
-    }
+      this.throwIfBondingStopped(bondSignal);
+      const acquiredDevice = device;
+      const { writeCharacteristic, notifyCharacteristic } =
+        characteristics ?? (await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice));
+      this.throwIfBondingStopped(bondSignal);
 
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    if (Platform.OS === 'android' && !(await device.isConnected().catch(() => false))) {
-      const disconnectedDevice = device;
-      await this.runNativeTeardown(uuid, blePlxManager, async () => {
-        await Promise.all([
-          this.runBestEffortNativeOperation('connect failure: cancel manager connection', () =>
-            blePlxManager.cancelDeviceConnection(uuid)
-          ),
-          this.runBestEffortNativeOperation('connect failure: cancel device connection', () =>
-            disconnectedDevice.cancelConnection()
-          ),
-        ]);
-      });
-      throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'device is not connected');
-    }
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    let characteristics: ResolvedBleCharacteristics | undefined;
-    if (isAndroid) {
-      if (refreshAndroidGattCache) {
-        // refreshGatt has already started a full rediscovery; let it finish before the MTU
-        // exchange so the request is not queued behind it.
-        characteristics = await this.resolveCharacteristicsWithTimeout(uuid, device);
-        if (androidRefreshConnectRan) this.androidGattCacheRefreshes.delete(uuid);
-        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+      const protocolHint = expectedProtocol
+        ? undefined
+        : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
+
+      // release transport before new transport instance
+      await this.releaseUnlocked(uuid, true);
+      if (protocolHint) {
+        this.deviceProtocolHints.set(uuid, protocolHint);
       }
-      device = await this.negotiateAndroidMtu(uuid, blePlxManager, device);
-    } else if (!skipPostConnectMtu) {
-      // Match 1.1.31: MTU is a connect() best-effort. If connect already fell back
-      // without requestMTU, do not put another requestMTU on the native serial
-      // queue — that is what wedges GATT after Account#2 reconnect.
-      const mtuResult = await resolveNegotiatedMtu(device, transactionId =>
-        blePlxManager.cancelTransaction(transactionId)
-      );
-      device = mtuResult.device;
-      if (mtuResult.timedOut) {
-        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-        Log?.debug(
-          '[ReactNativeBleTransport] post-connect MTU timed out, reconnecting without requesting MTU'
-        );
-        const timedOutDevice = device;
-        let mtuTeardownSettled = false;
-        await this.runNativeTeardown(uuid, blePlxManager, async () => {
-          await this.runBestEffortNativeOperation('mtu timeout: cancel device connection', () =>
-            timedOutDevice.cancelConnection()
-          );
-          mtuTeardownSettled = true;
+
+      try {
+        await this.installTransportForAcquire(uuid, acquiredDevice, {
+          writeCharacteristic,
+          notifyCharacteristic,
         });
-        if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-        if (!mtuTeardownSettled || this.blePlxManager !== blePlxManager) {
-          // The teardown budget expired and the manager that owned timedOutDevice was reset.
-          throw ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'BLE MTU cleanup timed out');
-        }
-        try {
-          device = await this.connectWithTimeout(
-            uuid,
-            () => timedOutDevice.connect(bareConnectOptions),
-            connectBackstopMs
-          );
-        } catch (error) {
-          if (shouldRethrowBleSetupError(error)) throw error;
-          if (
-            (error as { errorCode?: unknown })?.errorCode === BleErrorCode.DeviceAlreadyConnected
-          ) {
-            // GATT resolution and the protocol probe below still validate the retained link.
-            device = timedOutDevice;
-          } else {
-            remapError(error);
+
+        if (skipProtocolProbe) {
+          if (!expectedProtocol) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'skipProtocolProbe requires an expected BLE protocol'
+            );
           }
+          const hasConfirmedProtocol =
+            this.sessionProtocols.get(uuid) === expectedProtocol ||
+            (expectedProtocol === 'V2' && this.confirmedProtocolV2.has(uuid));
+          if (!hasConfirmedProtocol) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'skipProtocolProbe requires a previously confirmed protocol for this BLE endpoint'
+            );
+          }
+          this.deviceProtocol.set(uuid, expectedProtocol);
+          this.sessionProtocols.set(uuid, expectedProtocol);
+          this.protocolReprobeFailures.delete(uuid);
+          Log?.debug('[ReactNativeBleTransport] protocol selected without probe', {
+            deviceId: uuid,
+            protocol: expectedProtocol,
+            source: 'firmware-install-reconnect',
+          });
+          const currentTransport = transportCache[uuid];
+          if (!currentTransport) {
+            throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+          }
+          this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
+          return { uuid, protocolType: expectedProtocol };
         }
-      }
-    }
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-    const acquiredDevice = device;
-    const { writeCharacteristic, notifyCharacteristic } =
-      characteristics ?? (await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice));
-    if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
 
-    const protocolHint = expectedProtocol
-      ? undefined
-      : input.protocolHint ?? this.deviceProtocolHints.get(uuid);
-
-    // release transport before new transport instance
-    await this.releaseUnlocked(uuid, true);
-    if (protocolHint) {
-      this.deviceProtocolHints.set(uuid, protocolHint);
-    }
-
-    try {
-      await this.installTransportForAcquire(uuid, acquiredDevice, {
-        writeCharacteristic,
-        notifyCharacteristic,
-      });
-
-      if (skipProtocolProbe) {
-        if (!expectedProtocol) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'skipProtocolProbe requires an expected BLE protocol'
-          );
-        }
-        const hasConfirmedProtocol =
-          this.sessionProtocols.get(uuid) === expectedProtocol ||
-          (expectedProtocol === 'V2' && this.confirmedProtocolV2.has(uuid));
-        if (!hasConfirmedProtocol) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'skipProtocolProbe requires a previously confirmed protocol for this BLE endpoint'
-          );
-        }
-        this.deviceProtocol.set(uuid, expectedProtocol);
-        this.sessionProtocols.set(uuid, expectedProtocol);
-        this.protocolReprobeFailures.delete(uuid);
-        Log?.debug('[ReactNativeBleTransport] protocol selected without probe', {
-          deviceId: uuid,
-          protocol: expectedProtocol,
-          source: 'firmware-install-reconnect',
-        });
+        const protocolType = await this.detectProtocol(
+          uuid,
+          expectedProtocol,
+          protocolHint,
+          async () => {
+            await this.installTransportForAcquire(uuid, acquiredDevice);
+          }
+        );
+        this.throwIfBondingStopped(bondSignal);
         const currentTransport = transportCache[uuid];
         if (!currentTransport) {
           throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
         }
         this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
-        return { uuid, protocolType: expectedProtocol };
+        return { uuid, protocolType };
+      } catch (error) {
+        // A failed acquire must retire the physical link before Core retries. Logical
+        // release leaves GATT connected even when neither protocol receives a response.
+        await this.disconnectUnlocked(uuid);
+        throw error;
       }
-
-      const protocolType = await this.detectProtocol(
-        uuid,
-        expectedProtocol,
-        protocolHint,
-        async () => {
-          await this.installTransportForAcquire(uuid, acquiredDevice);
-        }
-      );
-      if (this.stopped) throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
-      const currentTransport = transportCache[uuid];
-      if (!currentTransport) {
-        throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
-      }
-      this.attachDisconnectSubscription(currentTransport, currentTransport.device, uuid);
-      return { uuid, protocolType };
-    } catch (error) {
-      // A failed acquire must retire the physical link before Core retries. Logical
-      // release leaves GATT connected even when neither protocol receives a response.
-      await this.disconnectUnlocked(uuid);
-      throw error;
+    } finally {
+      this.releaseBondAbortController(uuid, bondController);
     }
   }
 
@@ -2348,7 +2404,7 @@ export default class ReactNativeBleTransport {
     if (this.stopPromise) return this.stopPromise;
     this.stopped = true;
     // Bonding precedes GATT, so cancelDeviceConnection cannot end this wait.
-    this.bondAbortController.abort();
+    this.abortActiveBonding();
     const deviceIds = new Set([
       ...this.monitorTokens.keys(),
       ...this.sessionProtocols.keys(),
@@ -2392,6 +2448,7 @@ export default class ReactNativeBleTransport {
   }
 
   async disconnect(session: string) {
+    this.abortActiveBonding(session);
     return this.runLifecycleOperation(session, () => this.disconnectUnlocked(session));
   }
 
@@ -2547,6 +2604,7 @@ export default class ReactNativeBleTransport {
 
   async cancel() {
     Log?.debug('transport-react-native transport cancel');
+    this.abortActiveBonding();
     const pending = this.runPromise;
     const deviceId = this.runPromiseDeviceId;
     if (pending) {
@@ -3228,24 +3286,29 @@ export default class ReactNativeBleTransport {
 
     this.probingProtocols.set(uuid, 'V2');
     this.protocolV2Assemblers.get(uuid)?.reset();
-    const detected = await probeProtocolV2Helper({
-      call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
-        this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
-      logger: Log,
-      logPrefix: 'ProtocolV2 RN-BLE',
-      onProbeFailed: () => {
-        this.protocolV2Assemblers.get(uuid)?.reset();
-        this.resetProtocolV2Frames(uuid);
-      },
-      shouldRethrow: shouldRethrowProtocolProbeError,
-    });
-    if (!detected) {
+    try {
+      const detected = await probeProtocolV2Helper({
+        call: (name: string, data: Record<string, unknown>, options?: TransportCallOptions) =>
+          this.callProtocolV2(uuid, name, data, options),
+        timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
+        logger: Log,
+        logPrefix: 'ProtocolV2 RN-BLE',
+        onProbeFailed: () => {
+          this.protocolV2Assemblers.get(uuid)?.reset();
+          this.resetProtocolV2Frames(uuid);
+        },
+        shouldRethrow: shouldRethrowProtocolProbeError,
+      });
+      if (!detected) {
+        this.clearProbeProtocol(uuid, 'V2');
+      } else {
+        this.probingProtocols.delete(uuid);
+      }
+      return detected;
+    } catch (error) {
       this.clearProbeProtocol(uuid, 'V2');
-    } else {
-      this.probingProtocols.delete(uuid);
+      throw error;
     }
-    return detected;
   }
 
   private handleProtocolV2Notification(uuid: string, monitorToken: number, data: Uint8Array) {

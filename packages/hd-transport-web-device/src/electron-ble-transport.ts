@@ -91,6 +91,21 @@ const BLE_WRITE_DELAY_MS = 5;
 const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 
+const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
+  if (isProtocolV2LinkDisabledError(error)) {
+    return true;
+  }
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  // Pairing-recovery and cancel failures are not protocol mismatches; preserve
+  // them instead of falling through to another probe or ProbeFailed.
+  return (
+    code === HardwareErrorCode.BleDeviceBondError ||
+    code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
+    code === HardwareErrorCode.BleBondInvalid
+  );
+};
+
 /**
  * Desktop Electron BLE transport with automatic Protocol V1/V2 detection.
  *
@@ -689,7 +704,7 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
-      if (isProtocolV2LinkDisabledError(error)) {
+      if (shouldRethrowProtocolProbeError(error)) {
         throw error;
       }
       return false;
@@ -703,22 +718,27 @@ export default class ElectronBleTransport {
 
     this.deviceProtocol.set(uuid, 'V2');
     this.v2Assemblers.get(uuid)?.reset();
-    const detected = await probeProtocolV2Helper({
-      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
-      logger: this.Log,
-      logPrefix: 'ProtocolV2 BLE',
-      onProbeFailed: () => {
-        this.v2Assemblers.get(uuid)?.reset();
-        this.resetProtocolV2Frames(uuid);
-      },
-      // A declared V2 protocol needs no fallback; preserve the actual link failure.
-      shouldRethrow: error => expectedProtocol === 'V2' || isProtocolV2LinkDisabledError(error),
-    });
-    if (!detected) {
+    try {
+      const detected = await probeProtocolV2Helper({
+        call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
+        timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
+        logger: this.Log,
+        logPrefix: 'ProtocolV2 BLE',
+        onProbeFailed: () => {
+          this.v2Assemblers.get(uuid)?.reset();
+          this.resetProtocolV2Frames(uuid);
+        },
+        // A declared V2 protocol needs no fallback; preserve the actual link failure.
+        shouldRethrow: error => expectedProtocol === 'V2' || shouldRethrowProtocolProbeError(error),
+      });
+      if (!detected) {
+        this.clearProbeProtocol(uuid, 'V2');
+      }
+      return detected;
+    } catch (error) {
       this.clearProbeProtocol(uuid, 'V2');
+      throw error;
     }
-    return detected;
   }
 
   private async writeOnce(uuid: string, hexData: string): Promise<void> {

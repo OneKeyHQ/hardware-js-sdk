@@ -732,6 +732,115 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(device.connect).not.toHaveBeenCalled();
   });
 
+  test('does not retry pairDevice after cancel during Android bond delay and allows the next acquire to bond', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    pairDeviceMock.mockClear();
+    pairDeviceMock
+      .mockResolvedValueOnce({ bonded: false, bonding: false })
+      .mockResolvedValueOnce({ bonded: true, bonding: false });
+    device.connect = jest.fn().mockResolvedValue(device);
+
+    const acquiring = transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const rejection = acquiring.catch(error => error);
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+
+    await transport.cancel();
+    const error = await rejection;
+    expect(error).toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    expect([
+      HardwareErrorCode.BleDeviceNotBonded,
+      HardwareErrorCode.BleDeviceBondError,
+      HardwareErrorCode.BlePeerRemovedPairingInformation,
+      HardwareErrorCode.BleBondInvalid,
+    ]).not.toContain(error.errorCode);
+    await new Promise(resolve => {
+      setTimeout(resolve, 350);
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+    expect(device.connect).not.toHaveBeenCalled();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(2);
+    await transport.release(uuid, true);
+  });
+
+  test('does not retry pairDevice after cancel while pairDevice is pending', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    const pendingBond = createDeferred<{ bonded: boolean; bonding: boolean }>();
+    pairDeviceMock.mockClear();
+    pairDeviceMock
+      .mockImplementationOnce(() => pendingBond.promise)
+      .mockResolvedValueOnce({ bonded: true, bonding: false });
+    device.connect = jest.fn().mockResolvedValue(device);
+
+    const acquiring = transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const rejection = expect(acquiring).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+
+    const cancelling = transport.cancel();
+    pendingBond.resolve({ bonded: false, bonding: false });
+    await cancelling;
+    await rejection;
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+    expect(device.connect).not.toHaveBeenCalled();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(2);
+    await transport.release(uuid, true);
+  });
+
+  test('does not retry pairDevice after disconnect during Android bond delay', async () => {
+    setPlatformOS('android');
+    const { transport, uuid, device } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    pairDeviceMock.mockClear();
+    pairDeviceMock
+      .mockResolvedValueOnce({ bonded: false, bonding: false })
+      .mockResolvedValueOnce({ bonded: true, bonding: false });
+    device.connect = jest.fn().mockResolvedValue(device);
+
+    const acquiring = transport.acquire({ uuid, expectedProtocol: 'V2' });
+    const rejection = expect(acquiring).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+
+    await transport.disconnect(uuid);
+    await rejection;
+    expect(pairDeviceMock).toHaveBeenCalledTimes(1);
+    expect(device.connect).not.toHaveBeenCalled();
+
+    await expect(transport.acquire({ uuid, expectedProtocol: 'V2' })).resolves.toEqual({
+      uuid,
+      protocolType: 'V2',
+    });
+    expect(pairDeviceMock).toHaveBeenCalledTimes(2);
+    await transport.release(uuid, true);
+  });
+
   test('does not call pairDevice when stop happens before the first Android bond attempt', async () => {
     setPlatformOS('android');
     const { transport, uuid, device } = createHarness();
@@ -1228,8 +1337,11 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     async protocol => {
       for (const errorCode of [
         HardwareErrorCode.BleDeviceNotBonded,
+        HardwareErrorCode.BleDeviceBondError,
         HardwareErrorCode.BleDeviceBondedCanceled,
+        HardwareErrorCode.BlePeerRemovedPairingInformation,
         HardwareErrorCode.BleDeviceDisconnected,
+        HardwareErrorCode.BleBondInvalid,
         HardwareErrorCode.BleCharacteristicNotifyError,
         HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
         HardwareErrorCode.BleWriteCharacteristicError,
@@ -1252,6 +1364,32 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
       }
     }
   );
+
+  test('preserves iOS stale bond from the V2 notification monitor during undeclared protocol probe', async () => {
+    setPlatformOS('ios');
+    const harness = createHarness();
+    const { transport, uuid, writeCharacteristic } = harness;
+    harness.setShouldRespond(false);
+    jest
+      .spyOn(transport as any, 'callProtocolV1')
+      .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.BleTimeoutError));
+    writeCharacteristic.writeWithoutResponse.mockImplementationOnce(() => {
+      setTimeout(() => {
+        harness.emitMonitorError(
+          Object.assign(new Error('Device was disconnected'), {
+            iosErrorCode: 14,
+            reason: 'Peer removed pairing information',
+          })
+        );
+      }, 0);
+      return Promise.resolve();
+    });
+
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BlePeerRemovedPairingInformation,
+    });
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
 
   test.each(['V1', 'V2'] as const)(
     'still falls back after a silent %s probe timeout',
