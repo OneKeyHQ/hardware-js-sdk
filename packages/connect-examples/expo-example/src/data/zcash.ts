@@ -1,7 +1,7 @@
 import { ZcashAddressScope, ZcashAddressType } from '@onekeyfe/hd-transport';
+
 import transparent from './fixtures/zcash-transparent.json';
-import orchard from './fixtures/zcash-orchard.json';
-import ironwood from './fixtures/zcash-ironwood.json';
+import { zcashQaPresets, zcashQaRequirements } from './zcashQaPresets';
 import { prepareZcashSample } from '../utils/manualSigning/zcash';
 
 import type {
@@ -42,6 +42,20 @@ const api: PlaygroundProps[] = [
           includeSeedFingerprint: true,
         } satisfies ZcashGetAddressParams,
       },
+      ...[
+        { title: 'Internal / index 1', scope: ZcashAddressScope.INTERNAL, diversifierIndex: 1 },
+        { title: 'Account #2', path: "m/32'/133'/1'" },
+        { title: 'Orchard / max uint32 index', diversifierIndex: 0xffffffff },
+        { title: 'Address without display', showOnOneKey: false },
+      ].map(({ title, ...params }) => ({
+        title,
+        value: {
+          path: "m/32'/133'/0'",
+          addressType: ZcashAddressType.UNIFIED_ORCHARD,
+          showOnOneKey: true,
+          ...params,
+        } satisfies ZcashGetAddressParams,
+      })),
       {
         title: 'Batch Get Address',
         value: {
@@ -74,28 +88,19 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'zcashSignPczt',
-    description: '先选静态样例；透明交易可按当前钱包重绑定，屏蔽交易暂只提供静态测试。',
+    description: `透明静态样例可生成当前钱包测试数据。QA 预设：${zcashQaRequirements}`,
     presupposes: [
       {
         title: '透明交易（静态样例）',
         value: transparent satisfies ZcashSignPcztParams,
         prepareSample: call => prepareZcashSample(call, transparent),
       },
-      {
-        title: '固定 Orchard 屏蔽交易（异钱包拒签）',
-        value: orchard satisfies ZcashSignPcztParams,
+      ...zcashQaPresets.map(preset => ({
+        title: preset.title,
+        description: preset.description,
+        value: preset.value,
         prepareSample: null,
-      },
-      {
-        title: '固定 Ironwood 屏蔽交易（异钱包拒签）',
-        value: ironwood satisfies ZcashSignPcztParams,
-        prepareSample: null,
-      },
-      {
-        title: '错误格式（应拒绝）',
-        value: { pczt: '00' } satisfies ZcashSignPcztParams,
-        prepareSample: null,
-      },
+      })),
     ],
   },
 ];
