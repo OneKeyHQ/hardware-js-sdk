@@ -6,10 +6,9 @@ import OpenWalletSession from '../src/api/OpenWalletSession';
 import { Device } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
 import { DEVICE } from '../src/events';
-import {
-  ensureProtocolV2WalletSessionUnlocked,
-  getProtocolV2WalletSession,
-} from '../src/protocols/protocol-v2/walletSession';
+import * as walletSession from '../src/protocols/protocol-v2/walletSession';
+
+const { ensureProtocolV2WalletSessionUnlocked, getProtocolV2WalletSession } = walletSession;
 
 const STANDARD_SEED_DOMAINS = [DeviceSessionSeedDomain.SeedDomain_Standard];
 const CARDANO_SEED_DOMAINS = [
@@ -1768,24 +1767,46 @@ describe('openWalletSession', () => {
     }
   );
 
-  test.each([false, true])(
-    'openWalletSession does not thread CommonParams.deriveCardano: %s',
-    async deriveCardano => {
+  test.each([
+    {
+      mode: 'standard' as const,
+      deriveCardano: true,
+      expectedSeedDomains: CARDANO_SEED_DOMAINS,
+    },
+    {
+      mode: 'standard' as const,
+      deriveCardano: false,
+      expectedSeedDomains: STANDARD_SEED_DOMAINS,
+    },
+    {
+      mode: 'select-hidden' as const,
+      deriveCardano: true,
+      expectedSeedDomains: CARDANO_SEED_DOMAINS,
+    },
+    {
+      mode: 'select-hidden' as const,
+      deriveCardano: false,
+      expectedSeedDomains: STANDARD_SEED_DOMAINS,
+    },
+  ])(
+    'forwards deriveCardano=$deriveCardano in openWalletSession ($mode)',
+    async ({ mode, deriveCardano, expectedSeedDomains }) => {
       const typedCall = jest
         .fn()
         .mockResolvedValueOnce({ message: { version: 2 } })
         .mockResolvedValueOnce({ message: {} })
         .mockResolvedValueOnce({
           message: {
-            btc_test_address: 'hidden-state',
-            session_id: 'new-session',
+            btc_test_address: mode === 'standard' ? 'standard-state' : 'hidden-state',
+            session_id: mode === 'standard' ? 'standard-session' : 'hidden-session',
+            seed_domains: expectedSeedDomains,
           },
         });
       const method = new OpenWalletSession({
         payload: {
           method: 'openWalletSession',
           connectId: 'connect-id',
-          mode: 'select-hidden',
+          mode,
           deriveCardano,
         },
       });
@@ -1795,14 +1816,16 @@ describe('openWalletSession', () => {
         promptPassphrase: jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' }),
       }) as any;
 
+      expect(method.params).toEqual({ mode, deriveCardano });
       await expect(method.run()).resolves.toMatchObject({
-        walletType: 'hidden',
-        passphraseState: 'hidden-state',
+        protocol: 'V2',
+        walletType: mode === 'standard' ? 'standard' : 'hidden',
+        passphraseState: mode === 'standard' ? null : 'hidden-state',
       });
       expect(typedCall).toHaveBeenCalledWith('DeviceSessionAskPassphrase', 'Success', {
-        passphrase: 'host hidden wallet',
+        passphrase: mode === 'standard' ? '' : 'host hidden wallet',
         on_device: false,
-        seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
+        seed_domains: expectedSeedDomains,
       });
       expect(typedCall).toHaveBeenCalledWith(
         'DeviceSessionGet',
@@ -2203,6 +2226,325 @@ describe('openWalletSession', () => {
       passphrase: 'host hidden wallet',
       on_device: false,
       seed_domains: [DeviceSessionSeedDomain.SeedDomain_Standard],
+    });
+  });
+
+  test.each(['standard', 'select-hidden'] as const)(
+    'does not set deriveCardano when omitted in openWalletSession (%s)',
+    async mode => {
+      const spy = jest.spyOn(walletSession, 'getProtocolV2WalletSession').mockResolvedValue({
+        passphraseState: mode === 'standard' ? 'standard-state' : 'hidden-state',
+        newSession: 'session-1',
+        unlockedAttachPin: false,
+        resumed: false,
+        walletStatusRefreshed: true,
+      });
+
+      try {
+        const method = new OpenWalletSession({
+          payload: {
+            method: 'openWalletSession',
+            connectId: 'connect-id',
+            mode,
+          },
+        });
+        method.init();
+        method.device = createDevice() as any;
+
+        expect(method.params).toEqual({ mode });
+        expect('deriveCardano' in method.params).toBe(false);
+
+        await method.run();
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        const forwardedOptions = spy.mock.calls[0][1];
+        expect(forwardedOptions).toBeDefined();
+        expect('deriveCardano' in (forwardedOptions as Record<string, unknown>)).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
+    }
+  );
+
+  test.each(['true', 'false', 1, 0, null, {}])(
+    'rejects invalid deriveCardano parameter type: %p',
+    invalidDeriveCardano => {
+      const method = new OpenWalletSession({
+        payload: {
+          method: 'openWalletSession',
+          connectId: 'connect-id',
+          mode: 'select-hidden',
+          deriveCardano: invalidDeriveCardano,
+        } as any,
+      });
+
+      expect(() => method.init()).toThrow(
+        expect.objectContaining({
+          errorCode: HardwareErrorCode.CallMethodInvalidParameter,
+          message: 'Parameter [deriveCardano] is of type invalid and should be [boolean].',
+        })
+      );
+    }
+  );
+
+  test.each(['standard', 'select-hidden'] as const)(
+    'ignores deriveCardano harmlessly on Protocol V1 openWalletSession (%s)',
+    async mode => {
+      const typedCall = jest.fn().mockResolvedValue({
+        type: 'PassphraseState',
+        message: {
+          passphrase_state: mode === 'standard' ? 'main-wallet-state' : 'hidden-wallet-state',
+          session_id: 'v1-session',
+          unlocked_attach_pin: false,
+        },
+      });
+      const method = new OpenWalletSession({
+        payload: {
+          method: 'openWalletSession',
+          connectId: 'connect-id',
+          mode,
+          deriveCardano: true,
+        },
+      });
+      method.init();
+      const device = createDevice({ typedCall });
+      device.isProtocolV2 = () => false;
+      device.features = {
+        ...device.features,
+        deviceId: 'device-1',
+        unlocked: true,
+        sessionId: null,
+      };
+      device.getCurrentFirmwareVersionString = () => '4.15.0';
+      device.getCurrentDeviceType = () => EDeviceType.Pro;
+      device.getFeatures = jest.fn();
+      method.device = device as any;
+
+      await expect(method.run()).resolves.toEqual({
+        protocol: 'V1',
+        walletType: mode === 'standard' ? 'standard' : 'hidden',
+        deviceId: 'device-1',
+        passphraseState: mode === 'standard' ? null : 'hidden-wallet-state',
+        resumed: false,
+      });
+      expect(typedCall).toHaveBeenCalledWith('GetPassphraseState', 'PassphraseState', {
+        passphrase_state: undefined,
+      });
+    }
+  );
+
+  test('forwards deriveCardano in deprecated getPassphraseState on Protocol V2', async () => {
+    const typedCall = jest
+      .fn()
+      .mockResolvedValueOnce({ message: { version: 2 } })
+      .mockResolvedValueOnce({ message: {} })
+      .mockResolvedValueOnce({
+        message: {
+          btc_test_address: 'pro2-wallet-state',
+          session_id: 'pro2-wallet-session',
+          seed_domains: CARDANO_SEED_DOMAINS,
+        },
+      });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' });
+    const method = new GetPassphraseState({
+      payload: {
+        method: 'getPassphraseState',
+        connectId: 'connect-id',
+        initSession: true,
+        useEmptyPassphrase: false,
+        deriveCardano: true,
+      },
+    });
+    method.device = createDevice({ typedCall, promptPassphrase }) as any;
+
+    await expect(method.run()).resolves.toBe('pro2-wallet-state');
+    expect(typedCall).toHaveBeenNthCalledWith(2, 'DeviceSessionAskPassphrase', 'Success', {
+      passphrase: 'host hidden wallet',
+      on_device: false,
+      seed_domains: CARDANO_SEED_DOMAINS,
+    });
+  });
+
+  test('keeps V1 getPassphraseState parameterless even with deriveCardano', async () => {
+    const typedCall = jest.fn().mockResolvedValue({
+      type: 'PassphraseState',
+      message: {
+        passphrase_state: 'current-wallet-state',
+        session_id: 'current-wallet-session',
+        unlocked_attach_pin: false,
+      },
+    });
+    const method = new GetPassphraseState({
+      payload: {
+        method: 'getPassphraseState',
+        connectId: 'connect-id',
+        deriveCardano: true,
+      },
+    });
+    const device = createDevice({ typedCall });
+    device.isProtocolV2 = () => false;
+    device.features = {
+      ...device.features,
+      deviceId: 'device-1',
+      passphraseProtection: true,
+      unlocked: true,
+      sessionId: null,
+    };
+    device.getCurrentFirmwareVersionString = () => '4.15.0';
+    device.getCurrentDeviceType = () => EDeviceType.Pro;
+    device.getFeatures = jest.fn();
+    method.device = device as any;
+
+    await expect(method.run()).resolves.toBe('current-wallet-state');
+    expect(typedCall).toHaveBeenCalledWith('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: undefined,
+    });
+  });
+
+  test('reuses deriveCardano=true hidden session without a second prompt', async () => {
+    let activeSeedDomains = STANDARD_SEED_DOMAINS;
+    const typedCall = jest.fn((request: string, _responseType: string, params?: any) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        activeSeedDomains = params.seed_domains;
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'hidden-cardano-state',
+            session_id: 'hidden-cardano-session',
+            seed_domains: activeSeedDomains,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'host hidden wallet' });
+    const device = createDevice({ typedCall, promptPassphrase });
+
+    const openMethod = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'select-hidden',
+        deriveCardano: true,
+      },
+    });
+    openMethod.init();
+    openMethod.device = device as any;
+
+    const opened = await openMethod.run();
+    expect(opened).toEqual({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'hidden-cardano-state',
+      resumed: false,
+    });
+    expect(promptPassphrase).toHaveBeenCalledTimes(1);
+
+    // Subsequent Cardano call resumes with deriveCardano=true without re-prompting.
+    device.passphraseState = opened.passphraseState ?? undefined;
+    await expect(
+      getProtocolV2WalletSession(device as any, {
+        expectedPassphraseState: opened.passphraseState ?? undefined,
+        deriveCardano: true,
+      })
+    ).resolves.toMatchObject({
+      passphraseState: 'hidden-cardano-state',
+      newSession: 'hidden-cardano-session',
+      resumed: true,
+    });
+
+    expect(promptPassphrase).toHaveBeenCalledTimes(1);
+    expect(
+      typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionAskPassphrase')
+    ).toHaveLength(1);
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {
+      session_id: 'hidden-cardano-session',
+      btc_test_address: 'hidden-cardano-state',
+    });
+  });
+
+  test('reuses deriveCardano=true standard session without second AskPassphrase', async () => {
+    let activeSeedDomains = STANDARD_SEED_DOMAINS;
+    const typedCall = jest.fn((request: string, _responseType: string, params?: any) => {
+      if (request === 'ProtocolInfoRequest') {
+        return { message: { version: 2 } };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        activeSeedDomains = params.seed_domains;
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'standard-cardano-state',
+            session_id: 'standard-cardano-session',
+            seed_domains: activeSeedDomains,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = createDevice({ typedCall });
+    device.getStandardInternalState = () => deviceWalletSessionStore.getStandard('device-1');
+    device.updateInternalState = jest.fn(
+      (
+        _enabled: boolean,
+        passphraseState: string,
+        deviceId: string,
+        sessionId: string,
+        _featuresSessionId?: string | null,
+        walletType?: 'standard' | 'hidden'
+      ) => {
+        if (walletType === 'standard') {
+          deviceWalletSessionStore.setStandard(deviceId, passphraseState, sessionId);
+        } else {
+          deviceWalletSessionStore.set(deviceId, passphraseState, sessionId);
+        }
+      }
+    );
+
+    const openMethod = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'standard',
+        deriveCardano: true,
+      },
+    });
+    openMethod.init();
+    openMethod.device = device as any;
+
+    await expect(openMethod.run()).resolves.toEqual({
+      protocol: 'V2',
+      walletType: 'standard',
+      deviceId: 'device-1',
+      passphraseState: null,
+      resumed: false,
+    });
+
+    await expect(
+      getProtocolV2WalletSession(device as any, {
+        onlyMainPin: true,
+        deriveCardano: true,
+      })
+    ).resolves.toMatchObject({
+      passphraseState: 'standard-cardano-state',
+      newSession: 'standard-cardano-session',
+      resumed: true,
+    });
+
+    expect(
+      typedCall.mock.calls.filter(call => call[0] === 'DeviceSessionAskPassphrase')
+    ).toHaveLength(1);
+    expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {
+      session_id: 'standard-cardano-session',
+      btc_test_address: 'standard-cardano-state',
     });
   });
 });
