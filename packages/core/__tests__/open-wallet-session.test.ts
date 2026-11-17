@@ -6,6 +6,7 @@ import OpenWalletSession from '../src/api/OpenWalletSession';
 import { Device } from '../src/device/Device';
 import { deviceWalletSessionStore } from '../src/device/DeviceWalletSessionStore';
 import { DEVICE } from '../src/events';
+import { PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE } from '../src/protocols/protocol-v2';
 import * as walletSession from '../src/protocols/protocol-v2/walletSession';
 
 const { ensureProtocolV2WalletSessionUnlocked, getProtocolV2WalletSession } = walletSession;
@@ -2545,6 +2546,271 @@ describe('openWalletSession', () => {
     expect(typedCall).toHaveBeenLastCalledWith('DeviceSessionGet', 'DeviceSession', {
       session_id: 'standard-cardano-session',
       btc_test_address: 'standard-cardano-state',
+    });
+  });
+
+  test('opens an Attach PIN session with deriveCardano=true using real Device state projection when empty Ask clears unlocked_by_attach_to_pin', async () => {
+    let unlockedByAttachPin = true;
+    let askedCardano = false;
+    const typedCall = jest.fn((request: string, _responseType: string, params?: any) => {
+      if (request === 'DeviceInfoGet') {
+        return {
+          message: {
+            protocol_version: 2,
+            hw: { serial_no: 'SERIAL-PRO2' },
+            main_mcu: { application: { version: '5.0.0' } },
+          },
+        };
+      }
+      if (request === 'ProtocolInfoRequest') {
+        return {
+          message: {
+            version: 2,
+            build_fingerprint: 'application__5.0.0__abcdef0__PROD__RELEASE',
+            supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+          },
+        };
+      }
+      if (request === 'DeviceStatusGet') {
+        return {
+          message: {
+            device_id: 'device-1',
+            init_states: true,
+            unlocked: true,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: true,
+            unlocked_by_attach_to_pin: unlockedByAttachPin,
+          },
+        };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        askedCardano = true;
+        // Real firmware clears unlocked_by_attach_to_pin on AskPassphrase Success.
+        unlockedByAttachPin = false;
+        expect(params).toEqual({
+          passphrase: '',
+          on_device: false,
+          seed_domains: CARDANO_SEED_DOMAINS,
+        });
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'attach-state',
+            session_id: askedCardano ? 'attach-session-cardano' : 'attach-session',
+            seed_domains: askedCardano ? CARDANO_SEED_DOMAINS : STANDARD_SEED_DOMAINS,
+          },
+        };
+      }
+      if (request === 'LockDevice') {
+        return { message: {} };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const promptPassphrase = jest.fn().mockResolvedValue({ passphrase: 'should-not-ask' });
+    const device = Device.fromDescriptor({
+      id: 'connect-id',
+      path: 'connect-id',
+      commType: 'usb',
+      protocolType: 'V2',
+    } as never);
+    (device as any).commands = { typedCall, promptPassphrase };
+
+    const method = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'select-hidden',
+        deriveCardano: true,
+      },
+    });
+    method.init();
+    method.device = device;
+
+    await expect(method.run()).resolves.toEqual({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'attach-state',
+      resumed: false,
+    });
+    expect(promptPassphrase).not.toHaveBeenCalled();
+    expect(device.features?.unlockedAttachPin).toBe(true);
+    await expect(device.getDeviceState()).resolves.toMatchObject({
+      status: {
+        unlocked: true,
+        passphraseProtection: true,
+        unlockedAttachPin: true,
+      },
+    });
+  });
+
+  test('fails closed on real Device state when empty Cardano Ask switches away from the Attach PIN wallet address', async () => {
+    let unlockedByAttachPin = true;
+    let askedCardano = false;
+    const typedCall = jest.fn((request: string) => {
+      if (request === 'DeviceInfoGet') {
+        return {
+          message: {
+            protocol_version: 2,
+            hw: { serial_no: 'SERIAL-PRO2' },
+            main_mcu: { application: { version: '5.0.0' } },
+          },
+        };
+      }
+      if (request === 'ProtocolInfoRequest') {
+        return {
+          message: {
+            version: 2,
+            build_fingerprint: 'application__5.0.0__abcdef0__PROD__RELEASE',
+            supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+          },
+        };
+      }
+      if (request === 'DeviceStatusGet') {
+        return {
+          message: {
+            device_id: 'device-1',
+            init_states: true,
+            unlocked: true,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: true,
+            unlocked_by_attach_to_pin: unlockedByAttachPin,
+          },
+        };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        askedCardano = true;
+        unlockedByAttachPin = false;
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: askedCardano ? 'switched-wallet-state' : 'attach-state',
+            session_id: askedCardano ? 'switched-session' : 'attach-session',
+            seed_domains: askedCardano ? CARDANO_SEED_DOMAINS : STANDARD_SEED_DOMAINS,
+          },
+        };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const device = Device.fromDescriptor({
+      id: 'connect-id',
+      path: 'connect-id',
+      commType: 'usb',
+      protocolType: 'V2',
+    } as never);
+    (device as any).commands = { typedCall, promptPassphrase: jest.fn() };
+
+    const method = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'select-hidden',
+        deriveCardano: true,
+      },
+    });
+    method.init();
+    method.device = device;
+
+    await expect(method.run()).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceCheckPassphraseStateError,
+    });
+    expect(deviceWalletSessionStore.get('device-1', 'switched-wallet-state')).toBeUndefined();
+  });
+
+  test('preserves real Device state unlockedAttachPin=true after selecting Attach PIN with deriveCardano=true', async () => {
+    let unlockedByAttachPin = false;
+    const typedCall = jest.fn((request: string, _responseType: string, params?: any) => {
+      if (request === 'DeviceInfoGet') {
+        return {
+          message: {
+            protocol_version: 2,
+            hw: { serial_no: 'SERIAL-PRO2' },
+            main_mcu: { application: { version: '5.0.0' } },
+          },
+        };
+      }
+      if (request === 'ProtocolInfoRequest') {
+        return {
+          message: {
+            version: 2,
+            build_fingerprint: 'application__5.0.0__abcdef0__PROD__RELEASE',
+            supported_messages: [PROTOCOL_V2_DEVICE_STATUS_GET_MESSAGE_TYPE],
+          },
+        };
+      }
+      if (request === 'DeviceStatusGet') {
+        return {
+          message: {
+            device_id: 'device-1',
+            init_states: true,
+            unlocked: true,
+            passphrase_enabled: true,
+            attach_to_pin_enabled: true,
+            unlocked_by_attach_to_pin: unlockedByAttachPin,
+          },
+        };
+      }
+      if (request === 'DeviceSessionAskPin') {
+        expect(params).toEqual({ type: DeviceSessionPinType.AttachToPin });
+        unlockedByAttachPin = true;
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionAskPassphrase') {
+        unlockedByAttachPin = false;
+        return { message: {} };
+      }
+      if (request === 'DeviceSessionGet') {
+        return {
+          message: {
+            btc_test_address: 'attach-state',
+            session_id: 'attach-cardano-session',
+            seed_domains: CARDANO_SEED_DOMAINS,
+          },
+        };
+      }
+      if (request === 'LockDevice') {
+        return { message: {} };
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    });
+    const promptPassphrase = jest.fn().mockResolvedValue({ attachPinOnDevice: true });
+    const device = Device.fromDescriptor({
+      id: 'connect-id',
+      path: 'connect-id',
+      commType: 'usb',
+      protocolType: 'V2',
+    } as never);
+    (device as any).commands = { typedCall, promptPassphrase };
+
+    const method = new OpenWalletSession({
+      payload: {
+        method: 'openWalletSession',
+        connectId: 'connect-id',
+        mode: 'select-hidden',
+        deriveCardano: true,
+      },
+    });
+    method.init();
+    method.device = device;
+
+    await expect(method.run()).resolves.toEqual({
+      protocol: 'V2',
+      walletType: 'hidden',
+      deviceId: 'device-1',
+      passphraseState: 'attach-state',
+      resumed: false,
+    });
+    expect(device.features?.unlockedAttachPin).toBe(true);
+    await expect(device.getDeviceState()).resolves.toMatchObject({
+      status: {
+        unlocked: true,
+        passphraseProtection: true,
+        unlockedAttachPin: true,
+      },
     });
   });
 });

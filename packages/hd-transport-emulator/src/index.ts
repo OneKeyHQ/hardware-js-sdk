@@ -174,7 +174,7 @@ export default class EmulatorTransport {
     this.stopped = true;
   }
 
-  cancel() {
+  cancel(_session?: string) {
     this.Log.debug('canceled');
   }
 }

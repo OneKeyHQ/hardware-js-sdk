@@ -91,9 +91,45 @@ const BLE_WRITE_DELAY_MS = 5;
 const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 
+const isSilentWindowsPairingNoResponse = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const candidate = error as { errorCode?: unknown; params?: unknown };
+  const code = candidate.errorCode;
+  if (
+    code !== HardwareErrorCode.BleDeviceBondError &&
+    code !== HardwareErrorCode.BleBondInvalid
+  ) {
+    return false;
+  }
+  const params = candidate.params;
+  if (!params || typeof params !== 'object') {
+    return false;
+  }
+  const { phase, platform, stage, reason, nativeErrorMessage } = params as Record<
+    string,
+    unknown
+  >;
+  if (phase !== 'pairing' || platform !== 'win32' || stage !== 'write') {
+    return false;
+  }
+  if (typeof nativeErrorMessage === 'string' && nativeErrorMessage.length > 0) {
+    return false;
+  }
+  return reason === 'pairing_no_response' || reason === 'stale_bond';
+};
+
 const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   if (isProtocolV2LinkDisabledError(error)) {
     return true;
+  }
+  // A Windows write loop that received no notification without any native error
+  // happens when a V2-only device ignores the initial V1 probe; allow fallback
+  // to the alternate protocol on the same link. Confirmed pairing errors carry
+  // native evidence and remain terminal.
+  if (isSilentWindowsPairingNoResponse(error)) {
+    return false;
   }
   const code = (error as { errorCode?: unknown })?.errorCode;
   // Pairing-recovery and cancel failures are not protocol mismatches; preserve

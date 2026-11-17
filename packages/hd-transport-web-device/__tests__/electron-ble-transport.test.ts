@@ -1,6 +1,7 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
 import {
   EBleDisconnectReason,
+  EOneKeyBleMessageKeys,
   ERRORS,
   HardwareErrorCode,
   createDeferred,
@@ -1097,6 +1098,115 @@ describe('ElectronBleTransport protocol detection', () => {
   });
 
   test.each([
+    [
+      'pairing_no_response',
+      HardwareErrorCode.BleDeviceBondError,
+      { phase: 'pairing', platform: 'win32', stage: 'write', reason: 'pairing_no_response' },
+    ],
+    [
+      'silence stale_bond',
+      HardwareErrorCode.BleBondInvalid,
+      { phase: 'pairing', platform: 'win32', stage: 'write', reason: 'stale_bond' },
+    ],
+  ] as const)(
+    'falls through to Protocol V2 when undeclared V1 probe hits silent Windows %s',
+    async (_label, errorCode, params) => {
+      const device = { id: `win-silent-${errorCode}`, name: 'Unknown BLE Device' };
+      const nobleBle = createNobleBle(device);
+      let notificationHandler: ((deviceId: string, data: string) => void) | undefined;
+      nobleBle.onNotification.mockImplementation(handler => {
+        notificationHandler = handler;
+        return jest.fn();
+      });
+      const probeResponse = ProtocolV2.encodeFrame(
+        schemas,
+        'Success',
+        { message: 'ok' },
+        { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: 1 }
+      );
+      nobleBle.write
+        .mockRejectedValueOnce({
+          name: 'HardwareError',
+          message: 'Silent pairing miss',
+          errorCode,
+          params,
+        })
+        .mockImplementationOnce(() => {
+          setTimeout(() => notificationHandler?.(device.id, bytesToHex(probeResponse)), 0);
+          return Promise.resolve();
+        });
+      const bleTransport = configureTransport(nobleBle);
+
+      try {
+        await expect(bleTransport.acquire({ uuid: device.id })).resolves.toMatchObject({
+          uuid: device.id,
+          protocolType: 'V2',
+        });
+        expect(nobleBle.write).toHaveBeenCalledTimes(2);
+        expect(nobleBle.disconnect).not.toHaveBeenCalled();
+      } finally {
+        await bleTransport.release(device.id);
+      }
+    }
+  );
+
+  test.each([
+    [
+      HardwareErrorCode.BleDeviceBondError,
+      {
+        phase: 'pairing',
+        platform: 'win32',
+        stage: 'write',
+        reason: 'pairing_failed',
+        nativeErrorMessage: 'Access denied',
+      },
+    ],
+    [
+      HardwareErrorCode.BleBondInvalid,
+      {
+        phase: 'pairing',
+        platform: 'win32',
+        stage: 'write',
+        reason: 'stale_bond',
+        nativeErrorMessage: 'status: 3',
+      },
+    ],
+    [
+      HardwareErrorCode.BleBondInvalid,
+      {
+        phase: 'pairing',
+        platform: 'win32',
+        stage: 'subscribe',
+        reason: 'stale_bond',
+      },
+    ],
+  ] as const)(
+    'keeps confirmed Windows pairing failure %s terminal during undeclared V1 probe',
+    async (errorCode, params) => {
+      const device = { id: `win-confirmed-${errorCode}-${params.stage}`, name: 'Unknown BLE Device' };
+      const nobleBle = createNobleBle(device);
+      nobleBle.write.mockRejectedValueOnce({
+        name: 'HardwareError',
+        message: 'Confirmed pairing failure',
+        errorCode,
+        params,
+      });
+      const bleTransport = configureTransport(nobleBle);
+      const probeProtocolV2 = jest.spyOn(bleTransport as any, 'probeProtocolV2');
+
+      await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+        errorCode,
+        params,
+      });
+
+      expect(probeProtocolV2).not.toHaveBeenCalled();
+      expect(nobleBle.write).toHaveBeenCalledTimes(1);
+      expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+      expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    }
+  );
+
+  test.each([
     HardwareErrorCode.BleDeviceBondError,
     HardwareErrorCode.BleDeviceBondedCanceled,
     HardwareErrorCode.BlePeerRemovedPairingInformation,
@@ -1477,6 +1587,338 @@ describe('ElectronBleTransport protocol detection', () => {
       expect(nobleBle.write).toHaveBeenCalledTimes(1);
     } finally {
       await bleTransport.release(device.id);
+    }
+  });
+});
+
+describe('ElectronBleTransport Windows write-loop protocol detection integration', () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    delete (global as any).window;
+    jest.useRealTimers();
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  const setupWindowsIntegration = async (options?: { writeErrorOnV1?: Error }) => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const notificationListeners = new Set<(deviceId: string, data: string) => void>();
+    const disconnectListeners = new Set<
+      (device: { id: string; name: string; reason?: EBleDisconnectReason }) => void
+    >();
+    const mtuListeners = new Set<(device: { id: string; mtu: number }) => void>();
+
+    const webContents = {
+      isDestroyed: jest.fn(() => false),
+      on: jest.fn(),
+      send: jest.fn((channel: string, ...args: unknown[]) => {
+        if (channel === EOneKeyBleMessageKeys.NOBLE_BLE_NOTIFICATION) {
+          const [deviceId, data] = args as [string, string];
+          notificationListeners.forEach(listener => listener(deviceId, data));
+        } else if (channel === EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED) {
+          const [payload] = args as [
+            { id: string; name: string; reason?: EBleDisconnectReason }
+          ];
+          disconnectListeners.forEach(listener => listener(payload));
+        } else if (channel === EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED) {
+          const [payload] = args as [{ id: string; mtu: number }];
+          mtuListeners.forEach(listener => listener(payload));
+        }
+      }),
+    };
+
+    const ipcMain = {
+      handle: jest.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+        handlers.set(channel, handler);
+      }),
+      removeHandler: jest.fn((channel: string) => {
+        handlers.delete(channel);
+      }),
+    };
+
+    const deviceId = 'win-v2-only-device';
+    let responseSeq = 0;
+
+    const notifyCharacteristic = Object.assign(new EventEmitter(), {
+      uuid: '0003',
+      unsubscribe: jest.fn((callback: (error?: Error) => void) => callback()),
+      subscribe: jest.fn((callback: (error?: Error) => void) => callback()),
+    });
+
+    const writeCharacteristic = Object.assign(new EventEmitter(), {
+      uuid: '0002',
+      write: jest.fn(
+        (buffer: Buffer, _withoutResponse: boolean, callback: (error?: Error) => void) => {
+          if (buffer[0] === 0x5a) {
+            // Emit synchronously so attemptWindowsWriteUntilPaired observes
+            // pairedDevices before it starts another silent retry.
+            notifyCharacteristic.emit('data', Buffer.alloc(0));
+            callback();
+            return;
+          }
+          if (options?.writeErrorOnV1) {
+            callback(options.writeErrorOnV1);
+            return;
+          }
+          // Healthy V2-only device ignores V1 GetFeatures silently without native errors.
+          callback();
+        }
+      ),
+    });
+
+    const service = {
+      uuid: '0001',
+      discoverCharacteristics: jest.fn(
+        (
+          _characteristicUuids: string[],
+          callback: (error: Error | null, value: unknown[]) => void
+        ) => callback(null, [writeCharacteristic, notifyCharacteristic])
+      ),
+    };
+
+    const peripheral = Object.assign(new EventEmitter(), {
+      id: deviceId,
+      state: 'disconnected',
+      advertisement: {
+        localName: 'Unknown BLE Device',
+        serviceUuids: ['0001', 'fffd'],
+      },
+      connect: jest.fn((callback: (error?: Error) => void) => {
+        peripheral.state = 'connected';
+        callback();
+      }),
+      disconnect: jest.fn((callback: () => void) => {
+        peripheral.state = 'disconnected';
+        callback();
+      }),
+      discoverServices: jest.fn(
+        (_serviceUuids: string[], callback: (error: Error | null, value: unknown[]) => void) =>
+          callback(null, [service])
+      ),
+    });
+
+    const noble = Object.assign(new EventEmitter(), {
+      state: 'poweredOn',
+      startScanning: jest.fn((_services, _duplicates, callback) => {
+        callback?.();
+        noble.emit('discover', peripheral);
+      }),
+      stopScanning: jest.fn(callback => callback?.()),
+      stop: jest.fn(),
+    });
+
+    jest.resetModules();
+    jest.doMock('@stoprocent/noble', () => noble);
+    jest.doMock(
+      'electron',
+      () => ({
+        ipcMain,
+        webContents: { getAllWebContents: () => [webContents] },
+      }),
+      { virtual: true }
+    );
+    jest.doMock('electron-log', () => ({
+      info: jest.fn(),
+      debug: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    }));
+
+    const sdk = await import('../../hd-transport-electron/src/noble-ble-handler');
+    const TransportCtor = (await import('../src/electron-ble-transport')).default;
+    sdk.setupNobleBleHandlers(webContents as any);
+
+    const invoke = (channel: string, ...args: unknown[]) => {
+      const handler = handlers.get(channel);
+      if (!handler) {
+        throw new Error(`Missing IPC handler for ${channel}`);
+      }
+      return Promise.resolve(handler(undefined, ...args));
+    };
+
+    (global as any).window = {
+      desktopApi: {
+        nobleBle: {
+          enumerate: () => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE),
+          getDevice: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE, id),
+          connect: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, id),
+          disconnect: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT, id),
+          subscribe: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE, id),
+          unsubscribe: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE, id),
+          write: async (id: string, hex: string, writeOptions?: unknown) => {
+            const result = await invoke(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, id, hex, writeOptions);
+            // The native Windows write loop may emit a notification before the
+            // renderer has started readFrame. Deliver the V2 Success after the
+            // write IPC settles, matching the renderer-level V2-only tests.
+            if (hex.startsWith('5a')) {
+              responseSeq += 1;
+              const response = ProtocolV2.encodeFrame(
+                schemas,
+                'Success',
+                { message: 'ok' },
+                { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+              );
+              setTimeout(() => {
+                notificationListeners.forEach(listener => listener(id, bytesToHex(response)));
+              }, 0);
+            }
+            return result;
+          },
+          release: (id: string, keepSession?: boolean) =>
+            invoke(EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE, id, keepSession),
+          onNotification: (listener: (id: string, data: string) => void) => {
+            notificationListeners.add(listener);
+            return () => notificationListeners.delete(listener);
+          },
+          onDeviceDisconnected: (
+            listener: (device: { id: string; name: string; reason?: EBleDisconnectReason }) => void
+          ) => {
+            disconnectListeners.add(listener);
+            return () => disconnectListeners.delete(listener);
+          },
+          onMtuChanged: (listener: (device: { id: string; mtu: number }) => void) => {
+            mtuListeners.add(listener);
+            return () => mtuListeners.delete(listener);
+          },
+          checkAvailability: () => invoke(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK),
+        },
+      },
+    };
+
+    const logger = createLogger();
+    const bleTransport = new TransportCtor();
+    bleTransport.init(logger);
+    bleTransport.configure(protocolV1Schema);
+    bleTransport.configureProtocolV2(protocolV2Schema);
+
+    const driveTimersUntilSettled = async <T>(promise: Promise<T>): Promise<T> => {
+      let settled = false;
+      promise.then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        }
+      );
+      for (let step = 0; step < 60 && !settled; step += 1) {
+        for (let flush = 0; flush < 5 && !settled; flush += 1) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>(resolve => {
+            setImmediate(resolve);
+          });
+        }
+        if (settled) break;
+        jest.advanceTimersByTime(2000);
+      }
+      return promise;
+    };
+
+    return {
+      sdk,
+      logger,
+      webContents,
+      bleTransport,
+      peripheral,
+      writeCharacteristic,
+      driveTimersUntilSettled,
+    };
+  };
+
+  test('detects a V2-only device on Windows through real attemptWindowsWriteUntilPaired V1 silence (first acquire and wasBonded reconnect)', async () => {
+    const {
+      sdk,
+      bleTransport,
+      peripheral,
+      writeCharacteristic,
+      driveTimersUntilSettled,
+    } = await setupWindowsIntegration();
+
+    try {
+      await driveTimersUntilSettled(Promise.resolve(window.desktopApi!.nobleBle!.enumerate()));
+
+      // First acquire, no protocol hint: V1 write loop hits 15 silent attempts (715
+      // pairing_no_response), keeps GATT link, and falls through to V2 Ping.
+      await expect(
+        driveTimersUntilSettled(bleTransport.acquire({ uuid: peripheral.id }))
+      ).resolves.toMatchObject({
+        uuid: peripheral.id,
+        protocolType: 'V2',
+      });
+
+      const firstAcquireFirstBytes = writeCharacteristic.write.mock.calls.map(
+        ([buf]) => (buf as Buffer)[0]
+      );
+      expect(firstAcquireFirstBytes.slice(0, 15).every(b => b === 0x3f)).toBe(true);
+      expect(firstAcquireFirstBytes[15]).toBe(0x5a);
+      expect(firstAcquireFirstBytes).toHaveLength(16);
+      // Cold setup force-reconnects once. V1 silence must not abort the GATT link
+      // before the V2 probe runs.
+      expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
+
+      // Disconnect so pairedDevices clears while bondedDevices retains peripheral.id.
+      await bleTransport.disconnect(peripheral.id);
+      writeCharacteristic.write.mockClear();
+      peripheral.disconnect.mockClear();
+
+      // Clear renderer hint so the next acquire probes V1 first again with wasBonded=true.
+      (bleTransport as any).deviceProtocolHints.delete(peripheral.id);
+
+      // wasBonded + silence on V1 produces BleBondInvalid (724) with reason: 'stale_bond'
+      // and no nativeErrorMessage; healthy V2 device still falls through to V2.
+      await expect(
+        driveTimersUntilSettled(bleTransport.acquire({ uuid: peripheral.id }))
+      ).resolves.toMatchObject({
+        uuid: peripheral.id,
+        protocolType: 'V2',
+      });
+
+      const secondAcquireFirstBytes = writeCharacteristic.write.mock.calls.map(
+        ([buf]) => (buf as Buffer)[0]
+      );
+      expect(secondAcquireFirstBytes.slice(0, 15).every(b => b === 0x3f)).toBe(true);
+      expect(secondAcquireFirstBytes[15]).toBe(0x5a);
+      expect(secondAcquireFirstBytes).toHaveLength(16);
+      // After mockClear, only the next cold-setup force-reconnect should run.
+      expect(peripheral.disconnect).toHaveBeenCalledTimes(1);
+
+      await bleTransport.disconnect(peripheral.id);
+    } finally {
+      await sdk.disposeNobleBleSupport();
+    }
+  });
+
+  test('keeps confirmed Windows native status: 3 terminal during undeclared V1 probe', async () => {
+    const { sdk, bleTransport, peripheral, writeCharacteristic, driveTimersUntilSettled } =
+      await setupWindowsIntegration({
+        writeErrorOnV1: new Error('GATT operation failed, status: 3'),
+      });
+
+    try {
+      await driveTimersUntilSettled(Promise.resolve(window.desktopApi!.nobleBle!.enumerate()));
+
+      await expect(
+        driveTimersUntilSettled(bleTransport.acquire({ uuid: peripheral.id }))
+      ).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceBondError,
+        params: {
+          phase: 'pairing',
+          platform: 'win32',
+          stage: 'write',
+          reason: 'pairing_failed',
+          nativeErrorMessage: 'GATT operation failed, status: 3',
+        },
+      });
+
+      expect(writeCharacteristic.write).toHaveBeenCalledTimes(1);
+      expect(peripheral.disconnect).toHaveBeenCalled();
+    } finally {
+      await sdk.disposeNobleBleSupport();
     }
   });
 });

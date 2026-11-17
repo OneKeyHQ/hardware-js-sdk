@@ -2602,12 +2602,12 @@ export default class ReactNativeBleTransport {
     }
   }
 
-  async cancel() {
-    Log?.debug('transport-react-native transport cancel');
-    this.abortActiveBonding();
+  async cancel(uuid?: string) {
+    Log?.debug('transport-react-native transport cancel', uuid);
+    this.abortActiveBonding(uuid);
     const pending = this.runPromise;
     const deviceId = this.runPromiseDeviceId;
-    if (pending) {
+    if (pending && (uuid === undefined || deviceId === uuid)) {
       pending.reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled));
       if (this.runPromise === pending) {
         this.runPromise = null;

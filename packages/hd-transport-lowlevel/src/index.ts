@@ -644,7 +644,7 @@ export default class LowlevelTransport {
     return nextGeneration;
   }
 
-  cancel() {
+  cancel(_session?: string) {
     this.Log.debug('lowlevel-transport', 'cancel');
   }
 }

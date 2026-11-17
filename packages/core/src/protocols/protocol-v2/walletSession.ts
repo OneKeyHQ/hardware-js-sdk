@@ -88,6 +88,24 @@ const buildDeviceSessionGetRequest = ({
   ...(expectedPassphraseState ? { btc_test_address: expectedPassphraseState } : {}),
 });
 
+// Firmware AskPassphrase Success clears unlocked_by_attach_to_pin.
+// Identity is still the Attach PIN wallet; reconcile authoritative Device state
+// so state projections (OpenWalletSession, later passphrase picker) still see it.
+const preserveAttachPinState = (device: Device) => {
+  if (typeof device.updateFeaturesPatch === 'function') {
+    if (device.updateFeaturesPatch({ unlockedAttachPin: true }, 'passphrase') !== undefined) {
+      return;
+    }
+  }
+  if (typeof device.updateState === 'function') {
+    device.updateState({ status: { unlockedAttachPin: true } }, 'passphrase');
+    return;
+  }
+  if (device.features) {
+    device.features.unlockedAttachPin = true;
+  }
+};
+
 const askDevicePassphrase = async (
   device: Device,
   requestPayload: Omit<DeviceSessionAskPassphrase, 'seed_domains'>,
@@ -176,12 +194,7 @@ const selectDeviceSession = async (
         true,
         onStatusRefreshed
       );
-      // Firmware AskPassphrase Success clears unlocked_by_attach_to_pin.
-      // Identity is still the Attach PIN wallet; keep the SDK flag so a later
-      // passphrase picker still locks instead of prompting.
-      if (device.features) {
-        device.features.unlockedAttachPin = true;
-      }
+      preserveAttachPinState(device);
     }
     const attachPinSession = await getDeviceSession(device, buildDeviceSessionGetRequest());
     return Object.assign(attachPinSession, { viaAttachPin: true as const });
@@ -318,8 +331,8 @@ export async function getProtocolV2WalletSession(
       deriveCardano,
       markWalletStatusRefreshed
     );
-    if (keepAttachPin && device.features) {
-      device.features.unlockedAttachPin = true;
+    if (keepAttachPin) {
+      preserveAttachPinState(device);
     }
     const session = await getDeviceSession(device, buildDeviceSessionGetRequest());
     return keepAttachPin ? Object.assign(session, { viaAttachPin: true as const }) : session;

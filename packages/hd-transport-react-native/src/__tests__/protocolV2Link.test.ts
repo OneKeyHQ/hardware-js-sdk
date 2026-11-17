@@ -841,6 +841,134 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     await transport.release(uuid, true);
   });
 
+  test('scopes explicit transport.cancel(uuid) so another device waiting on Android bonding succeeds', async () => {
+    setPlatformOS('android');
+    const uuidA = 'rn-pro2-a';
+    const uuidB = 'rn-pro2-b';
+    const { transport } = createHarness();
+    const pairDeviceMock = jest.requireMock('../BleManager').pairDevice as jest.Mock;
+    const onDeviceBondStateMock = jest.requireMock('../BleManager').onDeviceBondState as jest.Mock;
+    pairDeviceMock.mockClear();
+    onDeviceBondStateMock.mockClear();
+
+    const makeDevice = (uuid: string) => {
+      let notifyCallback:
+        | ((error: Error | null, characteristic: { value: string } | null) => void)
+        | undefined;
+      const notifyCharacteristic = {
+        uuid: '0003',
+        deviceID: uuid,
+        isNotifiable: true,
+        monitor: jest.fn(callback => {
+          notifyCallback = callback;
+          return { remove: jest.fn() };
+        }),
+      };
+      const handleWrite = () => {
+        const response = ProtocolV2.encodeFrame(
+          schemas,
+          'Success',
+          { message: 'ok' },
+          { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: 1 }
+        );
+        notifyCallback?.(null, { value: Buffer.from(response).toString('base64') });
+        return Promise.resolve();
+      };
+      const writeCharacteristic = {
+        uuid: '0002',
+        deviceID: uuid,
+        isWritableWithResponse: true,
+        isWritableWithoutResponse: true,
+        writeWithResponse: jest.fn(handleWrite),
+        writeWithoutResponse: jest.fn(handleWrite),
+      };
+      const device = {
+        id: uuid,
+        name: 'OneKey Pro 2',
+        localName: 'OneKey Pro 2',
+        mtu: 247,
+        serviceUUIDs: ['00000001-0000-1000-8000-00805f9b34fb'],
+        isConnected: jest.fn(() => Promise.resolve(true)),
+        cancelConnection: jest.fn(() => Promise.resolve()),
+        connect: jest.fn(),
+        onDisconnected: jest.fn(() => ({ remove: jest.fn() })),
+      } as any;
+      device.connect.mockResolvedValue(device);
+      device.requestMTU = jest.fn(() => Promise.resolve(device));
+      device.requestConnectionPriority = jest.fn(() => Promise.resolve(device));
+      return { device, writeCharacteristic, notifyCharacteristic };
+    };
+
+    const devA = makeDevice(uuidA);
+    const devB = makeDevice(uuidB);
+    const devicesById = new Map([
+      [uuidA, devA],
+      [uuidB, devB],
+    ]);
+    transport.blePlxManager = {
+      devices: jest.fn((ids: string[]) =>
+        Promise.resolve(ids.map(id => devicesById.get(id)?.device).filter(Boolean))
+      ),
+      connectedDevices: jest.fn(() => Promise.resolve([])),
+      cancelTransaction: jest.fn(() => Promise.resolve()),
+      cancelDeviceConnection: jest.fn(() => Promise.resolve()),
+      destroy: jest.fn(),
+    } as any;
+    transport.resolveCharacteristics = jest.fn((device: { id: string }) => {
+      const entry = devicesById.get(device.id);
+      if (!entry) throw new Error(`Unknown device ${device.id}`);
+      return Promise.resolve({
+        writeCharacteristic: entry.writeCharacteristic,
+        notifyCharacteristic: entry.notifyCharacteristic,
+      });
+    });
+
+    const bondA = createDeferred<void>();
+    const bondB = createDeferred<void>();
+    pairDeviceMock.mockImplementation((id: string) =>
+      Promise.resolve({ bonded: false, bonding: true, initiated: id === uuidB })
+    );
+    onDeviceBondStateMock.mockImplementation((id: string, signal?: AbortSignal) => {
+      const deferred = id === uuidA ? bondA : bondB;
+      return new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) {
+          reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+          return;
+        }
+        const onAbort = () => reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected));
+        signal?.addEventListener('abort', onAbort, { once: true });
+        deferred.promise.then(
+          () => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+          },
+          err => {
+            signal?.removeEventListener('abort', onAbort);
+            reject(err);
+          }
+        );
+      });
+    });
+
+    const acquiringA = transport.acquire({ uuid: uuidA, expectedProtocol: 'V2' });
+    const acquiringB = transport.acquire({ uuid: uuidB, expectedProtocol: 'V2' });
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+
+    await transport.cancel(uuidA);
+    await expect(acquiringA).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleDeviceDisconnected,
+    });
+
+    bondB.resolve();
+    await expect(acquiringB).resolves.toEqual({
+      uuid: uuidB,
+      protocolType: 'V2',
+    });
+    await transport.release(uuidB, true);
+  });
+
   test('does not call pairDevice when stop happens before the first Android bond attempt', async () => {
     setPlatformOS('android');
     const { transport, uuid, device } = createHarness();

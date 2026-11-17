@@ -136,7 +136,7 @@ export type Transport = {
   ): Promise<MessageFromOneKey>;
   post(session: string, name: string, data: Record<string, any>): Promise<void>;
   read(session: string): Promise<MessageFromOneKey>;
-  cancel(): Promise<void>;
+  cancel(session?: string): Promise<void>;
 
   // reset the session of the transport
   // used to reset the session of the transport when the session is not valid
