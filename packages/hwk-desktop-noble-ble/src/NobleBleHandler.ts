@@ -149,7 +149,10 @@ const requestedServiceUuids = (options?: ElectronBleScanOptions): Set<string> | 
 };
 
 /** Hex-encodes buffers so the info survives the IPC structured clone. */
-const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
+const peripheralToInfo = (
+  p: NoblePeripheralLike,
+  remembered?: Iterable<string>
+): ThirdPartyBleDeviceInfo => {
   const adv = p.advertisement ?? {};
   return {
     id: p.id,
@@ -157,7 +160,8 @@ const peripheralToInfo = (p: NoblePeripheralLike): ThirdPartyBleDeviceInfo => {
     localName: adv.localName,
     rssi: p.rssi,
     isConnectable: p.connectable ?? null,
-    advertisedServiceUuids: adv.serviceUuids,
+    // A name-only packet must not erase previously advertised services.
+    advertisedServiceUuids: [...new Set([...(adv.serviceUuids ?? []), ...(remembered ?? [])])],
     serviceSolicitationUuids: adv.serviceSolicitationUuids,
     txPowerLevel: adv.txPowerLevel,
     manufacturerDataHex: adv.manufacturerData
@@ -207,8 +211,7 @@ const bluetoothUnavailableError = (state: string) =>
 const BLE_UNUSABLE_STATES = new Set(['poweredOff', 'unauthorized', 'unsupported']);
 
 /**
- * Native failure → HardwareErrorCode, at the only layer that sees the native fields. Messages
- * avoid "disconnected" / "not found": the Ledger adapter still retries on those words.
+ * Native failure → HardwareErrorCode, at the only layer that sees the native fields.
  */
 const toCanonicalBleError = (
   error: unknown,
@@ -242,7 +245,7 @@ const toCanonicalBleError = (
   }
   return createHwkError({
     code: HardwareErrorCode.BleConnectFailed,
-    message: `BLE ${phase} failed`,
+    message: error instanceof Error ? error.message : `BLE ${phase} failed`,
     params,
   });
 };
@@ -538,14 +541,14 @@ export class NobleBleHandler {
         this._keptByMemory.add(id);
         this._log('info', 'scan.keptByMemory', { id });
       }
-      result.push(peripheralToInfo(peripheral));
+      result.push(peripheralToInfo(peripheral, this._advertisedUuids.get(id)));
     }
     // A linked device stops advertising and ages out above, so merge held links
     // back in (field-verified on Safe 7: holding the link silences it).
     for (const [id, entry] of this._connected) {
       if (entry.vendor !== vendor) continue;
       if (result.some(info => info.id === id)) continue;
-      result.push(peripheralToInfo(entry.peripheral));
+      result.push(peripheralToInfo(entry.peripheral, this._advertisedUuids.get(id)));
     }
     return result;
   }
@@ -670,6 +673,13 @@ export class NobleBleHandler {
       this._scanOwners.delete(vendor);
       if (this._scanOwners.size > 0) return;
     }
+    // Windows bonds after discovery stops, while the selected peripheral may
+    // stop advertising. Keep its cache until connection or the next scan.
+    if (process.platform === 'win32') {
+      this._scanOwners.clear();
+      await this._pauseScan();
+      return;
+    }
     await this._stopContinuousScan();
   }
 
@@ -689,7 +699,7 @@ export class NobleBleHandler {
     ) {
       return null;
     }
-    return peripheralToInfo(p);
+    return peripheralToInfo(p, remembered);
   }
 
   /** Live RSSI (dBm) of a connected peripheral, else the cached scan-time value. */

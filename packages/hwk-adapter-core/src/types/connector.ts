@@ -648,7 +648,10 @@ export function createCombinedConnector(connectors: IConnector[]): IConnector {
     perConnector.sort((a, b) => a.index - b.index);
 
     for (const [id, owner] of deviceOwner) {
-      if (onTransport(owner, options.transportType)) deviceOwner.delete(id);
+      // Missing advertisements do not change a known BLE device's transport.
+      if (owner.connectionType !== 'ble' && onTransport(owner, options.transportType)) {
+        deviceOwner.delete(id);
+      }
     }
     const merged: ConnectorDevice[] = [];
     perConnector.forEach(({ index, devices }) => {

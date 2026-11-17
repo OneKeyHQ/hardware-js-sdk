@@ -318,6 +318,70 @@ describe('NobleBleHandler', () => {
     expect(noble.stopScanningAsync).toHaveBeenCalledTimes(1);
   });
 
+  test('Windows keeps the selected peripheral and services through an offline pairing window', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const peripheral = ledgerPeripheral('ledger');
+    const noble = new FakeNoble([peripheral]);
+    const handler = makeHandler(noble);
+    try {
+      await handler.scan({ vendor: 'ledger' });
+      peripheral.advertisement.serviceUuids = [];
+      noble.emit('discover', peripheral);
+      expect((await handler.scan({ vendor: 'ledger' }))[0].advertisedServiceUuids).toContain(
+        LEDGER_NANO_X.serviceUuid
+      );
+      await handler.stopScan('ledger');
+      jest.advanceTimersByTime(13_000);
+      expect(handler.getDevice('ledger')?.advertisedServiceUuids).toContain(
+        LEDGER_NANO_X.serviceUuid
+      );
+      const connecting = handler.connect('ledger', LEDGER_PROFILE);
+      await settle();
+      await expect(connecting).resolves.toMatchObject({ id: 'ledger' });
+      expect(noble.startScanningAsync).toHaveBeenCalledTimes(1);
+      expect(peripheral.connectAsync).toHaveBeenCalledTimes(1);
+    } finally {
+      await handler.dispose();
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      jest.useRealTimers();
+    }
+  });
+
+  test('non-Windows scan release still clears discovery targets', async () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const peripheral = ledgerPeripheral('ledger');
+    const handler = makeHandler(new FakeNoble([peripheral]));
+    try {
+      await handler.scan({ vendor: 'ledger' });
+      expect(handler.getDevice('ledger')).not.toBeNull();
+      await handler.stopScan('ledger');
+      expect(handler.getDevice('ledger')).toBeNull();
+    } finally {
+      await handler.dispose();
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    }
+  });
+
+  test('retains the native service-discovery error in a canonical connection failure', async () => {
+    const peripheral = ledgerPeripheral('ledger');
+    const handler = makeHandler(new FakeNoble([peripheral]));
+    try {
+      await handler.scan({ vendor: 'ledger' });
+      peripheral.discoverSomeServicesAndCharacteristicsAsync.mockRejectedValueOnce(
+        new Error('Windows GATT service discovery failed with status 3')
+      );
+      await expect(handler.connect('ledger', LEDGER_PROFILE)).rejects.toMatchObject({
+        code: HardwareErrorCode.BleConnectFailed,
+        message: 'Windows GATT service discovery failed with status 3',
+      });
+    } finally {
+      await handler.dispose();
+    }
+  });
+
   test('targeted pairing cancellation preserves other vendors and same-vendor devices', async () => {
     const first = new FakePeripheral('first', { localName: 'Trezor Safe 7' });
     const second = new FakePeripheral('second', { localName: 'Trezor Safe 7' });
