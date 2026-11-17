@@ -33,3 +33,9 @@ export type {
 
 export type { BleDebugLogEntry, BleDebugLogLevel, BleDebugLogger } from './debugLog';
 export { redactBleDebugLogData } from './debugLog';
+
+export type {
+  WindowsBlePairingOptions,
+  WindowsBlePairingRequest,
+  WindowsBlePairingDecision,
+} from './windowsPairingHelper';

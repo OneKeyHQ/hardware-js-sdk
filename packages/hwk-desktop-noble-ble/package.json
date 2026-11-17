@@ -27,10 +27,15 @@
         "types": "./dist/constants.d.ts",
         "default": "./dist/constants.js"
       }
-    }
+    },
+    "./prebuilds/*": "./prebuilds/*"
   },
   "files": [
-    "dist"
+    "dist",
+    "prebuilds",
+    "native/onekey-ble-pair/Cargo.toml",
+    "native/onekey-ble-pair/Cargo.lock",
+    "native/onekey-ble-pair/src"
   ],
   "scripts": {
     "build": "tsup",
@@ -38,7 +43,8 @@
     "clean": "rimraf dist",
     "test": "jest",
     "verify:types": "node scripts/verify-package-types.js",
-    "prepack": "yarn build && yarn verify:types"
+    "prepack": "yarn build && yarn verify:types && yarn verify:helper",
+    "verify:helper": "node scripts/verify-windows-helper.js"
   },
   "publishConfig": {
     "access": "public"

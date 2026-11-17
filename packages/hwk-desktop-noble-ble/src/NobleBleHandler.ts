@@ -9,6 +9,9 @@ import {
   THIRD_PARTY_BLE_STATE_SETTLE_TIMEOUT_MS,
 } from './constants';
 import { DEFAULT_THIRD_PARTY_BLE_VENDORS, normalizeBleUuid } from './vendorProfiles';
+import { WindowsBlePairing } from './windowsPairing';
+
+import type { WindowsBlePairingOptions } from './windowsPairingHelper';
 
 import type { ThirdPartyBleVendorProfile } from './vendorProfiles';
 import type { ThirdPartyBleAvailability, ThirdPartyBleDeviceInfo } from './types/desktop-api';
@@ -311,9 +314,11 @@ const BLE_SUBSCRIBE_TIMEOUT_MS = 60_000;
 const NOBLE_RECOVER_COOLDOWN_MS = 10_000;
 
 export interface NobleBleHandlerOptions {
+  /** Windows OS bonding before GATT connect. Omit to retain native-only behavior. */
+  windowsPairing?: WindowsBlePairingOptions;
   /** Override for tests; defaults to `require('@stoprocent/noble')`. */
   nobleFactory?: NobleFactory;
-  /** Override the overall connect timeout (tests only; defaults to 31s). */
+  /** Override GATT connect timeout (tests only; defaults to 31s), excluding OS pairing. */
   connectTimeoutMs?: number;
   /** Override the subscribe timeout (tests only; defaults to 60s). */
   subscribeTimeoutMs?: number;
@@ -330,6 +335,8 @@ export class NobleBleHandler {
   private _noble: NobleLike | undefined;
 
   private readonly _factory: NobleFactory;
+
+  private readonly _windowsPairing?: WindowsBlePairing;
 
   private readonly _connectTimeoutMs: number;
 
@@ -398,6 +405,9 @@ export class NobleBleHandler {
     this._connectTimeoutMs = options.connectTimeoutMs ?? BLE_CONNECT_TIMEOUT_MS;
     this._subscribeTimeoutMs = options.subscribeTimeoutMs ?? BLE_SUBSCRIBE_TIMEOUT_MS;
     this._logger = options.logger;
+    if (process.platform === 'win32' && options.windowsPairing) {
+      this._windowsPairing = new WindowsBlePairing(options.windowsPairing, options.logger);
+    }
     // A Map, so an IPC vendor like `__proto__` cannot reach an inherited property.
     this._vendors = new Map(Object.entries(options.vendors ?? DEFAULT_THIRD_PARTY_BLE_VENDORS));
   }
@@ -713,6 +723,7 @@ export class NobleBleHandler {
 
   /** Abandon matching pairing attempts without touching another owner's links. */
   async cancelPairing(options?: { vendor: string; id?: string }): Promise<void> {
+    this._windowsPairing?.cancel(options);
     const matches = (id: string, vendor?: string) =>
       options === undefined ||
       (vendor === options.vendor && (options.id === undefined || id === options.id));
@@ -852,6 +863,31 @@ export class NobleBleHandler {
     if (!this._resolveVendor(options.vendor).profile.acceptsConnect(options)) {
       throw invariantError(`BLE GATT profile not allowed for ${options.vendor}`);
     }
+    this._assertActive();
+    if (this._windowsPairing) {
+      const peripheral = this._discovered.get(id);
+      const { profile } = this._resolveVendor(options.vendor);
+      const remembered = this._advertisedUuids.get(id);
+      // Never ask the user to bond a bystander's peripheral or another vendor's device.
+      const device =
+        peripheral && matchesPeripheral(peripheral, profile, undefined, remembered)
+          ? peripheralToInfo(peripheral, remembered)
+          : undefined;
+      return this._windowsPairing.connect(
+        id,
+        options.vendor,
+        device,
+        () => this.stopScan(options.vendor),
+        () => this._connectWithTimeout(id, options)
+      );
+    }
+    return this._connectWithTimeout(id, options);
+  }
+
+  private async _connectWithTimeout(
+    id: string,
+    options: ElectronBleConnectOptions
+  ): Promise<{ id: string; name?: string }> {
     this._assertActive();
     // Promise.race cannot stop _connectInner; the claim makes a late success tear
     // its link down instead of committing an unowned one that silences the device.
@@ -1069,8 +1105,8 @@ export class NobleBleHandler {
       // though the peripheral arrives connected, unless a committed link owns it.
       const openedLink = !wasConnected || (route === 'direct' && !this._connected.has(id));
       if (openedLink) await this._safeDisconnect(peripheral);
-      // noble-win names an unreachable GATT only in its text. The app weighs how soon the
-      // link failed against the bond Windows holds, which the host cannot see.
+      // noble-win names an unreachable GATT only in its text. The Windows pairing module
+      // weighs how soon the link failed against the OS bond before classifying it.
       const unreachable = error instanceof Error && /\bunreachable\b/i.test(error.message);
       throw toCanonicalBleError(error, 'connect', {
         facts: unreachable
@@ -1224,6 +1260,7 @@ export class NobleBleHandler {
   dispose(): Promise<void> {
     if (this._disposePromise) return this._disposePromise;
     this._disposed = true;
+    this._windowsPairing?.cancel();
     this._clearIdleStop();
     this._scanning = false;
     this._onNotification = undefined;
