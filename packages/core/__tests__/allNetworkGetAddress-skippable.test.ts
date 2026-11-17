@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { handleSkippableHardwareError } from '../src/api/allnetwork/AllNetworkGetAddressBase';
 
@@ -29,6 +29,14 @@ describe('all-network chains the firmware lacks', () => {
     const error = handleSkippableHardwareError(new Error(message), device, method);
     expect(error?.errorCode).toBe(HardwareErrorCode.DeviceNotSupportMethod);
   });
+
+  test.each([HardwareErrorCode.ForbiddenKeyPath, HardwareErrorCode.DeviceNotSupportPath])(
+    'skips the chain when the device refuses its path (%s)',
+    errorCode => {
+      const error = handleSkippableHardwareError(ERRORS.TypedError(errorCode), device, method);
+      expect(error?.errorCode).toBe(errorCode);
+    }
+  );
 
   test('still fails the request on any other device error', () => {
     const error = handleSkippableHardwareError(

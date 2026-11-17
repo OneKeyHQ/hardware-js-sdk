@@ -257,6 +257,13 @@ export const en = {
     },
     // 添加方法描述翻译
     methodDescriptions: {
+      zcashGetAddress: 'Get a Zcash unified or transparent address.',
+      zcashGetFullViewingKey: 'Export the Zcash full viewing key with device confirmation.',
+      zcashSignPczt: 'Sign a Zcash PCZT supplied by the caller.',
+      moneroGetAddress: 'Get a Monero account address.',
+      moneroGetWatchKey: 'Export the Monero private view key with device confirmation.',
+      moneroKeyImageSync: 'Export Key Images for wallet-owned Monero outputs.',
+      moneroSignTransaction: 'Sign a Monero transaction supplied by the caller.',
       btcGetAddress: 'Get address for your account.',
       btcGetPublicKey: 'Get public key for your account.',
       btcDeriveContextHash: 'Derive a Babylon context hash (Classic 1s / Pure firmware 3.21.0+).',

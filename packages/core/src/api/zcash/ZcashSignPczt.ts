@@ -48,7 +48,7 @@ export default class ZcashSignPczt extends BaseMethod<HardwareZcashSignPczt> {
   getVersionRange(): DeviceFirmwareRange {
     return {
       model_pro2: {
-        min: '0.0.0',
+        min: '1.0.4',
       },
     };
   }

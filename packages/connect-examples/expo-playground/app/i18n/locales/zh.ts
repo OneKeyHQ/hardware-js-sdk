@@ -248,6 +248,13 @@ export const zh = {
     },
     // 添加方法描述翻译
     methodDescriptions: {
+      zcashGetAddress: '获取 Zcash 统一地址或透明地址',
+      zcashGetFullViewingKey: '经设备确认后导出 Zcash 完整查看密钥',
+      zcashSignPczt: '签名调用方提供的 Zcash PCZT',
+      moneroGetAddress: '获取 Monero 账户地址',
+      moneroGetWatchKey: '经设备确认后导出 Monero 私有查看密钥',
+      moneroKeyImageSync: '导出属于当前钱包的 Monero 输出的 Key Image',
+      moneroSignTransaction: '签名调用方提供的 Monero 交易',
       btcGetAddress: '获取 Bitcoin 地址',
       btcGetPublicKey: '获取 Bitcoin 公钥',
       btcDeriveContextHash: '派生 Babylon context hash（Classic 1s / Pure 固件 3.21.0+）',

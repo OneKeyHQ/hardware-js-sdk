@@ -1,7 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { Children, isValidElement, useContext, useState } from 'react';
-import * as Clipboard from 'expo-clipboard';
+import { Children, isValidElement, useContext, useEffect, useState } from 'react';
 
 import Playground from '../components/Playground';
 import PlaygroundExecutor from '../components/PlaygroundExecutor';
@@ -12,6 +11,8 @@ import {
   preparePresetEditor,
 } from '../utils/presetEditor';
 
+import { readDevice } from '../utils/manualSigning/common';
+import type { PrepareSigningSample } from '../utils/manualSigning/common';
 import type { ReactElement, ReactNode } from 'react';
 
 jest.mock('react', () => ({
@@ -55,6 +56,8 @@ jest.mock('../components/ui/AutoWrapperTextArea', () => ({
 }));
 
 type TestElement = ReactElement<{
+  id?: string;
+  prepareSample?: PrepareSigningSample;
   children?: ReactNode;
   value?: string;
   editable?: boolean;
@@ -127,67 +130,140 @@ describe('API Payload screen responsiveness', () => {
   });
 });
 
-describe('API Payload response redaction', () => {
+describe('API Payload execution', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(useContext).mockReturnValue({ sdk: {} });
+    jest.mocked(useState).mockReturnValue([false, jest.fn()]);
   });
 
-  test('masks the derived secret in both the response field and clipboard', async () => {
-    const secret = '00'.repeat(32);
-    const sdkResponse = { success: true, payload: { secret } };
-    jest.mocked(executeProtocolAwareMethod).mockResolvedValue(sdkResponse);
-    const onExecute = jest.fn();
-    const [executeButton] = collectElements(
-      PlaygroundExecutor({
-        methodPayload: { method: 'btcDeriveContextHash' },
-        onAcquireParams: () => Promise.resolve({}),
-        onExecute,
-      })
-    );
-    if (!executeButton.props.onPress) throw new Error('Missing execution button');
-    await executeButton.props.onPress();
+  test.each([
+    'btcSignTransaction',
+    'zcashSignPczt',
+    'moneroSignTransaction',
+    'moneroKeyImageSync',
+    'zcashGetFullViewingKey',
+  ])('%s preserves raw SDK success and failure for both execution buttons', async method => {
+    for (const result of [
+      { success: true, payload: { encKey: 'fake-response-value' } },
+      { success: false, payload: { error: 'device-error', code: 101 } },
+    ]) {
+      for (const manual of [false, true]) {
+        jest
+          .mocked(executeProtocolAwareMethod)
+          .mockClear()
+          .mockImplementation(options =>
+            Promise.resolve(
+              options.method === 'btcGetPublicKey' ? { success: true, payload: {} } : result
+            )
+          );
+        const params = { selected: 'preset' };
+        const prepare = jest.fn(async (call: Parameters<PrepareSigningSample>[0]) => {
+          await readDevice(call, 'btcGetPublicKey', {});
+          return params;
+        });
+        const onExecute = jest.fn();
+        const onPrepared = jest.fn();
+        const buttons = collectElements(
+          PlaygroundExecutor({
+            methodPayload: { method },
+            onAcquireParams: () => Promise.resolve(params),
+            prepareSample: prepare,
+            onPrepared,
+            onExecute,
+          })
+        ).filter(element => element.type === 'button');
+        expect(executeProtocolAwareMethod).not.toHaveBeenCalled();
+        await buttons[manual ? 1 : 0].props.onPress?.();
+        expect(prepare).toHaveBeenCalledTimes(manual ? 1 : 0);
+        expect(
+          jest.mocked(executeProtocolAwareMethod).mock.calls.map(([options]) => options.method)
+        ).toEqual(manual ? ['btcGetPublicKey', method] : [method]);
+        expect(jest.mocked(executeProtocolAwareMethod).mock.calls.at(-1)?.[0]).toMatchObject({
+          method,
+          params,
+        });
+        expect(onExecute).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+        if (manual) expect(onPrepared).toHaveBeenCalledWith(params);
+      }
+    }
+  });
 
-    expect(onExecute).toHaveBeenCalledTimes(1);
-    const response: string = onExecute.mock.calls[0][0];
+  test.each([0, 1])('uses only the selected preset generator (index %i)', selected => {
+    const prepare = jest.fn();
     jest
       .mocked(useState)
       .mockReturnValueOnce([false, jest.fn()])
       .mockReturnValueOnce(['', jest.fn()])
       .mockReturnValueOnce([false, jest.fn()])
-      .mockReturnValueOnce([response, jest.fn()]);
-    const elements = collectElements(Playground({ method: 'btcDeriveContextHash' }));
-    const responseField = elements.find(
-      element => element.type === 'text-area' && element.props.value === response
-    );
-    const copyButton = elements.find(element => element.type === 'button');
-    if (!responseField || !copyButton?.props.onPress) throw new Error('Missing response UI');
-
-    expect(responseField.props.editable).toBe(false);
-    expect(JSON.parse(responseField.props.value ?? '')).toEqual({
-      success: true,
-      payload: { secret: '[Redacted]' },
-    });
-    await copyButton.props.onPress();
-    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(response);
-    expect(response).not.toContain(secret);
-    expect(sdkResponse.payload.secret).toBe(secret);
+      .mockReturnValueOnce(['', jest.fn()])
+      .mockReturnValueOnce([selected, jest.fn()]);
+    const executor = collectElements(
+      Playground({
+        method: 'zcashSignPczt',
+        presupposes: [
+          { title: 'transparent', value: {}, prepareSample: prepare },
+          { title: 'shielded', value: {}, prepareSample: null },
+        ],
+      })
+    ).find(element => element.type === PlaygroundExecutor);
+    expect(executor?.props.prepareSample).toBe(selected === 0 ? prepare : undefined);
+    expect(prepare).not.toHaveBeenCalled();
   });
 
-  test('preserves the existing response viewer for other methods', async () => {
-    const sdkResponse = { success: true, payload: { address: 'test-address' } };
-    jest.mocked(executeProtocolAwareMethod).mockResolvedValue(sdkResponse);
+  test('preserves a preparation read failure and never starts signing', async () => {
+    const result = { success: false, payload: { error: 'original-read-error', code: 101 } };
+    jest.mocked(executeProtocolAwareMethod).mockResolvedValue(result);
     const onExecute = jest.fn();
-    const [executeButton] = collectElements(
+    const buttons = collectElements(
       PlaygroundExecutor({
-        methodPayload: { method: 'btcGetAddress' },
-        onAcquireParams: () => Promise.resolve({}),
+        methodPayload: { method: 'btcSignTransaction' },
+        onAcquireParams: jest.fn(),
         onExecute,
+        prepareSample: async call => {
+          await readDevice(call, 'btcGetPublicKey', {});
+          return {};
+        },
       })
-    );
-    if (!executeButton.props.onPress) throw new Error('Missing execution button');
-    await executeButton.props.onPress();
+    ).filter(element => element.type === 'button');
+    await buttons[1].props.onPress?.();
+    expect(executeProtocolAwareMethod).toHaveBeenCalledTimes(1);
+    expect(onExecute).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+  });
 
-    expect(onExecute).toHaveBeenCalledWith(JSON.stringify(sdkResponse, null, 2));
+  test('ignores duplicate clicks and stops after unmount during preparation', async () => {
+    let finishRead: ((result: { success: true; payload: object }) => void) | undefined;
+    jest.mocked(executeProtocolAwareMethod).mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finishRead = resolve;
+        })
+    );
+    const cancel = jest.fn();
+    jest.mocked(useContext).mockReturnValue({ sdk: { cancel } });
+    const onExecute = jest.fn();
+    const prepare = jest.fn(async (call: Parameters<PrepareSigningSample>[0]) => {
+      await readDevice(call, 'btcGetPublicKey', {});
+      return {};
+    });
+    const buttons = collectElements(
+      PlaygroundExecutor({
+        methodPayload: { method: 'btcSignTransaction' },
+        onAcquireParams: jest.fn(),
+        onExecute,
+        prepareSample: prepare,
+      })
+    ).filter(element => element.type === 'button');
+    const cleanup = jest.mocked(useEffect).mock.calls[0][0]();
+    const pending = buttons[1].props.onPress?.();
+    await buttons[1].props.onPress?.();
+    expect(prepare).toHaveBeenCalledTimes(1);
+    if (typeof cleanup !== 'function' || !finishRead) throw new Error('Missing preparation');
+    cleanup();
+    finishRead({ success: true, payload: {} });
+    await pending;
+    expect(cancel).toHaveBeenCalledWith('test-connect');
+    expect(executeProtocolAwareMethod).toHaveBeenCalledTimes(1);
+    expect(onExecute).not.toHaveBeenCalled();
   });
 });

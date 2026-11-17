@@ -624,6 +624,14 @@ const UNSUPPORTED_MESSAGE_FAILURES = [
   'Handler not found: No handler for type',
 ];
 
+// Errors that rule out only the chain at hand, so the other chains go on.
+const SKIPPABLE_ERROR_CODES: number[] = [
+  HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+  HardwareErrorCode.DeviceNotSupportMethod,
+  HardwareErrorCode.ForbiddenKeyPath,
+  HardwareErrorCode.DeviceNotSupportPath,
+];
+
 export function handleSkippableHardwareError(
   e: any,
   device: Device,
@@ -632,10 +640,7 @@ export function handleSkippableHardwareError(
   let error: HardwareError | undefined;
 
   if (e instanceof HardwareError && e.errorCode !== HardwareErrorCode.RuntimeError) {
-    const { errorCode } = e;
-    if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
-      error = e;
-    } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
+    if (SKIPPABLE_ERROR_CODES.includes(e.errorCode)) {
       error = e;
     }
   } else if (UNSUPPORTED_MESSAGE_FAILURES.some(text => e.message?.includes(text))) {
@@ -661,11 +666,6 @@ export function handleSkippableHardwareError(
         device.getCurrentFirmwareType()
       );
     }
-  } else if (
-    e.message?.toLowerCase()?.includes('forbidden key path') ||
-    e.message?.toLowerCase()?.includes('invalid path')
-  ) {
-    error = ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, e.message);
   }
 
   return error;

@@ -1,4 +1,16 @@
-import { type PlaygroundProps } from '../components/Playground';
+import { SolanaOffChainMessageVersion } from '@onekeyfe/hd-transport';
+
+import { prepareSolanaOffchainV1Sample } from '../utils/manualSigning/solana';
+
+import type { PlaygroundProps } from '../components/Playground';
+import type { SolSignOffchainMessageParams } from '@onekeyfe/hd-core';
+
+const offchainV1: SolSignOffchainMessageParams = {
+  path: "m/44'/501'/0'/0'",
+  messageHex: '48656c6c6f204f6e654b6579',
+  messageVersion: SolanaOffChainMessageVersion.MESSAGE_VERSION_1,
+  requiredSigners: ['80'.repeat(32)],
+};
 
 const api: PlaygroundProps[] = [
   {
@@ -49,7 +61,8 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'solSignOffchainMessage',
-    description: 'Sign Offchain Message',
+    description:
+      'Sign Offchain Message. V1 needs Classic 1S 3.21.0+ or Pro 2; use the generate button to add the current wallet to the required signers.',
     presupposes: [
       {
         title: 'Sign Offchain Message',
@@ -57,6 +70,21 @@ const api: PlaygroundProps[] = [
           path: "m/44'/501'/0'/0'",
           messageHex: '48656c6c6f',
         },
+      },
+      {
+        title: 'V1: Current Wallet And External Signer',
+        value: offchainV1,
+        prepareSample: call => prepareSolanaOffchainV1Sample(call, offchainV1),
+      },
+      {
+        title: 'V1: Current Wallet Not A Signer (Should Reject)',
+        value: offchainV1,
+        prepareSample: null,
+      },
+      {
+        title: 'V1: Empty Required Signers (Should Reject)',
+        value: { ...offchainV1, requiredSigners: [] },
+        prepareSample: null,
       },
     ],
   },
