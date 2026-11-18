@@ -121,6 +121,9 @@ selected vendor's discovered address, pauses scanning while retaining the target
 and serializes Windows ceremonies across handler instances. It never chooses a
 different device automatically. Native GATT connect timeout starts after OS
 pairing, so user confirmation does not consume the 31-second connect deadline.
+Discovery and scan pause have a separate deadline using `connectTimeoutMs`.
+Cancellation or that deadline settles the caller independently of native scan
+cleanup; a late discovery cannot start a cancelled pairing.
 
 - Ledger numeric comparison expires after 30 seconds. A pending prompt closes on
   device disconnection.

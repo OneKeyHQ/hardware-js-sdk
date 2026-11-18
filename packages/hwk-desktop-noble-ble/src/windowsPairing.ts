@@ -49,9 +49,16 @@ export class WindowsBlePairing {
 
   private readonly logger?: BleDebugLogger;
 
-  constructor(options: WindowsBlePairingOptions, logger?: BleDebugLogger) {
+  private readonly preparationTimeoutMs: number;
+
+  constructor(
+    options: WindowsBlePairingOptions,
+    preparationTimeoutMs: number,
+    logger?: BleDebugLogger
+  ) {
     this.options = options;
     this.logger = logger;
+    this.preparationTimeoutMs = preparationTimeoutMs;
   }
 
   cancel(target?: CancelTarget): void {
@@ -83,14 +90,48 @@ export class WindowsBlePairing {
     let pairingCleanup = Promise.resolve();
     try {
       let outcome: 'paired' | 'already-paired' | 'skipped' = 'skipped';
-      const device = await resolveDevice(signal);
+      // Native scan start/stop may never settle. Bound caller waiting separately
+      // from cleanup, including a scan pause that finishes after cancellation.
+      const preparing = (async () => {
+        const device = await resolveDevice(signal);
+        assertActive();
+        if (device?.address) {
+          const resume = await pauseScan();
+          if (signal.aborted) {
+            resume();
+            throw cancelledError();
+          }
+          resumeScan = resume;
+        }
+        return device;
+      })();
+      let onAbort!: () => void;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const interrupted = new Promise<never>((_, reject) => {
+        onAbort = () => reject(cancelledError());
+        signal.addEventListener('abort', onAbort, { once: true });
+        if (signal.aborted) onAbort();
+        timer = setTimeout(() => {
+          reject(
+            createHwkError({
+              code: HardwareErrorCode.DeviceNotFound,
+              message: 'BLE discovery did not complete before the connection deadline',
+              params: { phase: 'connect', stage: 'discovery', timedOut: true },
+            })
+          );
+          entry.controller.abort();
+        }, this.preparationTimeoutMs);
+      });
+      let device: ThirdPartyBleDeviceInfo | undefined;
+      try {
+        device = await Promise.race([preparing, interrupted]);
+      } finally {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+      }
       assertActive();
       const address = device?.address;
       if (address) {
-        // Retain the selected peripheral before queueing: another ceremony may
-        // take longer than the discovery cache's idle lifetime.
-        resumeScan = await pauseScan();
-        assertActive();
         const operation = pairingQueue.then(async () => {
           assertActive();
           return pairWindowsBleDevice(this.options, { id, vendor, address }, signal, this.logger);
@@ -102,15 +143,15 @@ export class WindowsBlePairing {
         pairingQueue = pairingCleanup;
         // A queued cancellation returns immediately, but its queue slot still waits
         // for the preceding helper's cleanup before the next ceremony can start.
-        let onAbort!: () => void;
+        let onPairingAbort!: () => void;
         const aborted = new Promise<never>((_, reject) => {
-          onAbort = () => reject(cancelledError());
-          signal.addEventListener('abort', onAbort, { once: true });
+          onPairingAbort = () => reject(cancelledError());
+          signal.addEventListener('abort', onPairingAbort, { once: true });
         });
         try {
           outcome = await Promise.race([operation, aborted]);
         } finally {
-          signal.removeEventListener('abort', onAbort);
+          signal.removeEventListener('abort', onPairingAbort);
         }
       }
       assertActive();

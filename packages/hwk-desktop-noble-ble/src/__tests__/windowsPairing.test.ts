@@ -326,6 +326,88 @@ it('retains a queued target beyond the discovery idle lifetime', async () => {
   }
 });
 
+it.each(['cancel', 'deadline'] as const)(
+  'settles a cold connect on %s while native scan start is still pending',
+  async mode => {
+    const { support, invoke, noble, ledger } = setup();
+    let release = () => {};
+    noble.startScanningAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          release = resolve;
+        })
+    );
+    let settled = false;
+    const result = invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'ledger', profiles.ledger)
+      .catch((error: unknown) => error)
+      .then(value => {
+        settled = true;
+        return value;
+      });
+    try {
+      await flush();
+      expect(noble.startScanningAsync).toHaveBeenCalled();
+      if (mode === 'cancel') {
+        await invoke(THIRD_PARTY_BLE_CHANNELS.cancelPairing, { vendor: 'ledger', id: 'ledger' });
+        await flush();
+      } else await advance(31_000);
+      expect(settled).toBe(true);
+      expect(await result).toMatchObject({
+        code:
+          mode === 'cancel'
+            ? HardwareErrorCode.BlePairingCancelled
+            : HardwareErrorCode.DeviceNotFound,
+      });
+      release();
+      noble.emit('discover', ledger);
+      await flush();
+      expect(mockPair).not.toHaveBeenCalled();
+      expect(ledger.connectAsync).not.toHaveBeenCalled();
+    } finally {
+      await invoke(THIRD_PARTY_BLE_CHANNELS.cancelPairing, { vendor: 'ledger', id: 'ledger' });
+      release();
+      await result;
+      await support.dispose();
+    }
+  }
+);
+
+it('cancels a cached connect before native scan stop finishes', async () => {
+  const { support, invoke, noble, ledger } = setup();
+  await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'ledger' });
+  let release = () => {};
+  noble.stopScanningAsync.mockImplementationOnce(
+    () =>
+      new Promise<void>(resolve => {
+        release = resolve;
+      })
+  );
+  let settled = false;
+  const result = invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'ledger', profiles.ledger)
+    .catch((error: unknown) => error)
+    .then(value => {
+      settled = true;
+      return value;
+    });
+  try {
+    await flush();
+    expect(noble.stopScanningAsync).toHaveBeenCalled();
+    await invoke(THIRD_PARTY_BLE_CHANNELS.cancelPairing, { vendor: 'ledger', id: 'ledger' });
+    await flush();
+    expect(settled).toBe(true);
+    expect(await result).toMatchObject({ code: HardwareErrorCode.BlePairingCancelled });
+    release();
+    await flush();
+    expect(mockPair).not.toHaveBeenCalled();
+    expect(ledger.connectAsync).not.toHaveBeenCalled();
+  } finally {
+    await invoke(THIRD_PARTY_BLE_CHANNELS.cancelPairing, { vendor: 'ledger', id: 'ledger' });
+    release();
+    await result;
+    await support.dispose();
+  }
+});
+
 it('pairs a device found by a cold connect before opening GATT', async () => {
   const { support, invoke, ledger } = setup();
   try {

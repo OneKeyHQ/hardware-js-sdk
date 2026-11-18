@@ -85,27 +85,46 @@ const restoreHostError = ({ message, code, params }: ConnectorSerializedError): 
 export function rehydrateElectronBleErrors<T extends object>(bridge: T): T {
   // A contextBridge object may be frozen, which rules out patching or proxying it.
   const wrapped = Object.create(bridge) as T;
-  const keys = new Set<keyof T>();
+  const invoke = (method: unknown, args: unknown[]) => {
+    const result = (method as (...params: unknown[]) => unknown).apply(bridge, args);
+    if (typeof (result as PromiseLike<unknown> | null)?.then !== 'function') return result;
+    return Promise.resolve(result).catch((error: unknown) => {
+      throw isSerializedError(error) ? restoreHostError(error) : error;
+    });
+  };
+  const descriptors = new Map<keyof T, PropertyDescriptor>();
   for (
     let source = bridge;
     source && source !== Object.prototype;
     source = Object.getPrototypeOf(source)
   ) {
     for (const key of Reflect.ownKeys(source) as Array<keyof T>) {
-      if (key !== 'constructor') keys.add(key);
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      if (key !== 'constructor' && descriptor && !descriptors.has(key))
+        descriptors.set(key, descriptor);
     }
   }
-  for (const key of keys) {
-    if (typeof bridge[key] === 'function') {
+  for (const [key, descriptor] of descriptors) {
+    if (typeof descriptor.value === 'function') {
       Object.defineProperty(wrapped, key, {
-        value: (...args: unknown[]) => {
-          const method = bridge[key] as (...params: unknown[]) => unknown;
-          const result = method.apply(bridge, args);
-          if (typeof (result as PromiseLike<unknown> | null)?.then !== 'function') return result;
-          return Promise.resolve(result).catch((error: unknown) => {
-            throw isSerializedError(error) ? restoreHostError(error) : error;
-          });
-        },
+        value: (...args: unknown[]) => invoke(bridge[key], args),
+      });
+    } else if (descriptor.get || descriptor.set) {
+      // Preserve accessor receivers, but evaluate them only when explicitly accessed.
+      Object.defineProperty(wrapped, key, {
+        get: descriptor.get
+          ? () => {
+              const value: unknown = Reflect.get(bridge, key, bridge);
+              return typeof value === 'function'
+                ? (...args: unknown[]) => invoke(value, args)
+                : value;
+            }
+          : undefined,
+        set: descriptor.set
+          ? (value: unknown) => {
+              Reflect.set(bridge, key, value, bridge);
+            }
+          : undefined,
       });
     }
   }

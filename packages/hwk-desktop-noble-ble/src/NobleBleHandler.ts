@@ -413,7 +413,11 @@ export class NobleBleHandler {
     this._subscribeTimeoutMs = options.subscribeTimeoutMs ?? BLE_SUBSCRIBE_TIMEOUT_MS;
     this._logger = options.logger;
     if (process.platform === 'win32' && options.windowsPairing) {
-      this._windowsPairing = new WindowsBlePairing(options.windowsPairing, options.logger);
+      this._windowsPairing = new WindowsBlePairing(
+        options.windowsPairing,
+        this._connectTimeoutMs,
+        options.logger
+      );
     }
     // A Map, so an IPC vendor like `__proto__` cannot reach an inherited property.
     this._vendors = new Map(Object.entries(options.vendors ?? DEFAULT_THIRD_PARTY_BLE_VENDORS));

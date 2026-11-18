@@ -59,7 +59,15 @@ describe('rehydrateElectronBleErrors', () => {
   });
 
   it('keeps prototype registration and emission on the original bridge instance', async () => {
+    const getter = jest.fn(() => {
+      throw new Error('connection is not ready');
+    });
+    const subscribeGetter = jest.fn();
     class Bridge {
+      get connectionOnlyStatus(): string {
+        return getter();
+      }
+
       private handler?: (data: string) => void;
 
       onNotification(handler: (data: string) => void) {
@@ -70,17 +78,22 @@ describe('rehydrateElectronBleErrors', () => {
         this.handler?.('notification');
       }
 
-      subscribe() {
-        return Promise.reject(serialized);
+      get subscribe() {
+        subscribeGetter();
+        expect(this).toBe(bridge);
+        return () => Promise.reject(serialized);
       }
     }
     const bridge = new Bridge();
     const wrapped = rehydrateElectronBleErrors(bridge);
+    expect(getter).not.toHaveBeenCalled();
+    expect(subscribeGetter).not.toHaveBeenCalled();
     const listener = jest.fn();
     wrapped.onNotification(listener);
     bridge.emit();
     expect(listener).toHaveBeenCalledWith('notification');
     await expect(wrapped.subscribe()).rejects.toMatchObject({ code: serialized.code });
+    expect(subscribeGetter).toHaveBeenCalledTimes(1);
   });
 
   it('calls the method the bridge holds at call time', async () => {
