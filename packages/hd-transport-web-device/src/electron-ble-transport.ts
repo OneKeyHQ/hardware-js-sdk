@@ -97,20 +97,14 @@ const isSilentWindowsPairingNoResponse = (error: unknown): boolean => {
   }
   const candidate = error as { errorCode?: unknown; params?: unknown };
   const code = candidate.errorCode;
-  if (
-    code !== HardwareErrorCode.BleDeviceBondError &&
-    code !== HardwareErrorCode.BleBondInvalid
-  ) {
+  if (code !== HardwareErrorCode.BleDeviceBondError && code !== HardwareErrorCode.BleBondInvalid) {
     return false;
   }
-  const params = candidate.params;
+  const { params } = candidate;
   if (!params || typeof params !== 'object') {
     return false;
   }
-  const { phase, platform, stage, reason, nativeErrorMessage } = params as Record<
-    string,
-    unknown
-  >;
+  const { phase, platform, stage, reason, nativeErrorMessage } = params as Record<string, unknown>;
   if (phase !== 'pairing' || platform !== 'win32' || stage !== 'write') {
     return false;
   }

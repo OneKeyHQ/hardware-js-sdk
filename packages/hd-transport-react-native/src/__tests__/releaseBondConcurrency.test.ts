@@ -1,10 +1,6 @@
 import { EventEmitter } from 'events';
-import transportPackage, {
-  PROTOCOL_V2_CHANNEL_BLE_UART,
-  ProtocolV2,
-} from '@onekeyfe/hd-transport';
+import transportPackage, { PROTOCOL_V2_CHANNEL_BLE_UART, ProtocolV2 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
-
 import DataManager from '@onekeyfe/hd-core/src/data-manager/DataManager';
 import TransportManager from '@onekeyfe/hd-core/src/data-manager/TransportManager';
 import { Device } from '@onekeyfe/hd-core/src/device/Device';
@@ -254,10 +250,12 @@ describe('ReactNativeBleTransport concurrent release and Android bonding', () =>
     deviceB.deviceConnector = connector;
 
     await deviceA.acquire('V2');
-    await expect(deviceA.commands.typedCall('Ping', 'Success', { message: 'hi' })).resolves.toEqual({
-      type: 'Success',
-      message: { message: 'ok' },
-    });
+    await expect(deviceA.commands.typedCall('Ping', 'Success', { message: 'hi' })).resolves.toEqual(
+      {
+        type: 'Success',
+        message: { message: 'ok' },
+      }
+    );
 
     const acquiringB = deviceB.acquire('V2');
     for (let i = 0; i < 10 && onDeviceBondStateMock.mock.calls.length === 0; i += 1) {

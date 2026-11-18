@@ -79,9 +79,7 @@ describe('getEIP712Hashes — large payload fixture', () => {
   });
 });
 
-const bytes4Payload = (
-  tag: string
-): EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> =>
+const bytes4Payload = (tag: string): EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> =>
   ({
     types: {
       EIP712Domain: [{ name: 'name', type: 'string' }],
@@ -90,7 +88,7 @@ const bytes4Payload = (
     primaryType: 'Tag',
     domain: { name: 'x' },
     message: { tag },
-  }) as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+  } as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>);
 
 describe('getEIP712Hashes — fixed-width bytesN', () => {
   it('rejects a bytesN value shorter than N', () => {

@@ -1220,7 +1220,10 @@ describe('ElectronBleTransport protocol detection', () => {
   ] as const)(
     'keeps confirmed Windows pairing failure %s terminal during undeclared V1 probe',
     async (errorCode, params) => {
-      const device = { id: `win-confirmed-${errorCode}-${params.stage}`, name: 'Unknown BLE Device' };
+      const device = {
+        id: `win-confirmed-${errorCode}-${params.stage}`,
+        name: 'Unknown BLE Device',
+      };
       const nobleBle = createNobleBle(device);
       nobleBle.write.mockRejectedValueOnce({
         name: 'HardwareError',
@@ -1658,9 +1661,7 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
           const [deviceId, data] = args as [string, string];
           notificationListeners.forEach(listener => listener(deviceId, data));
         } else if (channel === EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED) {
-          const [payload] = args as [
-            { id: string; name: string; reason?: EBleDisconnectReason }
-          ];
+          const [payload] = args as [{ id: string; name: string; reason?: EBleDisconnectReason }];
           disconnectListeners.forEach(listener => listener(payload));
         } else if (channel === EOneKeyBleMessageKeys.NOBLE_BLE_MTU_CHANGED) {
           const [payload] = args as [{ id: string; mtu: number }];
@@ -1766,7 +1767,7 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
       error: jest.fn(),
     }));
 
-    const sdk = await import('../../hd-transport-electron/src/noble-ble-handler');
+    const sdk = await import('@onekeyfe/hd-transport-electron/src/noble-ble-handler');
     const TransportCtor = (await import('../src/electron-ble-transport')).default;
     sdk.setupNobleBleHandlers(webContents as any);
 
@@ -1778,52 +1779,54 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
       return Promise.resolve(handler(undefined, ...args));
     };
 
+    const nobleBle = {
+      enumerate: () => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE),
+      getDevice: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE, id),
+      connect: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, id),
+      disconnect: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT, id),
+      subscribe: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE, id),
+      unsubscribe: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE, id),
+      write: async (id: string, hex: string, writeOptions?: unknown) => {
+        const result = await invoke(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, id, hex, writeOptions);
+        // The native Windows write loop may emit a notification before the
+        // renderer has started readFrame. Deliver the V2 Success after the
+        // write IPC settles, matching the renderer-level V2-only tests.
+        if (hex.startsWith('5a')) {
+          responseSeq += 1;
+          const response = ProtocolV2.encodeFrame(
+            schemas,
+            'Success',
+            { message: 'ok' },
+            { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
+          );
+          setTimeout(() => {
+            notificationListeners.forEach(listener => listener(id, bytesToHex(response)));
+          }, 0);
+        }
+        return result;
+      },
+      release: (id: string, keepSession?: boolean) =>
+        invoke(EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE, id, keepSession),
+      onNotification: (listener: (id: string, data: string) => void) => {
+        notificationListeners.add(listener);
+        return () => notificationListeners.delete(listener);
+      },
+      onDeviceDisconnected: (
+        listener: (device: { id: string; name: string; reason?: EBleDisconnectReason }) => void
+      ) => {
+        disconnectListeners.add(listener);
+        return () => disconnectListeners.delete(listener);
+      },
+      onMtuChanged: (listener: (device: { id: string; mtu: number }) => void) => {
+        mtuListeners.add(listener);
+        return () => mtuListeners.delete(listener);
+      },
+      checkAvailability: () => invoke(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK),
+    };
+
     (global as any).window = {
       desktopApi: {
-        nobleBle: {
-          enumerate: () => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_ENUMERATE),
-          getDevice: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_GET_DEVICE, id),
-          connect: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT, id),
-          disconnect: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_DISCONNECT, id),
-          subscribe: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_SUBSCRIBE, id),
-          unsubscribe: (id: string) => invoke(EOneKeyBleMessageKeys.NOBLE_BLE_UNSUBSCRIBE, id),
-          write: async (id: string, hex: string, writeOptions?: unknown) => {
-            const result = await invoke(EOneKeyBleMessageKeys.NOBLE_BLE_WRITE, id, hex, writeOptions);
-            // The native Windows write loop may emit a notification before the
-            // renderer has started readFrame. Deliver the V2 Success after the
-            // write IPC settles, matching the renderer-level V2-only tests.
-            if (hex.startsWith('5a')) {
-              responseSeq += 1;
-              const response = ProtocolV2.encodeFrame(
-                schemas,
-                'Success',
-                { message: 'ok' },
-                { router: PROTOCOL_V2_CHANNEL_BLE_UART, seq: responseSeq }
-              );
-              setTimeout(() => {
-                notificationListeners.forEach(listener => listener(id, bytesToHex(response)));
-              }, 0);
-            }
-            return result;
-          },
-          release: (id: string, keepSession?: boolean) =>
-            invoke(EOneKeyBleMessageKeys.NOBLE_BLE_RELEASE, id, keepSession),
-          onNotification: (listener: (id: string, data: string) => void) => {
-            notificationListeners.add(listener);
-            return () => notificationListeners.delete(listener);
-          },
-          onDeviceDisconnected: (
-            listener: (device: { id: string; name: string; reason?: EBleDisconnectReason }) => void
-          ) => {
-            disconnectListeners.add(listener);
-            return () => disconnectListeners.delete(listener);
-          },
-          onMtuChanged: (listener: (device: { id: string; mtu: number }) => void) => {
-            mtuListeners.add(listener);
-            return () => mtuListeners.delete(listener);
-          },
-          checkAvailability: () => invoke(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK),
-        },
+        nobleBle,
       },
     };
 
@@ -1861,6 +1864,7 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
       logger,
       webContents,
       bleTransport,
+      nobleBle,
       peripheral,
       writeCharacteristic,
       driveTimersUntilSettled,
@@ -1871,13 +1875,14 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
     const {
       sdk,
       bleTransport,
+      nobleBle,
       peripheral,
       writeCharacteristic,
       driveTimersUntilSettled,
     } = await setupWindowsIntegration();
 
     try {
-      await driveTimersUntilSettled(Promise.resolve(window.desktopApi!.nobleBle!.enumerate()));
+      await driveTimersUntilSettled(nobleBle.enumerate());
 
       // First acquire, no protocol hint: V1 write loop hits 15 silent attempts (715
       // pairing_no_response), keeps GATT link, and falls through to V2 Ping.
@@ -1888,9 +1893,7 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
         protocolType: 'V2',
       });
 
-      const firstAcquireFirstBytes = writeCharacteristic.write.mock.calls.map(
-        ([buf]) => (buf as Buffer)[0]
-      );
+      const firstAcquireFirstBytes = writeCharacteristic.write.mock.calls.map(([buf]) => buf[0]);
       expect(firstAcquireFirstBytes.slice(0, 15).every(b => b === 0x3f)).toBe(true);
       expect(firstAcquireFirstBytes[15]).toBe(0x5a);
       expect(firstAcquireFirstBytes).toHaveLength(16);
@@ -1915,9 +1918,7 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
         protocolType: 'V2',
       });
 
-      const secondAcquireFirstBytes = writeCharacteristic.write.mock.calls.map(
-        ([buf]) => (buf as Buffer)[0]
-      );
+      const secondAcquireFirstBytes = writeCharacteristic.write.mock.calls.map(([buf]) => buf[0]);
       expect(secondAcquireFirstBytes.slice(0, 15).every(b => b === 0x3f)).toBe(true);
       expect(secondAcquireFirstBytes[15]).toBe(0x5a);
       expect(secondAcquireFirstBytes).toHaveLength(16);
@@ -1931,13 +1932,19 @@ describe('ElectronBleTransport Windows write-loop protocol detection integration
   });
 
   test('keeps confirmed Windows native status: 3 terminal during undeclared V1 probe', async () => {
-    const { sdk, bleTransport, peripheral, writeCharacteristic, driveTimersUntilSettled } =
-      await setupWindowsIntegration({
-        writeErrorOnV1: new Error('GATT operation failed, status: 3'),
-      });
+    const {
+      sdk,
+      bleTransport,
+      nobleBle,
+      peripheral,
+      writeCharacteristic,
+      driveTimersUntilSettled,
+    } = await setupWindowsIntegration({
+      writeErrorOnV1: new Error('GATT operation failed, status: 3'),
+    });
 
     try {
-      await driveTimersUntilSettled(Promise.resolve(window.desktopApi!.nobleBle!.enumerate()));
+      await driveTimersUntilSettled(nobleBle.enumerate());
 
       await expect(
         driveTimersUntilSettled(bleTransport.acquire({ uuid: peripheral.id }))
