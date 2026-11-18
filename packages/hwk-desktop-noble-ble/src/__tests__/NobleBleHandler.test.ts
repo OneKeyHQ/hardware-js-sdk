@@ -1141,13 +1141,19 @@ describe('Trezor BLE process shutdown', () => {
 
   test.each([
     ['poweredOff', 'bluetoothTurnedOff'],
-    ['unsupported', 'bluetoothTurnedOff'],
+    ['unsupported', undefined],
     ['unauthorized', 'permissionDenied'],
   ])('fails at once while Bluetooth is %s', async (state, permissionDeniedReason) => {
     const handler = makeHandler(Object.assign(new FakeNoble(), { state }));
     await expect(handler.scan(PADDED_VENDOR)).rejects.toMatchObject({
-      code: HardwareErrorCode.DevicePermissionDenied,
-      params: { permissionDeniedReason, bluetoothState: state },
+      code:
+        state === 'unsupported'
+          ? HardwareErrorCode.TransportNotAvailable
+          : HardwareErrorCode.DevicePermissionDenied,
+      params: {
+        ...(permissionDeniedReason ? { permissionDeniedReason } : {}),
+        bluetoothState: state,
+      },
     });
   });
 
@@ -1174,7 +1180,7 @@ describe('Trezor BLE process shutdown', () => {
     const initializing = handler.init();
     const rejected = expect(initializing).rejects.toMatchObject({
       code: HardwareErrorCode.DevicePermissionDenied,
-      params: { permissionDeniedReason: 'bluetoothTurnedOff', bluetoothState: 'unknown' },
+      params: { bluetoothState: 'unknown' },
     });
     await Promise.resolve();
     jest.advanceTimersByTime(10_000);
@@ -1491,7 +1497,10 @@ describe('native link loss', () => {
       code: HardwareErrorCode.BleConnectFailed,
       params: { phase: 'subscribe' },
     });
-    expect(peripheral.listenerCount('disconnect')).toBe(1);
+    expect(peripheral.listenerCount('disconnect')).toBe(0);
+    await expect(handler.subscribe('id-1')).rejects.toMatchObject({
+      code: HardwareErrorCode.DeviceDisconnected,
+    });
   });
 
   test('Windows status 3 after the link dropped is a disconnect, not a refused bond', async () => {
@@ -1532,7 +1541,7 @@ describe('native link loss', () => {
       return { peripheral, handler };
     }
 
-    test('fails a subscribe the OS never answers', async () => {
+    test('retires a timed-out subscription so concurrent and later callers cannot see false success', async () => {
       const { peripheral, handler } = await linkedHandler();
       peripheral.notifyChar.subscribeAsync.mockReturnValueOnce(new Promise(() => undefined));
       const subscribing = expect(handler.subscribe('id-1')).rejects.toMatchObject({
@@ -1540,9 +1549,18 @@ describe('native link loss', () => {
         message: 'subscribe timed out after 1000ms',
         params: { phase: 'subscribe' },
       });
+      const concurrent = expect(handler.subscribe('id-1')).rejects.toMatchObject({
+        code: HardwareErrorCode.BleConnectFailed,
+      });
       await flush();
       jest.advanceTimersByTime(1000);
       await subscribing;
+      await concurrent;
+      await expect(handler.subscribe('id-1')).rejects.toMatchObject({
+        code: HardwareErrorCode.DeviceDisconnected,
+      });
+      expect(peripheral.notifyChar.subscribeAsync).toHaveBeenCalledTimes(1);
+      expect(peripheral.notifyChar.listenerCount('data')).toBe(0);
       expect(jest.getTimerCount()).toBe(0);
     });
 

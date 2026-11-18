@@ -85,7 +85,17 @@ const restoreHostError = ({ message, code, params }: ConnectorSerializedError): 
 export function rehydrateElectronBleErrors<T extends object>(bridge: T): T {
   // A contextBridge object may be frozen, which rules out patching or proxying it.
   const wrapped = Object.create(bridge) as T;
-  for (const key of Object.keys(bridge) as Array<keyof T>) {
+  const keys = new Set<keyof T>();
+  for (
+    let source = bridge;
+    source && source !== Object.prototype;
+    source = Object.getPrototypeOf(source)
+  ) {
+    for (const key of Reflect.ownKeys(source) as Array<keyof T>) {
+      if (key !== 'constructor') keys.add(key);
+    }
+  }
+  for (const key of keys) {
     if (typeof bridge[key] === 'function') {
       Object.defineProperty(wrapped, key, {
         value: (...args: unknown[]) => {

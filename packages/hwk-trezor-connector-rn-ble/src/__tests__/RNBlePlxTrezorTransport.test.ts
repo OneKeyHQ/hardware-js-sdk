@@ -486,8 +486,8 @@ describe('RNBlePlxTrezorTransport', () => {
         HardwareErrorCode.BlePairingTimeout,
       ],
       [
-        'an Android pairing failure (ATT 137)',
-        { attErrorCode: 137 },
+        'an Android pairing failure (GATT_AUTH_FAIL)',
+        { androidErrorCode: 137 },
         HardwareErrorCode.BlePairingTimeout,
       ],
       ['a device the OS does not know', { errorCode: 204 }, HardwareErrorCode.DeviceNotFound],
@@ -547,10 +547,13 @@ describe('RNBlePlxTrezorTransport', () => {
     });
   });
 
-  it('says why Bluetooth never came on', async () => {
+  it.each([
+    ['PoweredOff', 'bluetoothTurnedOff'],
+    ['Unsupported', undefined],
+  ])('reports the recovery reason for %s', async (state, permissionDeniedReason) => {
     const manager = {
       onStateChange: jest.fn((listener: (state: string) => void) => {
-        void Promise.resolve().then(() => listener('PoweredOff'));
+        void Promise.resolve().then(() => listener(state));
         return { remove: jest.fn() };
       }),
       startDeviceScan: jest.fn(),
@@ -562,8 +565,14 @@ describe('RNBlePlxTrezorTransport', () => {
     const transport = new RNBlePlxTrezorTransport({ manager });
 
     await expect(transport.connect('safe-7')).rejects.toMatchObject({
-      code: HardwareErrorCode.DevicePermissionDenied,
-      params: { permissionDeniedReason: 'bluetoothTurnedOff', bluetoothState: 'PoweredOff' },
+      code:
+        state === 'Unsupported'
+          ? HardwareErrorCode.TransportNotAvailable
+          : HardwareErrorCode.DevicePermissionDenied,
+      params: {
+        ...(permissionDeniedReason ? { permissionDeniedReason } : {}),
+        bluetoothState: state,
+      },
     });
   });
 

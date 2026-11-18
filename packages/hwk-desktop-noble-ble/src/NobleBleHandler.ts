@@ -110,6 +110,7 @@ interface DeviceEntry {
   writeChar?: NobleCharacteristicLike;
   notifyChar?: NobleCharacteristicLike;
   notifyHandler?: (data: Buffer, isNotification: boolean) => void;
+  subscribing?: Promise<void>;
   disconnectHandler?: (reason?: unknown) => void;
 }
 
@@ -203,10 +204,14 @@ const invariantError = (message: string) =>
 /** Not just `poweredOff`: an adapter without permission or support cannot be used either. */
 const bluetoothUnavailableError = (state: string) =>
   createHwkError({
-    code: HardwareErrorCode.DevicePermissionDenied,
+    code:
+      state === 'unsupported'
+        ? HardwareErrorCode.TransportNotAvailable
+        : HardwareErrorCode.DevicePermissionDenied,
     message: `Bluetooth is unavailable (state: ${state})`,
     params: {
-      permissionDeniedReason: state === 'unauthorized' ? 'permissionDenied' : 'bluetoothTurnedOff',
+      ...(state === 'unauthorized' ? { permissionDeniedReason: 'permissionDenied' } : {}),
+      ...(state === 'poweredOff' ? { permissionDeniedReason: 'bluetoothTurnedOff' } : {}),
       bluetoothState: state,
     },
   });
@@ -885,18 +890,30 @@ export class NobleBleHandler {
     }
     this._assertActive();
     if (this._windowsPairing) {
-      const peripheral = this._discovered.get(id);
-      const { profile } = this._resolveVendor(options.vendor);
-      const remembered = this._advertisedUuids.get(id);
-      // Never ask the user to bond a bystander's peripheral or another vendor's device.
-      const device =
-        peripheral && matchesPeripheral(peripheral, profile, undefined, remembered)
-          ? peripheralToInfo(peripheral, remembered)
-          : undefined;
       return this._windowsPairing.connect(
         id,
         options.vendor,
-        device,
+        async signal => {
+          const claim: ConnectClaim = { abandoned: signal.aborted };
+          const cancel = () => {
+            claim.abandoned = true;
+            claim.cancelScan?.();
+          };
+          signal.addEventListener('abort', cancel, { once: true });
+          try {
+            const peripheral =
+              this._discovered.get(id) ??
+              (await this._scanUntilFound(id, THIRD_PARTY_BLE_SCAN_DURATION_MS, claim));
+            const { profile } = this._resolveVendor(options.vendor);
+            const remembered = this._advertisedUuids.get(id);
+            // Only pair a peripheral that the selected vendor actually advertises.
+            return peripheral && matchesPeripheral(peripheral, profile, undefined, remembered)
+              ? peripheralToInfo(peripheral, remembered)
+              : undefined;
+          } finally {
+            signal.removeEventListener('abort', cancel);
+          }
+        },
         () => this._pauseScanForPairing(options.vendor),
         () => this._connectWithTimeout(id, options)
       );
@@ -1123,15 +1140,14 @@ export class NobleBleHandler {
     } catch (error) {
       // Don't leak a GATT link this call opened. A direct connect opened one even
       // though the peripheral arrives connected, unless a committed link owns it.
+      const msSinceLink = Date.now() - linkedAt;
       const openedLink = !wasConnected || (route === 'direct' && !this._connected.has(id));
       if (openedLink) await this._safeDisconnect(peripheral);
       // noble-win names an unreachable GATT only in its text. The Windows pairing module
       // weighs how soon the link failed against the OS bond before classifying it.
       const unreachable = error instanceof Error && /\bunreachable\b/i.test(error.message);
       throw toCanonicalBleError(error, 'connect', {
-        facts: unreachable
-          ? { gattUnreachable: true, msSinceLink: Date.now() - linkedAt }
-          : undefined,
+        facts: unreachable ? { gattUnreachable: true, msSinceLink } : undefined,
       });
     }
   }
@@ -1154,28 +1170,41 @@ export class NobleBleHandler {
   async subscribe(id: string): Promise<void> {
     const entry = this._requireEntry(id);
     if (!entry.notifyChar) throw invariantError(`BLE notify characteristic missing for ${id}`);
+    if (entry.subscribing) return entry.subscribing;
     if (entry.notifyHandler) return;
+    const characteristic = entry.notifyChar;
     const handler = (data: Buffer) => {
-      this._onNotification?.(id, data.toString('hex'));
+      if (this._connected.get(id) === entry) this._onNotification?.(id, data.toString('hex'));
     };
     entry.notifyHandler = handler;
     entry.notifyChar.on('data', handler);
-    try {
-      await failOnNativeLinkLoss(
-        entry.peripheral,
-        this._withSubscribeTimeout(entry.notifyChar.subscribeAsync()),
-        'subscribe'
-      );
-    } catch (error) {
-      this._log('warn', 'subscribe.error', {
-        id,
-        error: String(error),
-        ...nativeErrorFields(error),
+    const subscribing = failOnNativeLinkLoss(
+      entry.peripheral,
+      this._withSubscribeTimeout(Promise.resolve().then(() => characteristic.subscribeAsync())),
+      'subscribe'
+    )
+      .catch(async error => {
+        this._log('warn', 'subscribe.error', {
+          id,
+          error: String(error),
+          ...nativeErrorFields(error),
+        });
+        const canonical = toCanonicalBleError(error, 'subscribe', {
+          linkLost: entry.peripheral.state !== 'connected',
+        });
+        // A timed-out native subscription can still complete. Retire its link so
+        // another caller cannot mistake that abandoned attempt for a live subscription.
+        if (this._connected.get(id) === entry) {
+          this._cleanupDevice(id, true, entry);
+          await this._safeDisconnect(entry.peripheral);
+        }
+        throw canonical;
+      })
+      .finally(() => {
+        if (entry.subscribing === subscribing) entry.subscribing = undefined;
       });
-      throw toCanonicalBleError(error, 'subscribe', {
-        linkLost: entry.peripheral.state !== 'connected',
-      });
-    }
+    entry.subscribing = subscribing;
+    return subscribing;
   }
 
   private async _withSubscribeTimeout(subscribing: Promise<void>): Promise<void> {
@@ -1205,6 +1234,8 @@ export class NobleBleHandler {
   async unsubscribe(id: string): Promise<void> {
     const entry = this._connected.get(id);
     if (!entry?.notifyChar) return;
+    await entry.subscribing?.catch(() => undefined);
+    if (this._connected.get(id) !== entry) return;
     if (entry.notifyHandler) {
       entry.notifyChar.removeListener('data', entry.notifyHandler);
       entry.notifyHandler = undefined;

@@ -59,13 +59,22 @@ const PAIR_DECLINE_GRACE_MS = 5000;
 
 function helperFailure(message: string): IHwkErrorPayload {
   const status = /DevicePairingResultStatus\((\d+)\)/.exec(message)?.[1];
-  return status === undefined
-    ? { code: HardwareErrorCode.BleConnectFailed, message, params: { phase: 'pairing' } }
-    : {
-        code: HardwareErrorCode.BlePairingTimeout,
-        message,
-        params: { phase: 'pairing', pairingStatus: Number(status) },
-      };
+  if (status === undefined) {
+    return { code: HardwareErrorCode.BleConnectFailed, message, params: { phase: 'pairing' } };
+  }
+  const pairingStatus = Number(status);
+  let code = HardwareErrorCode.BlePairingTimeout;
+  if (pairingStatus === 12) code = HardwareErrorCode.DevicePermissionDenied;
+  else if (pairingStatus === 14) code = HardwareErrorCode.BlePairingCancelled;
+  return {
+    code,
+    message,
+    params: {
+      phase: 'pairing',
+      pairingStatus,
+      ...(pairingStatus === 12 ? { permissionDeniedReason: 'permissionDenied' } : {}),
+    },
+  };
 }
 
 /** Internal WinRT process protocol. No Electron window, IPC, or global UI decision slot. */

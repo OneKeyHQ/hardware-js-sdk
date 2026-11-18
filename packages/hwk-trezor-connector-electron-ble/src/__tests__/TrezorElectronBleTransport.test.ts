@@ -322,9 +322,9 @@ describe('TrezorElectronBleConnector', () => {
       },
       HardwareErrorCode.BlePairingCancelled,
     ],
-    // Text alone no longer decides anything.
-    [{ message: 'connect cancelled: BLE-1' }, HardwareErrorCode.BleConnectFailed],
-    [{ message: 'remote BLE device not found' }, HardwareErrorCode.BleConnectFailed],
+    // Older preloads only preserve the Error message.
+    [{ message: 'connect cancelled: BLE-1' }, HardwareErrorCode.BlePairingCancelled],
+    [{ message: 'remote BLE device not found' }, HardwareErrorCode.DeviceNotFound],
     // A host's own code is not ours.
     [{ message: 'host failure', code: -99999 }, HardwareErrorCode.BleConnectFailed],
   ])('a serialized host rejection %p reports %p', async (rejection, code) => {

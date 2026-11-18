@@ -156,13 +156,20 @@ function waitForPoweredOn(manager: BlePlxManager, ms = BLE_POWERED_ON_TIMEOUT_MS
         finish(() =>
           reject(
             createHwkError({
-              code: HardwareErrorCode.DevicePermissionDenied,
+              code:
+                lastState === 'Unsupported'
+                  ? HardwareErrorCode.TransportNotAvailable
+                  : HardwareErrorCode.DevicePermissionDenied,
               message: `BluetoothLE did not reach PoweredOn state (last: ${
                 lastState ?? 'unknown'
               })`,
               params: {
-                permissionDeniedReason:
-                  lastState === 'Unauthorized' ? 'permissionDenied' : 'bluetoothTurnedOff',
+                ...(lastState === 'Unauthorized'
+                  ? { permissionDeniedReason: 'permissionDenied' }
+                  : {}),
+                ...(lastState === 'PoweredOff'
+                  ? { permissionDeniedReason: 'bluetoothTurnedOff' }
+                  : {}),
                 bluetoothState: lastState,
               },
             })
@@ -1053,10 +1060,13 @@ function isDeviceUnreachable(error: unknown): boolean {
 }
 
 // ATT 15 (insufficient encryption): iOS reports a failed, refused, cancelled or timed-out
-// pairing alike; ATT 137 (GATT_AUTH_FAIL): Android's failed pairing.
+// pairing alike; Android reports GATT_AUTH_FAIL (0x89) in androidErrorCode.
 function isPairingFailure(error: unknown): boolean {
-  const { attErrorCode } = (error ?? {}) as { attErrorCode?: unknown };
-  return attErrorCode === 15 || attErrorCode === 137;
+  const { attErrorCode, androidErrorCode } = (error ?? {}) as {
+    attErrorCode?: unknown;
+    androidErrorCode?: unknown;
+  };
+  return attErrorCode === 15 || androidErrorCode === 0x89;
 }
 
 /** Native fields only: no stack in error params. */

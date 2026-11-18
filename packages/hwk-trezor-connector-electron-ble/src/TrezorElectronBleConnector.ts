@@ -96,10 +96,14 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       if (isStandardHwkError(error)) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      // The host codes every cause it can identify; anything else is one honest,
-      // generic BleConnectFailed instead of a guess from its text.
+      // Preserve message-only failures from older preloads and custom transports.
+      const code = /\bdevice not found\b/i.test(reason)
+        ? HardwareErrorCode.DeviceNotFound
+        : /\bconnect cancelled\b/i.test(reason)
+        ? HardwareErrorCode.BlePairingCancelled
+        : HardwareErrorCode.BleConnectFailed;
       throw createHwkError({
-        code: HardwareErrorCode.BleConnectFailed,
+        code,
         message: `Trezor BLE connect failed: ${device.connectId} (${reason})`,
         params: { connectId: device.connectId, originalError: { message: reason } },
       });

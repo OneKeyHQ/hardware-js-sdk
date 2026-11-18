@@ -82,6 +82,18 @@ it.each([0, 3])('closes on WinRT success %s before native cleanup finishes', asy
   await expect(pair.pending).resolves.toBe(status === 0 ? 'paired' : 'already-paired');
 });
 
+it.each([
+  [12, HardwareErrorCode.DevicePermissionDenied],
+  [7, HardwareErrorCode.BlePairingTimeout],
+])('preserves the recovery category for WinRT status %s', async (status, code) => {
+  const pair = start();
+  const signal = await pair.show();
+  mockHelper.report({ type: 'pairing-result', status });
+  expect(signal.aborted).toBe(true);
+  mockHelper.emit('close', 1);
+  expect(await pair.result).toMatchObject({ code, params: { pairingStatus: status } });
+});
+
 it('replays a persistent Trezor device refusal without waiting for the host deadline', async () => {
   const pair = start('trezor');
   const signal = await pair.show();

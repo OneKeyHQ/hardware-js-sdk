@@ -276,6 +276,37 @@ describe('TrezorCore', () => {
     });
   });
 
+  test('reports a terminal disconnect after recovering an internal THP ACK timeout', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    try {
+      const thpState = new protocolThp.ThpState();
+      thpState.setChannel(Buffer.from('1234', 'hex'));
+      const disconnected = new Error('link disconnected');
+      const transport = new MemoryByteTransport([]);
+      transport.read = jest
+        .fn()
+        .mockImplementationOnce(
+          (signal?: AbortSignal) =>
+            new Promise((_, reject) => {
+              signal?.addEventListener('abort', () => reject(new Error('internal read aborted')), {
+                once: true,
+              });
+            })
+        )
+        .mockRejectedValue(disconnected);
+      const core = new TrezorCore({ transport, protocol: protocolV2 });
+      const result = core
+        .call('ThpHandshakeInitRequest', { key: '00'.repeat(32) }, { thpState })
+        .catch((error: unknown) => error);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      jest.advanceTimersByTime(10_000);
+      expect(await result).toBe(disconnected);
+      expect(transport.read).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('unwraps THP abort options before forwarding signals to the byte transport', async () => {
     const thpState = new protocolThp.ThpState();
     const responseBytes = Buffer.from(

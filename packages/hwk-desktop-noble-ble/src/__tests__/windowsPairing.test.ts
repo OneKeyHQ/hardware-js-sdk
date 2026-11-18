@@ -326,18 +326,45 @@ it('retains a queued target beyond the discovery idle lifetime', async () => {
   }
 });
 
-it('retries GATT once after a fresh bond, without repeating pairing', async () => {
-  mockPair.mockResolvedValue('paired');
+it('pairs a device found by a cold connect before opening GATT', async () => {
   const { support, invoke, ledger } = setup();
   try {
-    ledger.connectAsync.mockRejectedValueOnce(new Error('link still held'));
+    const pending = invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'ledger', profiles.ledger);
+    await advance(600);
+    await expect(pending).resolves.toMatchObject({ id: 'ledger' });
+    expect(mockPair).toHaveBeenCalledTimes(1);
+    expect(mockPair.mock.invocationCallOrder[0]).toBeLessThan(
+      ledger.connectAsync.mock.invocationCallOrder[0]
+    );
+  } finally {
+    await support.dispose();
+  }
+});
+
+it('keeps other scans paused until the fresh-bond GATT retry finishes', async () => {
+  mockPair.mockResolvedValue('paired');
+  const { support, invoke, ledger, noble } = setup();
+  let finishRetry!: () => void;
+  try {
+    ledger.connectAsync.mockRejectedValueOnce(new Error('link still held')).mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishRetry = resolve;
+        })
+    );
     await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'ledger' });
+    await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'trezor' });
+    const scanCalls = noble.startScanningAsync.mock.calls.length;
     const pending = invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'ledger', profiles.ledger);
     await advance(3600);
-    await expect(pending).resolves.toMatchObject({ id: 'ledger' });
+    await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'trezor' });
+    expect(noble.startScanningAsync).toHaveBeenCalledTimes(scanCalls);
     expect(ledger.connectAsync).toHaveBeenCalledTimes(2);
+    finishRetry();
+    await expect(pending).resolves.toMatchObject({ id: 'ledger' });
     expect(mockPair).toHaveBeenCalledTimes(1);
   } finally {
+    finishRetry?.();
     await support.dispose();
   }
 });

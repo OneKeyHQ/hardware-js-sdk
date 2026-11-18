@@ -58,6 +58,31 @@ describe('rehydrateElectronBleErrors', () => {
     expect(wrapped.label).toBe('bridge');
   });
 
+  it('keeps prototype registration and emission on the original bridge instance', async () => {
+    class Bridge {
+      private handler?: (data: string) => void;
+
+      onNotification(handler: (data: string) => void) {
+        this.handler = handler;
+      }
+
+      emit() {
+        this.handler?.('notification');
+      }
+
+      subscribe() {
+        return Promise.reject(serialized);
+      }
+    }
+    const bridge = new Bridge();
+    const wrapped = rehydrateElectronBleErrors(bridge);
+    const listener = jest.fn();
+    wrapped.onNotification(listener);
+    bridge.emit();
+    expect(listener).toHaveBeenCalledWith('notification');
+    await expect(wrapped.subscribe()).rejects.toMatchObject({ code: serialized.code });
+  });
+
   it('calls the method the bridge holds at call time', async () => {
     const bridge = { connect: jest.fn(async () => 'first') };
     const wrapped = rehydrateElectronBleErrors(bridge);

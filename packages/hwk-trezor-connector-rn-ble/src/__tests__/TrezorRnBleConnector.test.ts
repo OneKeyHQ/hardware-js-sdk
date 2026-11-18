@@ -204,7 +204,7 @@ describe('TrezorRnBleConnector', () => {
     await expect(connector.connect('62:79:4D:55:37:8F')).rejects.toBe(notFound);
   });
 
-  it('reads no text from an uncoded transport failure', async () => {
+  it('preserves device-not-found failures from a legacy custom transport', async () => {
     const transport: TrezorBleTransport = {
       scan: jest.fn().mockResolvedValue([]),
       connect: jest.fn().mockRejectedValue(new Error('native BLE device not found')),
@@ -215,7 +215,7 @@ describe('TrezorRnBleConnector', () => {
     });
 
     await expect(connector.connect('62:79:4D:55:37:8F')).rejects.toMatchObject({
-      code: HardwareErrorCode.BleConnectFailed,
+      code: HardwareErrorCode.DeviceNotFound,
     });
   });
 

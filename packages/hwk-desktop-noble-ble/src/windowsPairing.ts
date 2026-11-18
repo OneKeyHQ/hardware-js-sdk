@@ -68,7 +68,7 @@ export class WindowsBlePairing {
   async connect<T>(
     id: string,
     vendor: string,
-    device: ThirdPartyBleDeviceInfo | undefined,
+    resolveDevice: (signal: AbortSignal) => Promise<ThirdPartyBleDeviceInfo | undefined>,
     pauseScan: () => Promise<() => void>,
     connect: () => Promise<T>
   ): Promise<T> {
@@ -83,6 +83,8 @@ export class WindowsBlePairing {
     let pairingCleanup = Promise.resolve();
     try {
       let outcome: 'paired' | 'already-paired' | 'skipped' = 'skipped';
+      const device = await resolveDevice(signal);
+      assertActive();
       const address = device?.address;
       if (address) {
         // Retain the selected peripheral before queueing: another ceremony may
@@ -120,7 +122,7 @@ export class WindowsBlePairing {
         if (outcome === 'paired' && !facts.timedOut) {
           await waitForRetry(signal);
           assertActive();
-          return connect();
+          return await connect();
         }
         if (
           vendor === 'ledger' &&

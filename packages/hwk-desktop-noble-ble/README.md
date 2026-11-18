@@ -81,8 +81,11 @@ The SDK does not include or build a native pairing executable. The host must
 provide a trusted, compatible helper through `windowsPairing.helperPath`, along
 with `onPairingRequest`. The OneKey Rust implementation and its x64/ARM64 binaries
 are maintained in the
-[App monorepo](https://github.com/OneKeyHQ/app-monorepo/tree/x/apps/desktop/native-modules/onekey-ble-pair).
-That repository owns native builds and binary updates.
+[App monorepo](https://github.com/OneKeyHQ/app-monorepo/tree/b8bb5cf4a5fb359c44ea2fbd3f39d00855bf8e15/apps/desktop/native-modules/onekey-ble-pair).
+Use the matching [x64/ARM64 binaries from the same revision](https://github.com/OneKeyHQ/app-monorepo/tree/b8bb5cf4a5fb359c44ea2fbd3f39d00855bf8e15/apps/desktop/public/static/bin/ble-pair),
+not assets from a different branch. That repository owns native builds and binary
+updates. This revision emits structured `link` and `pairing-result` events and
+continues reading host cancellation after confirmation.
 
 Copy the **target build architecture** outside ASAR. For example, if the host
 stores its executables under `resources/ble-pair/win-{x64,arm64}`, add this to its
