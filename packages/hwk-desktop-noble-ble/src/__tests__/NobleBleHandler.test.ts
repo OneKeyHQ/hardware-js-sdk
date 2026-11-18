@@ -1484,12 +1484,12 @@ describe('native link loss', () => {
     });
   });
 
-  test('Windows status 3 on a live link is a refused bond and leaves only the link handler', async () => {
+  test('a generic Windows subscribe error on a live link does not invalidate the bond', async () => {
     const { peripheral, handler } = await connectedHandler();
     peripheral.notifyChar.subscribeAsync.mockRejectedValueOnce(new Error('status: 3'));
     await expect(handler.subscribe('id-1')).rejects.toMatchObject({
-      code: HardwareErrorCode.BleBondInvalid,
-      params: { phase: 'subscribe', asyncStatus: 3 },
+      code: HardwareErrorCode.BleConnectFailed,
+      params: { phase: 'subscribe' },
     });
     expect(peripheral.listenerCount('disconnect')).toBe(1);
   });

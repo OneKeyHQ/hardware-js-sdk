@@ -368,6 +368,8 @@ export class NobleBleHandler {
 
   private _scanTransition: Promise<void> = Promise.resolve();
 
+  private _pairingScanPauses = 0;
+
   private _idleStopTimer?: ReturnType<typeof setTimeout>;
 
   private _onNotification?: (id: string, hexData: string) => void;
@@ -537,7 +539,11 @@ export class NobleBleHandler {
     const now = Date.now();
     const result: ThirdPartyBleDeviceInfo[] = [];
     for (const [id, peripheral] of this._discovered) {
-      if (now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS) {
+      // Pairing suspends advertisements; another vendor's polling must retain the cache.
+      if (
+        this._pairingScanPauses === 0 &&
+        now - (this._lastSeen.get(id) ?? 0) > THIRD_PARTY_BLE_DEVICE_TTL_MS
+      ) {
         this._discovered.delete(id);
         this._lastSeen.delete(id);
         this._advertisedUuids.delete(id);
@@ -621,7 +627,7 @@ export class NobleBleHandler {
   }
 
   private _armIdleStop(): void {
-    if (this._disposed) return;
+    if (this._disposed || this._pairingScanPauses > 0) return;
     this._clearIdleStop();
     this._idleStopTimer = setTimeout(() => {
       void this._stopContinuousScan();
@@ -641,7 +647,7 @@ export class NobleBleHandler {
     const transition = this._scanTransition.then(async () => {
       if (scanning) {
         this._assertActive();
-        if (this._scanOwners.size === 0) return;
+        if (this._scanOwners.size === 0 || this._pairingScanPauses > 0) return;
       }
       if (this._scanning === scanning) return;
       this._scanning = scanning;
@@ -665,6 +671,20 @@ export class NobleBleHandler {
   private async _pauseScan(): Promise<void> {
     this._clearIdleStop();
     await this._setScanning(false);
+  }
+
+  private async _pauseScanForPairing(vendor: string): Promise<() => void> {
+    this._scanOwners.delete(vendor);
+    this._pairingScanPauses += 1;
+    await this._pauseScan();
+    return () => {
+      this._pairingScanPauses -= 1;
+      if (this._disposed || this._pairingScanPauses > 0 || this._scanOwners.size === 0) return;
+      this._armIdleStop();
+      void this._setScanning(true).catch(error => {
+        this._log('warn', 'scan.resume.error', { error: String(error) });
+      });
+    };
   }
 
   /** Stop scanning and forget discovered devices (idle timeout / teardown). */
@@ -877,7 +897,7 @@ export class NobleBleHandler {
         id,
         options.vendor,
         device,
-        () => this.stopScan(options.vendor),
+        () => this._pauseScanForPairing(options.vendor),
         () => this._connectWithTimeout(id, options)
       );
     }
@@ -1152,7 +1172,9 @@ export class NobleBleHandler {
         error: String(error),
         ...nativeErrorFields(error),
       });
-      throw this._toSubscribeError(error, entry.peripheral);
+      throw toCanonicalBleError(error, 'subscribe', {
+        linkLost: entry.peripheral.state !== 'connected',
+      });
     }
   }
 
@@ -1178,24 +1200,6 @@ export class NobleBleHandler {
       clearTimeout(timer);
       if (cancel) this._pendingCancellations.delete(cancel);
     }
-  }
-
-  /**
-   * noble-win reports a failed subscribe only as `status: <AsyncStatus>`. Error (3) on a live
-   * link is a device refusing the bond Windows holds; a link already gone fails it the same way.
-   */
-  private _toSubscribeError(error: unknown, peripheral: NoblePeripheralLike): Error {
-    if (!(error instanceof Error) || error.message !== 'status: 3') {
-      return toCanonicalBleError(error, 'subscribe');
-    }
-    if (peripheral.state !== 'connected') {
-      return toCanonicalBleError(error, 'subscribe', { linkLost: true });
-    }
-    return createHwkError({
-      code: HardwareErrorCode.BleBondInvalid,
-      message: 'The device refused the Bluetooth pairing this computer holds',
-      params: { phase: 'subscribe', asyncStatus: 3 },
-    });
   }
 
   async unsubscribe(id: string): Promise<void> {

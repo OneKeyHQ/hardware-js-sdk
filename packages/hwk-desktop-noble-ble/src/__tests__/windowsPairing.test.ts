@@ -162,6 +162,39 @@ it.each(['darwin', 'linux', 'unconfigured'])(
   }
 );
 
+it('pauses a second vendor scan until Windows pairing and connection finish', async () => {
+  const { support, invoke, noble } = setup();
+  let finishPairing!: (outcome: string) => void;
+  mockPair.mockImplementationOnce(
+    () =>
+      new Promise<string>(resolve => {
+        expect(noble.stopScanningAsync).toHaveBeenCalledTimes(1);
+        finishPairing = resolve;
+      })
+  );
+  try {
+    await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'trezor' });
+    await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'ledger' });
+    const connecting = invoke(THIRD_PARTY_BLE_CHANNELS.connect, 'ledger', profiles.ledger);
+    await flush();
+    expect(mockPair).toHaveBeenCalledTimes(1);
+    await advance(13_000);
+    await invoke(THIRD_PARTY_BLE_CHANNELS.scan, { vendor: 'trezor' });
+    expect(noble.startScanningAsync).toHaveBeenCalledTimes(1);
+    expect(await invoke(THIRD_PARTY_BLE_CHANNELS.getDevice, 'ledger')).toMatchObject({
+      id: 'ledger',
+    });
+
+    finishPairing('already-paired');
+    await advance(300);
+    await expect(connecting).resolves.toMatchObject({ id: 'ledger' });
+    await flush();
+    expect(noble.startScanningAsync).toHaveBeenCalledTimes(2);
+  } finally {
+    await support.dispose();
+  }
+});
+
 it('validates vendor and GATT framing before asking Windows to pair', async () => {
   const { support, invoke } = setup();
   try {

@@ -679,7 +679,7 @@ export class LedgerConnectorBase implements IConnector {
   async disconnect(sessionId: string): Promise<void> {
     if (!this._deviceManager) return;
     // Names the caller, so a teardown nobody asked for can be traced in support logs.
-    debugLog('[DMK] disconnect requested', { sessionId, caller: describeCaller(new Error()) });
+    debugLog('[DMK] disconnect requested', { caller: describeCaller(new Error()) });
 
     const deviceId = this._deviceManager.getDeviceId(sessionId);
     this._signerManager?.invalidate(sessionId);

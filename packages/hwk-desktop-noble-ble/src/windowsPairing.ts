@@ -69,7 +69,7 @@ export class WindowsBlePairing {
     id: string,
     vendor: string,
     device: ThirdPartyBleDeviceInfo | undefined,
-    pauseScan: () => Promise<void>,
+    pauseScan: () => Promise<() => void>,
     connect: () => Promise<T>
   ): Promise<T> {
     if (vendor !== 'ledger' && vendor !== 'trezor') return connect();
@@ -79,22 +79,25 @@ export class WindowsBlePairing {
     const assertActive = () => {
       if (signal.aborted) throw cancelledError();
     };
+    let resumeScan: (() => void) | undefined;
+    let pairingCleanup = Promise.resolve();
     try {
       let outcome: 'paired' | 'already-paired' | 'skipped' = 'skipped';
       const address = device?.address;
       if (address) {
         // Retain the selected peripheral before queueing: another ceremony may
         // take longer than the discovery cache's idle lifetime.
-        await pauseScan();
+        resumeScan = await pauseScan();
         assertActive();
         const operation = pairingQueue.then(async () => {
           assertActive();
           return pairWindowsBleDevice(this.options, { id, vendor, address }, signal, this.logger);
         });
-        pairingQueue = operation.then(
+        pairingCleanup = operation.then(
           () => undefined,
           () => undefined
         );
+        pairingQueue = pairingCleanup;
         // A queued cancellation returns immediately, but its queue slot still waits
         // for the preceding helper's cleanup before the next ceremony can start.
         let onAbort!: () => void;
@@ -136,6 +139,7 @@ export class WindowsBlePairing {
       }
     } finally {
       this.pending.delete(entry);
+      if (resumeScan) void pairingCleanup.then(resumeScan);
     }
   }
 }
