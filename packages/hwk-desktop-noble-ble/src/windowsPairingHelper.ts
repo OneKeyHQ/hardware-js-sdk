@@ -17,7 +17,7 @@ export interface WindowsBlePairingRequest {
 }
 
 export interface WindowsBlePairingOptions {
-  /** Absolute path to the SDK's helper, copied outside Electron's ASAR. */
+  /** Absolute path to the host-provided helper, copied outside Electron's ASAR. */
   helperPath: string;
   /** Resolve only after the user compares the code and confirms or cancels. */
   onPairingRequest(request: WindowsBlePairingRequest): Promise<WindowsBlePairingDecision>;

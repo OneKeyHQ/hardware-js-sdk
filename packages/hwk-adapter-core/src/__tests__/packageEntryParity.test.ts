@@ -1,5 +1,4 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
-import { createRequire } from 'module';
 import { join, resolve } from 'path';
 
 /**
@@ -12,8 +11,7 @@ import { join, resolve } from 'path';
  * - exports mapping without an entry → resolves to dist files tsup never
  *   builds; consumers crash at install/import time.
  *
- * Generated dist files are not read. Static prebuild exports must resolve to
- * real files in a directory included in the package's publication manifest.
+ * Config-level checks only: no build artifacts are read, nothing is shipped.
  */
 
 const repoRoot = resolve(__dirname, '..', '..', '..', '..');
@@ -21,20 +19,8 @@ const packagesRoot = join(repoRoot, 'packages');
 
 type PackageExports = Record<
   string,
-  | {
-      import?: { types?: string; default?: string };
-      require?: { types?: string; default?: string };
-    }
-  | string
+  { import?: { types?: string; default?: string }; require?: { types?: string; default?: string } }
 >;
-
-function listFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap(entry =>
-    entry.isDirectory()
-      ? listFiles(join(directory, entry.name)).map(file => join(entry.name, file))
-      : [entry.name]
-  );
-}
 
 function parseTsupEntryKeys(configText: string): string[] | null {
   // Strip comments BEFORE matching: a `}` inside a comment (e.g. adapter-core
@@ -80,32 +66,13 @@ describe('tsup entry ↔ package.json exports parity', () => {
 
     const packageJson = JSON.parse(
       readFileSync(join(packagesRoot, pkg, 'package.json'), 'utf8')
-    ) as { name: string; exports?: PackageExports; files?: string[] };
+    ) as { exports?: PackageExports };
     const exportsMap = packageJson.exports;
     expect({ pkg, hasExports: Boolean(exportsMap) }).toEqual({ pkg, hasExports: true });
 
     const expectedKeys = (entryKeys ?? []).map(entryToExportKey).sort();
-    const assetKeys = Object.entries(exportsMap ?? {})
-      .filter(([key, target]) => key.startsWith('./prebuilds/') && typeof target === 'string')
-      .map(([key]) => key);
-    const actualKeys = Object.keys(exportsMap ?? {})
-      .filter(key => !assetKeys.includes(key))
-      .sort();
+    const actualKeys = Object.keys(exportsMap ?? {}).sort();
     expect({ pkg, exportKeys: actualKeys }).toEqual({ pkg, exportKeys: expectedKeys });
-
-    if (assetKeys.length) {
-      expect(packageJson.files).toContain('prebuilds');
-      for (const key of assetKeys) expect(exportsMap?.[key]).toBe(key);
-      const packageRoot = join(packagesRoot, pkg);
-      const assets = listFiles(join(packageRoot, 'prebuilds'));
-      expect(assets.length).toBeGreaterThan(0);
-      const requireFromPackage = createRequire(join(packageRoot, 'package.json'));
-      for (const asset of assets) {
-        expect(
-          requireFromPackage.resolve(`${packageJson.name}/prebuilds/${asset.replace(/\\/g, '/')}`)
-        ).toBe(join(packageRoot, 'prebuilds', asset));
-      }
-    }
 
     for (const entryKey of entryKeys ?? []) {
       const mapping = exportsMap?.[entryToExportKey(entryKey)];

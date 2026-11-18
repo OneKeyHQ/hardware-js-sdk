@@ -2,7 +2,8 @@
 
 `@onekeyfe/hwk-desktop-noble-ble` owns Ledger/Trezor BLE discovery, GATT I/O,
 Windows OS pairing, cancellation, and connection cleanup in the Electron main
-process. The host owns IPC sender authorization, UI, translations, and packaging.
+process. The host owns the native Windows pairing executable, IPC sender authorization,
+UI, translations, and packaging.
 It does not replace the separate OneKey `hd-transport-electron` transport.
 
 ## Main-process setup
@@ -38,8 +39,9 @@ const ble = initThirdPartyBleSupport(window.webContents, {
   windowsPairing: process.platform === 'win32' ? {
     helperPath: app.isPackaged
       ? path.join(process.resourcesPath, 'ble-pair', 'onekey-ble-pair.exe')
-      : require.resolve(
-          `@onekeyfe/hwk-desktop-noble-ble/prebuilds/win32-${process.arch}/onekey-ble-pair.exe`
+      : path.join(
+          app.getAppPath(), 'resources', 'ble-pair', `win-${process.arch}`,
+          'onekey-ble-pair.exe'
         ),
     async onPairingRequest({ pin, signal }) {
       if (signal.aborted || window.isDestroyed()) return 'cancel';
@@ -75,15 +77,21 @@ contract rather than adding an independent timeout.
 
 ## Windows packaging
 
-The npm package includes `prebuilds/win32-x64/onekey-ble-pair.exe` and
-`prebuilds/win32-arm64/onekey-ble-pair.exe`. Copy the **target build architecture**
-outside ASAR. For electron-builder, add the following to the Windows platform
-configuration (adjust the package root if your package manager nests it):
+The SDK does not include or build a native pairing executable. The host must
+provide a trusted, compatible helper through `windowsPairing.helperPath`, along
+with `onPairingRequest`. The OneKey Rust implementation and its x64/ARM64 binaries
+are maintained in the
+[App monorepo](https://github.com/OneKeyHQ/app-monorepo/tree/x/apps/desktop/native-modules/onekey-ble-pair).
+That repository owns native builds and binary updates.
+
+Copy the **target build architecture** outside ASAR. For example, if the host
+stores its executables under `resources/ble-pair/win-{x64,arm64}`, add this to its
+electron-builder Windows configuration:
 
 ```js
 win: {
   extraResources: [{
-    from: 'node_modules/@onekeyfe/hwk-desktop-noble-ble/prebuilds/win32-${arch}',
+    from: 'resources/ble-pair/win-${arch}',
     to: 'ble-pair',
     filter: ['onekey-ble-pair.exe'],
   }],
@@ -93,22 +101,15 @@ win: {
 Keep this SDK package external when bundling the main process, and install a
 compatible `@stoprocent/noble` Electron native build. Do not put the helper inside
 ASAR or choose its architecture from the machine performing a cross build.
-Store/MSIX builds must include the same resource. No helper is downloaded or
-compiled during package installation.
+Store/MSIX builds must include the same resource. Installing this package does
+not download or compile a helper, and does not supply the host's native Noble
+patches or Electron build.
 
-The helper source and locked Rust dependencies live in
-[`native/onekey-ble-pair`](./native/onekey-ble-pair). On Windows with the MSVC/Rust
-toolchains and Windows SDK installed, build each supported target with:
-
-```sh
-cargo build --manifest-path native/onekey-ble-pair/Cargo.toml --locked --release --target x86_64-pc-windows-msvc
-cargo build --manifest-path native/onekey-ble-pair/Cargo.toml --locked --release --target aarch64-pc-windows-msvc
-```
-
-Copy the outputs to the corresponding `prebuilds/win32-*` directories and run
-`yarn verify:helper`. Source changes and matching binaries ship together. The
-host should consume these package assets rather than maintain a separate Rust
-implementation.
+The host helper must implement the process protocol used by
+`src/windowsPairingHelper.ts`: accept `pair --address`, emit JSON events on stdout,
+and read `confirm`/`cancel` decisions from stdin. Keep host binary updates
+compatible with that protocol. Without the `windowsPairing` option, the SDK
+retains its existing native-only connection behavior.
 
 ## Lifecycle and error recovery
 
