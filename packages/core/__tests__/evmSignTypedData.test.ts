@@ -894,4 +894,23 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     await expect(method.run()).rejects.toBe(overflowError);
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
+
+  it('does not blindly sign a short bytesN value on the typed-hash fallback', async () => {
+    const data = buildLongStringData(2048);
+    data.types.SpotTerms = [
+      { name: 'terms', type: 'string' },
+      { name: 'tag', type: 'bytes4' },
+    ];
+    data.message.tag = '0xdeadbe';
+    const overflowError = ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Failure_DataError,Invalid length, bigger than 1536'
+    );
+    const typedCall = jest.fn().mockRejectedValueOnce(overflowError);
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    await expect(method.run()).rejects.toBe(overflowError);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+  });
 });

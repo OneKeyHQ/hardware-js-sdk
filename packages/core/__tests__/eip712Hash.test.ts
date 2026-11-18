@@ -78,3 +78,32 @@ describe('getEIP712Hashes — large payload fixture', () => {
     );
   });
 });
+
+const bytes4Payload = (
+  tag: string
+): EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> =>
+  ({
+    types: {
+      EIP712Domain: [{ name: 'name', type: 'string' }],
+      Tag: [{ name: 'tag', type: 'bytes4' }],
+    },
+    primaryType: 'Tag',
+    domain: { name: 'x' },
+    message: { tag },
+  }) as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+describe('getEIP712Hashes — fixed-width bytesN', () => {
+  it('rejects a bytesN value shorter than N', () => {
+    expect(() => getEIP712Hashes(bytes4Payload('0xdeadbe'))).toThrow('must be 4 bytes');
+  });
+
+  it('rejects a bytesN value longer than N', () => {
+    expect(() => getEIP712Hashes(bytes4Payload('0xdeadbeef00'))).toThrow('must be 4 bytes');
+  });
+
+  it('hashes an exact-length bytesN value', () => {
+    const hashes = getEIP712Hashes(bytes4Payload('0xdeadbeef'));
+    expect(hashes.domainHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(hashes.messageHash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+});

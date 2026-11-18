@@ -86,8 +86,8 @@ const encodeAddress = (value: unknown, fieldName: string): Uint8Array => {
 
 const encodeFixedBytes = (size: number, value: unknown, fieldName: string): Uint8Array => {
   const bytes = toHexBytes(value, fieldName);
-  if (bytes.length > size) {
-    return invalidTypedData(`${fieldName} exceeds bytes${size}`);
+  if (bytes.length !== size) {
+    return invalidTypedData(`${fieldName} must be ${size} bytes`);
   }
   const word = new Uint8Array(WORD_BYTE_LENGTH);
   word.set(bytes, 0);

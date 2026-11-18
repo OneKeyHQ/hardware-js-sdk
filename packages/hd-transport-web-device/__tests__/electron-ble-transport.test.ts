@@ -1152,6 +1152,43 @@ describe('ElectronBleTransport protocol detection', () => {
 
   test.each([
     [
+      'pairing_no_response',
+      HardwareErrorCode.BleDeviceBondError,
+      { phase: 'pairing', platform: 'win32', stage: 'write', reason: 'pairing_no_response' },
+    ],
+    [
+      'silence stale_bond',
+      HardwareErrorCode.BleBondInvalid,
+      { phase: 'pairing', platform: 'win32', stage: 'write', reason: 'stale_bond' },
+    ],
+  ] as const)(
+    'preserves silent Windows %s when both undeclared probes fail',
+    async (_label, errorCode, params) => {
+      const device = { id: `win-silent-both-${errorCode}`, name: 'Unknown BLE Device' };
+      const nobleBle = createNobleBle(device);
+      const silentError = {
+        name: 'HardwareError',
+        message: 'Silent pairing miss',
+        errorCode,
+        params,
+      };
+      nobleBle.write.mockRejectedValue(silentError);
+      const bleTransport = configureTransport(nobleBle);
+
+      await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+        errorCode,
+        params,
+      });
+
+      expect(nobleBle.write).toHaveBeenCalledTimes(2);
+      expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+      expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+      expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+    }
+  );
+
+  test.each([
+    [
       HardwareErrorCode.BleDeviceBondError,
       {
         phase: 'pairing',
