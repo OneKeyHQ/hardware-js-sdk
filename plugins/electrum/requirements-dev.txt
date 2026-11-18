@@ -1,0 +1,6 @@
+Electrum @ https://download.electrum.org/4.8.4/Electrum-4.8.4.tar.gz
+trezor[hidapi]>=0.20.1,<0.21
+libusb1>=1.6.4
+PyQt6~=6.10.2
+pytest>=8
+flake8>=7,<8
