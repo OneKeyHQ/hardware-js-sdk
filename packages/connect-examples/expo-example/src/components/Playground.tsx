@@ -13,6 +13,7 @@ import type { PrepareSigningSample } from '../utils/manualSigning/common';
 
 export interface PresupposeProps {
   title: string;
+  description?: string;
   value: any; // JSON object
   prepareSample?: PrepareSigningSample | null;
 }
@@ -117,6 +118,9 @@ const Playground = ({
               </Group.Item>
             ))}
           </Group>
+          {presupposes[selectedPreset]?.description && (
+            <Text marginHorizontal="$2">{presupposes[selectedPreset].description}</Text>
+          )}
         </>
       );
     }

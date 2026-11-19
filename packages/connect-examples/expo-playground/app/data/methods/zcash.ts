@@ -1,8 +1,11 @@
 import { ZcashAddressScope, ZcashAddressType } from '@onekeyfe/hd-transport';
 
 import transparent from '../../../../expo-example/src/data/fixtures/zcash-transparent.json';
-import orchard from '../../../../expo-example/src/data/fixtures/zcash-orchard.json';
-import ironwood from '../../../../expo-example/src/data/fixtures/zcash-ironwood.json';
+
+import {
+  zcashQaPresets,
+  zcashQaRequirements,
+} from '../../../../expo-example/src/data/zcashQaPresets';
 
 import type { MethodPreset, UnifiedMethodConfig } from '../types';
 
@@ -40,6 +43,33 @@ const api: UnifiedMethodConfig[] = [
           { name: 'includeSeedFingerprint', type: 'boolean', value: false },
         ],
       },
+      ...[
+        { title: 'Internal / index 1', scope: ZcashAddressScope.INTERNAL, diversifierIndex: 1 },
+        { title: 'Account #2', path: "m/32'/133'/1'" },
+        { title: 'Orchard / max uint32 index', diversifierIndex: 0xffffffff },
+        { title: 'Address without display', showOnOneKey: false },
+        { title: 'Address with seed fingerprint', includeSeedFingerprint: true },
+      ].map<MethodPreset>(({ title, ...params }) => ({
+        title,
+        parameters: Object.entries({
+          path: "m/32'/133'/0'",
+          addressType: ZcashAddressType.UNIFIED_ORCHARD,
+          scope: ZcashAddressScope.EXTERNAL,
+          diversifierIndex: 0,
+          showOnOneKey: true,
+          includeSeedFingerprint: false,
+          ...params,
+        }).map(([name, value]) => ({
+          name,
+          type:
+            typeof value === 'boolean'
+              ? 'boolean'
+              : typeof value === 'number'
+              ? 'number'
+              : 'string',
+          value,
+        })),
+      })),
       {
         title: 'Batch Get Address',
         parameters: [
@@ -83,13 +113,15 @@ const api: UnifiedMethodConfig[] = [
     description: 'methodDescriptions.zcashSignPczt',
     category: 'transaction',
     presets: [
-      { title: 'Static transparent P2PKH', value: transparent },
-      { title: 'Static Orchard shielded', value: orchard },
-      { title: 'Static Ironwood shielded', value: ironwood },
-      { title: 'Invalid format (expected rejection)', value: { pczt: '00' } },
+      {
+        title: 'Static transparent P2PKH',
+        description: 'Static offline sample. Signing requires matching wallet inputs.',
+        value: transparent,
+      },
+      ...zcashQaPresets,
     ].map<MethodPreset>(preset => ({
       title: preset.title,
-      description: 'Static offline sample. Signing requires matching wallet inputs.',
+      description: preset.description,
       parameters: [
         {
           name: 'pczt',
@@ -98,6 +130,16 @@ const api: UnifiedMethodConfig[] = [
           label: 'PCZT (hex)',
           value: preset.value.pczt,
         },
+        ...(preset.title.startsWith('QA ·')
+          ? [
+              {
+                name: 'useEmptyPassphrase',
+                type: 'boolean' as const,
+                value: true,
+                description: zcashQaRequirements,
+              },
+            ]
+          : []),
       ],
     })),
   },
