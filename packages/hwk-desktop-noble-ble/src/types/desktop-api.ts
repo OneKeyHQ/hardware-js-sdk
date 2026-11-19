@@ -2,7 +2,7 @@ import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyf
 
 /** Device info the main process returns to the renderer over IPC. */
 export interface ThirdPartyBleDeviceInfo {
-  /** Stable id (noble peripheral.id) used as connectId. */
+  /** Discovery locator (noble peripheral.id), used as connectId. May rotate; not wallet identity. */
   id: string;
   name?: string;
   rssi?: number;

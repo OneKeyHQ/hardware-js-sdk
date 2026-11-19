@@ -3172,7 +3172,7 @@ describe('LedgerAdapter', () => {
 
       await expect(adapter.searchDevices()).rejects.toMatchObject({
         code: HardwareErrorCode.DevicePermissionDenied,
-        reason: 'bluetoothTurnedOff',
+        params: { permissionDeniedReason: 'bluetoothTurnedOff' },
       });
     });
 

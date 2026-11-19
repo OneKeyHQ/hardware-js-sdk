@@ -9,7 +9,7 @@ import {
 } from '@ledgerhq/device-management-kit';
 import { Left, Right } from 'purify-ts';
 import { defer, from, mergeMap, repeat } from 'rxjs';
-import { hexToBytes } from '@onekeyfe/hwk-adapter-core';
+import { hexToBytes, rehydrateElectronBleErrors } from '@onekeyfe/hwk-adapter-core';
 
 import {
   LEDGER_BLE_MIN_FRAME_SIZE,
@@ -59,7 +59,7 @@ export class LedgerElectronBleTransport implements Transport {
   >;
 
   constructor(bridge: ElectronBleApi, args: LedgerElectronBleTransport['args']) {
-    this.bridge = bridge;
+    this.bridge = rehydrateElectronBleErrors(bridge);
     this.args = args;
   }
 

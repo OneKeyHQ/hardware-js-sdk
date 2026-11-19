@@ -102,5 +102,6 @@
 - Web SDK：[`packages/hd-web-sdk/README.md`](../packages/hd-web-sdk/README.md)
 - BLE SDK：[`packages/hd-ble-sdk/README.md`](../packages/hd-ble-sdk/README.md)
 - Common Connect SDK：[`packages/hd-common-connect-sdk/README.md`](../packages/hd-common-connect-sdk/README.md)
+- Third-party desktop BLE：[`packages/hwk-desktop-noble-ble/README.md`](../packages/hwk-desktop-noble-ble/README.md)（Windows 配对、主进程接入与打包）
 - Transport：[`packages/hd-transport/README.md`](../packages/hd-transport/README.md)
 - Web Device Transport：[`packages/hd-transport-web-device/README.md`](../packages/hd-transport-web-device/README.md)

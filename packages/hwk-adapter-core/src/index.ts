@@ -4,6 +4,7 @@ export {
   createHwkError,
   defaultOriginForCode,
   defaultRecoveryForCode,
+  isHardwareErrorCode,
   isHwkRecoveryHint,
   operationMayHaveCompletedParams,
 } from './types/errors';
@@ -234,6 +235,7 @@ export type {
   ElectronBleScanOptions,
   ElectronBleConnectOptions,
 } from './types/electronBle';
+export { rehydrateElectronBleErrors } from './types/electronBle';
 export {
   emitDeviceBindingStatus,
   requestSaveDeviceBinding,
