@@ -784,7 +784,7 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     'Failure_ProcessError,MemoryError',
     'Failure_ProcessError,memory allocation failed',
   ])('falls back to typed hash after Pro rejects with "%s"', async errorMessage => {
-    const data = buildLongStringData(2048);
+    const data = buildLongStringData(1024);
     const typedCall = jest
       .fn()
       .mockRejectedValueOnce(ERRORS.TypedError(HardwareErrorCode.RuntimeError, errorMessage))
@@ -829,16 +829,104 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     );
   });
 
-  it('does not fall back when the user cancels', async () => {
-    const data = buildLongStringData(2048);
+  test.each([64, 2048])('does not retry when the user cancels a %s-byte value', async length => {
+    const data = buildLongStringData(length);
     const cancellation = ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
     const typedCall = jest.fn().mockRejectedValueOnce(cancellation);
     const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
 
     await expect(method.run()).rejects.toBe(cancellation);
     expect(typedCall).toHaveBeenCalledTimes(1);
-    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+    expect(typedCall.mock.calls[0][0]).toBe(
+      length > 1536 ? 'EthereumSignTypedHashOneKey' : 'EthereumSignTypedDataOneKey'
+    );
   });
+
+  test.each([
+    'string',
+    'UTF-8 string',
+    'bytes',
+    'domain',
+    'nested struct array',
+    'nested arrays',
+    'string array',
+    'data field',
+    'domain only',
+  ])('selects typed hash before sending an oversized %s', async field => {
+    const data = buildLongStringData(1537);
+    if (field === 'UTF-8 string') data.message.terms = '测'.repeat(513);
+    if (field === 'bytes') {
+      data.types.SpotTerms = [{ name: 'terms', type: 'bytes' }];
+      data.message.terms = `0x${'ab'.repeat(1537)}`;
+    }
+    if (field === 'domain' || field === 'domain only') {
+      data.domain.name = 'a'.repeat(1537);
+      data.message.terms = 'short';
+      if (field === 'domain only') {
+        data.primaryType = 'EIP712Domain';
+        data.message = {};
+      }
+    }
+    if (field === 'nested struct array') {
+      data.types.Item = [{ name: 'content', type: 'string' }];
+      data.types.SpotTerms = [{ name: 'terms', type: 'Item[1]' }];
+      data.message.terms = [{ content: 'a'.repeat(1537) }];
+    }
+    if (field === 'string array') {
+      data.types.SpotTerms = [{ name: 'terms', type: 'string[]' }];
+      data.message.terms = ['short', 'a'.repeat(1537)];
+    }
+    if (field === 'nested arrays') {
+      data.types.SpotTerms = [{ name: 'terms', type: 'string[][]' }];
+      data.message.terms = [['a'.repeat(1537)]];
+    }
+    if (field === 'data field') {
+      data.types.SpotTerms = [{ name: 'data', type: 'bytes' }];
+      data.message = { data: `0x${'ab'.repeat(1537)}` };
+    }
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'EthereumTypedDataSignatureOneKey',
+      message: signatureMessage,
+    });
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall, '4.21.0');
+    const hashes = getEIP712Hashes(data);
+
+    await expect(method.run()).resolves.toEqual(signatureMessage);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall).toHaveBeenCalledWith(
+      'EthereumSignTypedHashOneKey',
+      'EthereumTypedDataSignatureOneKey',
+      expect.objectContaining({
+        domain_separator_hash: formatAnyHex(hashes.domainHash),
+        message_hash:
+          hashes.messageHash === undefined ? undefined : formatAnyHex(hashes.messageHash),
+      })
+    );
+  });
+
+  test.each(['string', 'UTF-8 string', 'bytes', 'combined fields'])(
+    'keeps the structured route for %s within the per-value limit',
+    async field => {
+      const data = buildLongStringData(1536);
+      if (field === 'UTF-8 string') data.message.terms = '测'.repeat(512);
+      if (field === 'bytes') {
+        data.types.SpotTerms = [{ name: 'terms', type: 'bytes' }];
+        data.message.terms = `0x${'ab'.repeat(1536)}`;
+      }
+      if (field === 'combined fields') {
+        data.domain.name = 'b'.repeat(1536);
+      }
+      const typedCall = jest.fn().mockResolvedValueOnce({
+        type: 'EthereumTypedDataSignatureOneKey',
+        message: signatureMessage,
+      });
+      const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+      await expect(method.run()).resolves.toEqual(signatureMessage);
+      expect(typedCall).toHaveBeenCalledTimes(1);
+      expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+    }
+  );
 
   it('does not fall back when the PIN is invalid', async () => {
     const data = buildLongStringData(2048);
@@ -847,6 +935,15 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
 
     await expect(method.run()).rejects.toBe(pinError);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([64, 2048])('does not retry after disconnection with a %s-byte value', async length => {
+    const disconnected = ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
+    const typedCall = jest.fn().mockRejectedValueOnce(disconnected);
+    const method = createRunnableMethod(buildLongStringData(length), EDeviceType.Pro, typedCall);
+
+    await expect(method.run()).rejects.toBe(disconnected);
     expect(typedCall).toHaveBeenCalledTimes(1);
   });
 
@@ -896,7 +993,7 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
   });
 
   it('does not blindly sign a short bytesN value on the typed-hash fallback', async () => {
-    const data = buildLongStringData(2048);
+    const data = buildLongStringData(1024);
     data.types.SpotTerms = [
       { name: 'terms', type: 'string' },
       { name: 'tag', type: 'bytes4' },
@@ -912,5 +1009,16 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     await expect(method.run()).rejects.toBe(overflowError);
     expect(typedCall).toHaveBeenCalledTimes(1);
     expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+  });
+
+  it('rejects invalid bytesN before sending an oversized payload for typed-hash signing', async () => {
+    const data = buildLongStringData(2048);
+    data.types.SpotTerms.push({ name: 'tag', type: 'bytes4' });
+    data.message.tag = '0xdeadbe';
+    const typedCall = jest.fn();
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    await expect(method.run()).rejects.toThrow();
+    expect(typedCall).not.toHaveBeenCalled();
   });
 });

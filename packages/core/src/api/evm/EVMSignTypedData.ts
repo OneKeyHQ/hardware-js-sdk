@@ -56,6 +56,7 @@ const MINI_MAX_NAME_LENGTH = 63;
 const MINI_MAX_DYNAMIC_VALUE_BYTES = 1536;
 const MINI_MAX_ARRAY_TYPE_FIELDS = 24;
 const MINI_MAX_ARRAY_ELEMENTS = 24;
+const PRO_MAX_DYNAMIC_VALUE_BYTES = 1536;
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -576,12 +577,40 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return this.device.getCurrentDeviceType() === EDeviceType.Pro;
   }
 
+  private hasProOversizedValue(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+    const walkValue = (typeName: string, value: unknown): boolean => {
+      if (value == null) return false;
+
+      if (/\[[0-9]*\]$/.test(typeName)) {
+        if (!Array.isArray(value)) return false;
+        const { entryTypeName } = parseArrayType(typeName);
+        return value.some(entry => walkValue(entryTypeName, entry));
+      }
+
+      if (typeName === 'string' || typeName === 'bytes') {
+        // Match the bytes sent in EthereumTypedDataValueAckOneKey, not JSON size.
+        return encodeData(typeName, value).length / 2 > PRO_MAX_DYNAMIC_VALUE_BYTES;
+      }
+
+      if (typeof value === 'object' && item.types[typeName]) {
+        return item.types[typeName].some(({ name, type }) =>
+          walkValue(type, (value as Record<string, unknown>)[name])
+        );
+      }
+
+      return false;
+    };
+
+    return (
+      walkValue('EIP712Domain', item.domain) || walkValue(item.primaryType as string, item.message)
+    );
+  }
+
   /**
-   * OneKey Pro parses and hashes the typed data on-device. Payloads above the
-   * firmware value limit fail after the request starts, so retry once with the
-   * typed-hash (blind signing) route instead of forcing the user to shrink the
-   * message. Only Pro is retried here: Touch is outside this issue's scope and
-   * Pro2/Neo use Protocol V2 with their own large-payload routing. Any other
+   * Known oversized Pro values take the typed-hash route before requesting
+   * structured signing. Keep one retry for firmware overflow or memory errors
+   * not predicted by the size check. Only Pro is retried here: Touch is outside
+   * this issue's scope and Pro2/Neo have their own Protocol V2 routing. Any other
    * failure (cancel, PIN, disconnect) is rethrown.
    */
   async signTypedDataWithTypedHashFallback() {
@@ -675,14 +704,29 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       return Promise.resolve(response.message);
     }
 
-    // Touch Pro Sign NestedArrays
-    if (this.hasNestedArrays(this.params.data) || this.hasBiggerData(this.params.data)) {
-      validateParams(this.params, [
-        { name: 'domainHash', type: 'hexString', required: true },
-        { name: 'messageHash', type: 'hexString', required: true },
-      ]);
+    const proHasOversizedValue =
+      this.isOneKeyPro() &&
+      semver.gte(this.device.getCurrentFirmwareVersionString() ?? '0.0.0', '4.2.0') &&
+      this.hasProOversizedValue(this.params.data);
 
-      const { domainHash, messageHash } = this.params;
+    // Touch Pro Sign NestedArrays
+    if (
+      proHasOversizedValue ||
+      this.hasNestedArrays(this.params.data) ||
+      this.hasBiggerData(this.params.data)
+    ) {
+      let { domainHash, messageHash } = this.params;
+      if (proHasOversizedValue) {
+        const hashes = getEIP712Hashes(this.params.data, this.params.metamaskV4Compat);
+        domainHash = formatAnyHex(hashes.domainHash);
+        messageHash =
+          hashes.messageHash === undefined ? undefined : formatAnyHex(hashes.messageHash);
+      } else {
+        validateParams(this.params, [
+          { name: 'domainHash', type: 'hexString', required: true },
+          { name: 'messageHash', type: 'hexString', required: true },
+        ]);
+      }
 
       if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
 
