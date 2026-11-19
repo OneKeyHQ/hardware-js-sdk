@@ -1712,7 +1712,12 @@ export default class ReactNativeBleTransport {
         }
       }
 
-      this.throwIfBondingStopped(bondSignal);
+      if (this.stopped || bondSignal.aborted) {
+        // Native connect can succeed after cancellation, before this link enters
+        // transportCache. Drain manager-owned teardown before rejecting acquire.
+        await this.disconnectUnlocked(uuid);
+        this.throwIfBondingStopped(bondSignal);
+      }
       if (Platform.OS === 'android' && !(await device.isConnected().catch(() => false))) {
         const disconnectedDevice = device;
         await this.runNativeTeardown(uuid, blePlxManager, async () => {

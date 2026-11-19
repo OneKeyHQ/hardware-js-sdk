@@ -530,6 +530,50 @@ describe('BLE connect timeout', () => {
 
   test.each(
     (['ios', 'android'] as const).flatMap(platform =>
+      (['manager', 'device'] as const).flatMap(source =>
+        (['V1', 'V2'] as const).map(expectedProtocol => ({ platform, source, expectedProtocol }))
+      )
+    )
+  )(
+    'cancel drains a late $platform $source connect before rejecting $expectedProtocol acquire',
+    async ({ platform, source, expectedProtocol }) => {
+      Object.assign(Platform, { OS: platform });
+      const { transport, device, bleManager, connect } = createHarness(() => nativeConnect.promise);
+      const nativeConnect = createDeferred<typeof device>();
+      const nativeDisconnect = createDeferred<void>();
+      if (source === 'manager') bleManager.devices.mockResolvedValue([]);
+      device.isConnected.mockResolvedValue(true);
+      if (source === 'device') device.isConnected.mockResolvedValueOnce(false);
+      bleManager.cancelDeviceConnection.mockImplementation(() => nativeDisconnect.promise);
+      let settled = false;
+      const acquiring = transport.acquire({ uuid: UUID, expectedProtocol }).catch(error => {
+        settled = true;
+        return error;
+      });
+      await flush();
+      await flush();
+      const pendingConnect = source === 'manager' ? bleManager.connectToDevice : connect;
+      expect(pendingConnect).toHaveBeenCalledTimes(1);
+
+      await transport.cancel(UUID);
+      nativeConnect.resolve(device);
+      await flush();
+      expect(settled).toBe(false);
+      expect(bleManager.cancelDeviceConnection).toHaveBeenCalledWith(UUID);
+      expect(device.discoverAllServicesAndCharacteristics).not.toHaveBeenCalled();
+
+      nativeDisconnect.resolve();
+      await advanceUntil(() => settled, 1000);
+      await expect(acquiring).resolves.toMatchObject({
+        errorCode: HardwareErrorCode.BleDeviceDisconnected,
+      });
+      expect(pendingConnect).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  test.each(
+    (['ios', 'android'] as const).flatMap(platform =>
       (['connect', 'mtu', 'gatt'] as const).flatMap(stage =>
         (['reject', 'resolve'] as const).map(completion => ({ platform, stage, completion }))
       )
