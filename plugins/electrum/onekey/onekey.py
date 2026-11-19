@@ -1,16 +1,34 @@
-from electrum.bip32 import convert_bip32_strpath_to_intpath
+import copy
+
+from electrum import descriptor
+from electrum.bip32 import BIP32Node
 from electrum.hw_wallet import HW_PluginBase
 from electrum.hw_wallet.plugin import trezor_validate_op_return_output_and_get_data
 from electrum.i18n import _
 from electrum.keystore import Hardware_KeyStore
 from electrum.plugin import Device, runs_in_hwd_thread
-from electrum.transaction import PartialTransaction, Sighash
+from electrum.transaction import PartialTransaction, PartialTxOutput, Sighash
 from electrum.util import UserFacingException
+
+from .ipc import Helper, HelperError, SDK_VERSION, runtime_command
 
 
 class OneKeyKeyStore(Hardware_KeyStore):
     hw_type = "onekey"
     device = "OneKey"
+
+    def __init__(self, data):
+        super().__init__(data)
+        self.onekey_binding = data.get("onekey_binding")
+        if self.onekey_binding is None:
+            pending = getattr(getattr(self, "plugin", None), "_new_wallet_bindings", {})
+            self.onekey_binding = pending.pop(self.xpub, None)
+
+    def dump(self):
+        data = super().dump()
+        if self.onekey_binding is not None:
+            data["onekey_binding"] = dict(self.onekey_binding)
+        return data
 
     def decrypt_message(self, sequence, message, password):
         raise UserFacingException(_("Message decryption is not supported by this OneKey plugin."))
@@ -27,38 +45,67 @@ class OneKeyPlugin(HW_PluginBase):
     keystore_class = OneKeyKeyStore
     DEVICE_IDS = ("OneKey",)
     SUPPORTED_XTYPES = ("standard", "p2wpkh-p2sh", "p2wpkh")
-    minimum_library = (0, 20, 1)
-    maximum_library = (0, 21)
-    libraries_URL = "https://pypi.org/project/trezor/"
+    minimum_library = (1, 2, 10)
+    maximum_library = (1, 2, 11)
+    libraries_URL = "https://github.com/OneKeyHQ/hardware-js-sdk/tree/feat/electrum-plugin/plugins/electrum"
 
     def __init__(self, parent, config, name):
         super().__init__(parent, config, name)
+        self.helper = Helper()
+        self._new_wallet_bindings = {}
         self.libraries_available = self.check_libraries_available()
         if self.libraries_available:
             self.device_manager().register_enumerate_func(self.enumerate)
 
+    def remember_wallet_binding(self, xpub, binding):
+        # The Qt wizard constructs/dumps its keystore after get_xpub returns.
+        self._new_wallet_bindings[xpub] = dict(binding)
+
     def get_library_version(self):
-        from .client import LIBRARY_VERSION
-        return LIBRARY_VERSION
+        try:
+            runtime_command()
+        except HelperError:
+            raise ImportError("Build the pinned Node USB runtime and set ONEKEY_ELECTRUM_RUNTIME.") from None
+        return SDK_VERSION
 
     @runs_in_hwd_thread
     def enumerate(self):
-        import usb1
-        from .transport import USB_IDS, device_path
-
-        with usb1.USBContext() as context:
-            return [
-                Device(path=device_path(device), interface_number=-1,
-                       id_=device_path(device), product_key="OneKey", usage_page=0,
-                       transport_ui_string="USB")
-                for device in context.getDeviceIterator(skip_on_error=True)
-                if (device.getVendorID(), device.getProductID()) == USB_IDS
-            ]
+        try:
+            found = self.helper.call("search", {}, timeout=30)
+            if type(found) is not list or len(found) > 32:
+                raise HelperError("PROTOCOL")
+            result = []
+            for device in found:
+                if (type(device) is not dict or set(device) != {"connectId", "serialNo", "deviceId", "model"}
+                        or any(type(value) is not str or not value for value in device.values())
+                        or device["model"] not in ("pro2", "neo")):
+                    raise HelperError("PROTOCOL")
+                result.append(Device(path=device["connectId"], interface_number=-1,
+                                     id_=device["serialNo"], product_key="OneKey", usage_page=0,
+                                     transport_ui_string="USB (Node SDK)"))
+            return result
+        except HelperError as error:
+            self.helper.close()
+            raise UserFacingException(str(error)) from None
 
     @runs_in_hwd_thread
     def create_client(self, device, handler):
         from .client import OneKeyClient
         return OneKeyClient(device.path, handler, self)
+
+    @runs_in_hwd_thread
+    def get_client(self, keystore, *args, **kwargs):
+        previous = getattr(self, "_expected_keystore", None)
+        self._expected_keystore = keystore
+        try:
+            # DeviceMgr may request an xpub while pairing. Supply the saved wallet intent
+            # before that callback, so reconnect cannot enter the wallet-selection flow.
+            client = super().get_client(keystore, *args, **kwargs)
+            if client is not None:
+                client.bind_keystore(keystore)
+            return client
+        finally:
+            self._expected_keystore = previous
 
     @runs_in_hwd_thread
     def show_address(self, wallet, address, keystore=None):
@@ -67,88 +114,145 @@ class OneKeyPlugin(HW_PluginBase):
             return
         if wallet.txin_type not in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
             raise UserFacingException(_("Only single-signature legacy and SegWit wallets are supported."))
-        path = convert_bip32_strpath_to_intpath(keystore.get_derivation_prefix())
-        path.extend(wallet.get_address_index(address))
-        self.get_client(keystore).show_address(path, wallet.txin_type, address)
+        from .client import account_path
+        path = account_path(keystore.get_derivation_prefix(), wallet.txin_type)
+        suffix = list(wallet.get_address_index(address))
+        pubkey = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
+        script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
+            pubkey=pubkey.hex(), script_type=wallet.txin_type).expand().output_script
+        expected = PartialTxOutput(scriptpubkey=script, value=0).address
+        if expected != address:
+            raise UserFacingException(_("Electrum address does not match the OneKey account."))
+        self.get_client(keystore).show_address(path + suffix, wallet.txin_type, address)
+
+    @staticmethod
+    def _owned_path(keystore, item, script_type, *, change=False):
+        from .client import account_path
+        prefix = account_path(keystore.get_derivation_prefix(), script_type)
+        if BIP32Node.from_xkey(keystore.xpub).xtype != {"p2pkh": "standard"}.get(script_type, script_type):
+            raise UserFacingException(_("Script type does not match the OneKey account."))
+        pubkey, path = keystore.find_my_pubkey_in_txinout(item)
+        if (not path or len(path) != len(prefix) + 2 or list(path[:3]) != prefix
+                or type(path[3]) is not int or path[3] not in (0, 1)
+                or type(path[4]) is not int or not 0 <= path[4] < 0x80000000
+                or (change and path[3] != 1)):
+            raise UserFacingException(_("Input or change does not belong to this OneKey account."))
+        derived = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(path[3:]).eckey.get_public_key_bytes(compressed=True)
+        if pubkey != derived:
+            raise UserFacingException(_("OneKey account public key mismatch."))
+        expected_script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
+            pubkey=derived.hex(), script_type=script_type).expand().output_script
+        desc = item.script_descriptor
+        if desc is None or desc.get_simple_multisig() or desc.expand().output_script != expected_script:
+            raise UserFacingException(_("OneKey ownership script mismatch."))
+        return list(path), expected_script
 
     @runs_in_hwd_thread
     def sign_transaction(self, keystore, tx: PartialTransaction):
-        from trezorlib import messages
         from .client import INPUT_SCRIPT_TYPES, OUTPUT_SCRIPT_TYPES
-
-        inputs = []
-        previous = {}
+        inputs, previous = [], {}
         for txin in tx.inputs():
             desc = txin.script_descriptor
             if not txin.is_mine or desc is None or desc.get_simple_multisig():
                 raise UserFacingException(_("Only single-signature inputs from this OneKey wallet are supported."))
             script_type = desc.to_legacy_electrum_script_type()
-            if script_type not in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
+            if script_type not in OUTPUT_SCRIPT_TYPES:
                 raise UserFacingException(_("Unsupported OneKey input script type."))
             if txin.sighash not in (None, Sighash.ALL):
                 raise UserFacingException(_("OneKey requires SIGHASH_ALL."))
-            pubkey, path = keystore.find_my_pubkey_in_txinout(txin)
-            if not path:
-                raise UserFacingException(_("Input does not belong to this OneKey wallet."))
-            if txin.utxo is None:
-                raise UserFacingException(_("Missing previous tx."))
-            previous[txin.prevout.txid] = self._previous_transaction(txin.utxo)
-            inputs.append(messages.TxInputType(
-                prev_hash=txin.prevout.txid, prev_index=txin.prevout.out_idx,
-                amount=txin.value_sats(), sequence=txin.nsequence,
-                address_n=path, script_type=INPUT_SCRIPT_TYPES[script_type],
-            ))
+            path, script = self._owned_path(keystore, txin, script_type)
+            prev = txin.utxo
+            index = txin.prevout.out_idx
+            if (prev is None or prev.txid() != txin.prevout.txid.hex()
+                    or not 0 <= index < len(prev.outputs())
+                    or prev.outputs()[index].scriptpubkey != script
+                    or prev.outputs()[index].value != txin.value_sats()):
+                raise UserFacingException(_("Missing or mismatched full previous transaction."))
+            previous[txin.prevout.txid.hex()] = self._previous_transaction(prev)
+            inputs.append(dict(prev_hash=txin.prevout.txid.hex(), prev_index=index,
+                               amount=str(txin.value_sats()), sequence=txin.nsequence,
+                               address_n=path, script_type=INPUT_SCRIPT_TYPES[script_type]))
 
         outputs = []
         for txout in tx.outputs():
-            if txout.is_mine and txout.is_change:
+            if txout.is_change:
                 desc = txout.script_descriptor
-                if desc is None or desc.get_simple_multisig():
+                if not txout.is_mine or desc is None or desc.get_simple_multisig():
                     raise UserFacingException(_("Unsupported OneKey change script."))
                 script_type = desc.to_legacy_electrum_script_type()
                 if script_type not in OUTPUT_SCRIPT_TYPES:
                     raise UserFacingException(_("Unsupported OneKey change script."))
-                pubkey, path = keystore.find_my_pubkey_in_txinout(txout)
-                if not path:
-                    raise UserFacingException(_("Change does not belong to this OneKey wallet."))
-                outputs.append(messages.TxOutputType(
-                    amount=txout.value, address_n=path,
-                    script_type=OUTPUT_SCRIPT_TYPES[script_type],
-                ))
+                path, script = self._owned_path(keystore, txout, script_type, change=True)
+                if script != txout.scriptpubkey:
+                    raise UserFacingException(_("OneKey change script does not match its derivation."))
+                outputs.append(dict(amount=str(txout.value), address_n=path,
+                                    script_type=OUTPUT_SCRIPT_TYPES[script_type]))
             elif txout.address:
-                outputs.append(messages.TxOutputType(
-                    amount=txout.value, address=txout.address,
-                    script_type=messages.OutputScriptType.PAYTOADDRESS,
-                ))
+                outputs.append(dict(amount=str(txout.value), address=txout.address, script_type="PAYTOADDRESS"))
             else:
-                outputs.append(messages.TxOutputType(
-                    amount=txout.value, script_type=messages.OutputScriptType.PAYTOOPRETURN,
-                    op_return_data=trezor_validate_op_return_output_and_get_data(txout),
-                ))
+                outputs.append(dict(amount=str(txout.value), script_type="PAYTOOPRETURN",
+                                    op_return_data=trezor_validate_op_return_output_and_get_data(txout).hex()))
 
-        signatures = self.get_client(keystore).sign_tx(
-            inputs, outputs, previous, version=tx.version, lock_time=tx.locktime,
-        )
-        if len(signatures) != len(inputs) or any(not sig for sig in signatures):
-            raise UserFacingException(_("OneKey did not sign all inputs."))
-        tx.update_signatures([sig + Sighash.to_sigbytes(Sighash.ALL) for sig in signatures])
-        if not tx.is_complete():
-            raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+        client = self.get_client(keystore)
+        try:
+            signatures = client.sign_tx(
+                inputs, outputs, previous, version=tx.version, lock_time=tx.locktime,
+            )
+            if type(signatures) is not list or len(signatures) != len(inputs):
+                raise UserFacingException(_("OneKey did not sign all inputs."))
+            checked = []
+            for index, entry in enumerate(signatures):
+                if (type(entry) is not dict or set(entry) != {"index", "signature"}
+                        or type(entry["index"]) is not int or entry["index"] != index):
+                    raise UserFacingException(_("Invalid OneKey signature index."))
+                checked.append(self._signature(entry["signature"]) + Sighash.to_sigbytes(Sighash.ALL))
+            # Electrum recovers/verifies against each ORIGINAL transaction input. Test a copy first
+            # so a partial, reordered, or foreign signature cannot mutate the user's transaction.
+            candidate = copy.deepcopy(tx)
+            candidate.update_signatures(checked)
+            if not candidate.is_complete():
+                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+            tx.update_signatures(checked)
+            if not tx.is_complete():
+                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+        except BaseException:
+            client.close()
+            raise
+
+    @staticmethod
+    def _signature(value):
+        if type(value) is not str or not 16 <= len(value) <= 144:
+            raise UserFacingException(_("Invalid OneKey signature encoding."))
+        try:
+            signature = bytes.fromhex(value)
+            if signature.hex() != value or signature[0] != 0x30 or signature[1] != len(signature) - 2:
+                raise ValueError()
+            offset = 2
+            order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
+            for i in range(2):
+                if signature[offset] != 2:
+                    raise ValueError()
+                size = signature[offset + 1]
+                offset += 2
+                number = signature[offset:offset + size]
+                if (not 1 <= size <= 33 or len(number) != size or number[0] & 0x80
+                        or (size > 1 and number[0] == 0 and not number[1] & 0x80)
+                        or not 0 < int.from_bytes(number, "big") < order
+                        or (i == 1 and int.from_bytes(number, "big") > order // 2)):
+                    raise ValueError()
+                offset += size
+            if offset != len(signature):
+                raise ValueError()
+            return signature
+        except (ValueError, IndexError):
+            raise UserFacingException(_("Invalid OneKey signature encoding.")) from None
 
     @staticmethod
     def _previous_transaction(tx):
-        from trezorlib import messages
-
-        return messages.TransactionType(
-            version=tx.version, lock_time=tx.locktime,
-            inputs=[messages.TxInputType(
-                prev_hash=txin.prevout.txid, prev_index=txin.prevout.out_idx,
-                script_sig=txin.script_sig, sequence=txin.nsequence,
-            ) for txin in tx.inputs()],
-            bin_outputs=[messages.TxOutputBinType(
-                amount=txout.value, script_pubkey=txout.scriptpubkey,
-            ) for txout in tx.outputs()],
-        )
+        return dict(hash=tx.txid(), version=tx.version, lock_time=tx.locktime,
+                    inputs=[dict(prev_hash=i.prevout.txid.hex(), prev_index=i.prevout.out_idx,
+                                 script_sig=(i.script_sig or b"").hex(), sequence=i.nsequence) for i in tx.inputs()],
+                    bin_outputs=[dict(amount=str(o.value), script_pubkey=o.scriptpubkey.hex()) for o in tx.outputs()])
 
     def wizard_entry_for_device(self, device_info, *, new_wallet=True):
         if not device_info.initialized:

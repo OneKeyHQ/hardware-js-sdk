@@ -19,4 +19,4 @@ def build():
 
 
 if __name__ == "__main__":
-    print(build())
+    print(f"{build()} (Python adapter only; build/install the pinned Node runtime separately)")

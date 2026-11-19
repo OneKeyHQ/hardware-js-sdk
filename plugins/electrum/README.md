@@ -1,56 +1,89 @@
-# OneKey Electrum 插件
+# OneKey Electrum adapter
 
-本目录是 OneKey Pro 2 / Neo 独立 Electrum ZIP 插件的维护入口。Electrum 的 Qt 插件由 Python 加载，因此源码和测试使用 Python；它不依赖 SDK 的 TypeScript 运行时，也不参与 Yarn workspace 和 npm 发包。
+This is a desktop Electrum Qt ≥4.8.4 adapter for initialized Pro2/Neo devices, Protocol V2 over Node USB. It supports single-signature Bitcoin/Testnet BIP44 legacy, BIP49 nested SegWit and BIP84 native SegWit accounts. Multisig, Taproot, other networks, message signing and device setup/firmware operations are outside this plugin.
 
-## 支持范围
+Python owns the Qt/keystore integration, account and transaction conversion, local derivation and verification. A private stdio child imports **real** `@onekeyfe/hd-common-connect-sdk` and `@onekeyfe/hd-transport-usb`; SDK Core/transport owns discovery, active protocol detection, USB I/O, framing, wallet sessions, unlock and cleanup. There is no Python USB/protobuf implementation, HTTP server or arbitrary SDK-method dispatch.
 
-- Electrum 4.8.4 起的桌面 Qt 界面。
-- 已完成初始化的 Pro 2 / Neo，Protocol V2，USB 连接。
-- 单签 Legacy、Nested SegWit 和 Native SegWit Bitcoin / Testnet 钱包。
-- 导入公钥、设备端核对地址、交易签名，以及设备端 PIN / passphrase 交互。
+## Build and install (source-tree development runtime)
 
-插件包含固件能力检查修复：`ProtocolInfo.supported_messages` 报告的是 C 管理指令，不能据此拒绝由 MicroPython 处理的 Bitcoin 指令。读取钱包前会校验设备身份和钱包 Session；失效、中断或钱包不匹配时中止，不自动重放签名请求。
+**The Python ZIP is an adapter only. It does not contain Node, SDK packages or a native USB runtime.** No compatible npm publication or redistributable runtime is assumed. The supported development path builds the SDK from this repository and keeps that source tree and its dependencies in place.
 
-Pro 2 的 USB 识别和协议握手已完成真机验证；两款设备的完整地址、隐藏钱包、签名及重连验收仍需完成。
+Fixed inputs:
 
-## 构建 ZIP
+- SDK source commit: `b62d1005e1f97319d9fa8b550a60466099727f45` (the SDK/build inputs must match this commit; plugin changes can be uncommitted).
+- Common SDK and Node USB package compatibility version: `1.2.10`. This version string alone is insufficient; the source commit and its `yarn.lock` are the pin.
+- Node **22.21.1**, Yarn **1.22.22**, Git, Python ≥3.11 for the build tools.
+- `usb@^2.14.0` resolves to **2.16.0** in the pinned lockfile. Keep its native addon and transitive dependencies; copying only JavaScript files is insufficient.
 
-构建只需要 Python 3.11 或更新版本，不需要安装 SDK 的 JavaScript 依赖：
-
-```sh
-cd plugins/electrum
-python3 build.py
-```
-
-产物位于 `dist/onekey-<version>.zip`。版本只在 `onekey/manifest.json` 中维护；构建脚本自动读取版本，并将插件源码、图标、许可证和 Linux USB 规则一起打包。构建产物不提交 Git。
-
-## 安装与升级
-
-1. 使用 Electrum 4.8.4 或更新版本的官方桌面发行包。
-2. 新建钱包，选择硬件钱包，在设备选择页点击 **Add plugin**，从插件管理器导入 ZIP。
-3. 按 Electrum 提示设置插件授权密码并授权安装。升级已安装插件后，完全退出并重开 Electrum。
-4. 连接设备，重新扫描并继续钱包向导。
-
-ZIP 使用 Electrum 官方发行包已包含的 `trezorlib` 和 `libusb1` Python 模块；版本约束和缺少依赖的错误由插件检查。使用 Electrum 源码环境时，需要自行安装其硬件依赖。
-
-Linux 用户还需将 ZIP 内的 `onekey/56-onekey.rules` 安装到 `/etc/udev/rules.d/`，重新加载 udev 规则后重新插拔设备。该规则仅匹配 `1209:4f4c`，使用 `uaccess` 或 `plugdev` 授权 USB 访问。
-
-## 开发与验证
-
-系统需提供 libusb 1.0；libsecp256k1 按 Electrum 上游安装要求准备。Python 开发环境与 SDK 的 Node 依赖分开维护：
+From the repository root, with these tools already installed for your OS/CPU:
 
 ```sh
-cd plugins/electrum
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-python -m pytest tests -q
-python -m flake8 onekey tests build.py --select=E9,F63,F7,F82
-python build.py
+python3 plugins/electrum/build_runtime.py
+python3 plugins/electrum/build.py
 ```
 
-测试使用模拟传输及合成交易，覆盖 USB 帧、CRC、型号识别、会话恢复、取消、地址不匹配、单签交易转换和 ZIP 首次加载。ZIP 加载测试直接使用本目录的构建产物和 Electrum 的外部插件导入器，无需把源码复制进 Electrum 仓库。
+`build_runtime.py` checks all tracked repository inputs outside this adapter against the source pin, including root TypeScript/bundler configs, and rejects untracked or ignored additions outside known generated/cache directories. It also records this adapter's JS/JSON inputs because root type-check globs can include them. It installs with the frozen lockfile using a project-local Yarn cache, then builds the common entry and its transitive SDK packages in dependency order and rejects changed inputs during that build.
 
-协议定义以 `submodules/firmware-pro2/sys/protobuf/onekey_protocol/` 为准。本插件的管理消息子集在 `onekey/messages.py`，USB 帧实现在 `onekey/transport.py`；更新这些定义时需同时核对固件字段和消息编号。
+The builder copies `entry.cjs`, `runtime.cjs` and `pin.cjs` into `plugins/electrum/.runtime/`. Its receipt, `runtime.json` plus `runtime.sha256`, binds the canonical source-tree path, source inputs, lock bytes, helper files, Node executable hash/version/platform/CPU, resolved SDK entry points, workspace `dist` files, and complete external runtime dependency packages (including native/WASM/data files). Dependencies and optional/peer dependencies are resolved from each package's actual location; an outside-tree link is rejected. SDK packages must resolve to their corresponding source-tree workspaces, never an npm package with a matching version label. Before importing SDK code or initializing it, the child rechecks the receipt digest, pinned Git state, exact source/artifact inventories, package versions and actual running Node binary/version. Added, removed, rebuilt or re-resolved dependencies fail closed. A CommonJS load guard also rejects unrecorded module files, so an undeclared dependency cannot bypass the inventory. Git must remain available to this source-tree development runtime. After writing the receipt, the builder runs the **real entry/import/native USB smoke without initializing hardware**; a failure removes both receipt files. This is local build integrity, not a signed distribution or protection against someone who can replace the plugin, helper and receipt together. It never downloads a replacement SDK from npm by version number, installs drivers, updates udev, or changes system settings.
 
-维护时修改本目录的源码和测试，再重新打包。涉及钱包、解锁或签名行为的改动需要聚焦测试和安全检查；不要记录真实设备的钱包会话、PIN、passphrase 或签名请求。
+The build uses the repository's workspace dependency installation, including native install scripts. On systems without a matching `usb` prebuild, a compatible C/C++ compiler, Python and node-gyp prerequisites must already be available. A native build failure stops installation; there is no fallback to Python USB or a different SDK. Repository SDK builds use the checked-in protobuf JSON; do not regenerate protobuf or move submodules for this plugin.
+
+Install the generated `plugins/electrum/dist/onekey-0.1.0.zip` through Electrum's **Add plugin** UI. Start Electrum with an absolute runtime manifest path in its process environment, for example from this checkout:
+
+```sh
+ONEKEY_ELECTRUM_RUNTIME="$PWD/plugins/electrum/.runtime/runtime.json" electrum --gui qt
+```
+
+For packaged macOS/Windows Electrum, launch its actual executable with the same environment variable (Finder/Start Menu launches do not inherit a terminal's environment). Keep this checkout, its workspace `node_modules`, built SDK packages, `.runtime` directory and the pinned Node executable available. The Python adapter verifies the receipt digest/helper hashes and passes that digest to the child. The child completes the full source/artifact/Node verification before SDK import and the versioned startup handshake; missing, drifted or incompatible runtime fails closed. Rebuild the receipt after an intended source/helper/dependency change; receipts from the earlier label-only format are rejected.
+
+Build separately on every target: macOS arm64/x64, Windows x64/arm64, Linux x64/arm64. Use the matching Node executable and native addon; do not copy one platform's `node_modules` to another platform/CPU. The development manifest contains absolute paths and is **not a portable runtime installer**. Support for a platform is conditional on a successful native build/import and the validation below; this migration does not claim that matrix has been verified. A future redistributable must assemble per-target Node/native dependencies, licenses and helper assets and pass those checks; the ZIP alone is never advertised as ready to run.
+
+On Linux, `onekey/56-onekey.rules` describes access for the current `1209:4f4c` firmware ID. An administrator may install an appropriate rule separately. Windows may need the appropriate USB driver configured separately. Neither the plugin nor the builder installs drivers/rules or requests elevated privileges.
+
+## Wallet identity and recovery
+
+The wizard asks explicitly for **standard**, **hidden** or **cancel**. PIN and passphrase entry happen on the device; the helper only accepts a fixed "enter on device" UI response and cannot receive a host PIN/passphrase. Standard/hidden selection is never inferred from `keepSession`, connection IDs or a previously unlocked device.
+
+New keystores retain the public `{serialNo, deviceId, walletType, passphraseState}` binding alongside their account xpub. `serialNo` is physical identity; `deviceId` identifies the initialization lifetime, not a physical serial. Standard wallets have `passphraseState=null`; hidden wallets have a nonempty SDK-provided public wallet identity. Firmware session IDs never cross the SDK boundary. The wizard's public account binding is handed to the keystore when Electrum constructs it and is included in its normal dump. Wallets from the old Python implementation lack this metadata and must be recreated through the hardware wallet wizard; the plugin refuses to guess their device/wallet identity. Keep the original wallet file until the recreated account and history have been checked.
+
+On reconnect the plugin requires the saved physical/initialization identity, passes the saved wallet intent to SDK recovery, and compares the returned account xpub to Electrum's xpub before address/signing operations. A hidden-wallet recovery never calls `select-hidden` again. The SDK may ask for device entry to restore the expected hidden wallet, but must reject a different `passphraseState`. A changed wallet, wiped device, timeout, cancellation, disconnect or child crash aborts the flow. Explicit rediscovery and a new client are required afterward; address/signing requests are never automatically replayed.
+
+Python derives input/change public keys from the account xpub, checks their paths and scripts against Electrum descriptors, requires matching full previous transactions, and permits SIGHASH_ALL only. Change must be the account's internal branch. Returned signatures must have exactly one indexed signature per input, canonical low-S DER encoding, and verify through Electrum's `update_signatures` against a copy of the **original transaction** before applying them. `serializedTx` is discarded inside the helper. Device-displayed addresses must equal the independently derived Electrum address.
+
+## Private IPC v1
+
+Each UTF-8 JSON line has exactly `{v:1, generation, id, op, params}`. A launch has a random 128-bit hex generation. IDs are positive safe integers and strictly increase, including control frames. Both peers limit a line to **1 MiB including newline**. The helper allows at most **8 outstanding operations**, **200 inputs/outputs/reference transactions**, and **2000 inputs/outputs within a reference transaction**. Amounts are bounded decimal satoshi strings; hashes/scripts are bounded lowercase hex; identities are bounded strings. Unknown fields, methods, versions, stale IDs/generations, invalid paths and malformed data terminate the child.
+
+| Operation | Exact params | Result |
+| --- | --- | --- |
+| `hello` | `{}` | protocol and pinned SDK version; SDK `init({env:'node-usb',debug:false})` must return true |
+| `search` | `{}` | supported initialized V2 devices, projected to connectId/serialNo/deviceId/model |
+| `state` | `connectId` | verified serialNo/deviceId/model |
+| `open` | `connectId, mode` (`standard`/`select-hidden`) | public wallet binding |
+| `xpub` | `connectId, binding, coin, path, scriptType` | xpub and optional public root fingerprint |
+| `address` | same as xpub, five-component path | device-confirmed address (always showOnOneKey) |
+| `sign` | `connectId, binding, coin, inputs, outputs, refTxs, version, locktime` | dense indexed DER signatures only |
+| `ui` | `target, token, choice:'device'` | no response; valid only for the active passphrase selection event |
+| `cancel` | `target` | acknowledges SDK cancellation then terminates the generation |
+| `dispose` | `{}` | invokes SDK dispose |
+
+Results are exactly `{v,generation,id,ok:true,result}` or `{v,generation,id,ok:false,error:{code}}`; codes are static and never include SDK error messages/params. UI events are exactly `{v,generation,id,event,token}` with only pin/passphrase/button/passphrase-select indicators (Core close notifications are consumed locally), never raw SDK device objects. UI replies have no response frame. Cancel has a null result acknowledgement; Python waits at most 250 ms for it before killing the child, and discards any original response after cancellation. All operations are serialized in a bounded queue, including calls to different devices, so the SDK's uncorrelated public UI response API has only one possible waiting operation. Cancel/UI frames bypass this queue. Both queued and running requests have a 120-second deadline; Python discovery/startup uses 30 seconds. Python's absolute deadline begins before waiting for the serialization lock and also bounds child startup. Cancelled/expired queued calls return without sending an operation or disturbing the active caller; the pipe writer rechecks cancellation/deadline before writing queued bytes. A dead child suppresses late responses and queued work. Reader/writer threads bound pipe waits; request waits run on Electrum's hardware thread, never its Qt GUI thread.
+
+Stdout is reserved before SDK imports and contains IPC only. Child stderr and SDK diagnostics are discarded, SDK debug is false, and Node preload/debug environment hooks are removed at spawn. Requests, SDK response objects, PINs/passphrases and firmware sessions are never written to files or diagnostics. Binding metadata in the Electrum keystore is public identity, not a secret/session credential.
+
+## Focused validation
+
+```sh
+python3 -m venv plugins/electrum/.venv
+plugins/electrum/.venv/bin/python -m pip install -r plugins/electrum/requirements-dev.txt
+PYTHONPATH=plugins/electrum plugins/electrum/.venv/bin/python -m unittest discover -s plugins/electrum/tests -v
+node --test plugins/electrum/tests/helper.test.cjs plugins/electrum/tests/pin.test.cjs
+plugins/electrum/.venv/bin/python -m flake8 plugins/electrum/onekey plugins/electrum/tests plugins/electrum/build.py plugins/electrum/build_runtime.py --select=E9,F63,F7,F82
+python3 plugins/electrum/build_runtime.py
+python3 plugins/electrum/build.py
+yarn agent:check --profile commit
+```
+
+The Node tests mock SDK calls but execute the real helper dispatcher and production entry (with test-only module injection). Receipt tests use synthetic package/native files and Git metadata to exercise actual file hashing, drift detection and rejection before mock SDK import; they do not establish real SDK/native import compatibility. Discovery skips successful, explicitly uninitialized/loader Pro2/Neo states, while incomplete state and SDK communication failures remain fatal. The stdlib Python IPC tests exercise real child processes without Electrum or USB. Electrum tests require the pinned Electrum 4.8.4/PyQt dependencies and native secp256k1 prerequisites; they test the actual adapter, local derivation, original-transaction signature checks, hidden-wallet binding and Electrum's ZIP importer. A missing dependency is a failure, not a skipped security check. The real import smoke performed by the runtime builder is separate from mock tests.
+
+Before release, independently validate each OS/CPU and Electrum build: external ZIP first load, wizard creation and saved binding after restart, both Pro2/Neo, all three script types on Bitcoin/Testnet, standard/hidden/Attach-PIN recovery, correct and wrong passphrases, address comparison, signing, cancellation during confirmation, unplug/replug, lock/reconnect and cleanup. No real-device or platform verification is implied by mock tests. Do not use real secrets in fixtures or diagnostics.

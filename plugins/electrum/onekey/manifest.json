@@ -3,9 +3,15 @@
   "fullname": "OneKey Pro 2 and Neo",
   "version": "0.1.0",
   "min_electrum_version": "4.8.4",
-  "description": "USB support for initialized OneKey Pro 2 and Neo hardware wallets. Supports single-signature legacy and SegWit Bitcoin wallets.",
-  "registers_keystore": ["hardware", "onekey", "OneKey wallet"],
+  "description": "Node USB SDK adapter for initialized OneKey Pro 2 and Neo. Requires the separately built, source-pinned Node runtime. Single-signature Bitcoin/Testnet only.",
+  "registers_keystore": [
+    "hardware",
+    "onekey",
+    "OneKey wallet"
+  ],
   "icon": "onekey.svg",
-  "requires": [["trezorlib", "https://pypi.org/project/trezor/"], ["usb1", "https://pypi.org/project/libusb1/"]],
-  "available_for": ["qt"]
+  "requires": [],
+  "available_for": [
+    "qt"
+  ]
 }
