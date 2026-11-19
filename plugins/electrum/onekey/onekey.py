@@ -20,14 +20,25 @@ class OneKeyKeyStore(Hardware_KeyStore):
     def __init__(self, data):
         super().__init__(data)
         self.onekey_binding = data.get("onekey_binding")
+        # maybe_master_pubkey builds a preview keystore. create_storage builds another
+        # and is the one Electrum writes. Copy until that persisted dump.
+        self._onekey_binding_from_pending = False
         if self.onekey_binding is None:
             pending = getattr(getattr(self, "plugin", None), "_new_wallet_bindings", {})
-            self.onekey_binding = pending.pop(self.xpub, None)
+            saved = pending.get(self.xpub) if isinstance(pending, dict) else None
+            if saved is not None:
+                self.onekey_binding = dict(saved)
+                self._onekey_binding_from_pending = True
 
     def dump(self):
         data = super().dump()
         if self.onekey_binding is not None:
             data["onekey_binding"] = dict(self.onekey_binding)
+        if self._onekey_binding_from_pending:
+            pending = getattr(getattr(self, "plugin", None), "_new_wallet_bindings", None)
+            if isinstance(pending, dict):
+                pending.pop(self.xpub, None)
+            self._onekey_binding_from_pending = False
         return data
 
     def decrypt_message(self, sequence, message, password):
@@ -53,19 +64,31 @@ class OneKeyPlugin(HW_PluginBase):
         super().__init__(parent, config, name)
         self.helper = Helper()
         self._new_wallet_bindings = {}
+        self._live_clients = set()
         self.libraries_available = self.check_libraries_available()
         if self.libraries_available:
             self.device_manager().register_enumerate_func(self.enumerate)
 
     def remember_wallet_binding(self, xpub, binding):
-        # The Qt wizard constructs/dumps its keystore after get_xpub returns.
+        # Kept until the keystore Electrum persists is dumped.
         self._new_wallet_bindings[xpub] = dict(binding)
+
+    def retain_client(self, client):
+        self._live_clients.add(client)
+
+    def release_helper(self, client):
+        # One Electrum wallet closing must not kill a second wallet still using this process.
+        self._live_clients.discard(client)
+        if self._live_clients:
+            return
+        if client.helper.generation == client.generation:
+            client.helper.shutdown()
 
     def get_library_version(self):
         try:
             runtime_command()
         except HelperError:
-            raise ImportError("Build the pinned Node USB runtime and set ONEKEY_ELECTRUM_RUNTIME.") from None
+            raise ImportError("Install onekey-runtime beside this plugin, or set ONEKEY_ELECTRUM_RUNTIME.") from None
         return SDK_VERSION
 
     @runs_in_hwd_thread
@@ -77,8 +100,14 @@ class OneKeyPlugin(HW_PluginBase):
             result = []
             for device in found:
                 if (type(device) is not dict or set(device) != {"connectId", "serialNo", "deviceId", "model"}
-                        or any(type(value) is not str or not value for value in device.values())
                         or device["model"] not in ("pro2", "neo")):
+                    raise HelperError("PROTOCOL")
+                for key in ("connectId", "serialNo", "model"):
+                    if type(device[key]) is not str or not device[key] or len(device[key]) > 256:
+                        raise HelperError("PROTOCOL")
+                # Locked initialized firmware omits device_id. serialNo is enough to enter the wizard.
+                if (device["deviceId"] is not None and (type(device["deviceId"]) is not str
+                        or not device["deviceId"] or len(device["deviceId"]) > 256)):
                     raise HelperError("PROTOCOL")
                 result.append(Device(path=device["connectId"], interface_number=-1,
                                      id_=device["serialNo"], product_key="OneKey", usage_page=0,
@@ -101,6 +130,13 @@ class OneKeyPlugin(HW_PluginBase):
             # DeviceMgr may request an xpub while pairing. Supply the saved wallet intent
             # before that callback, so reconnect cannot enter the wallet-selection flow.
             client = super().get_client(keystore, *args, **kwargs)
+            if client is not None and not client.attached():
+                # Cancel/IPC failure leaves Electrum's per-serial cache pointing at a dead client.
+                client.close()
+                client = super().get_client(keystore, *args, **kwargs)
+            if client is not None and not client.attached():
+                client.close()
+                return None
             if client is not None:
                 client.bind_keystore(keystore)
             return client

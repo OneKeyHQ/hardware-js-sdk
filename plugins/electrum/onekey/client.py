@@ -6,6 +6,7 @@ from electrum.bip32 import BIP32Node, convert_bip32_strpath_to_intpath
 from electrum.hw_wallet import HardwareClientBase
 from electrum.i18n import _
 from electrum.plugin import runs_in_hwd_thread
+from electrum.storage import get_derivation_used_for_hw_device_encryption
 from electrum.util import UserCancelled, UserFacingException
 
 from .ipc import HelperError, SDK_VERSION
@@ -48,6 +49,20 @@ def account_path(path, xtype):
     return path
 
 
+def storage_encryption_path(path, xtype):
+    """Electrum's wallet-file key, m/4541509'/1112098098'. Not an account path."""
+    if xtype != "standard":
+        return None
+    try:
+        actual = convert_bip32_strpath_to_intpath(path) if isinstance(path, str) else list(path)
+    except Exception:
+        return None
+    expected = convert_bip32_strpath_to_intpath(get_derivation_used_for_hw_device_encryption())
+    if actual != expected:
+        return None
+    return actual
+
+
 def normalized_xpub(xpub, xtype):
     node = BIP32Node.from_xkey(xpub)
     if xpub != node.to_xpub():
@@ -67,21 +82,31 @@ class OneKeyClient(HardwareClientBase):
         self.account = None
         self.root_fingerprint = None
         self.closed = False
+        self._released = False
+        self._fresh_selection = False
         try:
             state = self._call("state", {"connectId": path})
             self._check_state(state)
             self.device_id = state["deviceId"]
             self.serial = state["serialNo"]
             self.model = MODELS[state["model"]]
+            retain = getattr(self.plugin, "retain_client", None)
+            if retain is not None:
+                retain(self)
         except BaseException:
             self.close()
             raise
+
+    def attached(self):
+        return not self.closed and self.helper.generation == self.generation
 
     @staticmethod
     def _check_state(state):
         if (type(state) is not dict or set(state) != {"deviceId", "serialNo", "model"}
                 or state["model"] not in MODELS
-                or any(type(state[k]) is not str or not state[k] for k in ("deviceId", "serialNo"))):
+                or type(state["serialNo"]) is not str or not state["serialNo"]):
+            raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
+        if state["deviceId"] is not None and (type(state["deviceId"]) is not str or not state["deviceId"]):
             raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
 
     def _call(self, op, params):
@@ -126,7 +151,11 @@ class OneKeyClient(HardwareClientBase):
         if mode not in ("standard", "select-hidden"):
             raise UserCancelled()
         self.binding = check_binding(self._call("open", {"connectId": self.connect_id, "mode": mode}))
-        if self.binding["deviceId"] != self.device_id or self.binding["serialNo"] != self.serial:
+        if self.binding["serialNo"] != self.serial:
+            raise UserFacingException(_("OneKey device identity changed."))
+        if self.device_id is None:
+            self.device_id = self.binding["deviceId"]
+        elif self.binding["deviceId"] != self.device_id:
             raise UserFacingException(_("OneKey device identity changed."))
 
     def _xpub(self, path, xtype):
@@ -145,6 +174,12 @@ class OneKeyClient(HardwareClientBase):
             raise UserFacingException(_("OneKey returned a public key at the wrong derivation."))
         return xpub
 
+    def begin_new_wallet_selection(self):
+        # Consumed by the next get_xpub on the hardware thread. Saved wallets never set this.
+        if self.closed:
+            raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+        self._fresh_selection = True
+
     @runs_in_hwd_thread
     def bind_keystore(self, keystore):
         xtype = BIP32Node.from_xkey(keystore.xpub).xtype
@@ -157,7 +192,17 @@ class OneKeyClient(HardwareClientBase):
                     "This wallet has no OneKey device binding. Recreate it with the hardware wallet wizard."
                 ))
             saved = check_binding(saved)
-            if saved["deviceId"] != self.device_id or saved["serialNo"] != self.serial:
+            if saved["serialNo"] != self.serial:
+                raise UserFacingException(_("This Electrum wallet is bound to a different OneKey device."))
+            if self.device_id is None:
+                opened = check_binding(self._call("open", {
+                    "connectId": self.connect_id,
+                    "mode": "standard" if saved["walletType"] == "standard" else "select-hidden",
+                }))
+                if opened != saved:
+                    raise UserFacingException(_("OneKey device identity changed."))
+                self.device_id = opened["deviceId"]
+            elif saved["deviceId"] != self.device_id:
                 raise UserFacingException(_("This Electrum wallet is bound to a different OneKey device."))
             if self.binding is not None and self.binding != saved:
                 raise UserFacingException(_("OneKey wallet selection changed. Reconnect the device."))
@@ -176,13 +221,42 @@ class OneKeyClient(HardwareClientBase):
         if self._xpub(path, xtype) != expected:
             raise UserFacingException(_("OneKey account changed. Reconnect the device."))
 
+    def _drop_device_cache(self):
+        get_manager = getattr(self.plugin, "device_manager", None)
+        if not callable(get_manager):
+            return
+        try:
+            manager = get_manager()
+        except Exception:
+            return
+        clients = getattr(manager, "clients", None)
+        if not isinstance(clients, dict):
+            return
+        lock = getattr(manager, "lock", None)
+        if lock is not None:
+            lock.acquire()
+        try:
+            clients.pop(self, None)
+        finally:
+            if lock is not None:
+                lock.release()
+
     @runs_in_hwd_thread
     def close(self):
         self.closed = True
         self.binding = None
         self.account = None
-        if self.helper.generation == self.generation:
-            self.helper.shutdown()
+        self._drop_device_cache()
+        if self._released:
+            return
+        self._released = True
+        release = getattr(self.plugin, "release_helper", None)
+        if release is not None:
+            release(self)
+        elif getattr(self.helper, "generation", None) == self.generation:
+            shutdown = getattr(self.helper, "shutdown", None)
+            if shutdown is not None:
+                shutdown()
 
     def is_pairable(self):
         return True
@@ -204,16 +278,32 @@ class OneKeyClient(HardwareClientBase):
         try:
             state = self._call("state", {"connectId": self.connect_id})
             self._check_state(state)
-            if state["deviceId"] == self.device_id and state["serialNo"] == self.serial:
-                return True
-            self.close()
-            return False
+            if state["serialNo"] != self.serial:
+                self.close()
+                return False
+            if self.device_id is not None and state["deviceId"] not in (None, self.device_id):
+                self.close()
+                return False
+            return True
         except Exception:
             self.close()
             return False
 
+    def _storage_encryption_xpub(self, path):
+        # Same selected wallet, but this node must not replace the account or its binding.
+        with self.flow():
+            self._select_wallet()
+            return self._xpub(path, "standard")
+
     @runs_in_hwd_thread
     def get_xpub(self, bip32_path, xtype):
+        if self._fresh_selection:
+            self._fresh_selection = False
+            self.binding = None
+            self.account = None
+        encryption = storage_encryption_path(bip32_path, xtype)
+        if encryption is not None:
+            return self._storage_encryption_xpub(encryption)
         path = account_path(bip32_path, xtype)
         expected = getattr(self.plugin, "_expected_keystore", None)
         if expected is not None:

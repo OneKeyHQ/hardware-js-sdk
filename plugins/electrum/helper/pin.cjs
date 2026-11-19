@@ -1,6 +1,7 @@
 'use strict';
 
-// This is an integrity receipt for a local source-tree build, not an installer or trust service.
+// Build-time receipt for the pinned source tree, and a closed-file receipt for the
+// redistributable runtime. The latter carries one Node binary per desktop target.
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -8,10 +9,15 @@ const childProcess = require('node:child_process');
 const Module = require('node:module');
 const { createRequire, isBuiltin } = Module;
 
-const SDK_SOURCE = 'b62d1005e1f97319d9fa8b550a60466099727f45';
+// Already on onekey. An intermediate commit of this PR disappears in a squash merge.
+const SDK_SOURCE = '38f0b8c5d8fb645c1652880eb099866de57280aa';
 const SDK_VERSION = '1.2.10';
 const NODE_VERSION = '22.21.1';
+// Core imports lodash but does not declare it. The SDK source pin cannot change from this adapter.
+const PINNED_RUNTIME_DEPENDENCIES = { '@onekeyfe/hd-core': ['lodash'] };
 const HELPERS = ['entry.cjs', 'runtime.cjs', 'pin.cjs'];
+// Official Node 22.21.1 builds. Linux binaries are glibc, matching nodejs.org.
+const BUNDLE_PLATFORMS = ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-arm64', 'win32-x64'];
 const GENERATED = new Set(['.git', 'node_modules', 'dist', 'lib', 'libDev', 'coverage', '.cache',
   '.yarn', '__pycache__', 'submodules', '.venv', '.runtime', '.pytest_cache']);
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -53,7 +59,9 @@ function sourceSnapshot(root) {
       const relative = path.relative(root, file).split(path.sep).join('/');
       if (relative === 'plugins/electrum') {
         // Root allowJs/type-check globs can include the adapter's JS/JSON inputs too.
-        for (const input of files(root, file, GENERATED)) {
+        // dist/onekey-runtime is a build product. A directory named runtime under the
+        // adapter is the same kind of output and must not become a source input.
+        for (const input of files(root, file, new Set([...GENERATED, 'runtime']))) {
           if (/\.(?:[cm]?js|jsx|tsx?|json)$/.test(input)) {
             inventory[path.relative(root, input).split(path.sep).join('/')] = hash(input);
           }
@@ -137,6 +145,9 @@ function artifactSnapshot(root) {
         || manifest.peerDependenciesMeta?.[dependency]?.optional === true;
       visit(dependency, localRequire, optionalDependency);
     }
+    for (const dependency of PINNED_RUNTIME_DEPENDENCIES[manifest.name] ?? []) {
+      visit(dependency, localRequire, false);
+    }
   }
   for (const name of ['@onekeyfe/hd-common-connect-sdk', '@onekeyfe/hd-transport-usb']) {
     entries[name] = path.relative(root, inside(root, entryRequire.resolve(name))).split(path.sep).join('/');
@@ -155,10 +166,78 @@ function capture(root, helperDirectory) {
     nodeVersion: NODE_VERSION, platform: process.platform, machine: process.arch,
     assets: Object.fromEntries(HELPERS.map(name => [name, hash(path.join(helperDirectory, name))])) };
 }
+function listFiles(root) {
+  const found = [];
+  function walk(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      check(!entry.isSymbolicLink());
+      if (entry.isDirectory()) walk(file);
+      else { check(entry.isFile()); found.push(path.relative(root, file).split(path.sep).join('/')); }
+    }
+  }
+  walk(root);
+  return found;
+}
+function bundleReceipt(bundleDir) {
+  bundleDir = fs.realpathSync(bundleDir);
+  const nodeDir = path.join(bundleDir, 'nodes');
+  check(same(fs.readdirSync(nodeDir).sort(), BUNDLE_PLATFORMS));
+  const files = {};
+  function walk(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      const rel = path.relative(bundleDir, file).split(path.sep).join('/');
+      check(!entry.isSymbolicLink());
+      if (rel === 'nodes' || rel.startsWith('nodes/')) continue;
+      if (entry.isDirectory()) { walk(file); continue; }
+      check(entry.isFile());
+      if (rel === 'runtime.json' || rel === 'runtime.sha256') continue;
+      if (HELPERS.includes(entry.name) && path.dirname(file) === bundleDir) continue;
+      files[rel] = hash(file);
+    }
+  }
+  walk(bundleDir);
+  const platforms = {};
+  for (const name of BUNDLE_PLATFORMS) {
+    const executable = name.startsWith('win32-') ? 'node.exe' : 'node';
+    const directory = path.join(nodeDir, name);
+    check(same(fs.readdirSync(directory), [executable]));
+    const rel = `nodes/${name}/${executable}`;
+    platforms[name] = { node: rel, nodeSha256: hash(path.join(bundleDir, rel)) };
+  }
+  return { schema: 2, mode: 'bundle', sdkSource: SDK_SOURCE, sdkVersion: SDK_VERSION,
+    nodeVersion: NODE_VERSION,
+    assets: Object.fromEntries(HELPERS.map(name => [name, hash(path.join(bundleDir, name))])),
+    files: sorted(files), platforms: sorted(platforms) };
+}
+function verifyBundle(manifestPath, data) {
+  const root = fs.realpathSync(path.dirname(fs.realpathSync(manifestPath)));
+  check(data.schema === 2 && data.mode === 'bundle');
+  check(data.sdkSource === SDK_SOURCE && data.sdkVersion === SDK_VERSION);
+  check(data.nodeVersion === NODE_VERSION && process.version === `v${NODE_VERSION}`);
+  check(same(Object.keys(data.platforms).sort(), BUNDLE_PLATFORMS));
+  const platform = `${process.platform}-${process.arch}`;
+  const spec = data.platforms[platform];
+  check(spec && spec.node === `nodes/${platform}/${platform.startsWith('win32-') ? 'node.exe' : 'node'}`);
+  const nodePath = inside(root, path.join(root, spec.node));
+  check(fs.realpathSync(process.execPath) === nodePath && hash(nodePath) === spec.nodeSha256);
+  for (const name of HELPERS) check(data.assets[name] === hash(path.join(root, name)));
+  for (const [rel, expected] of Object.entries(data.files)) check(hash(inside(root, path.join(root, rel))) === expected);
+  for (const name of BUNDLE_PLATFORMS) {
+    const other = data.platforms[name];
+    check(hash(inside(root, path.join(root, other.node))) === other.nodeSha256);
+  }
+  const expected = new Set([...Object.keys(data.files), ...HELPERS, 'runtime.json', 'runtime.sha256',
+    ...BUNDLE_PLATFORMS.map(name => data.platforms[name].node)]);
+  check(same(listFiles(root).sort(), [...expected].sort()));
+  return data;
+}
 function verifyRuntime(manifestPath, expectedHash, expectedRoot = path.resolve(__dirname, '../../..')) {
   const bytes = fs.readFileSync(manifestPath);
   check(/^[a-f0-9]{64}$/.test(expectedHash) && digest(bytes) === expectedHash);
   const data = JSON.parse(bytes);
+  if (data.mode === 'bundle') return verifyBundle(manifestPath, data);
   const root = fs.realpathSync(expectedRoot);
   check(data.schema === 1 && data.sdkSource === SDK_SOURCE && data.sdkVersion === SDK_VERSION);
   check(data.sourceTree === root && fs.realpathSync(data.sourceTree) === root);
@@ -172,28 +251,33 @@ function verifyRuntime(manifestPath, expectedHash, expectedRoot = path.resolve(_
   return data;
 }
 function guardLoads(data, helperDirectory) {
+  const bundled = data.mode === 'bundle';
+  const root = fs.realpathSync(bundled ? helperDirectory : data.sourceTree);
+  const helperRoot = fs.realpathSync(helperDirectory);
   const load = Module._load;
   Module._load = function pinnedLoad(request, parent, isMain) {
     if (!isBuiltin(request)) {
       const resolved = Module._resolveFilename(request, parent, isMain);
-      const file = inside(data.sourceTree, resolved);
-      const relative = path.relative(data.sourceTree, file).split(path.sep).join('/');
-      const expected = data.artifacts[relative]
-        ?? (path.dirname(file) === helperDirectory ? data.assets[path.basename(file)] : undefined);
+      const file = inside(root, resolved);
+      const relative = path.relative(root, file).split(path.sep).join('/');
+      const expected = (bundled ? data.files[relative] : data.artifacts[relative])
+        ?? (path.dirname(file) === helperRoot ? data.assets[path.basename(file)] : undefined);
       // An undeclared dependency must not silently escape the recorded package closure.
       check(expected && (Module._cache[resolved] || hash(file) === expected));
     }
     return load.call(this, request, parent, isMain);
   };
 }
-module.exports = { SDK_SOURCE, SDK_VERSION, NODE_VERSION, HELPERS, hash, digest,
-  sourceSnapshot, artifactSnapshot, capture, verifyRuntime, guardLoads };
+module.exports = { SDK_SOURCE, SDK_VERSION, NODE_VERSION, HELPERS, BUNDLE_PLATFORMS,
+  PINNED_RUNTIME_DEPENDENCIES, hash, digest, sourceSnapshot, artifactSnapshot, capture,
+  bundleReceipt, verifyRuntime, guardLoads };
 
 if (require.main === module) {
   try {
     const root = fs.realpathSync(process.argv[3]);
     const result = process.argv[2] === '--check-source' ? sourceSnapshot(root)
-      : process.argv[2] === '--snapshot' ? capture(root, path.join(root, 'plugins/electrum/.runtime')) : null;
+      : process.argv[2] === '--snapshot' ? capture(root, path.join(root, 'plugins/electrum/.runtime'))
+      : process.argv[2] === '--bundle' ? bundleReceipt(root) : null;
     check(result);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch {

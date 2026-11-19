@@ -6,7 +6,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 const pin = require('../helper/pin.cjs');
 
-function fixture(t, substituteSDK = false) {
+function fixture(t, substituteSDK = false, prepare = undefined) {
   const root = fs.mkdtempSync(path.join(__dirname, '.pin-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (name, value) => {
@@ -54,6 +54,7 @@ function fixture(t, substituteSDK = false) {
     }
     fs.symlinkSync(path.join(root, 'packages', name), path.join(root, 'node_modules/@onekeyfe', name), 'junction');
   }
+  if (prepare) prepare({ root, put, sources });
   const data = pin.capture(root, runtime);
   const manifest = path.join(runtime, 'runtime.json');
   const receipt = JSON.stringify(data);
@@ -173,4 +174,88 @@ test('startup validates receipt before loading even the mock SDK; no real import
   assert.equal(unrecorded.status, 1);
   assert.equal(unrecorded.stdout, '');
   assert.equal(fs.existsSync(path.join(f.root, 'imported')), false);
+});
+
+test('real core lodash import is pinned and an unlisted import still fails smoke', t => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../../../packages/core/src/utils/deviceFeaturesUtils.ts'), 'utf8');
+  assert.match(source, /from 'lodash'/);
+  assert.deepEqual(pin.PINNED_RUNTIME_DEPENDENCIES['@onekeyfe/hd-core'], ['lodash']);
+  const f = fixture(t, false, ({ root, put, sources }) => {
+    put('packages/core/package.json', JSON.stringify({ name: '@onekeyfe/hd-core', version: pin.SDK_VERSION,
+      main: 'dist/index.js' }));
+    put('packages/core/dist/index.js', "require('lodash'); module.exports = {};");
+    put('node_modules/lodash/package.json', JSON.stringify({ name: 'lodash', version: '4.17.21', main: 'lodash.js' }));
+    put('node_modules/lodash/lodash.js', 'module.exports = { isNaN: Number.isNaN };');
+    fs.symlinkSync(path.join(root, 'packages/core'), path.join(root, 'node_modules/@onekeyfe/hd-core'), 'junction');
+    put('packages/hd-common-connect-sdk/package.json', JSON.stringify({ name: '@onekeyfe/hd-common-connect-sdk',
+      version: pin.SDK_VERSION, main: 'dist/index.js',
+      dependencies: { 'synthetic-dependency': '1.0.0', 'synthetic-types': '1.0.0', '@onekeyfe/hd-core': pin.SDK_VERSION } }));
+    put('packages/hd-common-connect-sdk/dist/index.js',
+      `require('@onekeyfe/hd-core'); require('node:fs').writeFileSync(${JSON.stringify(path.join(root, 'imported'))}, 'yes'); module.exports = {default: {init() {throw Error('no hardware init');}}};`);
+    sources.push('packages/core/package.json', 'packages/core/dist/index.js');
+  });
+  assert.equal(typeof f.data.artifacts['node_modules/lodash/lodash.js'], 'string');
+  const manifest = f.manifest;
+  fs.writeFileSync(manifest, JSON.stringify(f.data));
+  f.digest = pin.digest(JSON.stringify(f.data));
+  function launch() {
+    const driver = `const cp = require('node:child_process');
+      cp.execFileSync = (cmd, args) => args[0] === 'diff' ? '' : ${JSON.stringify(f.sources.join('\n'))};
+      process.argv = [process.execPath, ${JSON.stringify(path.join(f.runtime, 'entry.cjs'))},
+        '--manifest', ${JSON.stringify(manifest)}, '--manifest-sha256', ${JSON.stringify(f.digest)}, '--smoke'];
+      require(process.argv[1]);`;
+    return childProcess.spawnSync(process.execPath, ['-e', driver], { encoding: 'utf8' });
+  }
+  const clean = launch();
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.equal(JSON.parse(clean.stdout).imports, true);
+  fs.unlinkSync(path.join(f.root, 'imported'));
+  f.put('packages/core/dist/index.js', "require('lodash'); require('not-pinned'); module.exports = {};");
+  f.put('node_modules/not-pinned/package.json', JSON.stringify({ name: 'not-pinned', main: 'index.js' }));
+  f.put('node_modules/not-pinned/index.js', 'module.exports = 1;');
+  const again = pin.capture(f.root, f.runtime);
+  assert.equal(again.artifacts['node_modules/not-pinned/index.js'], undefined);
+  fs.writeFileSync(manifest, JSON.stringify(again));
+  f.digest = pin.digest(JSON.stringify(again));
+  const rejected = launch();
+  assert.equal(rejected.status, 1);
+  assert.equal(rejected.stdout, '');
+  assert.equal(fs.existsSync(path.join(f.root, 'imported')), false);
+});
+
+test('bundle receipt covers every desktop node and rejects a changed file', t => {
+  assert.deepEqual(pin.BUNDLE_PLATFORMS, ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-arm64', 'win32-x64']);
+  const bundle = fs.mkdtempSync(path.join(__dirname, '.pin-bundle-'));
+  t.after(() => fs.rmSync(bundle, { recursive: true, force: true }));
+  for (const name of pin.HELPERS) {
+    fs.copyFileSync(path.join(__dirname, '../helper', name), path.join(bundle, name));
+  }
+  const sample = path.join(bundle, 'node_modules/example/index.js');
+  fs.mkdirSync(path.dirname(sample), { recursive: true });
+  fs.writeFileSync(sample, 'module.exports = 1;\n');
+  const platform = `${process.platform}-${process.arch}`;
+  for (const name of pin.BUNDLE_PLATFORMS) {
+    const executable = name.startsWith('win32-') ? 'node.exe' : 'node';
+    const dest = path.join(bundle, 'nodes', name, executable);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    if (name === platform) fs.copyFileSync(process.execPath, dest);
+    else fs.writeFileSync(dest, `stub-${name}`);
+    if (!name.startsWith('win32-')) fs.chmodSync(dest, 0o755);
+  }
+  const manifest = path.join(bundle, 'runtime.json');
+  const receipt = JSON.stringify(pin.bundleReceipt(bundle));
+  fs.writeFileSync(manifest, receipt);
+  const digest = pin.digest(receipt);
+  fs.writeFileSync(path.join(bundle, 'runtime.sha256'), `${digest}\n`);
+  const node = path.join(bundle, 'nodes', platform, 'node');
+  const script = `
+    const pin = require(${JSON.stringify(path.join(bundle, 'pin.cjs'))});
+    const data = pin.verifyRuntime(${JSON.stringify(manifest)}, ${JSON.stringify(digest)});
+    if (data.mode !== 'bundle' || !data.platforms[${JSON.stringify(platform)}]) process.exit(2);
+  `;
+  const accepted = childProcess.spawnSync(node, ['-e', script], { encoding: 'utf8' });
+  assert.equal(accepted.status, 0, accepted.stderr);
+  fs.writeFileSync(sample, 'module.exports = 2;\n');
+  const rejected = childProcess.spawnSync(node, ['-e', script], { encoding: 'utf8' });
+  assert.equal(rejected.status, 1);
 });

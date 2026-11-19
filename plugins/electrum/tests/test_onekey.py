@@ -1,6 +1,9 @@
 import importlib.util
 import os
+from pathlib import Path
+import threading
 import sys
+import tempfile
 import unittest
 import zipfile
 from types import SimpleNamespace
@@ -8,15 +11,20 @@ from unittest import mock
 
 from electrum import constants, descriptor
 from electrum.bip32 import BIP32Node, convert_bip32_strpath_to_intpath
+from electrum.keystore import load_keystore, register_keystore
 from electrum.plugin import run_in_hwd_thread
+from electrum.storage import WalletStorage, get_derivation_used_for_hw_device_encryption
 from electrum.transaction import PartialTransaction, PartialTxInput, PartialTxOutput, Transaction, TxOutpoint, Sighash
 from electrum.util import UserCancelled, UserFacingException
+from electrum.wallet_db import WalletDB
+from electrum.wizard import NewWalletWizard
 from electrum.zip_importer import MemoryZipImporter
 
 from onekey.client import OneKeyClient, coin_name, check_binding
 from onekey.onekey import OneKeyKeyStore, OneKeyPlugin
 from onekey.ipc import HelperError
 from build import build
+from install_runtime import install
 
 
 STATE = dict(deviceId="synthetic-device", serialNo="synthetic-serial", model="pro2")
@@ -35,7 +43,9 @@ class TestOneKeyPackaging(unittest.TestCase):
                 self.assertIn("onekey/" + name, names)
             for suffix in ("messages.py", "transport.py", "entry.cjs", "node"):
                 self.assertNotIn("onekey/" + suffix, names)
-            self.assertFalse(any("__pycache__" in name for name in names))
+            self.assertFalse(any("runtime/" in name or "__pycache__" in name for name in names))
+            # Electrum reads the whole external plugin zip into memory and rejects files over 10 MB.
+            self.assertLess(archive.stat().st_size, 10_000_000)
         importer = MemoryZipImporter(archive.read_bytes(), root_name=root_name,
                                      prefix="onekey", archive_path=str(archive)).install()
         try:
@@ -50,6 +60,24 @@ class TestOneKeyPackaging(unittest.TestCase):
             for name in list(sys.modules):
                 if name == root_name or name.startswith(root_name + "."):
                     del sys.modules[name]
+
+    def test_installer_puts_runtime_beside_the_plugin_zip(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "package"
+            runtime = source / "onekey-runtime"
+            (runtime / "nodes").mkdir(parents=True)
+            (runtime / "runtime.json").write_text("{}\n")
+            (source / "onekey-0.1.0.zip").write_bytes(b"plugin")
+            (source / "onekey-electrum-0.1.0.zip").write_bytes(b"outer")
+            destination = Path(temporary) / "plugins"
+            plugin, installed, replaced = install(source, destination)
+            self.assertEqual(plugin.read_bytes(), b"plugin")
+            self.assertEqual((installed / "runtime.json").read_text(), "{}\n")
+            self.assertFalse(replaced)
+            (source / "onekey-0.1.0.zip").write_bytes(b"updated")
+            plugin, installed, replaced = install(source, destination)
+            self.assertTrue(replaced)
+            self.assertEqual(plugin.read_bytes(), b"updated")
 
 
 class TestOneKeyClient(unittest.TestCase):
@@ -101,13 +129,188 @@ class TestOneKeyClient(unittest.TestCase):
         client.close()
         helper.shutdown.assert_not_called()
 
+    def test_locked_device_state_is_accepted_and_open_sets_the_device_id(self):
+        helper = mock.Mock(generation="generation-one")
+        helper.call.return_value = dict(deviceId=None, serialNo="synthetic-serial", model="pro2")
+        handler = mock.Mock()
+        handler.choose_wallet.return_value = "standard"
+        plugin = SimpleNamespace(helper=helper, SUPPORTED_XTYPES=OneKeyPlugin.SUPPORTED_XTYPES,
+                                 remember_wallet_binding=mock.Mock())
+        client = run_in_hwd_thread(lambda: OneKeyClient("usb1", handler, plugin))
+        self.assertIsNone(client.device_id)
+        opened = dict(deviceId="synthetic-device", serialNo="synthetic-serial",
+                      walletType="standard", passphraseState=None)
+        xpub = self.public_key()
+        helper.call.side_effect = [opened, dict(xpub=xpub, rootFingerprint=None)]
+        self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
+        self.assertEqual("synthetic-device", client.device_id)
+        self.assertEqual("open", helper.call.call_args_list[-2].args[0])
+
+    def test_saved_wallet_on_a_locked_device_opens_before_comparing_identity(self):
+        helper = mock.Mock(generation="generation-one")
+        helper.call.return_value = dict(deviceId=None, serialNo=STATE["serialNo"], model="pro2")
+        plugin = SimpleNamespace(helper=helper, SUPPORTED_XTYPES=OneKeyPlugin.SUPPORTED_XTYPES,
+                                 remember_wallet_binding=mock.Mock())
+        client = run_in_hwd_thread(lambda: OneKeyClient("usb1", mock.Mock(), plugin))
+        xpub = self.public_key()
+        saved = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
+                     walletType="standard", passphraseState=None)
+        keystore = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'", onekey_binding=saved))
+        helper.call.side_effect = [saved, dict(xpub=xpub, rootFingerprint=None)]
+        client.bind_keystore(keystore)
+        self.assertEqual(["state", "open", "xpub"], [call.args[0] for call in helper.call.call_args_list])
+        self.assertEqual("standard", helper.call.call_args_list[1].args[1]["mode"])
+
+    def test_new_wallet_fetch_does_not_reuse_the_previous_selection(self):
+        client, helper, handler = self.make_client()
+        client.binding = dict(BINDING)
+        client.account = ("previous",)
+        client.begin_new_wallet_selection()
+        xpub = self.public_key()
+        helper.call.side_effect = [BINDING, dict(xpub=xpub, rootFingerprint=None)]
+        self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
+        handler.choose_wallet.assert_called_once()
+        self.assertEqual(BINDING["passphraseState"], client.binding["passphraseState"])
+
+    def test_closing_one_client_leaves_the_other_helper_running(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin._live_clients = set()
+        plugin.helper = mock.Mock(generation="generation-one")
+        plugin.helper.call.return_value = dict(STATE)
+        plugin.retain_client = OneKeyPlugin.retain_client.__get__(plugin)
+        plugin.release_helper = OneKeyPlugin.release_helper.__get__(plugin)
+        handler = mock.Mock()
+        first = run_in_hwd_thread(lambda: OneKeyClient("usb1", handler, plugin))
+        second = run_in_hwd_thread(lambda: OneKeyClient("usb2", handler, plugin))
+        first.close()
+        plugin.helper.shutdown.assert_not_called()
+        self.assertTrue(second.attached())
+        second.close()
+        plugin.helper.shutdown.assert_called_once()
+
+    def test_close_removes_the_cached_client_before_the_next_request(self):
+        client, _, _ = self.make_client()
+        manager = SimpleNamespace(lock=threading.Lock(), clients={client: "synthetic-serial"})
+        client.plugin.device_manager = lambda: manager
+        client.close()
+        self.assertNotIn(client, manager.clients)
+
+    def test_get_client_replaces_a_closed_client_before_bind(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        closed = mock.Mock()
+        closed.attached.return_value = False
+        fresh = mock.Mock()
+        fresh.attached.return_value = True
+        keystore = mock.Mock()
+        with mock.patch("electrum.hw_wallet.plugin.HW_PluginBase.get_client", side_effect=[closed, fresh]):
+            result = OneKeyPlugin.get_client(plugin, keystore)
+        closed.close.assert_called_once()
+        fresh.bind_keystore.assert_called_once_with(keystore)
+        self.assertIs(result, fresh)
+
+    def test_search_accepts_a_locked_device_without_device_id(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.helper = mock.Mock()
+        plugin.helper.call.return_value = [dict(connectId="usb1", serialNo="synthetic-serial",
+                                                 deviceId=None, model="pro2")]
+        devices = OneKeyPlugin.enumerate(plugin)
+        self.assertEqual("synthetic-serial", devices[0].id_)
+        plugin.helper.call.return_value = [dict(connectId="usb1", serialNo="synthetic-serial",
+                                                 deviceId="", model="pro2")]
+        with self.assertRaises(UserFacingException):
+            OneKeyPlugin.enumerate(plugin)
+
     def test_wizard_binding_is_copied_into_keystore_dump(self):
         xpub = self.public_key()
         plugin = SimpleNamespace(_new_wallet_bindings={xpub: dict(BINDING)})
         with mock.patch.object(OneKeyKeyStore, "plugin", plugin, create=True):
-            keystore = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'"))
-            self.assertEqual(BINDING, keystore.dump()["onekey_binding"])
+            preview = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'"))
+            stored = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'"))
+            self.assertEqual(BINDING, preview.onekey_binding)
+            self.assertEqual(BINDING, stored.onekey_binding)
+            self.assertEqual({xpub: BINDING}, plugin._new_wallet_bindings)
+            self.assertEqual(BINDING, stored.dump()["onekey_binding"])
             self.assertEqual({}, plugin._new_wallet_bindings)
+            self.assertEqual(BINDING, preview.dump()["onekey_binding"])
+
+    def test_wizard_persists_binding_across_preview_and_storage_keystore(self):
+        xpub = self.public_key()
+        plugin = SimpleNamespace(_new_wallet_bindings={})
+        previous = getattr(OneKeyKeyStore, "plugin", None)
+        OneKeyPlugin.remember_wallet_binding(plugin, xpub, BINDING)
+        OneKeyKeyStore.plugin = plugin
+        register_keystore("onekey", OneKeyKeyStore)
+        data = {
+            "wallet_type": "standard",
+            "keystore_type": "hardware",
+            "hw_type": "onekey",
+            "derivation_path": "m/84'/0'/0'",
+            "root_fingerprint": "01020304",
+            "master_key": xpub,
+            "label": "synthetic",
+            "soft_device_id": STATE["deviceId"],
+            "password": "",
+            "encrypt": False,
+        }
+        wizard = NewWalletWizard.__new__(NewWalletWizard)
+        wizard._logger = mock.Mock()
+        try:
+            wizard.maybe_master_pubkey(data)
+            self.assertEqual(xpub, data["multisig_master_pubkey"])
+            self.assertIn(xpub, plugin._new_wallet_bindings)
+            with tempfile.TemporaryDirectory() as directory:
+                path = os.path.join(directory, "wallet")
+                wizard.create_storage(path, data)
+                self.assertNotIn(xpub, plugin._new_wallet_bindings)
+                storage = WalletStorage(path)
+                db = WalletDB(storage.read(), storage=storage, upgrade=True)
+                loaded = load_keystore(db, "keystore")
+                self.assertEqual(BINDING, loaded.onekey_binding)
+                self.assertEqual(BINDING, loaded.dump()["onekey_binding"])
+        finally:
+            OneKeyKeyStore.plugin = previous
+
+    def encryption_xpub(self):
+        root = BIP32Node.from_rootseed(os.urandom(32), xtype="standard")
+        return root.subkey_at_private_derivation(get_derivation_used_for_hw_device_encryption()).to_xpub()
+
+    def test_storage_encryption_xpub_keeps_the_selected_account(self):
+        client, helper, handler = self.make_client()
+        account_xpub = self.public_key()
+        client.binding = dict(BINDING)
+        client.account = ([0x80000054, 0x80000000, 0x80000000], "p2wpkh", account_xpub)
+        encryption_xpub = self.encryption_xpub()
+        helper.call.return_value = dict(xpub=encryption_xpub, rootFingerprint=None)
+        path = get_derivation_used_for_hw_device_encryption()
+        self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
+        self.assertEqual(account_xpub, client.account[2])
+        self.assertEqual("p2wpkh", client.account[1])
+        handler.choose_wallet.assert_not_called()
+        client.plugin.remember_wallet_binding.assert_not_called()
+        sent = helper.call.call_args.args[1]
+        self.assertEqual(convert_bip32_strpath_to_intpath(path), sent["path"])
+        self.assertEqual("SPENDADDRESS", sent["scriptType"])
+        self.assertEqual(BINDING, sent["binding"])
+
+    def test_storage_encryption_can_select_a_wallet_without_becoming_the_account(self):
+        client, helper, handler = self.make_client()
+        encryption_xpub = self.encryption_xpub()
+        helper.call.side_effect = [BINDING, dict(xpub=encryption_xpub, rootFingerprint=None)]
+        path = get_derivation_used_for_hw_device_encryption()
+        self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
+        self.assertIsNone(client.account)
+        handler.choose_wallet.assert_called_once()
+        client.plugin.remember_wallet_binding.assert_not_called()
+        self.assertEqual("open", helper.call.call_args_list[-2].args[0])
+
+    def test_storage_encryption_path_is_not_a_general_account_exception(self):
+        client, helper, _ = self.make_client()
+        path = get_derivation_used_for_hw_device_encryption()
+        for requested, xtype in ((path + "/0'", "standard"), ("m/4541509'/0'", "standard"), (path, "p2wpkh"),
+                                 ("m/86'/0'/0'", "p2wpkh")):
+            with self.subTest(path=requested, xtype=xtype), self.assertRaises(UserFacingException):
+                client.get_xpub(requested, xtype)
+        self.assertEqual(1, helper.call.call_count)
 
     def test_cancelled_selection_does_not_open_standard_wallet(self):
         client, helper, handler = self.make_client()

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 
 def build():
@@ -18,5 +18,28 @@ def build():
     return output
 
 
+def build_distribution():
+    root = Path(__file__).resolve().parent
+    manifest = json.loads((root / "onekey" / "manifest.json").read_text())
+    plugin_zip = build()
+    runtime = root / "dist" / "onekey-runtime"
+    if not (runtime / "runtime.json").is_file():
+        raise RuntimeError("Build the runtime first: python3 plugins/electrum/build_runtime.py")
+    # Electrum rejects plugin zips over 10 MB, so this outer archive is the redistributable.
+    output = root / "dist" / f"onekey-electrum-{manifest['version']}.zip"
+    temporary = output.with_suffix(".partial")
+    with ZipFile(temporary, "w") as archive:
+        archive.write(plugin_zip, plugin_zip.name, compress_type=ZIP_DEFLATED)
+        archive.write(root / "install_runtime.py", "install.py", compress_type=ZIP_DEFLATED)
+        for source in sorted(runtime.rglob("*")):
+            if not source.is_file():
+                continue
+            relative = Path("onekey-runtime") / source.relative_to(runtime)
+            stored = "nodes" in source.relative_to(runtime).parts
+            archive.write(source, relative, compress_type=ZIP_STORED if stored else ZIP_DEFLATED)
+    temporary.replace(output)
+    return output
+
+
 if __name__ == "__main__":
-    print(f"{build()} (Python adapter only; build/install the pinned Node runtime separately)")
+    print(build_distribution())

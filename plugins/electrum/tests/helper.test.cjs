@@ -89,7 +89,7 @@ test('fixed SDK API routing, V2 state, explicit wallet selection and public proj
   assert.equal(JSON.stringify(h.output).includes('serializedTx'), false);
 });
 
-test('schema rejects unknown methods, extra fields, sessions, oversized and invalid values', () => {
+test('schema rejects unknown methods, extra fields, sessions, oversized and invalid values', async () => {
   const malformed = [envelope(1, 'wipeDevice'), envelope(1, 'state', { connectId: 'usb1', debug: true }),
     envelope(1, 'xpub', { ...xpubParams, sessionId: 'forbidden' }),
     envelope(1, 'xpub', { ...xpubParams, binding: { ...wallet, walletType: 'standard' } }),
@@ -102,6 +102,7 @@ test('schema rejects unknown methods, extra fields, sessions, oversized and inva
   validate(envelope(1, 'sign', txParams()), generation);
   const h = harness();
   h.input.write('x'.repeat(MAX_LINE));
+  await turn();
   assert.equal(h.died(), true);
 });
 
@@ -150,7 +151,7 @@ test('timeouts/disconnect/SDK failure are terminal and never replay side effects
         : new Promise(() => {});
     };
     h.send(2, 'address', { ...xpubParams, path: [...account, 0, 0] }); await turn();
-    if (mode === 'disconnect') h.sdk.emit('device-disconnect', {});
+    if (mode === 'disconnect') h.sdk.emit('device-disconnect', { device: { connectId: 'usb1' } });
     if (mode === 'timeout') await new Promise(resolve => setTimeout(resolve, 30));
     await turn();
     assert.equal(h.died(), true, mode);
@@ -158,6 +159,26 @@ test('timeouts/disconnect/SDK failure are terminal and never replay side effects
     assert.equal(calls, 1);
     assert.equal(JSON.stringify(h.output).includes('do-not-forward-secret'), false);
   }
+});
+
+test('disconnect of another device leaves the active wallet request running', async t => {
+  const h = await ready(t);
+  let release;
+  h.sdk.btcGetAddress = () => new Promise(resolve => { release = resolve; });
+  h.send(2, 'address', { ...xpubParams, path: [...account, 0, 0] });
+  h.send(3, 'state', { connectId: 'usb2' });
+  await turn();
+  h.sdk.emit('device-disconnect', {});
+  h.sdk.emit('device-disconnect', { device: { connectId: 'usb-other' } });
+  h.sdk.emit('device-disconnect', { device: { connectId: 'usb2' } });
+  await turn();
+  assert.equal(h.died(), false);
+  assert.equal(h.output.some(m => m.id === 3 && m.ok === false), true);
+  assert.equal(h.sdk.calls.some(c => c[0] === 'state' && c[1] === 'usb2'), false);
+  release(ok({ address: 'synthetic-address' }));
+  await turn();
+  assert.equal(h.died(), false);
+  assert.equal(h.output.find(m => m.id === 2 && m.ok)?.result.address, 'synthetic-address');
 });
 
 test('wallet/device/protocol mismatch fails before address/signing', async t => {
@@ -294,6 +315,51 @@ test('discovery skips explicit uninitialized and loader states before supported 
   assert.deepEqual(queried, ids);
   assert.deepEqual(h.output.at(-1).result, [{ connectId: 'ready', deviceId: identity.deviceId,
     serialNo: identity.serialNo, model: 'pro2' }]);
+});
+
+test('locked initialized device is listed without deviceId and unlocks only through open', async t => {
+  const h = await ready(t);
+  h.sdk.getDeviceState = async () => ok({ schemaVersion: 1, protocol: 'V2',
+    identity: { deviceId: null, serialNo: identity.serialNo, deviceType: 'pro2' },
+    status: { initialized: true, mode: 'normal', unlocked: false } });
+  h.send(2, 'search'); await turn();
+  assert.equal(h.died(), false);
+  assert.deepEqual(h.output.at(-1).result, [{ connectId: 'usb1', deviceId: null,
+    serialNo: identity.serialNo, model: 'pro2' }]);
+  h.sdk.openWalletSession = async () => ok({ protocol: 'V2', deviceId: identity.deviceId,
+    walletType: 'standard', passphraseState: null });
+  h.send(3, 'open', { connectId: 'usb1', mode: 'standard' }); await turn();
+  assert.equal(h.output.at(-1).ok, true);
+  assert.equal(h.output.at(-1).result.deviceId, identity.deviceId);
+  h.send(4, 'xpub', xpubParams); await turn();
+  assert.equal(h.output.at(-1).ok, false);
+  assert.equal(h.output.at(-1).error.code, 'DEVICE_MISMATCH');
+  assert.equal(h.sdk.calls.some(c => c[0] === 'xpub'), false);
+});
+
+test('cancel disposes the sdk before the cancel acknowledgement', async t => {
+  const h = await ready(t);
+  h.sdk.getDeviceState = () => new Promise(() => {});
+  h.sdk.dispose = async () => {
+    assert.equal(h.output.some(message => message.id === 3), false);
+    h.sdk.calls.push(['dispose']);
+  };
+  h.send(2, 'state', { connectId: 'usb1' }); await turn();
+  h.send(3, 'cancel', { target: 2 }); await turn();
+  assert.equal(h.died(), true);
+  assert.equal(h.sdk.calls.some(c => c[0] === 'dispose'), true);
+  assert.deepEqual(h.output.at(-1), { v: 1, generation, id: 3, ok: true, result: null });
+});
+
+test('a dispose that does not return still exits within the cleanup budget', async t => {
+  const h = await ready(t);
+  h.sdk.getDeviceState = () => new Promise(() => {});
+  h.sdk.dispose = () => new Promise(() => {});
+  h.send(2, 'state', { connectId: 'usb1' }); await turn();
+  h.send(3, 'cancel', { target: 2 });
+  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.equal(h.died(), true);
+  assert.equal(h.output.at(-1).id, 3);
 });
 
 test('discovery still terminates on communication failures and incomplete state', async t => {

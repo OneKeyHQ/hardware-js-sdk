@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest import mock
 
-from onekey.ipc import Helper, HelperError, SDK_SOURCE, SDK_VERSION, runtime_command
+from onekey.ipc import DESKTOP_PLATFORMS, Helper, HelperError, SDK_SOURCE, SDK_VERSION, desktop_platform, runtime_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +71,26 @@ class TestHelperIPC(unittest.TestCase):
             generation = helper.generation
             futures = [pool.submit(helper.call, "state", {"number": i}, generation=generation) for i in range(12)]
             self.assertEqual(list(range(12)), [future.result(timeout=5)["number"] for future in futures])
+
+    def test_success_frame_after_cancel_is_dropped(self):
+        def worker():
+            helper = self.make_helper("hang")
+            cancelled = threading.Event()
+
+            def get(*args, **kwargs):
+                cancelled.set()
+                return dict(v=1, generation=helper.generation, id=helper._counter,
+                            ok=True, result={"signed": True})
+
+            with mock.patch.object(helper._messages, "get", side_effect=get):
+                with self.assertRaises(HelperError) as raised:
+                    helper.call("state", {}, timeout=2, cancelled=cancelled)
+            self.assertEqual("CANCELLED", raised.exception.code)
+            self.assertIsNone(helper.generation)
+            self.assertIsNone(helper.process)
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            pool.submit(worker).result(timeout=5)
 
     def test_cancel_during_pending_request(self):
         with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -160,6 +180,40 @@ class TestHelperIPC(unittest.TestCase):
                 manifest.write_text(json.dumps(data))
                 with self.assertRaisesRegex(HelperError, "RUNTIME_INVALID"):
                     runtime_command()
+
+    def test_bundle_runtime_is_beside_the_installed_plugin_zip(self):
+        self.assertEqual(DESKTOP_PLATFORMS, ("darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64",
+                                             "win32-arm64", "win32-x64"))
+        target = desktop_platform()
+        self.assertIsNotNone(target)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "onekey-runtime"
+            data = dict(schema=2, mode="bundle", sdkSource=SDK_SOURCE, sdkVersion=SDK_VERSION,
+                        assets={}, platforms={})
+            for name in DESKTOP_PLATFORMS:
+                executable = "node.exe" if name.startswith("win32-") else "node"
+                payload = b"current-node" if name == target else name.encode()
+                path = runtime / "nodes" / name / executable
+                path.parent.mkdir(parents=True)
+                path.write_bytes(payload)
+                data["platforms"][name] = {"node": f"nodes/{name}/{executable}",
+                                           "nodeSha256": hashlib.sha256(payload).hexdigest()}
+            for name in ("entry.cjs", "runtime.cjs", "pin.cjs"):
+                content = name.encode()
+                (runtime / name).write_bytes(content)
+                data["assets"][name] = hashlib.sha256(content).hexdigest()
+            manifest = runtime / "runtime.json"
+            manifest.write_text(json.dumps(data))
+            manifest.with_suffix(".sha256").write_text(hashlib.sha256(manifest.read_bytes()).hexdigest())
+            synthetic = f"{root / 'onekey-0.1.0.zip'}/onekey/ipc.py"
+            current = runtime / "nodes" / target / ("node.exe" if target.startswith("win32-") else "node")
+            with mock.patch.dict(os.environ, {"ONEKEY_ELECTRUM_RUNTIME": ""}):
+                with mock.patch("onekey.ipc.__file__", synthetic):
+                    self.assertEqual(runtime_command()[0], str(current.resolve()))
+                    current.write_bytes(b"tampered")
+                    with self.assertRaisesRegex(HelperError, "RUNTIME_INVALID"):
+                        runtime_command()
 
 
 if __name__ == "__main__":

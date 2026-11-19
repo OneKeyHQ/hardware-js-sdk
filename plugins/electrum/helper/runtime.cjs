@@ -1,6 +1,7 @@
 'use strict';
 
 const MAX_LINE = 1024 * 1024;
+const DISPOSE_BUDGET_MS = 200;
 const LIMIT = 200;
 const INPUT = ['SPENDADDRESS', 'SPENDP2SHWITNESS', 'SPENDWITNESS'];
 const CHANGE = ['PAYTOADDRESS', 'PAYTOP2SHWITNESS', 'PAYTOWITNESS'];
@@ -164,6 +165,11 @@ function der(signature) {
   }
   requireValue(offset === b.length, 'SDK_FAILED');
 }
+function deviceId(value) {
+  if (value == null) return null;
+  string(value);
+  return value;
+}
 function stateResult(s, discovery = false) {
   if (discovery && s?.schemaVersion === 1 && s.protocol === 'V2'
     && ['pro2', 'neo'].includes(s.identity?.deviceType)
@@ -171,9 +177,9 @@ function stateResult(s, discovery = false) {
       || ['bootloader', 'romloader', 'notInitialized', 'backupMode'].includes(s.status?.mode))) return null;
   requireValue(s && s.protocol === 'V2' && s.schemaVersion === 1 && s.status?.initialized === true
     && s.status.mode === 'normal' && ['pro2', 'neo'].includes(s.identity?.deviceType), 'UNSUPPORTED');
-  string(s.identity.deviceId);
+  // A locked Pro2/Neo can omit device_id until openWalletSession unlocks it. serialNo stays the physical id.
   string(s.identity.serialNo);
-  return { deviceId: s.identity.deviceId, serialNo: s.identity.serialNo, model: s.identity.deviceType };
+  return { deviceId: deviceId(s.identity.deviceId), serialNo: s.identity.serialNo, model: s.identity.deviceType };
 }
 function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVersion = '1.2.10') {
   let dead = false;
@@ -190,14 +196,30 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
     if (Buffer.byteLength(line) > MAX_LINE) { die(); return; }
     write(line);
   };
-  function die() {
+  let sessionGeneration = generation;
+  function die(ack) {
     if (dead) return;
     dead = true;
+    // Reject anything still queued before waiting on transport cleanup.
+    sessionGeneration = null;
     active.forEach(a => clearTimeout(a.timer));
-    // Cancel/dispose are best effort; the owner terminates the process, bounding native I/O too.
+    active.clear();
+    pending.length = 0;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      const reply = ack && typeof ack === 'object' && ack.ok === true ? ack : undefined;
+      if (reply) {
+        const line = `${JSON.stringify({ v: 1, generation, ...reply })}\n`;
+        if (Buffer.byteLength(line) <= MAX_LINE) write(line);
+      }
+      fatal();
+    };
+    const timer = setTimeout(finish, DISPOSE_BUDGET_MS);
+    if (typeof timer.unref === 'function') timer.unref();
+    Promise.resolve().then(() => sdk.dispose()).then(finish, finish);
     try { sdk.cancel(); } catch { /* No diagnostics across the boundary. */ }
-    Promise.resolve().then(() => sdk.dispose()).catch(() => {});
-    fatal();
   }
   const call = async promise => {
     const response = await promise;
@@ -238,15 +260,19 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
     const state = stateResult(await call(sdk.getDeviceState(p.connectId, { ...COMMON, scope: 'runtime' })));
     if (m.op === 'state') return state;
     if (m.op === 'open') {
+      // Unlock first. A locked device has no device_id yet; the session result is the one that must.
       const wallet = await call(sdk.openWalletSession(p.connectId, { ...COMMON, mode: p.mode }));
-      requireValue(wallet.protocol === 'V2' && wallet.deviceId === state.deviceId, 'DEVICE_MISMATCH');
+      requireValue(wallet && wallet.protocol === 'V2' && wallet.deviceId, 'DEVICE_MISMATCH');
+      string(wallet.deviceId);
+      if (state.deviceId !== null) requireValue(wallet.deviceId === state.deviceId, 'DEVICE_MISMATCH');
       requireValue(wallet.walletType === (p.mode === 'standard' ? 'standard' : 'hidden'), 'WALLET_MISMATCH');
       const result = { deviceId: wallet.deviceId, serialNo: state.serialNo,
         walletType: wallet.walletType, passphraseState: wallet.passphraseState };
       binding(result);
       return result;
     }
-    requireValue(state.deviceId === p.binding.deviceId && state.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
+    requireValue(state.deviceId !== null && state.deviceId === p.binding.deviceId
+      && state.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
     const walletParams = p.binding.walletType === 'standard'
       ? { useEmptyPassphrase: true } : { passphraseState: p.binding.passphraseState };
     const params = { ...COMMON, ...walletParams, coin: p.coin };
@@ -294,7 +320,26 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
     }
     send({ id, event, token });
   });
-  sdk.on('device-disconnect', () => die());
+  sdk.on('device-disconnect', payload => {
+    const device = payload && typeof payload.device === 'object' ? payload.device : payload;
+    const connectId = device && typeof device.connectId === 'string' ? device.connectId : '';
+    if (!connectId) return;
+    const current = running !== undefined ? active.get(running) : undefined;
+    if (current && current.connectId === connectId) {
+      die();
+      return;
+    }
+    // Another device unplugging must not abort the wallet that is still connected.
+    for (let index = pending.length - 1; index >= 0; index--) {
+      const message = pending[index];
+      if (message.params?.connectId !== connectId) continue;
+      pending.splice(index, 1);
+      const queued = active.get(message.id);
+      if (queued) clearTimeout(queued.timer);
+      active.delete(message.id);
+      send({ id: message.id, ok: false, error: { code: 'SDK_FAILED' } });
+    }
+  });
   function runNext() {
     if (dead || running !== undefined) return;
     const m = pending.shift();
@@ -315,15 +360,16 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
   }
   function receive(m) {
     try {
-      validate(m, generation);
+      validate(m, sessionGeneration);
       requireValue(m.id > highestId);
       highestId = m.id;
       if (m.op === 'cancel') {
         const a = active.get(m.params.target);
         requireValue(a, 'UI_FAILED');
-        if (running === m.params.target) sdk.cancel(a.connectId);
-        send({ id: m.id, ok: true, result: null });
-        die();
+        if (running === m.params.target) {
+          try { sdk.cancel(a.connectId); } catch { /* die() cancels again. */ }
+        }
+        die({ id: m.id, ok: true, result: null });
         return;
       }
       if (m.op === 'ui') {
@@ -360,8 +406,8 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
     }
     if (buffer.length >= MAX_LINE) die();
   });
-  input.on('end', die);
-  input.on('error', die);
+  input.on('end', () => die());
+  input.on('error', () => die());
   return { die };
 }
 module.exports = { serve, validate, der, MAX_LINE };
