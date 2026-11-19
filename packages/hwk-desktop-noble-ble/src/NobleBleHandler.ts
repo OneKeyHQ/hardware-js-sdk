@@ -100,6 +100,7 @@ interface ConnectClaim {
   cancelNative?: () => void;
   /** Connecting by id to a device the scan never saw. */
   directPending?: boolean;
+  linkEstablished?: boolean;
 }
 
 interface DeviceEntry {
@@ -945,7 +946,9 @@ export class NobleBleHandler {
     const timer = setTimeout(() => {
       abandon(
         createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
+          code: claim.linkEstablished
+            ? HardwareErrorCode.BleConnectFailed
+            : HardwareErrorCode.DeviceNotFound,
           message: `connect timed out after ${this._connectTimeoutMs}ms`,
           // A device no scan surfaced is not advertising; the Ledger adapter retries that one.
           params: {
@@ -1089,6 +1092,7 @@ export class NobleBleHandler {
       this._log('info', 'connect.linked', { id, elapsedMs: Date.now() - startedAt });
       await abortIfAbandoned('link');
     }
+    claim.linkEstablished = true;
     const linkedAt = Date.now();
 
     try {

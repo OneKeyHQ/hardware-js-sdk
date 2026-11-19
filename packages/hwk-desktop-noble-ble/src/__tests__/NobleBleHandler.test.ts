@@ -939,7 +939,10 @@ describe('NobleBleHandler connect release', () => {
       () => new Promise(() => undefined)
     );
     const second = handler.connect('id-1', PADDED_PROFILE);
-    const rejected = expect(second).rejects.toThrow(/timed out/);
+    const rejected = expect(second).rejects.toMatchObject({
+      code: HardwareErrorCode.BleConnectFailed,
+      params: { phase: 'connect', timedOut: true },
+    });
     await settle();
     jest.advanceTimersByTime(700);
     await flush();
@@ -1466,7 +1469,10 @@ describe('native link loss', () => {
       dropLinkDuring(peripheral, 'unknown')
     );
     const handler = await scannedHandler(peripheral, 800);
-    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toThrow(/timed out/);
+    await expect(handler.connect('id-1', PADDED_PROFILE)).rejects.toMatchObject({
+      code: HardwareErrorCode.BleConnectFailed,
+      params: { phase: 'connect', timedOut: true },
+    });
   });
 
   test('a connect CoreBluetooth fails for a removed pairing maps to BleBondInvalid', async () => {
