@@ -289,6 +289,32 @@ describe('createCombinedConnector', () => {
     expect(usb.connectCalls).toEqual([]);
   });
 
+  test('an empty BLE scan preserves the known route without trying USB', async () => {
+    const usb = new FakeConnector('usb', []);
+    const ble = new FakeConnector('ble', [device('ble-1')]);
+    const combined = createCombinedConnector([usb, ble]);
+    await combined.searchDevices({ transportType: 'ble' });
+    jest.spyOn(ble, 'searchDevices').mockResolvedValueOnce([]);
+    await expect(combined.searchDevices({ transportType: 'ble' })).resolves.toEqual([]);
+
+    await expect(combined.connect('ble-1')).resolves.toMatchObject({ sessionId: 'ble-1' });
+    expect(usb.connectCalls).toEqual([]);
+    expect(ble.connectCalls).toEqual(['ble-1']);
+  });
+
+  test('an empty USB scan still retires the old USB route', async () => {
+    const ble = new FakeConnector('ble', []);
+    const usb = new FakeConnector('usb', [device('usb-1')]);
+    const combined = createCombinedConnector([ble, usb]);
+    await combined.searchDevices({ transportType: 'usb' });
+    jest.spyOn(usb, 'searchDevices').mockResolvedValueOnce([]);
+    await expect(combined.searchDevices({ transportType: 'usb' })).resolves.toEqual([]);
+
+    await expect(combined.connect('usb-1')).resolves.toMatchObject({ sessionId: 'usb-1' });
+    expect(ble.connectCalls).toEqual(['usb-1']);
+    expect(usb.connectCalls).toEqual(['usb-1']);
+  });
+
   test('connect with no deviceId picks the prioritized (USB) device', async () => {
     const ble = new FakeConnector('ble', [device('ble-1')]);
     const usb = new FakeConnector('usb', [device('usb-1')]);

@@ -15,6 +15,7 @@ import {
   emitDeviceBindingStatus,
   failure,
   isConnectionLost,
+  isHardwareErrorCode,
   isHardwareOperationId,
   isHwkRecoveryHint,
   isUserRefusal,
@@ -102,13 +103,6 @@ import type {
   TronSignedTx,
   UiResponseEvent,
 } from '@onekeyfe/hwk-adapter-core';
-
-// Valid HardwareErrorCode numbers. Used to reject foreign numeric `code`s (e.g.
-// a DOMException's `code: 20` on a WebUSB AbortError) that must NOT be trusted
-// as HardwareErrorCodes — otherwise they leak through as Unknown.
-const KNOWN_HARDWARE_ERROR_CODES = new Set<number>(
-  Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
-);
 
 type NullableCallArg<T> = T | null | undefined;
 
@@ -2916,10 +2910,7 @@ export class TrezorAdapter implements IHardwareWallet {
     // ours — fall through to message-based mapping (transferOut/USBDevice abort
     // → TransportError) so it surfaces as a recognizable, retryable transport
     // error instead of Unknown.
-    const trustedNumericCode =
-      typeof typed.code === 'number' && KNOWN_HARDWARE_ERROR_CODES.has(typed.code)
-        ? typed.code
-        : undefined;
+    const trustedNumericCode = isHardwareErrorCode(typed.code) ? typed.code : undefined;
     const code =
       trustedNumericCode ??
       TrezorAdapter._mapTrezorFailureCode(error) ??

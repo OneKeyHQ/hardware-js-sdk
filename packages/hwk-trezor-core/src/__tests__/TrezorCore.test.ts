@@ -235,6 +235,78 @@ describe('TrezorCore', () => {
     }
   });
 
+  // The vendored transport code would report these by text; the code the byte transport set wins.
+  describe('keeps the error a byte transport threw', () => {
+    const linkDropped = Object.assign(new Error('BLE link dropped during write'), { code: 10101 });
+
+    test('when a v1 continuation read fails', async () => {
+      const responseBytes = buildMessage({
+        name: 'Features',
+        data: {
+          vendor: 'trezor.io',
+          major_version: 2,
+          minor_version: 8,
+          patch_version: 10,
+          label: 'x'.repeat(180),
+        },
+        protocol: protocolV1,
+      });
+      const [, responseChunkHeader] = protocolV1.getHeaders(responseBytes);
+      const [firstChunk] = createChunks(responseBytes, responseChunkHeader, 64);
+      const transport = new MemoryByteTransport([firstChunk]);
+      transport.read = jest
+        .fn<Promise<Buffer>, []>()
+        .mockResolvedValueOnce(firstChunk)
+        .mockRejectedValueOnce(linkDropped);
+      const core = new TrezorCore({ transport, protocol: protocolV1, chunkSize: 64 });
+
+      await expect(core.call('Initialize', {})).rejects.toBe(linkDropped);
+    });
+
+    test.each(['read', 'write'] as const)('when a THP %s fails', async side => {
+      const thpState = new protocolThp.ThpState();
+      thpState.setChannel(Buffer.from('ffff', 'hex'));
+      const transport = new MemoryByteTransport([]);
+      transport[side] = jest.fn().mockRejectedValue(linkDropped);
+      const core = new TrezorCore({ transport, protocol: protocolV2, chunkSize: 64 });
+
+      await expect(
+        core.call('ThpCreateChannelRequest', { nonce: 'cb263fc1c42de1ac' }, { thpState })
+      ).rejects.toBe(linkDropped);
+    });
+  });
+
+  test('reports a terminal disconnect after recovering an internal THP ACK timeout', async () => {
+    jest.useFakeTimers({ doNotFake: ['performance', 'setImmediate'] });
+    try {
+      const thpState = new protocolThp.ThpState();
+      thpState.setChannel(Buffer.from('1234', 'hex'));
+      const disconnected = new Error('link disconnected');
+      const transport = new MemoryByteTransport([]);
+      transport.read = jest
+        .fn()
+        .mockImplementationOnce(
+          (signal?: AbortSignal) =>
+            new Promise((_, reject) => {
+              signal?.addEventListener('abort', () => reject(new Error('internal read aborted')), {
+                once: true,
+              });
+            })
+        )
+        .mockRejectedValue(disconnected);
+      const core = new TrezorCore({ transport, protocol: protocolV2 });
+      const result = core
+        .call('ThpHandshakeInitRequest', { key: '00'.repeat(32) }, { thpState })
+        .catch((error: unknown) => error);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      jest.advanceTimersByTime(10_000);
+      expect(await result).toBe(disconnected);
+      expect(transport.read).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('unwraps THP abort options before forwarding signals to the byte transport', async () => {
     const thpState = new protocolThp.ThpState();
     const responseBytes = Buffer.from(

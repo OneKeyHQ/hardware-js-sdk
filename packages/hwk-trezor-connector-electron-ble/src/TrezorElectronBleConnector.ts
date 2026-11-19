@@ -4,7 +4,7 @@ import {
   TREZOR_SAFE_7_MODEL,
   isTrezorBleDescriptor,
 } from '@onekeyfe/hwk-trezor-adapter';
-import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, createHwkError, isHardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import {
   TrezorConnectorBase,
   type TrezorConnectorBaseOptions,
@@ -23,7 +23,7 @@ import type { ConnectorDevice } from '@onekeyfe/hwk-adapter-core';
 import type { ThirdPartyBleDeviceInfo } from '@onekeyfe/hwk-desktop-noble-ble';
 
 const isStandardHwkError = (error: unknown): error is { code: number } =>
-  typeof (error as { code?: unknown })?.code === 'number';
+  isHardwareErrorCode((error as { code?: unknown })?.code);
 
 export interface TrezorElectronBleConnectorOptions {
   transport?: TrezorElectronBleTransport;
@@ -96,30 +96,14 @@ export class TrezorElectronBleConnector extends TrezorConnectorBase {
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       if (isStandardHwkError(error)) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      // The device wasn't found at all → DeviceNotFound. Otherwise the connect
-      // itself failed: noble drops the real CoreBluetooth reason (hardcodes
-      // "connection failed" / a timeout), so we CANNOT tell a stale bond from an
-      // out-of-range / unresponsive device. Surface one honest, generic
-      // BleConnectFailed instead of guessing a specific cause.
-      if (/device not found/i.test(reason)) {
-        throw createHwkError({
-          code: HardwareErrorCode.DeviceNotFound,
-          message: `Trezor BLE device not found: ${device.connectId}`,
-          params: { connectId: device.connectId, originalError: { message: reason } },
-        });
-      }
-      // cancelPairing abandoned the connect. Reporting that as a connect failure
-      // would tell the user the device is unreachable when they are the one who
-      // stopped it.
-      if (/connect cancelled/i.test(reason)) {
-        throw createHwkError({
-          code: HardwareErrorCode.BlePairingCancelled,
-          message: `Trezor BLE pairing cancelled: ${device.connectId}`,
-          params: { connectId: device.connectId, originalError: { message: reason } },
-        });
-      }
+      // Preserve message-only failures from older preloads and custom transports.
+      const code = /\bdevice not found\b/i.test(reason)
+        ? HardwareErrorCode.DeviceNotFound
+        : /\bconnect cancelled\b/i.test(reason)
+        ? HardwareErrorCode.BlePairingCancelled
+        : HardwareErrorCode.BleConnectFailed;
       throw createHwkError({
-        code: HardwareErrorCode.BleConnectFailed,
+        code,
         message: `Trezor BLE connect failed: ${device.connectId} (${reason})`,
         params: { connectId: device.connectId, originalError: { message: reason } },
       });

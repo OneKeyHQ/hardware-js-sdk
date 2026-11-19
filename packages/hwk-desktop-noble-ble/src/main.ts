@@ -1,8 +1,15 @@
-import { THIRD_PARTY_BLE_CHANNELS } from './constants';
+import { isHardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+
+import { THIRD_PARTY_BLE_CHANNELS, THIRD_PARTY_BLE_IPC_ERROR_TYPE } from './constants';
 import { NobleBleHandler } from './NobleBleHandler';
 
+import type { ThirdPartyBleIpcErrorResponse } from './constants';
 import type { NobleBleHandlerOptions } from './NobleBleHandler';
-import type { ElectronBleConnectOptions, ElectronBleScanOptions } from '@onekeyfe/hwk-adapter-core';
+import type {
+  ConnectorSerializedError,
+  ElectronBleConnectOptions,
+  ElectronBleScanOptions,
+} from '@onekeyfe/hwk-adapter-core';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -31,6 +38,48 @@ export interface ThirdPartyBleSupportHandle {
   handler: NobleBleHandler;
   dispose(): Promise<void>;
   disposeForAppQuit(releaseNoble?: (instance: { stop?(): void }) => void): Promise<void>;
+}
+
+/**
+ * Electron IPC keeps only an Error's message; as data, a `createHwkError`'s code and params
+ * survive. Only those cross, so the renderer rebuilds exactly what the host threw.
+ */
+export function createThirdPartyBleIpcErrorResponse(error: unknown): ThirdPartyBleIpcErrorResponse {
+  const { message, code, params } = (error ?? {}) as Record<string, unknown>;
+  const serialized: ConnectorSerializedError = {
+    message: typeof message === 'string' ? message : 'Unknown error',
+    // A host error's own code (the app's -99999) must not read as a HardwareErrorCode.
+    ...(isHardwareErrorCode(code) ? { code } : {}),
+  };
+  if (params && typeof params === 'object') {
+    try {
+      // IPC structured-clones, which throws on values JSON just drops (a nested function).
+      serialized.params = JSON.parse(JSON.stringify(params)) as Record<string, unknown>;
+    } catch {
+      // A circular params bag costs only the params.
+    }
+  }
+  return { type: THIRD_PARTY_BLE_IPC_ERROR_TYPE, success: false, error: serialized };
+}
+
+/**
+ * Handlers registered through this resolve failures as `ThirdPartyBleIpcErrorResponse`.
+ * Wrap the `ipcMain` that registers with Electron so inner wrappers still see throws, and
+ * pair it with a preload that rethrows `response.error`.
+ */
+export function withThirdPartyBleIpcErrors(ipcMain: IpcMainLike): IpcMainLike {
+  return {
+    handle: (channel, listener) => {
+      ipcMain.handle(channel, async (event, ...args) => {
+        try {
+          return await Promise.resolve(listener(event, ...args));
+        } catch (error) {
+          return createThirdPartyBleIpcErrorResponse(error);
+        }
+      });
+    },
+    removeHandler: channel => ipcMain.removeHandler(channel),
+  };
 }
 
 const DEFAULT_IPC_MAIN: () => IpcMainLike = () => {

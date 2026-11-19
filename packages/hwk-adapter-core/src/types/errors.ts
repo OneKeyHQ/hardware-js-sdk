@@ -100,8 +100,9 @@ export enum HardwareErrorCode {
   ThpPairingFailed = 10306,
   /**
    * The OS-level BLE bond is stale/invalid, so the device rejected link
-   * encryption: Android GATT_INSUF_AUTHENTICATION (status 5) or iOS "Peer
-   * removed pairing information". Happens after the device is wiped/re-flashed
+   * encryption: Android GATT_INSUF_AUTHENTICATION (status 5), CoreBluetooth
+   * "Peer removed pairing information" (CBError 14, iOS and macOS), or a bond
+   * Windows still holds that the device refuses. Happens after the device is wiped/re-flashed
    * or unpaired elsewhere while the host still holds an old bond. The SDK cannot
    * remove an OS bond — the user must forget the device in system Bluetooth
    * settings and re-pair. Distinct from BlePairingTimeout (SMP window) and
@@ -117,12 +118,11 @@ export enum HardwareErrorCode {
    */
   ThpPairingRequired = 10308,
   /**
-   * Generic BLE connect failure where the OS dropped the specific reason. On
-   * macOS the noble native binding hardcodes "connection failed" (and a connect
-   * timeout) and discards the CoreBluetooth NSError, so the SDK cannot tell a
-   * stale bond from an out-of-range / unresponsive device. Surfaced as a
+   * Generic BLE connect failure with no identifiable cause, e.g. a timeout or an
+   * OS reason that cannot tell a stale bond from an out-of-range / unresponsive
+   * device. Surfaced as a
    * generic "couldn't connect — check the device, re-pair if paired before".
-   * Distinct from BleBondInvalid (a *known* stale-bond signal, iOS/Android only)
+   * Distinct from BleBondInvalid (a *known* stale-bond signal)
    * and BlePairingTimeout (the SMP bonding window).
    */
   BleConnectFailed = 10309,
@@ -216,6 +216,15 @@ export enum HardwareErrorCode {
   BtcWalletPolicyHmacMismatch = 11300,
   /** 0xb007 Aborted due to unexpected state (malformed PSBT / missing UTXO). */
   BtcUnexpectedState = 11301,
+}
+
+const HARDWARE_ERROR_CODES = new Set<number>(
+  Object.values(HardwareErrorCode).filter((value): value is number => typeof value === 'number')
+);
+
+/** DOMExceptions and host errors carry numeric `code`s too (0, 20, -99999); only ours count. */
+export function isHardwareErrorCode(code: unknown): code is HardwareErrorCode {
+  return typeof code === 'number' && HARDWARE_ERROR_CODES.has(code);
 }
 
 /**

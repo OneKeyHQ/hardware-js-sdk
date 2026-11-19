@@ -1,4 +1,4 @@
-import { HardwareErrorCode, createHwkError } from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, createHwkError, isHardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import {
   type TrezorDebugLogLevel,
   type TrezorDebugLogger,
@@ -71,7 +71,7 @@ const transportError = (message: string): Error =>
   createHwkError({ code: HardwareErrorCode.TransportError, message });
 
 const isStandardHwkError = (error: unknown): error is Error & { code: number } =>
-  error instanceof Error && typeof (error as { code?: unknown })?.code === 'number';
+  error instanceof Error && isHardwareErrorCode((error as { code?: unknown })?.code);
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
