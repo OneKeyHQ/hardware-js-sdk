@@ -22,6 +22,7 @@ const object = (value, keys) => {
 };
 const string = (value, max = 256) => {
   requireValue(typeof value === 'string' && value.length > 0 && value.length <= max);
+  // eslint-disable-next-line no-control-regex -- reject ASCII controls, including NUL
   requireValue(!/[\x00-\x1f\x7f]/.test(value));
 };
 const uint = (value, max = 0xffffffff) => {
@@ -31,6 +32,11 @@ const hex = (value, max, size) => {
   requireValue(typeof value === 'string' && value.length <= max && /^(?:[a-f0-9]{2})*$/.test(value));
   if (size !== undefined) requireValue(value.length === size);
 };
+// Electrum's wallet-file key, m/4541509'/1112098098'. xpub only; not an account path.
+const STORAGE_ENCRYPTION_PATH = [0x80000000 + 4541509, 0x80000000 + 1112098098];
+const isStorageEncryptionPath = value => Array.isArray(value)
+  && value.length === STORAGE_ENCRYPTION_PATH.length
+  && value.every((n, index) => n === STORAGE_ENCRYPTION_PATH[index]);
 const path = (value, coin, scriptType) => {
   requireValue(Array.isArray(value) && (value.length === 3 || value.length === 5));
   value.forEach(n => uint(n));
@@ -134,7 +140,9 @@ function validate(m, generation) {
       binding(p.binding);
       requireValue(p.coin === 'Bitcoin' || p.coin === 'Testnet');
       if (m.op === 'sign') signParams(p);
-      else {
+      else if (m.op === 'xpub' && isStorageEncryptionPath(p.path)) {
+        requireValue(p.scriptType === 'SPENDADDRESS');
+      } else {
         path(p.path, p.coin, p.scriptType);
         requireValue(INPUT.includes(p.scriptType));
         if (m.op === 'address') requireValue(p.path.length === 5);

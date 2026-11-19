@@ -100,10 +100,39 @@ test('schema rejects unknown methods, extra fields, sessions, oversized and inva
   malformed.push(envelope(1, 'sign', badTx));
   for (const message of malformed) assert.throws(() => validate(message, generation));
   validate(envelope(1, 'sign', txParams()), generation);
+  const encryption = [0x80000000 + 4541509, 0x80000000 + 1112098098];
+  for (const coin of ['Bitcoin', 'Testnet']) {
+    validate(envelope(1, 'xpub', { ...bound, coin, path: encryption, scriptType: 'SPENDADDRESS' }), generation);
+  }
+  for (const params of [
+    { ...bound, path: encryption, scriptType: 'SPENDWITNESS' },
+    { ...bound, path: [encryption[0], encryption[1], 0x80000000], scriptType: 'SPENDADDRESS' },
+    { ...bound, path: [encryption[0]], scriptType: 'SPENDADDRESS' },
+    { ...bound, path: [encryption[0], encryption[1] + 1], scriptType: 'SPENDADDRESS' },
+    { ...bound, path: [4541509, 1112098098], scriptType: 'SPENDADDRESS' },
+  ]) assert.throws(() => validate(envelope(1, 'xpub', params), generation));
+  assert.throws(() => validate(envelope(1, 'address', {
+    ...bound, path: encryption, scriptType: 'SPENDADDRESS' }), generation));
+  const signed = txParams();
+  signed.inputs[0].address_n = encryption;
+  assert.throws(() => validate(envelope(1, 'sign', signed), generation));
   const h = harness();
   h.input.write('x'.repeat(MAX_LINE));
   await turn();
   assert.equal(h.died(), true);
+});
+
+test('storage encryption xpub is forwarded', async t => {
+  const h = await ready(t);
+  const encryption = [0x80000000 + 4541509, 0x80000000 + 1112098098];
+  h.send(2, 'xpub', { ...bound, path: encryption, scriptType: 'SPENDADDRESS' });
+  await turn();
+  const call = h.sdk.calls.find(c => c[0] === 'xpub');
+  assert.deepEqual(call[3].path, encryption);
+  assert.equal(call[3].scriptType, 'SPENDADDRESS');
+  assert.equal(call[3].showOnOneKey, false);
+  assert.equal(h.output.at(-1).ok, true);
+  assert.equal(h.died(), false);
 });
 
 test('one queue serializes operations across devices; UI reply penetrates a waiting call', async t => {
