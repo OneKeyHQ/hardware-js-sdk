@@ -519,4 +519,12 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'moneroKeyImageSync' }),
   moneroSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'moneroSignTransaction' }),
+  starknetGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'starknetGetPublicKey' }),
+  starknetGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'starknetGetAddress' }),
+  starknetSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'starknetSignTransaction' }),
+  starknetExportPrivacyViewingKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'starknetExportPrivacyViewingKey' }),
 });
