@@ -22,6 +22,24 @@ In order to be able to use new features of onekey-firmware you need to update pr
 
 The same task can be run from the repository root with `yarn update-protobuf`. The Protocol V2 schema requires the `firmware-pro2` submodule checked out on branch `main`.
 
+## CSP-safe protobuf runtime (`@bufbuild/protobuf`)
+
+Transport initialization uses `parseTransportConfigure` (and `parseConfigure`) backed
+by `@bufbuild/protobuf` descriptor registries, avoiding `protobufjs` runtime code
+generation (`new Function` / `eval`) in strict CSP environments such as Chrome MV3
+extensions.
+
+Run these commands from the repository root:
+
+```sh
+yarn --cwd packages/hd-transport test --runInBand --coverage=false static-protobuf
+yarn --cwd packages/hd-transport build
+yarn --cwd packages/hd-transport test:static-csp
+```
+
+The differential and boundary tests compare `@bufbuild/protobuf` encoding/decoding
+byte-for-byte against `protobufjs` using synthetic data without connecting to hardware.
+
 ## Docs
 
 Documentation is available [Hardware SDK Getting Started](https://developer.onekey.so/en/hardware-sdk/getting-started)

@@ -1,7 +1,6 @@
-const ProtoBuf = require('protobufjs/light');
-
 const { encode } = require('../src/serialization/protobuf/encode');
 const { decode } = require('../src/serialization/protobuf/decode');
+const { parseConfigure } = require('../src/serialization/protobuf/messages');
 
 const HDNodeType = {
   fields: {
@@ -508,7 +507,7 @@ const fixtures = [
 describe('Real messages', () => {
   fixtures.forEach(f => {
     describe(f.name, () => {
-      const Messages = ProtoBuf.Root.fromJSON({
+      const Messages = parseConfigure({
         nested: { messages: { nested: { ...f.message } } },
       });
       const Message = Messages.lookup(`messages.${f.name}`);

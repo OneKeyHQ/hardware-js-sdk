@@ -34,7 +34,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
-const { parseConfigure, ProtocolV1, check } = transport;
+const { parseTransportConfigure, ProtocolV1, check } = transport;
 
 declare global {
   interface Window {
@@ -98,9 +98,9 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
  * after a Protocol V1 GetFeatures timeout by probing Protocol V2 Ping.
  */
 export default class ElectronBleTransport {
-  private _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  private _messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
-  private _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  private _messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   private protocolV2SchemaConfiguration: string | undefined;
 
@@ -322,7 +322,7 @@ export default class ElectronBleTransport {
   }
 
   configure(signedData: any) {
-    this._messages = parseConfigure(signedData);
+    this._messages = parseTransportConfigure(signedData);
     this.configured = true;
   }
 
@@ -333,7 +333,7 @@ export default class ElectronBleTransport {
     }
 
     const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
-    this._messagesV2 = parseConfigure(signedData);
+    this._messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaConfiguration = configuration;
     if (isReconfiguration) {
       this.protocolV2Links

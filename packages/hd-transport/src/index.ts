@@ -1,12 +1,10 @@
-import * as protobuf from 'protobufjs/light';
-import Long from 'long';
-
 import {
   createMessageFromName,
   createMessageFromType,
   decodeProtobuf,
   encodeProtobuf,
   parseConfigure,
+  parseTransportConfigure,
 } from './serialization';
 import { PROTOCOL_V2_SYS_MESSAGE_THRESHOLD, ProtocolV1, ProtocolV2 } from './protocols';
 import * as protocolV2Codec from './protocols/v2';
@@ -24,9 +22,6 @@ import {
   withProtocolTimeout,
 } from './protocols/v2/session';
 import * as check from './utils/highlevel-checks';
-
-protobuf.util.Long = Long;
-protobuf.configure();
 
 export type {
   Transport,
@@ -46,6 +41,13 @@ export type {
   TransportDeviceDisconnectEvent,
 } from './types';
 
+export type {
+  ProtobufEnumType,
+  ProtobufFieldInfo,
+  ProtobufMessageType,
+  ProtobufNamespaceJson,
+  ProtobufRoot,
+} from './serialization/protobuf/descriptor';
 export { Messages, TRANSPORT_EVENT } from './types';
 export * from './types/messages';
 export * from './utils/logBlockCommand';
@@ -63,6 +65,7 @@ export * from './protocols/v2/usb-transport-base';
 export default {
   check,
   parseConfigure,
+  parseTransportConfigure,
   protocolV2: protocolV2Codec,
   ProtocolV1,
   ProtocolV2,

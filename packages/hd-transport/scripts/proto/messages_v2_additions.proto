@@ -1,0 +1,18 @@
+// Additive snapshot: OneKeyHQ/firmware-pro2 @ eef41b96f29da705f52c07722c1028de8690c576.
+// Extracted from sys/protobuf/onekey_protocol/latest/messages_device_control.proto
+// and messages_uiview.proto. Keep existing pinned definitions and reject collisions.
+syntax = "proto2";
+
+enum DeviceSettingsPage {
+  DeviceNameDisplay = 4;
+  DeviceUsbLock = 5;
+  DeviceRandomKeypad = 6;
+  DeviceFido = 7;
+  DeviceAutolock = 8;
+  DeviceAutoshutdown = 9;
+  DeviceBluetooth = 10;
+}
+
+message ViewVerifyPage {
+  optional string multisig_policy = 10;
+}

@@ -22,7 +22,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
 
-const { check, ProtocolV1, parseConfigure } = transport;
+const { check, ProtocolV1, parseTransportConfigure } = transport;
 
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
@@ -69,9 +69,9 @@ function readProtocolV1PayloadLength(data: Uint8Array) {
 }
 
 export default class LowlevelTransport {
-  _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
-  _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   configured = false;
 
@@ -139,7 +139,7 @@ export default class LowlevelTransport {
   }
 
   configure(signedData: any) {
-    const messages = parseConfigure(signedData);
+    const messages = parseTransportConfigure(signedData);
     this.configured = true;
     this._messages = messages;
   }
@@ -151,7 +151,7 @@ export default class LowlevelTransport {
     }
 
     const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
-    this._messagesV2 = parseConfigure(signedData);
+    this._messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaConfiguration = configuration;
 
     if (isReconfiguration) {

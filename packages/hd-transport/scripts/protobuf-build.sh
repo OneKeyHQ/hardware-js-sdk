@@ -88,13 +88,34 @@ npx pbjs -t json -p "$DIST_PATH" -o "$DIST_PATH/messages.json" --keep-case "$V1_
 cp "$DIST_PATH/messages.json" "$CORE_MESSAGES_DIR/messages.json"
 
 echo "=== Building Protocol V2 messages ==="
-SRC_PRO2_LEGACY="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol/legacy"
-SRC_PRO2_LATEST="$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol/latest"
+SRC_PRO2_ROOT="${PROTOBUF_FIRMWARE_PRO2_DIR:-$REPO_ROOT/submodules/firmware-pro2/sys/protobuf/onekey_protocol}"
+SRC_PRO2_LEGACY="$SRC_PRO2_ROOT/legacy"
+SRC_PRO2_LATEST="$SRC_PRO2_ROOT/latest"
 
 if [[ ! -d "$SRC_PRO2_LEGACY" || ! -d "$SRC_PRO2_LATEST" ]]; then
     echo "firmware-pro2 protobuf schema is missing"
     exit 1
 fi
+
+V2_LEGACY_PROTOS=()
+while IFS= read -r proto; do
+    V2_LEGACY_PROTOS+=("$SRC_PRO2_LEGACY/$proto")
+done < <(node - "$SRC_PRO2_LEGACY" <<'NODE'
+const fs = require('fs');
+// Match the existing firmware declaration order without depending on host collation.
+const key = name => name.replace(/[^a-z0-9]/g, '');
+const files = fs.readdirSync(process.argv[2])
+  .filter(name => /^messages.*\.proto$/.test(name) && name !== 'messages.proto')
+  .sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+process.stdout.write(`${files.join('\n')}\n`);
+NODE
+)
+# The pinned firmware predates the Zcash contract already exported by the SDK.
+if [[ ! -f "$SRC_PRO2_LEGACY/messages_zcash.proto" ]]; then
+    V2_LEGACY_PROTOS+=("$PARENT_PATH/proto/messages_zcash.proto")
+fi
+# Keep chain declarations before wire metadata for stable built-in schema signatures.
+V2_LEGACY_PROTOS+=("$SRC_PRO2_LEGACY/messages.proto")
 
 {
     echo 'syntax = "proto2";'
@@ -102,7 +123,7 @@ fi
     echo ''
     grep -hv \
         -e '^import ' -e '^syntax' -e '^package' -e 'option java_' \
-        "$SRC_PRO2_LEGACY"/messages*.proto \
+        "${V2_LEGACY_PROTOS[@]}" \
         | sed 's/ hw\.onekey\.messages\.[a-zA-Z_]*\./ /g' \
         | sed 's/ crypto\./ /g' \
         | sed 's/ ethereum_definitions\./ /g' \
@@ -155,6 +176,8 @@ fs.writeFileSync(protoPath, proto);
 NODE
 
 npx pbjs -t json -p "$PARENT_PATH" -o "$PACKAGE_ROOT/messages-protocol-v2.json" --keep-case "$V2_TMP_PROTO"
+node "$PARENT_PATH/protobuf-zcash.js" "$PACKAGE_ROOT/messages-protocol-v2.json"
+node "$PARENT_PATH/protobuf-v2-additions.js" "$PACKAGE_ROOT/messages-protocol-v2.json"
 cp "$PACKAGE_ROOT/messages-protocol-v2.json" "$CORE_MESSAGES_DIR/messages-protocol-v2.json"
 
 echo "generating type definitions for: $LANG"

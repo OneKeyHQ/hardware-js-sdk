@@ -1,0 +1,194 @@
+import ByteBuffer from 'bytebuffer';
+import Long from 'long';
+
+import v1 from '@onekeyfe/hd-core/src/data/messages/messages.json';
+import v2 from '../messages-protocol-v2.json';
+import {
+  createMessageFromName,
+  parseConfigure,
+  parseTransportConfigure,
+} from '../src/serialization/protobuf/messages';
+import { encode } from '../src/serialization/protobuf/encode';
+import { decode } from '../src/serialization/protobuf/decode';
+
+describe('@bufbuild/protobuf boundary semantics', () => {
+  const v1Root = parseTransportConfigure(v1);
+  const v2Root = parseTransportConfigure(v2);
+
+  test('preserves empty byte entries in repeated bytes fields (e.g. multisig signatures)', () => {
+    const { Message } = createMessageFromName(v1Root, 'TxAck');
+    const encoded = encode(Message, {
+      tx: {
+        inputs: [
+          {
+            address_n: [0x80000031, 0x80000000, 0x80000000, 0, 0],
+            prev_hash: '00'.repeat(32),
+            prev_index: 0,
+            multisig: {
+              pubkeys: [],
+              signatures: ['', 'deadbeef', ''],
+              m: 2,
+            },
+          },
+        ],
+      },
+    });
+    const decoded = decode(Message, encoded);
+    expect(decoded.tx.inputs[0].multisig.signatures).toStrictEqual(['', 'deadbeef', '']);
+  });
+
+  test('decodes 64-bit integers as safe numbers when in range and strings when outside safe range', () => {
+    const root = parseConfigure({
+      nested: {
+        LongBox: {
+          fields: {
+            u64_safe: { id: 1, type: 'uint64' },
+            u64_big: { id: 2, type: 'uint64' },
+            s64_neg: { id: 3, type: 'sint64' },
+            i64_neg_big: { id: 4, type: 'int64' },
+          },
+        },
+      },
+    });
+    const Msg = root.lookupType('LongBox');
+    const encoded = encode(Msg, {
+      u64_safe: 42,
+      u64_big: '18446744073709551615',
+      s64_neg: -123456,
+      i64_neg_big: '-9223372036854775808',
+    });
+    expect(decode(Msg, encoded)).toStrictEqual({
+      u64_safe: 42,
+      u64_big: '18446744073709551615',
+      s64_neg: -123456,
+      i64_neg_big: '-9223372036854775808',
+    });
+  });
+
+  test('throws RangeError on unsafe JS numbers', () => {
+    const { Message } = createMessageFromName(v1Root, 'Ping');
+    const root = parseConfigure({
+      nested: {
+        NumMsg: { fields: { amount: { id: 1, type: 'uint64' } } },
+      },
+    });
+    expect(Message).toBeDefined();
+    expect(() =>
+      encode(root.lookupType('NumMsg'), { amount: Number.MAX_SAFE_INTEGER + 1 })
+    ).toThrow(RangeError);
+  });
+
+  test('decodes absent optional fields as null and empty repeated fields as []', () => {
+    const { Message } = createMessageFromName(v2Root, 'DeviceSession');
+    const encoded = encode(Message, {});
+    expect(decode(Message, encoded)).toStrictEqual({
+      session_id: null,
+      btc_test_address: null,
+      seed_domains: [],
+    });
+  });
+
+  test('throws when a required proto2 field is missing on the wire', () => {
+    const { Message } = createMessageFromName(v2Root, 'ProtocolInfo');
+    expect(() => decode(Message, ByteBuffer.wrap(new Uint8Array([0x08, 0x01])))).toThrow(
+      "missing required 'build_fingerprint'"
+    );
+  });
+
+  test('throws on malformed wire bytes', () => {
+    const { Message } = createMessageFromName(v1Root, 'Features');
+    expect(() => decode(Message, ByteBuffer.wrap(new Uint8Array([0x0a, 0xff, 0xff])))).toThrow();
+  });
+
+  test('matches protobufjs for empty Buffer vs empty string on optional bytes fields', () => {
+    const { Message } = createMessageFromName(v1Root, 'CosiCommit');
+    const withEmptyBuffer = encode(Message, {
+      address_n: [0x80002722, 0x80000000],
+      data: Buffer.alloc(0),
+    });
+    const withEmptyString = encode(Message, {
+      address_n: [0x80002722, 0x80000000],
+      data: '',
+    });
+    const withHexBuffer = encode(Message, {
+      address_n: [0x80002722, 0x80000000],
+      data: Buffer.from('deadbeef', 'hex'),
+    });
+    expect(withEmptyBuffer.toString('hex')).toBe('08a2ce808008088080808008');
+    expect(withEmptyString.toString('hex')).toBe('08a2ce8080080880808080081200');
+    expect(decode(Message, withHexBuffer).data).toBe('deadbeef');
+  });
+
+  test('encodes Long instances, BigInt, and rejects empty string for 64-bit integer fields', () => {
+    const root = parseConfigure({
+      nested: {
+        Int64Box: {
+          fields: {
+            u64: { id: 1, type: 'uint64' },
+            i64: { id: 2, type: 'int64' },
+          },
+        },
+      },
+    });
+    const Msg = root.lookupType('Int64Box');
+    const fromLong = encode(Msg, {
+      u64: Long.fromString('9007199254740993', true),
+      i64: Long.fromString('-9223372036854775808', false),
+    });
+    const fromBigInt = encode(Msg, {
+      u64: BigInt('9007199254740993'),
+      i64: BigInt('-9223372036854775808'),
+    });
+    expect(fromLong.toString('hex')).toBe(fromBigInt.toString('hex'));
+    expect(decode(Msg, fromLong)).toStrictEqual({
+      u64: '9007199254740993',
+      i64: '-9223372036854775808',
+    });
+    expect(() => encode(Msg, { u64: '' })).toThrow('empty string');
+  });
+
+  test('encodes enums from either string name or numeric id and decodes singular as name vs repeated as numbers', () => {
+    const { Message: GetAddress } = createMessageFromName(v1Root, 'GetAddress');
+    const byName = encode(GetAddress, { script_type: 'SPENDWITNESS' });
+    const byNumber = encode(GetAddress, { script_type: 3 });
+    expect(byName.toString('hex')).toBe('2803');
+    expect(byNumber.toString('hex')).toBe('2803');
+    expect(decode(GetAddress, byName).script_type).toBe('SPENDWITNESS');
+
+    const { Message: DeviceSession } = createMessageFromName(v2Root, 'DeviceSession');
+    const session = encode(DeviceSession, { seed_domains: [1, 2] });
+    expect(decode(DeviceSession, session).seed_domains).toStrictEqual([1, 2]);
+  });
+
+  test('handles 4-byte emoji UTF-8 and numeric coercion on string fields', () => {
+    const { Message: Ping } = createMessageFromName(v1Root, 'Ping');
+    const emoji = encode(Ping, { message: '🚀中文hello' });
+    expect(decode(Ping, emoji).message).toBe('🚀中文hello');
+
+    const numeric = encode(Ping, { message: 12345 });
+    expect(decode(Ping, numeric).message).toBe('12345');
+  });
+
+  test('preserves Features singular enum strings and repeated capabilities numbers for Core capability checks', () => {
+    const { Message: Features } = createMessageFromName(v1Root, 'Features');
+    const encoded = encode(Features, {
+      vendor: 'onekey.so',
+      capabilities: [1, 5, 17],
+      backup_type: 'Bip39',
+      safety_checks: 'Strict',
+      onekey_device_type: 'CLASSIC1S',
+    });
+    const decoded = decode(Features, encoded);
+    expect(decoded.capabilities).toStrictEqual([1, 5, 17]);
+    expect(decoded.backup_type).toBe('Bip39');
+    expect(decoded.safety_checks).toBe('Strict');
+    expect(decoded.onekey_device_type).toBe('CLASSIC1S');
+
+    const { Message: Failure } = createMessageFromName(v1Root, 'Failure');
+    const failEncoded = encode(Failure, { code: 4, message: 'Cancelled' });
+    expect(decode(Failure, failEncoded)).toStrictEqual({
+      code: 'Failure_ActionCancelled',
+      message: 'Cancelled',
+    });
+  });
+});

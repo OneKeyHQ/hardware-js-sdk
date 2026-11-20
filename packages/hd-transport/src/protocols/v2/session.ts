@@ -16,7 +16,7 @@ import { ProtocolV2 } from '..';
 import * as check from '../../utils/highlevel-checks';
 import { LogBlockCommand } from '../../utils/logBlockCommand';
 
-import type { Root } from 'protobufjs/light';
+import type { ProtobufRoot } from '../../serialization/protobuf/descriptor';
 import type {
   MessageFromOneKey,
   ProtocolV2FileWritePipeline,
@@ -26,8 +26,8 @@ import type {
 export * from './errors';
 
 export type ProtocolV2Schemas = {
-  protocolV1: Root;
-  protocolV2: Root;
+  protocolV1: ProtobufRoot;
+  protocolV2: ProtobufRoot;
 };
 
 export type ProtocolV2CallContext = {

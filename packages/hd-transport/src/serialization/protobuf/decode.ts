@@ -1,107 +1,128 @@
+import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
+import { ScalarType, fromBinary, isFieldSet } from '@bufbuild/protobuf';
+// eslint-disable-next-line import/no-unresolved, camelcase
+import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
 
-import { isPrimitiveField } from '../../utils/protobuf';
+import type { DescMessage, Message } from '@bufbuild/protobuf';
+import type { ProtobufMessageType } from './descriptor';
 
-import type { Field, Message, Type } from 'protobufjs/light';
+const is64BitScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT64 ||
+  scalar === ScalarType.UINT64 ||
+  scalar === ScalarType.SINT64 ||
+  scalar === ScalarType.FIXED64 ||
+  scalar === ScalarType.SFIXED64;
 
-const transform = (field: Field, value: any) => {
-  // [compatibility]: optional undefined keys should be null. Example: Features.fw_major.
-  if (field?.optional && typeof value === 'undefined') {
-    return null;
-  }
-
-  if (field?.type === 'bytes') {
-    return ByteBuffer.wrap(value).toString('hex');
-    // return value.toString('hex');
-  }
-
-  // [compatibility]
-  // it is likely that we can remove this right away because trezor-connect tests don't ever trigger this condition
-  // we should probably make sure that trezor-connect treats following protobuf types as strings: int64, uint64, sint64, fixed64, sfixed64
-  if (field?.long) {
-    if (Number.isSafeInteger(value.toNumber())) {
-      // old trezor-link behavior https://github.com/trezor/trezor-link/blob/9c200cc5608976cff0542484525e98c753ba1888/src/lowlevel/protobuf/message_decoder.js#L80
-      return value.toNumber();
+const decodeScalar = (scalar: ScalarType, value: unknown): unknown => {
+  if (scalar === ScalarType.BYTES) {
+    if (value instanceof Uint8Array) {
+      return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('hex');
     }
-    // otherwise return as string
-    return value.toString();
+    return ByteBuffer.wrap(value as ArrayBuffer).toString('hex');
+  }
+
+  if (is64BitScalar(scalar)) {
+    const bigVal = typeof value === 'bigint' ? value : BigInt(String(value));
+    const numVal = Number(bigVal);
+    if (Number.isSafeInteger(numVal) && BigInt(numVal) === bigVal) {
+      return numVal;
+    }
+    return bigVal.toString();
   }
 
   return value;
 };
 
-function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['fields']) {
-  // get rid of Message.prototype references
-  const { ...message } = Message;
-  const res: { [key: string]: any } = {};
-
-  Object.keys(fields).forEach(key => {
-    const field = fields[key];
-    // @ts-ignore
-    const value = message[key];
-
-    if (value == null) {
-      if (field.optional) {
-        res[key] = null;
+function assertRequiredFields(desc: DescMessage, decoded: Message): void {
+  const record = decoded as unknown as Record<string, unknown>;
+  for (const field of desc.fields) {
+    if (field.fieldKind === 'list') {
+      if (field.listKind === 'message') {
+        const list = record[field.localName];
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            assertRequiredFields(field.message, item as Message);
+          }
+        }
       }
-      return;
-    }
-
-    /* istanbul ignore else  */
-    if (field.repeated) {
-      /* istanbul ignore else  */
-      if (isPrimitiveField(field.type)) {
-        res[key] = value.map((v: any) => transform(field, v));
-      }
-      // [compatibility]: keep array enums as array of numbers.
-      else if ('valuesById' in field.resolvedType!) {
-        res[key] = value;
-      } else if ('fields' in field.resolvedType!) {
-        res[key] = value.map((v: any) => messageToJSON(v, (field.resolvedType as Type).fields));
-      } else {
-        throw new Error(`case not handled for repeated key: ${key}`);
-      }
-    } else if (isPrimitiveField(field.type)) {
-      res[key] = transform(field, value);
-    }
-    // enum type
-    else if ('valuesById' in field.resolvedType!) {
-      res[key] = field.resolvedType.valuesById[value];
-    }
-    // message type
-    else if (field.resolvedType!.fields) {
-      // [compatibility]: absent optional sub-messages are not own properties
-      // of the decoded instance, so value is undefined here; decode them to
-      // null, matching the optional primitive-field convention above.
-      res[key] = value == null ? null : messageToJSON(value, (field.resolvedType as Type).fields);
     } else {
-      throw new Error(`case not handled: ${key}`);
+      if (field.proto.label === FieldLabel.REQUIRED && !isFieldSet(decoded, field)) {
+        throw new Error(`missing required '${field.name}'`);
+      }
+      if (field.fieldKind === 'message' && isFieldSet(decoded, field)) {
+        const sub = record[field.localName];
+        if (sub != null) {
+          assertRequiredFields(field.message, sub as Message);
+        }
+      }
     }
-  });
+  }
+}
+
+function messageToJSON(desc: DescMessage, decoded: Message): Record<string, unknown> {
+  const record = decoded as unknown as Record<string, unknown>;
+  const res: Record<string, unknown> = {};
+
+  for (const field of desc.fields) {
+    const isOptional = field.fieldKind !== 'list' && field.proto.label !== FieldLabel.REQUIRED;
+
+    if (field.fieldKind === 'list') {
+      const list = record[field.localName];
+      if (!Array.isArray(list) || list.length === 0) {
+        res[field.name] = [];
+      } else if (field.listKind === 'scalar') {
+        res[field.name] = list.map(v => decodeScalar(field.scalar, v));
+      } else if (field.listKind === 'enum') {
+        // [compatibility]: keep array enums as array of numbers.
+        res[field.name] = [...list];
+      } else if (field.listKind === 'message') {
+        res[field.name] = list.map(v => messageToJSON(field.message, v as Message));
+      }
+    } else if (!isFieldSet(decoded, field)) {
+      if (isOptional) {
+        res[field.name] = null;
+      }
+    } else {
+      const value = record[field.localName];
+      if (value == null) {
+        if (isOptional) {
+          res[field.name] = null;
+        }
+      } else if (field.fieldKind === 'scalar') {
+        res[field.name] = decodeScalar(field.scalar, value);
+      } else if (field.fieldKind === 'enum') {
+        res[field.name] = field.enum.value[value as number]?.name;
+      } else if (field.fieldKind === 'message') {
+        res[field.name] = messageToJSON(field.message, value as Message);
+      }
+    }
+  }
 
   return res;
 }
 
-export const decode = (Message: Type, data: ByteBuffer) => {
+export const decode = (
+  messageType: ProtobufMessageType,
+  data: ByteBuffer
+): Record<string, unknown> => {
   const buff = data.toBuffer();
   const a = new Uint8Array(buff);
 
-  let decoded;
+  let decoded: Message;
   try {
-    decoded = Message.decode(a);
+    decoded = fromBinary(messageType.desc, a);
+    assertRequiredFields(messageType.desc, decoded);
   } catch (error) {
     // Fix a battery_level problem with the device
     if (a.length > 1 && a[a.length - 1] === 0xff) {
       a[a.length - 1] = 0x04;
-      decoded = Message.decode(a);
+      decoded = fromBinary(messageType.desc, a);
+      assertRequiredFields(messageType.desc, decoded);
     } else {
       throw error;
     }
   }
 
-  // [compatibility]: in the end it should be possible to get rid of messageToJSON method and call
-  // Message.toObject(decoded) to return result as plain javascript object. This method should be able to do
-  // all required conversions (for example bytes to hex) but we can't use it at the moment for compatibility reasons
-  // for example difference between enum decoding when [enum] vs enum
-  return messageToJSON(decoded, decoded.$type.fields);
+  return messageToJSON(messageType.desc, decoded);
 };
