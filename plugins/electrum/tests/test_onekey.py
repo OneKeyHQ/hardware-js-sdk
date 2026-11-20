@@ -469,6 +469,53 @@ class TestOneKeyClient(unittest.TestCase):
         self.assertEqual("SPENDADDRESS", sent["scriptType"])
         self.assertEqual(BINDING, sent["binding"])
 
+    def test_storage_unlock_asks_again_without_replacing_the_open_wallet(self):
+        client, helper, handler = self.make_client()
+        account_xpub = self.public_key()
+        standard = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
+                        walletType="standard", passphraseState=None)
+        client.binding = dict(standard)
+        client.account = ([0x80000054, 0x80000000, 0x80000000], "p2wpkh", account_xpub)
+        client.device_id = STATE["deviceId"]
+        client.root_fingerprint = "01020304"
+        encryption_xpub = self.encryption_xpub()
+        helper.call.side_effect = [
+            dict(BINDING), dict(xpub=encryption_xpub, rootFingerprint=0xAABBCCDD),
+            dict(xpub=encryption_xpub, rootFingerprint=None),
+        ]
+        client.begin_storage_unlock_selection()
+        path = get_derivation_used_for_hw_device_encryption()
+        self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
+        self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
+        handler.choose_wallet.assert_called_once()
+        self.assertEqual(["state", "open", "xpub", "xpub"], [call.args[0] for call in helper.call.call_args_list])
+        self.assertEqual(BINDING, helper.call.call_args_list[2].args[1]["binding"])
+        self.assertEqual(standard, helper.call.call_args_list[3].args[1]["binding"])
+        self.assertEqual(standard, client.binding)
+        self.assertEqual(account_xpub, client.account[2])
+        self.assertEqual(STATE["deviceId"], client.device_id)
+        self.assertEqual("01020304", client.root_fingerprint)
+        self.assertFalse(client._unlock_selection)
+        client.plugin.remember_wallet_binding.assert_not_called()
+
+    def test_cancelled_storage_unlock_keeps_the_open_wallet(self):
+        client, helper, handler = self.make_client()
+        standard = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
+                        walletType="standard", passphraseState=None)
+        account = ([0x80000054, 0x80000000, 0x80000000], "p2wpkh", self.public_key())
+        client.binding = dict(standard)
+        client.account = account
+        handler.choose_wallet.side_effect = UserCancelled()
+        client.begin_storage_unlock_selection()
+        with self.assertRaises(UserCancelled):
+            client.get_xpub(get_derivation_used_for_hw_device_encryption(), "standard")
+        self.assertEqual(standard, client.binding)
+        self.assertEqual(account, client.account)
+        self.assertFalse(client.closed)
+        self.assertFalse(client._unlock_selection)
+        helper.shutdown.assert_not_called()
+        self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list))
+
     def test_storage_encryption_can_select_a_wallet_without_becoming_the_account(self):
         client, helper, handler = self.make_client()
         encryption_xpub = self.encryption_xpub()

@@ -39,7 +39,7 @@ class Plugin(OneKeyPlugin, QtPluginBase):
             "onekey_start": {"gui": WCScriptAndDerivation},
             "onekey_xpub": {"gui": WCOneKeyXPub},
             "onekey_not_initialized": {"gui": WCHWUninitialized},
-            "onekey_unlock": {"gui": WCHWUnlock},
+            "onekey_unlock": {"gui": WCOneKeyUnlock},
         })
 
 
@@ -79,6 +79,16 @@ class OneKeyQtHandler(QtHandlerBase):
                 self._wallet_choice = "standard"
         finally:
             self._wallet_choice_done.set()
+
+
+class WCOneKeyUnlock(WCHWUnlock):
+    def on_ready(self):
+        # Decrypting an existing file must not reuse a wallet already open on this device.
+        _name, info = self.wizard_data["hardware_device"]
+        client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False)
+        if client is not None:
+            client.begin_storage_unlock_selection()
+        super().on_ready()
 
 
 class WCOneKeyXPub(WCHWXPub):

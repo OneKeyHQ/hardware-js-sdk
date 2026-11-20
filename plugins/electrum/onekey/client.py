@@ -84,6 +84,7 @@ class OneKeyClient(HardwareClientBase):
         self.closed = False
         self._released = False
         self._fresh_selection = False
+        self._unlock_selection = False
         try:
             state = self._call("state", {"connectId": path})
             self._check_state(state)
@@ -130,7 +131,7 @@ class OneKeyClient(HardwareClientBase):
             self.handler.show_message(text, on_cancel=self.cancelled.set)
 
     @contextmanager
-    def flow(self):
+    def flow(self, *, close_on_error=True):
         if self.handler is None:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
         self.cancelled.clear()
@@ -138,7 +139,8 @@ class OneKeyClient(HardwareClientBase):
         try:
             yield
         except BaseException:
-            self.close()
+            if close_on_error:
+                self.close()
             raise
         finally:
             self.handler.finished()
@@ -179,6 +181,12 @@ class OneKeyClient(HardwareClientBase):
         if self.closed:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
         self._fresh_selection = True
+
+    def begin_storage_unlock_selection(self):
+        # One-shot. The next wallet-file decryption asks again and then restores the account binding.
+        if self.closed:
+            raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+        self._unlock_selection = True
 
     @runs_in_hwd_thread
     def bind_keystore(self, keystore):
@@ -296,10 +304,25 @@ class OneKeyClient(HardwareClientBase):
             return False
 
     def _storage_encryption_xpub(self, path):
-        # Same selected wallet, but this node must not replace the account or its binding.
-        with self.flow():
-            self._select_wallet()
-            return self._xpub(path, "standard")
+        # Account encryption keeps the wallet just selected. Opening an encrypted file asks again,
+        # and that answer is not stored on the client used by another wallet.
+        force = self._unlock_selection
+        self._unlock_selection = False
+        saved = (self.binding, self.account, self.device_id, self.root_fingerprint)
+        try:
+            with self.flow(close_on_error=not force):
+                if force:
+                    self.binding = None
+                    self.account = None
+                self._select_wallet()
+                return self._xpub(path, "standard")
+        except BaseException:
+            if force and self.closed:
+                self.close()
+            raise
+        finally:
+            if force and not self.closed:
+                self.binding, self.account, self.device_id, self.root_fingerprint = saved
 
     @runs_in_hwd_thread
     def get_xpub(self, bip32_path, xtype):
