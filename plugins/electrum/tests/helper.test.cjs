@@ -390,6 +390,33 @@ test('locked device restores a saved wallet without open and checks the unlocked
   assert.equal(main[3].passphraseState, undefined);
 });
 
+test('a cached device id is checked again after the call', async t => {
+  for (const [op, params, leaked] of [
+    ['xpub', xpubParams, 'synthetic-xpub'],
+    ['address', { ...xpubParams, path: [...account, 0, 0] }, 'synthetic-address'],
+    ['sign', txParams(), '3006020101020101'],
+  ]) {
+    for (const revealed of ['other-device', null]) {
+      const h = await ready(t);
+      let reads = 0;
+      h.sdk.getDeviceState = async (id, stateParams) => {
+        h.sdk.calls.push(['state', id, stateParams]);
+        reads += 1;
+        return ok({ schemaVersion: 1, protocol: 'V2',
+          identity: { deviceId: reads === 1 ? identity.deviceId : revealed,
+            serialNo: identity.serialNo, deviceType: 'pro2' },
+          status: { initialized: true, mode: 'normal', unlocked: reads === 1 } });
+      };
+      h.send(2, op, params); await turn();
+      assert.equal(h.output.at(-1).ok, false);
+      assert.equal(h.output.at(-1).error.code, 'DEVICE_MISMATCH');
+      assert.equal(JSON.stringify(h.output).includes(leaked), false);
+      assert.equal(h.sdk.calls.some(c => c[0] === op && c[2] === identity.deviceId), true);
+      assert.equal(h.died(), true);
+    }
+  }
+});
+
 test('locked device does not return an xpub when unlock reveals a different device', async t => {
   const h = await ready(t);
   h.sdk.getDeviceState = async (id, params) => {

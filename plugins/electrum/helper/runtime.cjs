@@ -282,7 +282,8 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
     requireValue(state.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
     // A locked device omits device_id. Passing the saved id makes Core reject the
     // call before useDevicePassphraseState can unlock and restore the wallet.
-    // An empty id skips that pre-check. The refreshed state is the identity check.
+    // An empty id skips that pre-check. A cached id can also survive a locked
+    // status, so the id after the call is the one that has to match.
     if (state.deviceId !== null) requireValue(state.deviceId === p.binding.deviceId, 'DEVICE_MISMATCH');
     const locked = state.deviceId === null;
     const deviceId = locked ? '' : state.deviceId;
@@ -290,7 +291,6 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
       ? { useEmptyPassphrase: true } : { passphraseState: p.binding.passphraseState };
     const params = { ...COMMON, ...walletParams, coin: p.coin };
     const confirmIdentity = async () => {
-      if (!locked) return;
       const refreshed = stateResult(await call(sdk.getDeviceState(p.connectId, { ...COMMON, scope: 'runtime' })));
       requireValue(refreshed.deviceId === p.binding.deviceId
         && refreshed.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
