@@ -1672,15 +1672,16 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     }
 
     try {
+      // Initialize aborts on-device setup; protocol probing must remain read-only.
       const response = await this.callProtocolV1(
         path,
-        this.identityProbe ? 'GetFeatures' : 'Initialize',
+        'GetFeatures',
         {},
         {
           timeoutMs: PROTOCOL_V1_PROBE_TIMEOUT,
         }
       );
-      return !this.identityProbe || response.type === 'Features';
+      return response.type === 'Features';
     } catch (error) {
       if (this.isWebUsbIoHardwareError(error)) throw error;
       return false;
