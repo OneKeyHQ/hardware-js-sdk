@@ -5,6 +5,9 @@
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
   "main": "dist/index.js",
+  "browser": {
+    "@onekeyfe/hd-transport-usb": false
+  },
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
@@ -15,10 +18,13 @@
   },
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
-    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js && node scripts/check-bundle.mjs",
     "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0"
   },
   "dependencies": {
     "@onekeyfe/hd-core": "1.2.11-alpha.2",

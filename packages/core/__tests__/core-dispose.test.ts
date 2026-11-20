@@ -4,6 +4,10 @@ import Core, { init, initConnector, initCore, switchTransport } from '../src/cor
 import DataManager from '../src/data-manager/DataManager';
 import TransportManager from '../src/data-manager/TransportManager';
 import { DevicePool } from '../src/device/DevicePool';
+import { UI_EVENT, UI_RESPONSE } from '../src/events';
+
+import type { CoreContext } from '../src/core';
+import type { UiPromiseResponse } from '../src/events/ui-promise';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0-test'),
@@ -13,6 +17,162 @@ jest.mock('../src/data/config', () => ({
 describe('Core.dispose', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  test('a superseded Core cannot handle responses or dispose the current runtime', async () => {
+    const previous = TransportManager.transport;
+    const stop = jest.fn().mockResolvedValue(undefined);
+    const old = initCore();
+    const current = initCore();
+    TransportManager.transport = { stop } as never;
+    const disposePool = jest.spyOn(DevicePool, 'dispose');
+    try {
+      await expect(
+        old.handleMessage({ event: UI_EVENT, type: UI_RESPONSE.RECEIVE_PIN, payload: '' })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.NotInitialized });
+      await old.dispose();
+      expect(stop).not.toHaveBeenCalled();
+      expect(disposePool).not.toHaveBeenCalled();
+      await current.dispose();
+      expect(stop).toHaveBeenCalledTimes(1);
+    } finally {
+      await current.dispose();
+      TransportManager.transport = previous;
+    }
+  });
+
+  test('disposes old PIN waiters while a new Core can accept its own reply', async () => {
+    const getWaiters = (core: Core) =>
+      (core as unknown as { getCoreContext: () => CoreContext }).getCoreContext().uiPromises;
+    const old = initCore();
+    const oldWaiter = createDeferred<UiPromiseResponse, typeof UI_RESPONSE.RECEIVE_PIN>(
+      UI_RESPONSE.RECEIVE_PIN
+    );
+    getWaiters(old).push(oldWaiter);
+    const rejected = expect(oldWaiter.promise).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.ActionCancelled,
+    });
+    const current = initCore();
+    const currentWaiter = createDeferred<UiPromiseResponse, typeof UI_RESPONSE.RECEIVE_PIN>(
+      UI_RESPONSE.RECEIVE_PIN
+    );
+    getWaiters(current).push(currentWaiter);
+    const reply = { event: UI_EVENT, type: UI_RESPONSE.RECEIVE_PIN, payload: '' } as const;
+    try {
+      await old.dispose();
+      await rejected;
+      await current.handleMessage(reply);
+      await expect(currentWaiter.promise).resolves.toBe(reply);
+    } finally {
+      await current.dispose();
+    }
+  });
+
+  test('a pending transport load cannot stop the transport of a new Core', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const old = initCore();
+    const entered = createDeferred<void>();
+    const loading = createDeferred<new () => unknown>();
+    const stale = jest.fn(() => ({ stop: jest.fn() }));
+    const fresh = { stop: jest.fn() };
+    const loadNext = jest.fn().mockResolvedValue(stale);
+    let current: Core | undefined;
+    const switching = switchTransport({
+      env: 'node-usb',
+      owner: old,
+      loadTransport: () => {
+        entered.resolve();
+        return loading.promise;
+      },
+    });
+    const queued = switchTransport({ env: 'webusb', owner: old, loadTransport: loadNext });
+    const rejections = Promise.all(
+      [switching, queued].map(promise =>
+        expect(promise).rejects.toMatchObject({ errorCode: HardwareErrorCode.NotInitialized })
+      )
+    );
+    try {
+      await entered.promise;
+      expect(loadNext).not.toHaveBeenCalled();
+      await old.dispose();
+      current = initCore();
+      TransportManager.transport = fresh as never;
+      loading.resolve(stale);
+      await rejections;
+      expect(stale).not.toHaveBeenCalled();
+      expect(loadNext).not.toHaveBeenCalled();
+      expect(fresh.stop).not.toHaveBeenCalled();
+    } finally {
+      loading.resolve(stale);
+      await Promise.allSettled([switching, queued, rejections]);
+      await old.dispose();
+      await current?.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
+
+  test('rejects lowlevel without a plugin before stopping the active transport', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const stop = jest.fn();
+    TransportManager.transport = { stop } as never;
+    const core = initCore();
+    const loadTransport = jest.fn();
+    try {
+      await expect(
+        switchTransport({ env: 'lowlevel', owner: core, loadTransport })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.TransportNotConfigured });
+      expect(stop).not.toHaveBeenCalled();
+      expect(loadTransport).not.toHaveBeenCalled();
+      expect(DataManager.settings).toBe(settings);
+    } finally {
+      await core.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
+
+  test('clears the previous plugin when a new lifecycle supplies none', async () => {
+    const previous = TransportManager.transport;
+    const previousPlugin = TransportManager.plugin;
+    const { settings } = DataManager;
+    const plugin = {
+      enumerate: jest.fn(),
+      send: jest.fn(),
+      receive: jest.fn(),
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      init: jest.fn(),
+      version: 'test',
+    };
+    function TestTransport() {
+      return { stop: jest.fn() };
+    }
+    jest.spyOn(DataManager, 'load').mockImplementation(next => {
+      DataManager.settings = next;
+      return Promise.resolve();
+    });
+    const old = await init({ ...settings, env: 'lowlevel' }, TestTransport, plugin);
+    let current: Core | undefined;
+    try {
+      expect(TransportManager.plugin).toBe(plugin);
+      current = await init({ ...settings, env: 'webusb' }, TestTransport);
+      expect(TransportManager.plugin).toBeNull();
+      await switchTransport({ env: 'lowlevel', Transport: TestTransport, plugin });
+      expect(TransportManager.plugin).toBe(plugin);
+      await old?.dispose();
+      expect(TransportManager.plugin).toBe(plugin);
+      await current?.dispose();
+      expect(TransportManager.plugin).toBeNull();
+    } finally {
+      await old?.dispose();
+      await current?.dispose();
+      TransportManager.transport = previous;
+      TransportManager.plugin = previousPlugin;
+      DataManager.settings = settings;
+    }
   });
 
   test('幂等停止 Connector 和 Transport，并重置共享设备状态', async () => {

@@ -1,7 +1,7 @@
 import DataManager from '../src/data-manager/DataManager';
 import { parseConnectSettings } from '../src/data-manager/connectSettings';
 
-import type { RemoteConfigResponse } from '../src/types';
+import type { ConnectSettings, RemoteConfigResponse } from '../src/types';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
@@ -54,6 +54,48 @@ describe('parseConnectSettings', () => {
     });
 
     await expect(DataManager.load(settings)).resolves.toBe(false);
+    expect(mockAxiosGet).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'keeps the config fetch receiver with cancellation=%s',
+    async cancellable => {
+      const configFetcher = jest.fn(function (this: ConnectSettings) {
+        return Promise.resolve(this.preRelease ? preloadedConfig : null);
+      });
+      const settings = parseConnectSettings({
+        firmwareManifestMode: 'sdk-managed',
+        preRelease: true,
+        configFetcher,
+      });
+      const signal = cancellable ? new AbortController().signal : undefined;
+      mockAxiosGet.mockClear();
+
+      await expect(DataManager.load(settings, signal)).resolves.toBe(true);
+      expect(configFetcher.mock.contexts).toEqual([settings]);
+      expect(mockAxiosGet).not.toHaveBeenCalled();
+    }
+  );
+
+  it('abandons a pending host fetch without using its response or the fallback', async () => {
+    let deliverConfig!: (config: RemoteConfigResponse) => void;
+    const pendingConfig = new Promise<RemoteConfigResponse>(resolve => {
+      deliverConfig = resolve;
+    });
+    const configFetcher = jest.fn(() => pendingConfig);
+    const controller = new AbortController();
+    const loading = DataManager.load(
+      parseConnectSettings({ firmwareManifestMode: 'sdk-managed', configFetcher }),
+      controller.signal
+    );
+
+    expect(configFetcher).toHaveBeenCalledTimes(1);
+    controller.abort();
+    await expect(loading).resolves.toBe(false);
+    const currentConfig = DataManager.deviceMap;
+    deliverConfig(preloadedConfig);
+    await pendingConfig;
+    expect(DataManager.deviceMap).toBe(currentConfig);
     expect(mockAxiosGet).not.toHaveBeenCalled();
   });
 });
