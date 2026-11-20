@@ -1,7 +1,7 @@
 import semver from 'semver';
 import { get } from 'lodash';
 import BigNumber from 'bignumber.js';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
 
 import { UI_REQUEST } from '../../constants/ui-request';
@@ -10,11 +10,13 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
 import { existCapability } from '../../utils/capabilitieUtils';
+import { LoggerNames, getLogger } from '../../utils/logger';
 import {
   DeviceModelToTypes,
   type EthereumSignTypedDataMessage,
   type EthereumSignTypedDataTypes,
 } from '../../types';
+import { getEIP712Hashes } from './eip712Hash';
 import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash';
 import { shouldUseLegacyV1EvmMessages } from './protocol';
 import { signTypedHash } from './latest/signTypedHash';
@@ -54,6 +56,25 @@ const MINI_MAX_NAME_LENGTH = 63;
 const MINI_MAX_DYNAMIC_VALUE_BYTES = 1536;
 const MINI_MAX_ARRAY_TYPE_FIELDS = 24;
 const MINI_MAX_ARRAY_ELEMENTS = 24;
+const PRO_MAX_DYNAMIC_VALUE_BYTES = 1536;
+
+const Log = getLogger(LoggerNames.Method);
+
+// OneKey Pro firmware rejects a typed-data value above MAX_VALUE_BYTE_SIZE with
+// wire.DataError("Invalid length, bigger than 1536"), surfaced by Core as
+// "Failure_DataError,Invalid length, bigger than 1536". The memory patterns are
+// defensive: some Pro firmware builds fail before reaching the size validation.
+const PRO_TYPED_DATA_OVERFLOW_PATTERNS = [
+  /Invalid length, bigger than \d+/i,
+  /\b(?:not enough memory|out of memory|memory\s*error)\b/i,
+  /\b(?:memory allocation|alloc(?:ation)?)\s+failed\b/i,
+  /\bfailed to allocate\b/i,
+];
+
+const isProTypedDataOverflowError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return PRO_TYPED_DATA_OVERFLOW_PATTERNS.some(pattern => pattern.test(message));
+};
 
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
   getSupportedProtocols() {
@@ -552,6 +573,82 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return true;
   }
 
+  isOneKeyPro() {
+    return this.device.getCurrentDeviceType() === EDeviceType.Pro;
+  }
+
+  private hasProOversizedValue(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+    const walkValue = (typeName: string, value: unknown): boolean => {
+      if (value == null) return false;
+
+      if (/\[[0-9]*\]$/.test(typeName)) {
+        if (!Array.isArray(value)) return false;
+        const { entryTypeName } = parseArrayType(typeName);
+        return value.some(entry => walkValue(entryTypeName, entry));
+      }
+
+      if (typeName === 'string' || typeName === 'bytes') {
+        // Match the bytes sent in EthereumTypedDataValueAckOneKey, not JSON size.
+        return encodeData(typeName, value).length / 2 > PRO_MAX_DYNAMIC_VALUE_BYTES;
+      }
+
+      if (typeof value === 'object' && item.types[typeName]) {
+        return item.types[typeName].some(({ name, type }) =>
+          walkValue(type, (value as Record<string, unknown>)[name])
+        );
+      }
+
+      return false;
+    };
+
+    return (
+      walkValue('EIP712Domain', item.domain) || walkValue(item.primaryType as string, item.message)
+    );
+  }
+
+  /**
+   * Known oversized Pro values take the typed-hash route before requesting
+   * structured signing. Keep one retry for firmware overflow or memory errors
+   * not predicted by the size check. Only Pro is retried here: Touch is outside
+   * this issue's scope and Pro2/Neo have their own Protocol V2 routing. Any other
+   * failure (cancel, PIN, disconnect) is rethrown.
+   */
+  async signTypedDataWithTypedHashFallback() {
+    try {
+      return await this.signTypedData();
+    } catch (error) {
+      if (!isProTypedDataOverflowError(error)) {
+        throw error;
+      }
+
+      Log.error(
+        'EIP-712 structured signing was rejected by OneKey Pro firmware, retrying with typed hash',
+        error
+      );
+
+      let hashes;
+      try {
+        hashes = getEIP712Hashes(this.params.data, this.params.metamaskV4Compat);
+      } catch (hashError) {
+        // Keep the original firmware failure when this payload cannot produce a
+        // typed-hash digest, so the caller is not misled by a hashing error.
+        Log.error('Unable to compute EIP-712 hashes for typed-hash fallback', hashError);
+        throw error;
+      }
+
+      const response = await this.signTypedHash({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN: this.params.addressN,
+        domainHash: formatAnyHex(hashes.domainHash),
+        messageHash:
+          hashes.messageHash === undefined ? undefined : formatAnyHex(hashes.messageHash),
+        chainId: this.params.chainId,
+      });
+
+      return response.message;
+    }
+  }
+
   async run() {
     if (!this.device.features) {
       throw ERRORS.TypedError(
@@ -607,14 +704,29 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       return Promise.resolve(response.message);
     }
 
-    // Touch Pro Sign NestedArrays
-    if (this.hasNestedArrays(this.params.data) || this.hasBiggerData(this.params.data)) {
-      validateParams(this.params, [
-        { name: 'domainHash', type: 'hexString', required: true },
-        { name: 'messageHash', type: 'hexString', required: true },
-      ]);
+    const proHasOversizedValue =
+      this.isOneKeyPro() &&
+      semver.gte(this.device.getCurrentFirmwareVersionString() ?? '0.0.0', '4.2.0') &&
+      this.hasProOversizedValue(this.params.data);
 
-      const { domainHash, messageHash } = this.params;
+    // Touch Pro Sign NestedArrays
+    if (
+      proHasOversizedValue ||
+      this.hasNestedArrays(this.params.data) ||
+      this.hasBiggerData(this.params.data)
+    ) {
+      let { domainHash, messageHash } = this.params;
+      if (proHasOversizedValue) {
+        const hashes = getEIP712Hashes(this.params.data, this.params.metamaskV4Compat);
+        domainHash = formatAnyHex(hashes.domainHash);
+        messageHash =
+          hashes.messageHash === undefined ? undefined : formatAnyHex(hashes.messageHash);
+      } else {
+        validateParams(this.params, [
+          { name: 'domainHash', type: 'hexString', required: true },
+          { name: 'messageHash', type: 'hexString', required: true },
+        ]);
+      }
 
       if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
 
@@ -630,6 +742,9 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     }
 
     // For Touch、Pro we use EthereumSignTypedData
+    if (this.isOneKeyPro()) {
+      return this.signTypedDataWithTypedHashFallback();
+    }
     return this.signTypedData();
   }
 }

@@ -142,6 +142,25 @@ than repeating the message predicate.
 Map once inside the selected system. Do not translate between `hd-core` and `hwk` inside the SDK,
 and do not reclassify an already canonical error from its fallback message.
 
+### Stale Host Bond After A Device Reset
+
+A device wipe removes the device-side bond while the host keeps the old one, so the next pairing
+must surface a re-pair signal rather than a generic connect timeout:
+
+- iOS and macOS `CBErrorDomain` 14 (`peer removed pairing information`) maps to
+  `BlePeerRemovedPairingInformation` (719).
+- A Windows GATT pairing/authentication failure on a device this process already used over an
+  encrypted link maps to `BleBondInvalid` (724); the first pairing failure maps to
+  `BleDeviceBondError` (715); an explicit user cancel maps to `BleDeviceBondedCanceled` (718).
+- A Windows pairing that never produces a notification is a pairing failure, not a silent success,
+  and tears down the half-paired link.
+- Core treats 715, 718, 719, and 724 as terminal for the `ensureConnected` poll: retrying cannot
+  repair the bond and the App owns the re-pair dialog.
+
+On iOS a connect that follows a scan sighting within 15 s gets an 8 s native connect budget
+(`IOS_PRESENT_DEVICE_CONNECT_TIMEOUT_MS`) so an answer that arrives just after the old 3 s budget
+is not lost. The sighting is spent once; an absent device keeps the short budget.
+
 ## Cross-Runtime Transport
 
 The legacy Core response path uses `serializeError()` through `createResponseMessage()`. HWK

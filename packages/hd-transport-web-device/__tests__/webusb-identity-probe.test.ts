@@ -911,7 +911,7 @@ describe('WebUSB identity probe ownership', () => {
   );
 
   test.each([false, true])(
-    'uses a read-only V1 probe only for isolated discovery (%s)',
+    'keeps repeated V1 probes read-only during on-device setup (%s)',
     async identityProbe => {
       const probe = new WebUsbTransport(identityProbe);
       const internals = probe as unknown as {
@@ -929,7 +929,11 @@ describe('WebUSB identity probe ownership', () => {
         .spyOn(internals, 'callProtocolV1')
         .mockResolvedValue({ type: 'Features', message: {} });
       await expect(internals.probeProtocolV1('USB_PATH')).resolves.toBe(true);
-      expect(call.mock.calls[0][1]).toBe(identityProbe ? 'GetFeatures' : 'Initialize');
+      await expect(internals.probeProtocolV1('USB_PATH')).resolves.toBe(true);
+      expect(call).toHaveBeenCalledTimes(2);
+      expect(call.mock.calls.map(([, name]) => name)).toEqual(['GetFeatures', 'GetFeatures']);
+      call.mockResolvedValue({ type: 'Failure', message: {} });
+      await expect(internals.probeProtocolV1('USB_PATH')).resolves.toBe(false);
     }
   );
 });

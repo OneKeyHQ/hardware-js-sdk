@@ -1166,4 +1166,58 @@ describe('DeviceCommands cancellation', () => {
       jest.useRealTimers();
     }
   });
+
+  it('skips transport.cancel on dispose(false) and scopes dispose(true) to mainId', async () => {
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(TransportManager, 'getTransport').mockReturnValue({
+      cancel,
+    } as unknown as DeviceCommands['transport']);
+    const device = Device.fromDescriptor({
+      id: 'device-a',
+      path: 'device-a',
+      name: 'OneKey Pro 2',
+      debug: false,
+      commType: 'ble',
+      protocolType: 'V2',
+    });
+
+    const commandsA = new DeviceCommands(device, 'device-a');
+    await commandsA.dispose(false);
+    expect(commandsA.disposed).toBe(true);
+    expect(cancel).not.toHaveBeenCalled();
+
+    const commandsB = new DeviceCommands(device, 'device-b');
+    await commandsB.dispose(true);
+    expect(commandsB.disposed).toBe(true);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledWith('device-b');
+  });
+
+  it('does not call transport.cancel during normal Device.release()', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const cancel = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(TransportManager, 'getTransport').mockReturnValue({
+      cancel,
+    } as unknown as DeviceCommands['transport']);
+    const device = Device.fromDescriptor({
+      id: 'device-a',
+      path: 'device-a',
+      name: 'OneKey Pro 2',
+      debug: false,
+      commType: 'ble',
+      protocolType: 'V2',
+    });
+    device.mainId = 'device-a';
+    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+    const release = jest.fn().mockResolvedValue(true);
+    device.deviceConnector = { release, disconnect: jest.fn() } as never;
+    const commands = new DeviceCommands(device, 'device-a');
+    device.commands = commands;
+
+    await device.release();
+
+    expect(commands.disposed).toBe(true);
+    expect(release).toHaveBeenCalledWith('device-a', false, false);
+    expect(cancel).not.toHaveBeenCalled();
+  });
 });

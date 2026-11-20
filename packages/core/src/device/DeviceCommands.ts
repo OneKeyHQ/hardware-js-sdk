@@ -221,10 +221,12 @@ export class DeviceCommands {
     Log.debug(`[DeviceCommands] Created: ${this.instanceId}, device: ${this.device.instanceId}`);
   }
 
-  async dispose(_cancelRequest: boolean) {
+  async dispose(cancelRequest: boolean) {
     this.disposed = true;
     this.disposalToken = {};
-    await this.transport.cancel?.();
+    if (cancelRequest) {
+      await this.transport.cancel?.(this.mainId);
+    }
   }
 
   checkDisposed() {

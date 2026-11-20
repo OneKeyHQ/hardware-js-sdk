@@ -140,6 +140,11 @@ describe('Core 错误输出边界', () => {
   test.each([
     HardwareErrorCode.BleDeviceNotBonded,
     HardwareErrorCode.BleDeviceBondedCanceled,
+    // A host bond that outlived a device wipe cannot be repaired by another
+    // connect poll; the App needs the code to offer re-pair guidance.
+    HardwareErrorCode.BleDeviceBondError,
+    HardwareErrorCode.BlePeerRemovedPairingInformation,
+    HardwareErrorCode.BleBondInvalid,
     HardwareErrorCode.BleDeviceDisconnected,
     HardwareErrorCode.PollingTimeout,
     HardwareErrorCode.BlePoweredOff,

@@ -1,6 +1,7 @@
 import { DevicePool } from '../src/device/DevicePool';
 import { Device } from '../src/device/Device';
 import { DEVICE } from '../src/events';
+import TransportManager from '../src/data-manager/TransportManager';
 
 jest.mock('../src/data/config', () => ({
   getSDKVersion: jest.fn(() => '1.0.0'),
@@ -15,6 +16,104 @@ describe('DevicePool state lifecycle', () => {
   afterEach(() => {
     DevicePool.dispose();
   });
+
+  test.each([false, true])(
+    'reads V1 discovery state without restarting on-device setup (cached: %s)',
+    async cached => {
+      const descriptor = {
+        path: 'classic-usb',
+        id: 'classic-usb',
+        name: 'Classic 1S',
+        commType: 'webusb' as const,
+        protocolType: 'V1' as const,
+        debug: false,
+      };
+      const device = Device.fromDescriptor(descriptor);
+      let onDeviceSetupActive = true;
+      const initialize = jest.spyOn(device, 'initialize').mockImplementation(() => {
+        onDeviceSetupActive = false;
+        return Promise.resolve();
+      });
+      const readFeatures = jest.spyOn(device, 'getFeatures').mockImplementation(() => {
+        device.features = {
+          protocol: 'V1',
+          deviceType: 'classic',
+          deviceId: 'classic-identity',
+          serialNo: descriptor.path,
+          initialized: false,
+          mode: 'notInitialized',
+        } as NonNullable<Device['features']>;
+        return Promise.resolve(device.features);
+      });
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      jest.spyOn(device, 'connect').mockResolvedValue(true);
+      jest.spyOn(device, 'acquire').mockResolvedValue(true);
+      const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
+      const reconfigure = jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
+      if (cached) DevicePool.devicesCache = { [descriptor.path]: device };
+
+      try {
+        for (let scan = 0; scan < 2; scan++) {
+          const result = await DevicePool.getDevices([descriptor], descriptor.path, {
+            forceProtocolDetection: true,
+            refreshRuntimeState: true,
+          });
+          expect(result.deviceList).toEqual([device]);
+        }
+        expect(onDeviceSetupActive).toBe(true);
+        expect(initialize).not.toHaveBeenCalled();
+        expect(readFeatures).toHaveBeenCalledTimes(2);
+        expect(reconfigure).toHaveBeenCalledWith(device.features);
+        expect(reconfigure).toHaveBeenCalledTimes(2);
+        expect(release).toHaveBeenCalledTimes(2);
+        expect(device.toMessageObject()).toMatchObject({
+          deviceId: 'classic-identity',
+          mode: 'notInitialized',
+          features: { initialized: false },
+        });
+        await device.run(() => Promise.resolve());
+        expect(initialize).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    }
+  );
+
+  test.each(['features', 'schema'] as const)(
+    'releases V1 discovery after a failed %s read without sending Initialize',
+    async failureStage => {
+      const device = new Device({
+        path: 'classic-usb',
+        id: 'classic-usb',
+        name: 'Classic 1S',
+        commType: 'webusb',
+        protocolType: 'V1',
+        debug: false,
+      });
+      const readError = new Error('discovery failed');
+      jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+      jest.spyOn(device, 'connect').mockResolvedValue(true);
+      const initialize = jest.spyOn(device, 'initialize').mockResolvedValue(undefined);
+      const readFeatures = jest.spyOn(device, 'getFeatures').mockResolvedValue(undefined);
+      const reconfigure = jest.spyOn(TransportManager, 'reconfigure').mockResolvedValue(undefined);
+      if (failureStage === 'features') readFeatures.mockRejectedValue(readError);
+      else reconfigure.mockRejectedValue(readError);
+      const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
+
+      try {
+        await expect(
+          DevicePool.getDevices([device.originalDescriptor], 'classic-usb', {
+            forceProtocolDetection: true,
+            refreshRuntimeState: true,
+          })
+        ).rejects.toBe(readError);
+        expect(initialize).not.toHaveBeenCalled();
+        expect(release).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    }
+  );
 
   test('refreshes runtime state for a cached Protocol V2 discovery result', async () => {
     const descriptor = { path: 'pro2-path', protocolType: 'V2' } as any;
@@ -71,15 +170,25 @@ describe('DevicePool state lifecycle', () => {
       return Promise.resolve(true);
     });
     const initialize = jest.spyOn(device, 'initialize').mockResolvedValue(undefined);
+    const getFeatures = jest.spyOn(device, 'getFeatures');
+    const getDeviceState = jest.spyOn(device, 'getDeviceState').mockResolvedValue({
+      status: { mode: 'normal' },
+    } as Awaited<ReturnType<Device['getDeviceState']>>);
     const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
     DevicePool.devicesCache = { 'cached-id': device };
 
     const result = await DevicePool.getDevices([descriptor], 'cached-id', {
       forceProtocolDetection: true,
+      refreshRuntimeState: true,
     });
 
     expect(acquire).toHaveBeenCalledWith(undefined, { forceProtocolDetection: true });
-    expect(initialize).toHaveBeenCalledWith({ forceProtocolDetection: true });
+    expect(initialize).toHaveBeenCalledWith({
+      forceProtocolDetection: true,
+      refreshRuntimeState: true,
+    });
+    expect(getFeatures).not.toHaveBeenCalled();
+    expect(getDeviceState).toHaveBeenCalledTimes(2);
     expect(release).toHaveBeenCalledTimes(1);
     expect(device.originalDescriptor.protocolType).toBe('V2');
     expect(result.deviceList).toEqual([device]);

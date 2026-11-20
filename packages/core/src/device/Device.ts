@@ -1623,7 +1623,7 @@ export class Device extends EventEmitter {
 
   async interruptionFromOutside() {
     if (this.commands) {
-      await this.commands.dispose(false);
+      await this.commands.dispose(true);
     }
     if (this.runPromise) {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside));

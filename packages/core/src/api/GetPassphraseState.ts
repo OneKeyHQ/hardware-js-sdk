@@ -40,6 +40,9 @@ export default class GetPassphraseState extends BaseMethod {
         ? {
             onlyMainPin: this.payload.useEmptyPassphrase === true,
             initSession: this.payload.initSession === true,
+            ...(typeof this.payload.deriveCardano === 'boolean'
+              ? { deriveCardano: this.payload.deriveCardano }
+              : {}),
           }
         : undefined
     );

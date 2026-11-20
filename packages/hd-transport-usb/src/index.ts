@@ -554,7 +554,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     return check.call(jsonData);
   }
 
-  cancel() {
+  cancel(_session?: string) {
     this.cancelled = true;
   }
 

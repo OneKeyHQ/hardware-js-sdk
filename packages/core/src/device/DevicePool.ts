@@ -4,6 +4,7 @@ import EventEmitter from 'events';
 import { Device } from './Device';
 import { DEVICE } from '../events';
 import { LoggerNames, getLogger } from '../utils';
+import TransportManager from '../data-manager/TransportManager';
 
 import type { InitOptions } from './Device';
 import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
@@ -193,7 +194,13 @@ export class DevicePool extends EventEmitter {
         });
       }
       try {
-        await device.initialize(initOptions);
+        if (initOptions?.refreshRuntimeState && !device.isProtocolV2()) {
+          // Discovery must not abort an on-device creation or recovery workflow.
+          await device.getFeatures();
+          await TransportManager.reconfigure(device.features);
+        } else {
+          await device.initialize(initOptions);
+        }
         if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
           await this._refreshProtocolV2DiscoveryState(device);
         }

@@ -91,6 +91,53 @@ const BLE_WRITE_DELAY_MS = 5;
 const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 
+const isSilentWindowsPairingNoResponse = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const candidate = error as { errorCode?: unknown; params?: unknown };
+  const code = candidate.errorCode;
+  if (code !== HardwareErrorCode.BleDeviceBondError && code !== HardwareErrorCode.BleBondInvalid) {
+    return false;
+  }
+  const { params } = candidate;
+  if (!params || typeof params !== 'object') {
+    return false;
+  }
+  const { phase, platform, stage, reason, nativeErrorMessage } = params as Record<string, unknown>;
+  if (phase !== 'pairing' || platform !== 'win32' || stage !== 'write') {
+    return false;
+  }
+  if (typeof nativeErrorMessage === 'string' && nativeErrorMessage.length > 0) {
+    return false;
+  }
+  return reason === 'pairing_no_response' || reason === 'stale_bond';
+};
+
+const shouldRethrowProtocolProbeError = (error: unknown, isLastProbe = false): boolean => {
+  if (isProtocolV2LinkDisabledError(error)) {
+    return true;
+  }
+  // A Windows write loop that received no notification without any native error
+  // happens when a V2-only device ignores the initial V1 probe; allow fallback
+  // to the alternate protocol on the same link. Confirmed pairing errors carry
+  // native evidence and remain terminal. If this is the last remaining probe,
+  // preserve the silent 715/724 so Core can show re-pair instead of retrying
+  // TransportProtocolProbeFailed.
+  if (isSilentWindowsPairingNoResponse(error)) {
+    return isLastProbe;
+  }
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  // Pairing-recovery and cancel failures are not protocol mismatches; preserve
+  // them instead of falling through to another probe or ProbeFailed.
+  return (
+    code === HardwareErrorCode.BleDeviceBondError ||
+    code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BlePeerRemovedPairingInformation ||
+    code === HardwareErrorCode.BleBondInvalid
+  );
+};
+
 /**
  * Desktop Electron BLE transport with automatic Protocol V1/V2 detection.
  *
@@ -617,13 +664,16 @@ export default class ElectronBleTransport {
 
     for (let i = 0; i < probeOrder.length; i += 1) {
       const protocol = probeOrder[i];
+      const isLastProbe = i === probeOrder.length - 1;
       if (i > 0) {
         // Keep the physical BLE link while switching probes. Reconnecting here can
         // summon a second OS pairing prompt for a device that is still onboarding.
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
       }
       const detected =
-        protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+        protocol === 'V1'
+          ? await this.probeProtocolV1(uuid, isLastProbe)
+          : await this.probeProtocolV2(uuid, undefined, isLastProbe);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
@@ -675,7 +725,7 @@ export default class ElectronBleTransport {
     }
   }
 
-  private async probeProtocolV1(uuid: string) {
+  private async probeProtocolV1(uuid: string, isLastProbe = false) {
     if (!this._messages) {
       return false;
     }
@@ -689,36 +739,46 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
-      if (isProtocolV2LinkDisabledError(error)) {
+      if (shouldRethrowProtocolProbeError(error, isLastProbe)) {
         throw error;
       }
       return false;
     }
   }
 
-  private async probeProtocolV2(uuid: string, expectedProtocol?: ProtocolType) {
+  private async probeProtocolV2(
+    uuid: string,
+    expectedProtocol?: ProtocolType,
+    isLastProbe = false
+  ) {
     if (!this._messages || !this._messagesV2) {
       return false;
     }
 
     this.deviceProtocol.set(uuid, 'V2');
     this.v2Assemblers.get(uuid)?.reset();
-    const detected = await probeProtocolV2Helper({
-      call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
-      timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
-      logger: this.Log,
-      logPrefix: 'ProtocolV2 BLE',
-      onProbeFailed: () => {
-        this.v2Assemblers.get(uuid)?.reset();
-        this.resetProtocolV2Frames(uuid);
-      },
-      // A declared V2 protocol needs no fallback; preserve the actual link failure.
-      shouldRethrow: error => expectedProtocol === 'V2' || isProtocolV2LinkDisabledError(error),
-    });
-    if (!detected) {
+    try {
+      const detected = await probeProtocolV2Helper({
+        call: (name, data, options) => this.callProtocolV2(uuid, name, data, options),
+        timeoutMs: PROTOCOL_V2_PROBE_TIMEOUT_MS,
+        logger: this.Log,
+        logPrefix: 'ProtocolV2 BLE',
+        onProbeFailed: () => {
+          this.v2Assemblers.get(uuid)?.reset();
+          this.resetProtocolV2Frames(uuid);
+        },
+        // A declared V2 protocol needs no fallback; preserve the actual link failure.
+        shouldRethrow: error =>
+          expectedProtocol === 'V2' || shouldRethrowProtocolProbeError(error, isLastProbe),
+      });
+      if (!detected) {
+        this.clearProbeProtocol(uuid, 'V2');
+      }
+      return detected;
+    } catch (error) {
       this.clearProbeProtocol(uuid, 'V2');
+      throw error;
     }
-    return detected;
   }
 
   private async writeOnce(uuid: string, hexData: string): Promise<void> {
