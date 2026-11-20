@@ -129,6 +129,19 @@ class TestOneKeyPackaging(unittest.TestCase):
             self.assertTrue((destination / "other-1.0.0.zip").is_file())
             self.assertEqual((destination / "onekey-0.0.1.zip.disabled").read_bytes(), b"disabled")
 
+    def test_damaged_zip_does_not_block_removal_of_an_older_onekey_plugin(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            source, destination = self._package(temporary, "{}\n", b"unused")
+            self._named_zip(source / "onekey-0.1.0.zip", "onekey")
+            destination.mkdir()
+            (destination / "aaaa-broken.zip").write_bytes(b"PK\x03\x04not-a-zip")
+            self._named_zip(destination / "onekey-0.0.9.zip", "onekey")
+            install(source, destination)
+            self.assertTrue((destination / "onekey-0.1.0.zip").is_file())
+            self.assertFalse((destination / "onekey-0.0.9.zip").exists())
+            self.assertEqual((destination / "aaaa-broken.zip").read_bytes(), b"PK\x03\x04not-a-zip")
+
     def test_testnet_flag_changes_only_the_default_destination(self):
         with mock.patch.dict(os.environ, {"ELECTRUMDIR": "/tmp/electrum-root"}):
             self.assertEqual(plugins_dir(), Path("/tmp/electrum-root/plugins"))

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 
 def plugins_dir(testnet=False):
@@ -36,7 +36,7 @@ def _manifest_name(path):
     try:
         with ZipFile(path) as archive:
             data = json.loads(archive.read("onekey/manifest.json"))
-    except (OSError, ValueError, KeyError, json.JSONDecodeError):
+    except (OSError, ValueError, KeyError, json.JSONDecodeError, BadZipFile):
         return None
     name = data.get("name") if type(data) is dict else None
     return name if type(name) is str else None

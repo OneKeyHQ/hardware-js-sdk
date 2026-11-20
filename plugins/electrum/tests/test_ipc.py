@@ -222,6 +222,13 @@ class TestHelperIPC(unittest.TestCase):
             with mock.patch.dict(os.environ, {"ONEKEY_ELECTRUM_RUNTIME": ""}):
                 with mock.patch("onekey.ipc.__file__", synthetic), mock.patch("onekey.ipc.__loader__", importer):
                     self.assertEqual(runtime_command()[0], str(current.resolve()))
+                    windows_path = str(archive).replace("/", "\\")
+                    windows_importer = MemoryZipImporter(
+                        archive.read_bytes(), root_name="onekey_pin_win",
+                        prefix="onekey", archive_path=windows_path)
+                    with mock.patch("onekey.ipc.__file__", windows_path + "/onekey/ipc.py"), \
+                            mock.patch("onekey.ipc.__loader__", windows_importer):
+                        self.assertEqual(runtime_command()[0], str(current.resolve()))
                     current.write_bytes(b"tampered")
                     with self.assertRaisesRegex(HelperError, "RUNTIME_INVALID"):
                         runtime_command()

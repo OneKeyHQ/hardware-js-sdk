@@ -67,12 +67,16 @@ def _authorized_runtime_pin():
     pin, or a sibling runtime whose receipt does not match that pin, is refused.
     The pin is read from the in-memory archive, not from the zip path on disk.
     """
-    raw = __file__.replace("\\", "/")
+    raw = __file__
     marker = ".zip/"
-    if marker not in raw:
+    if marker not in raw.replace("\\", "/"):
         return None
     get_data = getattr(__loader__, "get_data", None)
     if not callable(get_data):
+        raise HelperError("RUNTIME_INVALID")
+    # Electrum joins the archive path as-is, then adds "/". Windows archive
+    # paths keep backslashes, and get_data matches that original string.
+    if marker not in raw:
         raise HelperError("RUNTIME_INVALID")
     try:
         payload = get_data(raw.split(marker, 1)[0] + ".zip/onekey/runtime_pin.txt")
