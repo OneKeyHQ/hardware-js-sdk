@@ -127,19 +127,67 @@ def download(url, dest, expected):
 
 def extract_node(archive, member, dest):
     dest.parent.mkdir(parents=True, exist_ok=True)
-    if archive.name.endswith(".zip"):
-        with ZipFile(archive) as zipped:
-            with zipped.open(member) as source, dest.open("wb") as output:
-                shutil.copyfileobj(source, output)
-    else:
-        with tarfile.open(archive, "r:gz") as tar:
-            source = tar.extractfile(member)
-            if source is None:
-                raise RuntimeError("Node archive is missing its executable")
-            with source, dest.open("wb") as output:
-                shutil.copyfileobj(source, output)
+    with _open_archive_member(archive, member) as source, dest.open("wb") as output:
+        shutil.copyfileobj(source, output)
     if not dest.name.endswith(".exe"):
         dest.chmod(0o755)
+
+
+def node_license_member(filename):
+    if filename.endswith(".tar.gz"):
+        stem = filename[:-len(".tar.gz")]
+    elif filename.endswith(".zip"):
+        stem = filename[:-len(".zip")]
+    else:
+        raise RuntimeError("Unexpected Node archive")
+    return stem + "/LICENSE"
+
+
+def _open_archive_member(archive, member):
+    if str(archive).endswith(".zip"):
+        zipped = ZipFile(archive)
+        try:
+            return _ClosingReader(zipped, zipped.open(member))
+        except Exception:
+            zipped.close()
+            raise
+    tar = tarfile.open(archive, "r:gz")
+    source = tar.extractfile(member)
+    if source is None:
+        tar.close()
+        raise RuntimeError("Node archive is missing " + member)
+    return _ClosingReader(tar, source)
+
+
+class _ClosingReader:
+    def __init__(self, parent, source):
+        self.parent = parent
+        self.source = source
+
+    def read(self, size=-1):
+        return self.source.read(size)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        self.close()
+
+    def close(self):
+        self.source.close()
+        self.parent.close()
+
+
+def write_shared_license(bundle, archive, member):
+    # One shared Node license at the runtime root. A platform directory must
+    # stay a single executable or the bundle receipt rejects it.
+    with _open_archive_member(archive, member) as source:
+        text = source.read().decode()
+    if "Copyright Node.js contributors" not in text:
+        raise RuntimeError("Node LICENSE is not the official license")
+    destination = Path(bundle) / "LICENSE"
+    destination.write_text(text)
+    return destination
 
 
 def install_nodes(bundle):
@@ -152,6 +200,8 @@ def install_nodes(bundle):
             digest, name = line.split()
             sums[name] = digest
     cache = PLUGIN / ".cache" / "node-v22.21.1"
+    license_archive = None
+    license_member = None
     for platform_name, filename, member, relative in NODE_TARGETS:
         expected = sums.get(filename)
         if expected is None:
@@ -160,6 +210,12 @@ def install_nodes(bundle):
         log(f"Node {platform_name}: {filename}")
         download(f"{NODE_DIST}/{filename}", archive, expected)
         extract_node(archive, member, bundle / relative)
+        if license_archive is None:
+            license_archive = archive
+            license_member = node_license_member(filename)
+    if license_archive is None:
+        raise RuntimeError("Node LICENSE is not the official license")
+    write_shared_license(bundle, license_archive, license_member)
 
 
 def assemble_bundle(snapshot):

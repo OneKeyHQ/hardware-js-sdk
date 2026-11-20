@@ -76,8 +76,41 @@ class OneKeyPlugin(HW_PluginBase):
     def retain_client(self, client):
         self._live_clients.add(client)
 
+    def _connected_clients(self):
+        get_manager = getattr(self, "device_manager", None)
+        if not callable(get_manager):
+            return None
+        try:
+            clients = getattr(get_manager(), "clients", None)
+        except Exception:
+            return None
+        return clients if isinstance(clients, dict) else None
+
+    def _sweep_unplugged(self, keep=None):
+        # Scan replaces DeviceMgr.clients before unpair, so the removed client's
+        # close() never runs. Drop those refs here. Do not pop the dict: scan
+        # may still be iterating it.
+        connected = self._connected_clients()
+        if connected is None:
+            return
+        dropped = None
+        for live in list(self._live_clients):
+            if live is keep or live in connected:
+                continue
+            live.closed = True
+            live.binding = None
+            live.account = None
+            live._released = True
+            self._live_clients.discard(live)
+            dropped = live
+        if keep is not None or self._live_clients or dropped is None:
+            return
+        if dropped.helper.generation == dropped.generation:
+            dropped.helper.shutdown()
+
     def release_helper(self, client):
         # One Electrum wallet closing must not kill a second wallet still using this process.
+        self._sweep_unplugged(keep=client)
         self._live_clients.discard(client)
         if self._live_clients:
             return
@@ -93,6 +126,7 @@ class OneKeyPlugin(HW_PluginBase):
 
     @runs_in_hwd_thread
     def enumerate(self):
+        self._sweep_unplugged()
         try:
             found = self.helper.call("search", {}, timeout=30)
             if type(found) is not list or len(found) > 32:
@@ -126,6 +160,7 @@ class OneKeyPlugin(HW_PluginBase):
     def get_client(self, keystore, *args, **kwargs):
         previous = getattr(self, "_expected_keystore", None)
         self._expected_keystore = keystore
+        self._sweep_unplugged()
         try:
             # DeviceMgr may request an xpub while pairing. Supply the saved wallet intent
             # before that callback, so reconnect cannot enter the wallet-selection flow.

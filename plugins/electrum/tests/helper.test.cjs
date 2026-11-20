@@ -346,7 +346,7 @@ test('discovery skips explicit uninitialized and loader states before supported 
     serialNo: identity.serialNo, model: 'pro2' }]);
 });
 
-test('locked initialized device is listed without deviceId and unlocks only through open', async t => {
+test('locked initialized device is listed without deviceId', async t => {
   const h = await ready(t);
   h.sdk.getDeviceState = async () => ok({ schemaVersion: 1, protocol: 'V2',
     identity: { deviceId: null, serialNo: identity.serialNo, deviceType: 'pro2' },
@@ -355,15 +355,56 @@ test('locked initialized device is listed without deviceId and unlocks only thro
   assert.equal(h.died(), false);
   assert.deepEqual(h.output.at(-1).result, [{ connectId: 'usb1', deviceId: null,
     serialNo: identity.serialNo, model: 'pro2' }]);
-  h.sdk.openWalletSession = async () => ok({ protocol: 'V2', deviceId: identity.deviceId,
-    walletType: 'standard', passphraseState: null });
-  h.send(3, 'open', { connectId: 'usb1', mode: 'standard' }); await turn();
+});
+
+test('locked device restores a saved wallet without open and checks the unlocked device id', async t => {
+  const h = await ready(t);
+  let locked = true;
+  h.sdk.getDeviceState = async (id, params) => {
+    h.sdk.calls.push(['state', id, params]);
+    return ok({ schemaVersion: 1, protocol: 'V2',
+      identity: { deviceId: locked ? null : identity.deviceId, serialNo: identity.serialNo, deviceType: 'pro2' },
+      status: { initialized: true, mode: 'normal', unlocked: !locked } });
+  };
+  h.sdk.btcGetPublicKey = async (...args) => {
+    h.sdk.calls.push(['xpub', ...args]);
+    locked = false;
+    return ok({ xpub: 'synthetic-xpub', root_fingerprint: 5 });
+  };
+  h.send(2, 'xpub', xpubParams); await turn();
   assert.equal(h.output.at(-1).ok, true);
-  assert.equal(h.output.at(-1).result.deviceId, identity.deviceId);
-  h.send(4, 'xpub', xpubParams); await turn();
+  assert.equal(h.output.at(-1).result.xpub, 'synthetic-xpub');
+  const hidden = h.sdk.calls.find(c => c[0] === 'xpub');
+  assert.equal(hidden[2], '');
+  assert.equal(hidden[3].passphraseState, wallet.passphraseState);
+  assert.equal(hidden[3].useEmptyPassphrase, undefined);
+  assert.equal(h.sdk.calls.some(c => c[0] === 'open'), false);
+  assert.equal(h.died(), false);
+  locked = true;
+  const standard = { ...wallet, walletType: 'standard', passphraseState: null };
+  h.send(3, 'xpub', { ...xpubParams, binding: standard }); await turn();
+  assert.equal(h.output.at(-1).ok, true);
+  const main = h.sdk.calls.filter(c => c[0] === 'xpub').at(-1);
+  assert.equal(main[2], '');
+  assert.equal(main[3].useEmptyPassphrase, true);
+  assert.equal(main[3].passphraseState, undefined);
+});
+
+test('locked device does not return an xpub when unlock reveals a different device', async t => {
+  const h = await ready(t);
+  h.sdk.getDeviceState = async (id, params) => {
+    h.sdk.calls.push(['state', id, params]);
+    return ok({ schemaVersion: 1, protocol: 'V2',
+      identity: { deviceId: null, serialNo: identity.serialNo, deviceType: 'pro2' },
+      status: { initialized: true, mode: 'normal', unlocked: false } });
+  };
+  h.send(2, 'xpub', xpubParams); await turn();
   assert.equal(h.output.at(-1).ok, false);
   assert.equal(h.output.at(-1).error.code, 'DEVICE_MISMATCH');
-  assert.equal(h.sdk.calls.some(c => c[0] === 'xpub'), false);
+  assert.equal(JSON.stringify(h.output).includes('synthetic-xpub'), false);
+  assert.equal(h.sdk.calls.some(c => c[0] === 'xpub'), true);
+  assert.equal(h.sdk.calls.some(c => c[0] === 'open'), false);
+  assert.equal(h.died(), true);
 });
 
 test('cancel disposes the sdk before the cancel acknowledgement', async t => {

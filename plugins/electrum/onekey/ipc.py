@@ -60,7 +60,37 @@ def _inside(root, relative):
     return candidate
 
 
+def _authorized_runtime_pin():
+    """Sha256 of runtime.json pinned inside the zip Electrum already authorized.
+
+    Dev and tests are not loaded from a zip, so they skip this. A zip with no
+    pin, or a sibling runtime whose receipt does not match that pin, is refused.
+    The pin is read from the in-memory archive, not from the zip path on disk.
+    """
+    raw = __file__.replace("\\", "/")
+    marker = ".zip/"
+    if marker not in raw:
+        return None
+    get_data = getattr(__loader__, "get_data", None)
+    if not callable(get_data):
+        raise HelperError("RUNTIME_INVALID")
+    try:
+        payload = get_data(raw.split(marker, 1)[0] + ".zip/onekey/runtime_pin.txt")
+    except (OSError, KeyError, ValueError, TypeError):
+        raise HelperError("RUNTIME_INVALID") from None
+    if type(payload) is not bytes:
+        raise HelperError("RUNTIME_INVALID")
+    try:
+        text = payload.decode("ascii").strip()
+    except UnicodeError:
+        raise HelperError("RUNTIME_INVALID") from None
+    if len(text) != 64 or any(character not in "0123456789abcdef" for character in text):
+        raise HelperError("RUNTIME_INVALID")
+    return text
+
+
 def runtime_command():
+    pinned = _authorized_runtime_pin()
     selected = os.environ.get("ONEKEY_ELECTRUM_RUNTIME", "")
     if selected:
         manifest = Path(selected)
@@ -74,6 +104,8 @@ def runtime_command():
         manifest = manifest.resolve()
         receipt = manifest.read_bytes()
         receipt_hash = hashlib.sha256(receipt).hexdigest()
+        if pinned is not None and receipt_hash != pinned:
+            raise ValueError()
         if manifest.with_suffix(".sha256").read_text().strip() != receipt_hash:
             raise ValueError()
         data = json.loads(receipt)

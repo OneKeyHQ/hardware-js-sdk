@@ -1,6 +1,10 @@
+import hashlib
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
+import tarfile
 import threading
 import sys
 import tempfile
@@ -23,8 +27,9 @@ from electrum.zip_importer import MemoryZipImporter
 from onekey.client import OneKeyClient, coin_name, check_binding
 from onekey.onekey import OneKeyKeyStore, OneKeyPlugin
 from onekey.ipc import HelperError
-from build import build
-from install_runtime import install
+from build import build, build_distribution
+from build_runtime import extract_node, node_license_member, write_shared_license
+from install_runtime import install, parse_install_args, plugins_dir
 
 
 STATE = dict(deviceId="synthetic-device", serialNo="synthetic-serial", model="pro2")
@@ -78,6 +83,122 @@ class TestOneKeyPackaging(unittest.TestCase):
             plugin, installed, replaced = install(source, destination)
             self.assertTrue(replaced)
             self.assertEqual(plugin.read_bytes(), b"updated")
+
+    def test_failed_copy_keeps_the_installed_runtime_and_old_zip(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            source, destination = self._package(temporary, '{"generation":1}\n', b"plugin")
+            install(source, destination)
+            self._named_zip(destination / "onekey-0.0.9.zip", "onekey")
+            (source / "onekey-runtime" / "runtime.json").write_text('{"generation":2}\n')
+            (source / "onekey-0.1.0.zip").write_bytes(b"updated")
+            with mock.patch("install_runtime.shutil.copytree", side_effect=OSError("full")):
+                with self.assertRaises(OSError):
+                    install(source, destination)
+            self.assertEqual((destination / "onekey-runtime" / "runtime.json").read_text(), '{"generation":1}\n')
+            self.assertEqual((destination / "onekey-0.1.0.zip").read_bytes(), b"plugin")
+            self.assertTrue((destination / "onekey-0.0.9.zip").is_file())
+
+    def test_failed_zip_replace_restores_the_previous_runtime(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            source, destination = self._package(temporary, '{"generation":1}\n', b"plugin")
+            install(source, destination)
+            (source / "onekey-runtime" / "runtime.json").write_text('{"generation":2}\n')
+            (source / "onekey-0.1.0.zip").write_bytes(b"updated")
+            with mock.patch("install_runtime._replace_file", side_effect=OSError("zip")):
+                with self.assertRaises(OSError):
+                    install(source, destination)
+            self.assertEqual((destination / "onekey-runtime" / "runtime.json").read_text(), '{"generation":1}\n')
+            self.assertEqual((destination / "onekey-0.1.0.zip").read_bytes(), b"plugin")
+            self.assertFalse((destination / ".onekey-runtime.backup").exists())
+            self.assertFalse((destination / ".onekey-runtime.incoming").exists())
+
+    def test_installer_removes_other_onekey_zips_after_the_new_one_is_in_place(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            source, destination = self._package(temporary, "{}\n", b"unused")
+            self._named_zip(source / "onekey-0.1.0.zip", "onekey")
+            destination.mkdir()
+            self._named_zip(destination / "onekey-0.0.9.zip", "onekey")
+            self._named_zip(destination / "other-1.0.0.zip", "other")
+            (destination / "onekey-0.0.1.zip.disabled").write_bytes(b"disabled")
+            install(source, destination)
+            self.assertTrue((destination / "onekey-0.1.0.zip").is_file())
+            self.assertFalse((destination / "onekey-0.0.9.zip").exists())
+            self.assertTrue((destination / "other-1.0.0.zip").is_file())
+            self.assertEqual((destination / "onekey-0.0.1.zip.disabled").read_bytes(), b"disabled")
+
+    def test_testnet_flag_changes_only_the_default_destination(self):
+        with mock.patch.dict(os.environ, {"ELECTRUMDIR": "/tmp/electrum-root"}):
+            self.assertEqual(plugins_dir(), Path("/tmp/electrum-root/plugins"))
+            self.assertEqual(plugins_dir(testnet=True), Path("/tmp/electrum-root/testnet/plugins"))
+            _source, destination = parse_install_args(["--testnet"])
+            self.assertEqual(destination, Path("/tmp/electrum-root/testnet/plugins"))
+            _source, destination = parse_install_args(["/pkg", "/explicit", "--testnet"])
+            self.assertEqual(_source, Path("/pkg"))
+            self.assertEqual(destination, Path("/explicit"))
+            _source, destination = parse_install_args([])
+            self.assertEqual(destination, Path("/tmp/electrum-root/plugins"))
+
+    def test_node_license_is_packaged_outside_the_platform_directory(self):
+        text = "Node.js is licensed for use as follows:\nCopyright Node.js contributors. All rights reserved.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            archive_path = temporary / "node-v22.21.1-darwin-arm64.tar.gz"
+            with tarfile.open(archive_path, "w:gz") as tar:
+                payload = text.encode()
+                info = tarfile.TarInfo("node-v22.21.1-darwin-arm64/LICENSE")
+                info.size = len(payload)
+                tar.addfile(info, io.BytesIO(payload))
+                binary = b"node-binary"
+                info = tarfile.TarInfo("node-v22.21.1-darwin-arm64/bin/node")
+                info.size = len(binary)
+                tar.addfile(info, io.BytesIO(binary))
+            bundle = temporary / "bundle"
+            node = bundle / "nodes" / "darwin-arm64" / "node"
+            extract_node(archive_path, "node-v22.21.1-darwin-arm64/bin/node", node)
+            write_shared_license(bundle, archive_path, node_license_member(archive_path.name))
+            self.assertEqual([path.name for path in node.parent.iterdir()], ["node"])
+            self.assertEqual((bundle / "LICENSE").read_text(), text)
+            win = temporary / "node-v22.21.1-win-x64.zip"
+            with zipfile.ZipFile(win, "w") as archive:
+                archive.writestr("node-v22.21.1-win-x64/LICENSE", text)
+                archive.writestr("node-v22.21.1-win-x64/node.exe", b"node")
+            write_shared_license(bundle, win, node_license_member(win.name))
+            self.assertEqual((bundle / "LICENSE").read_text(), text)
+            root = temporary / "plugin"
+            (root / "onekey").mkdir(parents=True)
+            (root / "onekey" / "manifest.json").write_text('{"version":"0.1.0"}\n')
+            (root / "install_runtime.py").write_text("# installer\n")
+            runtime = root / "dist" / "onekey-runtime"
+            (runtime / "nodes" / "darwin-arm64").mkdir(parents=True)
+            (runtime / "runtime.json").write_text("{}\n")
+            (runtime / "LICENSE").write_text(text)
+            (runtime / "nodes" / "darwin-arm64" / "node").write_bytes(b"node")
+            with zipfile.ZipFile(build_distribution(root)) as archive:
+                self.assertEqual(archive.read("onekey-runtime/LICENSE").decode(), text)
+                self.assertFalse(any(name.startswith("onekey-runtime/nodes/") and name.endswith("LICENSE")
+                                     for name in archive.namelist()))
+                with zipfile.ZipFile(io.BytesIO(archive.read("onekey-0.1.0.zip"))) as plugin:
+                    pin = plugin.read("onekey/runtime_pin.txt").decode().strip()
+            self.assertEqual(pin, hashlib.sha256(b"{}\n").hexdigest())
+
+    @staticmethod
+    def _package(root, runtime_text, plugin_bytes):
+        source = Path(root) / "package"
+        runtime = source / "onekey-runtime"
+        runtime.mkdir(parents=True)
+        (runtime / "runtime.json").write_text(runtime_text)
+        (source / "onekey-0.1.0.zip").write_bytes(plugin_bytes)
+        (source / "onekey-electrum-0.1.0.zip").write_bytes(b"outer")
+        return source, Path(root) / "plugins"
+
+    @staticmethod
+    def _named_zip(path, name):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("onekey/manifest.json", json.dumps({"name": name}))
 
 
 class TestOneKeyClient(unittest.TestCase):
@@ -146,20 +267,26 @@ class TestOneKeyClient(unittest.TestCase):
         self.assertEqual("synthetic-device", client.device_id)
         self.assertEqual("open", helper.call.call_args_list[-2].args[0])
 
-    def test_saved_wallet_on_a_locked_device_opens_before_comparing_identity(self):
-        helper = mock.Mock(generation="generation-one")
-        helper.call.return_value = dict(deviceId=None, serialNo=STATE["serialNo"], model="pro2")
-        plugin = SimpleNamespace(helper=helper, SUPPORTED_XTYPES=OneKeyPlugin.SUPPORTED_XTYPES,
-                                 remember_wallet_binding=mock.Mock())
-        client = run_in_hwd_thread(lambda: OneKeyClient("usb1", mock.Mock(), plugin))
-        xpub = self.public_key()
-        saved = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
-                     walletType="standard", passphraseState=None)
-        keystore = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'", onekey_binding=saved))
-        helper.call.side_effect = [saved, dict(xpub=xpub, rootFingerprint=None)]
-        client.bind_keystore(keystore)
-        self.assertEqual(["state", "open", "xpub"], [call.args[0] for call in helper.call.call_args_list])
-        self.assertEqual("standard", helper.call.call_args_list[1].args[1]["mode"])
+    def test_saved_wallet_on_a_locked_device_restores_without_opening(self):
+        cases = [
+            dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
+                 walletType="standard", passphraseState=None),
+            dict(BINDING),
+        ]
+        for saved in cases:
+            helper = mock.Mock(generation="generation-one")
+            helper.call.return_value = dict(deviceId=None, serialNo=STATE["serialNo"], model="pro2")
+            plugin = SimpleNamespace(helper=helper, SUPPORTED_XTYPES=OneKeyPlugin.SUPPORTED_XTYPES,
+                                     remember_wallet_binding=mock.Mock())
+            client = run_in_hwd_thread(lambda helper=helper, plugin=plugin: OneKeyClient("usb1", mock.Mock(), plugin))
+            xpub = self.public_key()
+            keystore = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'", onekey_binding=saved))
+            helper.call.side_effect = [dict(xpub=xpub, rootFingerprint=None)]
+            client.bind_keystore(keystore)
+            self.assertEqual(["state", "xpub"], [call.args[0] for call in helper.call.call_args_list])
+            self.assertEqual(saved, helper.call.call_args.args[1]["binding"])
+            self.assertEqual(saved["deviceId"], client.device_id)
+            self.assertNotIn("select-hidden", json.dumps([call.args for call in helper.call.call_args_list]))
 
     def test_new_wallet_fetch_does_not_reuse_the_previous_selection(self):
         client, helper, handler = self.make_client()
@@ -194,6 +321,56 @@ class TestOneKeyClient(unittest.TestCase):
         client.plugin.device_manager = lambda: manager
         client.close()
         self.assertNotIn(client, manager.clients)
+
+    def test_health_check_failure_does_not_change_the_client_dict(self):
+        client, helper, _ = self.make_client()
+        manager = SimpleNamespace(lock=threading.RLock(), clients={client: client.serial})
+        client.plugin.device_manager = lambda: manager
+        client.plugin.release_helper = mock.Mock()
+        helper.call.side_effect = RuntimeError("gone")
+        usable = []
+        for cached, _id in manager.clients.items():
+            usable.append(cached.has_usable_connection_with_device())
+        self.assertEqual([False], usable)
+        self.assertEqual([client], list(manager.clients))
+        client.plugin.release_helper.assert_called_once_with(client)
+
+    def test_unplugged_client_is_released_when_the_last_wallet_closes(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin._live_clients = set()
+        plugin.helper = mock.Mock(generation="generation-one")
+        plugin.helper.call.return_value = dict(STATE)
+        plugin.retain_client = OneKeyPlugin.retain_client.__get__(plugin)
+        plugin.release_helper = OneKeyPlugin.release_helper.__get__(plugin)
+        plugin._sweep_unplugged = OneKeyPlugin._sweep_unplugged.__get__(plugin)
+        plugin._connected_clients = OneKeyPlugin._connected_clients.__get__(plugin)
+        handler = mock.Mock()
+        first = run_in_hwd_thread(lambda: OneKeyClient("usb1", handler, plugin))
+        second = run_in_hwd_thread(lambda: OneKeyClient("usb2", handler, plugin))
+        manager = SimpleNamespace(clients={first: first.serial, second: second.serial})
+        plugin.device_manager = lambda: manager
+        del manager.clients[first]
+        second.close()
+        plugin.helper.shutdown.assert_called_once()
+        self.assertTrue(first.closed)
+        self.assertNotIn(first, plugin._live_clients)
+        self.assertNotIn(second, plugin._live_clients)
+
+    def test_next_enumerate_releases_a_client_the_scan_already_dropped(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin._live_clients = set()
+        plugin.helper = mock.Mock(generation="generation-one")
+        plugin.helper.call.side_effect = [dict(STATE), []]
+        plugin.retain_client = OneKeyPlugin.retain_client.__get__(plugin)
+        plugin.release_helper = OneKeyPlugin.release_helper.__get__(plugin)
+        plugin._sweep_unplugged = OneKeyPlugin._sweep_unplugged.__get__(plugin)
+        plugin._connected_clients = OneKeyPlugin._connected_clients.__get__(plugin)
+        client = run_in_hwd_thread(lambda: OneKeyClient("usb1", mock.Mock(), plugin))
+        plugin.device_manager = lambda: SimpleNamespace(clients={})
+        self.assertEqual([], OneKeyPlugin.enumerate(plugin))
+        plugin.helper.shutdown.assert_called_once()
+        self.assertTrue(client.closed)
+        self.assertNotIn(client, plugin._live_clients)
 
     def test_get_client_replaces_a_closed_client_before_bind(self):
         plugin = OneKeyPlugin.__new__(OneKeyPlugin)

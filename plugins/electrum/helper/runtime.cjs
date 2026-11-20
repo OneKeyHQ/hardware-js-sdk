@@ -279,27 +279,41 @@ function serve(sdk, input, write, fatal, generation, timeoutMs = 120000, sdkVers
       binding(result);
       return result;
     }
-    requireValue(state.deviceId !== null && state.deviceId === p.binding.deviceId
-      && state.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
+    requireValue(state.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
+    // A locked device omits device_id. Passing the saved id makes Core reject the
+    // call before useDevicePassphraseState can unlock and restore the wallet.
+    // An empty id skips that pre-check. The refreshed state is the identity check.
+    if (state.deviceId !== null) requireValue(state.deviceId === p.binding.deviceId, 'DEVICE_MISMATCH');
+    const locked = state.deviceId === null;
+    const deviceId = locked ? '' : state.deviceId;
     const walletParams = p.binding.walletType === 'standard'
       ? { useEmptyPassphrase: true } : { passphraseState: p.binding.passphraseState };
     const params = { ...COMMON, ...walletParams, coin: p.coin };
+    const confirmIdentity = async () => {
+      if (!locked) return;
+      const refreshed = stateResult(await call(sdk.getDeviceState(p.connectId, { ...COMMON, scope: 'runtime' })));
+      requireValue(refreshed.deviceId === p.binding.deviceId
+        && refreshed.serialNo === p.binding.serialNo, 'DEVICE_MISMATCH');
+    };
     if (m.op === 'xpub') {
-      const result = await call(sdk.btcGetPublicKey(p.connectId, state.deviceId,
+      const result = await call(sdk.btcGetPublicKey(p.connectId, deviceId,
         { ...params, path: p.path, scriptType: p.scriptType, showOnOneKey: false }));
+      await confirmIdentity();
       string(result.xpub, 128);
       if (result.root_fingerprint !== undefined) uint(result.root_fingerprint);
       return { xpub: result.xpub, rootFingerprint: result.root_fingerprint ?? null };
     }
     if (m.op === 'address') {
-      const result = await call(sdk.btcGetAddress(p.connectId, state.deviceId,
+      const result = await call(sdk.btcGetAddress(p.connectId, deviceId,
         { ...params, path: p.path, scriptType: p.scriptType, showOnOneKey: true }));
+      await confirmIdentity();
       string(result.address, 128);
       return { address: result.address };
     }
-    const result = await call(sdk.btcSignTransaction(p.connectId, state.deviceId,
+    const result = await call(sdk.btcSignTransaction(p.connectId, deviceId,
       { ...params, inputs: p.inputs, outputs: p.outputs, refTxs: p.refTxs,
         version: p.version, locktime: p.locktime }));
+    await confirmIdentity();
     requireValue(Array.isArray(result.signatures) && result.signatures.length === p.inputs.length, 'SDK_FAILED');
     return { signatures: Array.from(result.signatures, (signature, index) => {
       der(signature);

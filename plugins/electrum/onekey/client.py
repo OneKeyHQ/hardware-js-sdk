@@ -194,15 +194,9 @@ class OneKeyClient(HardwareClientBase):
             saved = check_binding(saved)
             if saved["serialNo"] != self.serial:
                 raise UserFacingException(_("This Electrum wallet is bound to a different OneKey device."))
-            if self.device_id is None:
-                opened = check_binding(self._call("open", {
-                    "connectId": self.connect_id,
-                    "mode": "standard" if saved["walletType"] == "standard" else "select-hidden",
-                }))
-                if opened != saved:
-                    raise UserFacingException(_("OneKey device identity changed."))
-                self.device_id = opened["deviceId"]
-            elif saved["deviceId"] != self.device_id:
+            # Locked firmware has no device_id yet. The saved binding is restored on
+            # the xpub call. select-hidden would force a new wallet choice.
+            if self.device_id is not None and saved["deviceId"] != self.device_id:
                 raise UserFacingException(_("This Electrum wallet is bound to a different OneKey device."))
             if self.binding is not None and self.binding != saved:
                 raise UserFacingException(_("OneKey wallet selection changed. Reconnect the device."))
@@ -210,6 +204,8 @@ class OneKeyClient(HardwareClientBase):
             actual = self._xpub(path, xtype)
             if actual != expected:
                 raise UserFacingException(_("OneKey account does not match this Electrum wallet."))
+            if self.device_id is None:
+                self.device_id = saved["deviceId"]
             # Persist only the public wallet identity, never the firmware session or secrets.
             keystore.onekey_binding = dict(self.binding)
             self.account = (path, xtype, expected)
@@ -241,12 +237,7 @@ class OneKeyClient(HardwareClientBase):
             if lock is not None:
                 lock.release()
 
-    @runs_in_hwd_thread
-    def close(self):
-        self.closed = True
-        self.binding = None
-        self.account = None
-        self._drop_device_cache()
+    def _release_helper_ref(self):
         if self._released:
             return
         self._released = True
@@ -257,6 +248,21 @@ class OneKeyClient(HardwareClientBase):
             shutdown = getattr(self.helper, "shutdown", None)
             if shutdown is not None:
                 shutdown()
+
+    @runs_in_hwd_thread
+    def close(self):
+        self.closed = True
+        self.binding = None
+        self.account = None
+        self._drop_device_cache()
+        self._release_helper_ref()
+
+    def _detach_without_cache_drop(self):
+        # DeviceMgr is iterating clients. Popping that dict raises RuntimeError.
+        self.closed = True
+        self.binding = None
+        self.account = None
+        self._release_helper_ref()
 
     def is_pairable(self):
         return True
@@ -279,14 +285,14 @@ class OneKeyClient(HardwareClientBase):
             state = self._call("state", {"connectId": self.connect_id})
             self._check_state(state)
             if state["serialNo"] != self.serial:
-                self.close()
+                self._detach_without_cache_drop()
                 return False
             if self.device_id is not None and state["deviceId"] not in (None, self.device_id):
-                self.close()
+                self._detach_without_cache_drop()
                 return False
             return True
         except Exception:
-            self.close()
+            self._detach_without_cache_drop()
             return False
 
     def _storage_encryption_xpub(self, path):

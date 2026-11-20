@@ -8,7 +8,10 @@ import tempfile
 import threading
 import time
 import unittest
+import zipfile
 from unittest import mock
+
+from electrum.zip_importer import MemoryZipImporter
 
 from onekey.ipc import DESKTOP_PLATFORMS, Helper, HelperError, SDK_SOURCE, SDK_VERSION, desktop_platform, runtime_command
 
@@ -206,12 +209,39 @@ class TestHelperIPC(unittest.TestCase):
             manifest = runtime / "runtime.json"
             manifest.write_text(json.dumps(data))
             manifest.with_suffix(".sha256").write_text(hashlib.sha256(manifest.read_bytes()).hexdigest())
-            synthetic = f"{root / 'onekey-0.1.0.zip'}/onekey/ipc.py"
+            pin = hashlib.sha256(manifest.read_bytes()).hexdigest()
+            archive = root / "onekey-0.1.0.zip"
+            with zipfile.ZipFile(archive, "w") as zipped:
+                zipped.writestr("onekey/__init__.py", "")
+                zipped.writestr("onekey/ipc.py", "")
+                zipped.writestr("onekey/runtime_pin.txt", pin + "\n")
+            importer = MemoryZipImporter(archive.read_bytes(), root_name="onekey_pin",
+                                         prefix="onekey", archive_path=str(archive))
+            synthetic = f"{archive}/onekey/ipc.py"
             current = runtime / "nodes" / target / ("node.exe" if target.startswith("win32-") else "node")
             with mock.patch.dict(os.environ, {"ONEKEY_ELECTRUM_RUNTIME": ""}):
-                with mock.patch("onekey.ipc.__file__", synthetic):
+                with mock.patch("onekey.ipc.__file__", synthetic), mock.patch("onekey.ipc.__loader__", importer):
                     self.assertEqual(runtime_command()[0], str(current.resolve()))
                     current.write_bytes(b"tampered")
+                    with self.assertRaisesRegex(HelperError, "RUNTIME_INVALID"):
+                        runtime_command()
+                    current.write_bytes(b"current-node")
+                    manifest.write_text(json.dumps(data, indent=2))
+                    manifest.with_suffix(".sha256").write_text(
+                        hashlib.sha256(manifest.read_bytes()).hexdigest() + "\n")
+                    with self.assertRaisesRegex(HelperError, "RUNTIME_INVALID"):
+                        runtime_command()
+            bare = root / "onekey-unpinned.zip"
+            with zipfile.ZipFile(bare, "w") as zipped:
+                zipped.writestr("onekey/__init__.py", "")
+                zipped.writestr("onekey/ipc.py", "")
+            bare_importer = MemoryZipImporter(bare.read_bytes(), root_name="onekey_bare",
+                                              prefix="onekey", archive_path=str(bare))
+            manifest.write_text(json.dumps(data))
+            manifest.with_suffix(".sha256").write_text(hashlib.sha256(manifest.read_bytes()).hexdigest())
+            with mock.patch.dict(os.environ, {"ONEKEY_ELECTRUM_RUNTIME": ""}):
+                with mock.patch("onekey.ipc.__file__", f"{bare}/onekey/ipc.py"), \
+                        mock.patch("onekey.ipc.__loader__", bare_importer):
                     with self.assertRaisesRegex(HelperError, "RUNTIME_INVALID"):
                         runtime_command()
 
