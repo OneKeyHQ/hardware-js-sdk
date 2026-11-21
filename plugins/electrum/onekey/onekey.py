@@ -10,7 +10,7 @@ from electrum.plugin import Device, runs_in_hwd_thread
 from electrum.transaction import PartialTransaction, PartialTxOutput, Sighash
 from electrum.util import UserFacingException
 
-from .ipc import Helper, HelperError, SDK_VERSION, runtime_command
+from .ipc import Helper, HelperError, SDK_VERSION
 
 
 class OneKeyKeyStore(Hardware_KeyStore):
@@ -118,10 +118,6 @@ class OneKeyPlugin(HW_PluginBase):
             client.helper.shutdown()
 
     def get_library_version(self):
-        try:
-            runtime_command()
-        except HelperError:
-            raise ImportError("Install onekey-runtime beside this plugin, or set ONEKEY_ELECTRUM_RUNTIME.") from None
         return SDK_VERSION
 
     @runs_in_hwd_thread
@@ -145,7 +141,7 @@ class OneKeyPlugin(HW_PluginBase):
                     raise HelperError("PROTOCOL")
                 result.append(Device(path=device["connectId"], interface_number=-1,
                                      id_=device["serialNo"], product_key="OneKey", usage_page=0,
-                                     transport_ui_string="USB (Node SDK)"))
+                                     transport_ui_string="USB"))
             return result
         except HelperError as error:
             self.helper.close()

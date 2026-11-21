@@ -1,12 +1,9 @@
-import concurrent.futures
 import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import tempfile
-import threading
-import time
 import unittest
 import zipfile
 from unittest import mock
@@ -20,147 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class TestHelperIPC(unittest.TestCase):
-    def make_helper(self, mode="echo"):
-        helper = Helper([shutil.which("node"), str(ROOT / "tests" / "mock_child.cjs"), mode])
-        self.addCleanup(helper.close)
-        helper.call("search", {}, timeout=2)
-        return helper
-
     def test_main_thread_cannot_block_qt(self):
         with self.assertRaisesRegex(HelperError, "GUI_THREAD"):
             Helper().call("search", {})
-
-    def test_ui_response_while_call_pending_and_followup_ids(self):
-        def worker():
-            helper = self.make_helper("ui")
-            events = []
-            for _ in range(2):
-                self.assertEqual("device-choice", helper.call("state", {}, on_ui=events.append))
-            self.assertEqual(["passphrase-select", "passphrase-select"], events)
-            helper.shutdown()
-            self.assertIsNone(helper.generation)
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            pool.submit(worker).result(timeout=5)
-
-    def test_cancel_timeout_crash_and_stale_response_invalidate_generation(self):
-        def worker(mode):
-            helper = self.make_helper(mode)
-            original = helper.generation
-            cancelled = threading.Event()
-            if mode == "cancel":
-                cancelled.set()
-                helper.command[-1] = "hang"
-            code = {"cancel": "CANCELLED", "hang": "TIMEOUT", "error": "SDK_FAILED", "crash": "CRASH"}.get(mode)
-            with self.assertRaises(HelperError) as raised:
-                helper.call("state", {}, timeout=0.15, cancelled=cancelled)
-            if code and mode != "crash":
-                self.assertEqual(code, raised.exception.code)
-            self.assertIsNone(helper.generation)
-            self.assertIsNone(helper.process)
-            with self.assertRaisesRegex(HelperError, "STALE"):
-                helper.call("state", {}, generation=original)
-            # Recovery requires explicit discovery, followed by a NEW client/binding check.
-            helper.call("search", {}, timeout=2)
-            self.assertNotEqual(original, helper.generation)
-            with self.assertRaisesRegex(HelperError, "STALE"):
-                helper.call("state", {}, generation=original)
-        for mode in ("hang", "crash", "stale", "wrong-id", "extra", "long", "error", "invalid-error", "bool-id", "nan"):
-            with self.subTest(mode=mode), concurrent.futures.ThreadPoolExecutor() as pool:
-                pool.submit(worker, mode).result(timeout=5)
-
-    def test_serialized_calls_do_not_consume_each_others_response(self):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
-            helper = pool.submit(self.make_helper).result(timeout=5)
-            generation = helper.generation
-            futures = [pool.submit(helper.call, "state", {"number": i}, generation=generation) for i in range(12)]
-            self.assertEqual(list(range(12)), [future.result(timeout=5)["number"] for future in futures])
-
-    def test_success_frame_after_cancel_is_dropped(self):
-        def worker():
-            helper = self.make_helper("hang")
-            cancelled = threading.Event()
-
-            def get(*args, **kwargs):
-                cancelled.set()
-                return dict(v=1, generation=helper.generation, id=helper._counter,
-                            ok=True, result={"signed": True})
-
-            with mock.patch.object(helper._messages, "get", side_effect=get):
-                with self.assertRaises(HelperError) as raised:
-                    helper.call("state", {}, timeout=2, cancelled=cancelled)
-            self.assertEqual("CANCELLED", raised.exception.code)
-            self.assertIsNone(helper.generation)
-            self.assertIsNone(helper.process)
-
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            pool.submit(worker).result(timeout=5)
-
-    def test_cancel_during_pending_request(self):
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            helper = pool.submit(self.make_helper, "hang").result(timeout=5)
-            cancelled = threading.Event()
-            started = time.monotonic()
-            future = pool.submit(helper.call, "state", {}, timeout=10, cancelled=cancelled)
-            time.sleep(0.05)
-            cancelled.set()
-            with self.assertRaisesRegex(HelperError, "CANCELLED"):
-                future.result(timeout=2)
-            self.assertLess(time.monotonic() - started, 2)
-
-    def test_pre_dispatch_cancellation_or_expiry_does_not_launch_or_send(self):
-        def worker():
-            helper = Helper([shutil.which("node"), str(ROOT / "tests" / "mock_child.cjs"), "echo"])
-            cancelled = threading.Event()
-            cancelled.set()
-            with mock.patch.object(helper, "_start") as start, mock.patch.object(helper, "_send") as send:
-                with self.assertRaisesRegex(HelperError, "CANCELLED"):
-                    helper.call("search", {}, cancelled=cancelled)
-                with self.assertRaisesRegex(HelperError, "TIMEOUT"):
-                    helper.call("search", {}, timeout=0)
-                start.assert_not_called()
-                send.assert_not_called()
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            pool.submit(worker).result(timeout=2)
-
-    def test_cancelled_or_expired_queued_request_never_dispatches(self):
-        for mode in ("cancelled", "expired"):
-            with self.subTest(mode=mode), concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-                helper = pool.submit(self.make_helper, "delay").result(timeout=3)
-                sent = threading.Event()
-                original_send = helper._send
-
-                def send(op, params, request_id, **kwargs):
-                    result = original_send(op, params, request_id, **kwargs)
-                    if params.get("hold"):
-                        sent.set()
-                    return result
-
-                cancelled = threading.Event()
-                with mock.patch.object(helper, "_send", side_effect=send) as dispatch:
-                    head = pool.submit(helper.call, "state", {"hold": True}, timeout=2)
-                    self.assertTrue(sent.wait(timeout=1))
-                    queued = pool.submit(helper.call, "address", {}, timeout=0.03 if mode == "expired" else 2,
-                                         cancelled=cancelled)
-                    time.sleep(0.06)
-                    if mode == "cancelled":
-                        cancelled.set()
-                    with self.assertRaisesRegex(HelperError, "CANCELLED" if mode == "cancelled" else "TIMEOUT"):
-                        queued.result(timeout=2)
-                    self.assertFalse(any(call.args[0] == "address" for call in dispatch.call_args_list))
-                    self.assertEqual({"hold": True}, head.result(timeout=2))
-                    self.assertIsNotNone(helper.process)
-
-    def test_startup_uses_callers_absolute_deadline(self):
-        def worker():
-            helper = Helper([shutil.which("node"), str(ROOT / "tests" / "mock_child.cjs"), "slow-start"])
-            self.addCleanup(helper.close)
-            with mock.patch.object(helper, "_send", wraps=helper._send) as send:
-                with self.assertRaisesRegex(HelperError, "TIMEOUT"):
-                    helper.call("search", {}, timeout=0.04)
-                self.assertEqual(["hello"], [call.args[0] for call in send.call_args_list])
-            self.assertIsNone(helper.process)
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            pool.submit(worker).result(timeout=2)
 
     def test_runtime_requires_pin_and_asset_hashes(self):
         with tempfile.TemporaryDirectory() as temporary:

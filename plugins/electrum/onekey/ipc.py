@@ -4,12 +4,14 @@ import json
 import os
 from pathlib import Path
 import platform
-import queue
-import subprocess
 import sys
 import threading
 import time
 import uuid
+
+from .device import Session, SessionError
+from .link import LinkError
+from .usb import list_paths, open_path
 
 
 VERSION = 1
@@ -146,218 +148,116 @@ def runtime_command():
 
 
 class Helper:
-    def __init__(self, command=None):
-        self.command = command
+    """In-process Pro 2 / Neo session. This object does not start Node."""
+
+    def __init__(self, ports=None):
+        self.ports = ports
         self.process = None
         self.generation = None
-        self._serial = threading.RLock()
-        self._outgoing = None
-        self._threads = []
-        self._counter = 0
-        self._messages = None
+        self._lock = threading.RLock()
+        self._wallets = {}
 
-    def _start(self, deadline, cancelled):
-        self.generation = uuid.uuid4().hex
-        # Inherited Node hooks could write secrets or inject code before entry.cjs starts.
-        env = {key: value for key, value in os.environ.items()
-               if key not in ("NODE_OPTIONS", "NODE_PATH", "NODE_DEBUG", "ELECTRON_RUN_AS_NODE")}
-        self._messages = queue.Queue(maxsize=32)
-        try:
-            self.process = subprocess.Popen(
-                (self.command or runtime_command()) + ["--generation", self.generation],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env=env,
-            )
-        except (OSError, HelperError):
-            self.generation = None
-            raise HelperError("RUNTIME_UNAVAILABLE") from None
-        self._outgoing = queue.Queue(maxsize=16)
-        self._threads = [threading.Thread(target=self._read, args=(self.process, self._messages), daemon=True),
-                         threading.Thread(target=self._writer, args=(self.process, self._outgoing, self._messages), daemon=True)]
-        for thread in self._threads:
-            thread.start()
-        try:
-            if self.call("hello", {}, timeout=min(30, deadline - time.monotonic()),
-                         cancelled=cancelled) != {"protocol": 1, "sdkVersion": SDK_VERSION}:
-                raise HelperError("PROTOCOL")
-        except BaseException:
-            self.close()
-            raise
-
-    @staticmethod
-    def _read(process, messages):
-        try:
-            while True:
-                raw = process.stdout.readline(MAX_LINE + 1)
-                if not raw or len(raw) > MAX_LINE or not raw.endswith(b"\n"):
-                    raise ValueError()
-                message = json.loads(raw, parse_constant=_invalid_constant)
-                if type(message) is not dict:
-                    raise ValueError()
-                messages.put_nowait(message)
-        except (OSError, ValueError, RecursionError, queue.Full):
-            # Waking a waiter must not depend on a malformed/noisy child draining its pipe.
-            try:
-                if process.poll() is None:
-                    process.kill()
-            except OSError:
-                pass
-            try:
-                messages.put_nowait(None)
-            except queue.Full:
-                pass
-
-    @staticmethod
-    def _writer(process, outgoing, messages):
-        try:
-            while True:
-                item = outgoing.get()
-                if item is None:
-                    return
-                raw, deadline, cancelled = item
-                if ((cancelled is not None and cancelled.is_set())
-                        or (deadline is not None and time.monotonic() >= deadline)):
-                    continue
-                process.stdin.write(raw)
-                process.stdin.flush()
-        except (OSError, ValueError):
-            try:
-                messages.put_nowait(None)
-            except queue.Full:
-                pass
-
-    def _send(self, operation, params, request_id, *, deadline=None, cancelled=None):
-        if operation not in OPERATIONS:
-            raise HelperError("PROTOCOL")
-        raw = json.dumps(dict(v=VERSION, generation=self.generation, id=request_id,
-                              op=operation, params=params), separators=(",", ":"),
-                         allow_nan=False).encode() + b"\n"
-        if len(raw) > MAX_LINE:
-            raise HelperError("LIMIT")
-        try:
-            self._outgoing.put_nowait((raw, deadline, cancelled))
-        except queue.Full:
-            raise HelperError("IO") from None
-
-    def call(self, operation, params, *, timeout=120, cancelled=None, on_ui=None,
-             generation=None):
+    def call(self, op, params, timeout=120, generation=None, cancelled=None, on_ui=None):
         if threading.current_thread() is threading.main_thread():
             raise HelperError("GUI_THREAD")
+        if op not in OPERATIONS or type(params) is not dict:
+            raise HelperError("INVALID_REQUEST")
         deadline = time.monotonic() + timeout
-        expected_generation = generation or self.generation
-
-        def check_wait():
+        with self._lock:
             if cancelled is not None and cancelled.is_set():
                 raise HelperError("CANCELLED")
             if time.monotonic() >= deadline:
                 raise HelperError("TIMEOUT")
-
-        check_wait()
-        while not self._serial.acquire(timeout=min(0.05, max(0, deadline - time.monotonic()))):
-            check_wait()
-        try:
-            # A queued failure belongs to this caller, not to the request owning the link.
-            check_wait()
-            if self.process is None:
-                if operation != "search" or generation is not None:
-                    raise HelperError("STALE")
-                self._start(deadline, cancelled)
-                expected_generation = self.generation
-            if expected_generation != self.generation:
+            if generation is not None and generation != self.generation:
                 raise HelperError("STALE")
-            check_wait()
-            self._counter += 1
-            request_id = self._counter
+            if self.generation is None and op not in ("hello", "search"):
+                raise HelperError("STALE")
+            if self.generation is None:
+                self.generation = uuid.uuid4().hex
             try:
-                self._send(operation, params, request_id, deadline=deadline, cancelled=cancelled)
-                while True:
-                    if cancelled is not None and cancelled.is_set():
-                        # Control traffic bypasses the helper's device queue. Kill even if cancel hangs.
-                        self._counter += 1
-                        cancel_id = self._counter
-                        self._send("cancel", {"target": request_id}, cancel_id)
-                        cancel_deadline = time.monotonic() + 0.25
-                        while time.monotonic() < cancel_deadline:
-                            try:
-                                ack = self._messages.get(timeout=0.05)
-                            except queue.Empty:
-                                continue
-                            if ack is None or ack == dict(v=VERSION, generation=self.generation,
-                                                          id=cancel_id, ok=True, result=None):
-                                break
-                        raise HelperError("CANCELLED")
-                    if time.monotonic() >= deadline:
-                        raise HelperError("TIMEOUT")
-                    try:
-                        message = self._messages.get(timeout=min(0.05, max(0.001, deadline - time.monotonic())))
-                    except queue.Empty:
-                        if self.process.poll() is not None:
-                            raise HelperError("CRASH")
-                        continue
-                    # The frame may have been queued before cancel or the deadline. Do not deliver it.
-                    if cancelled is not None and cancelled.is_set():
-                        raise HelperError("CANCELLED")
-                    if time.monotonic() >= deadline:
-                        raise HelperError("TIMEOUT")
-                    if (message is None or type(message.get("v")) is not int
-                            or type(message.get("id")) is not int or message.get("v") != VERSION
-                            or message.get("generation") != self.generation
-                            or message.get("id") != request_id):
-                        raise HelperError("PROTOCOL")
-                    if "event" in message:
-                        if set(message) != {"v", "generation", "id", "event", "token"}:
-                            raise HelperError("PROTOCOL")
-                        if message["event"] not in ("pin", "passphrase", "button", "passphrase-select", "close"):
-                            raise HelperError("PROTOCOL")
-                        if type(message["token"]) is not int or message["token"] < 1:
-                            raise HelperError("PROTOCOL")
-                        if on_ui:
-                            on_ui(message["event"])
-                        if message["event"] == "passphrase-select":
-                            self._counter += 1
-                            self._send("ui", {"target": request_id, "token": message["token"],
-                                              "choice": "device"}, self._counter,
-                                       deadline=deadline, cancelled=cancelled)
-                        continue
-                    if set(message) != {"v", "generation", "id", "ok", "result"} or message["ok"] is not True:
-                        if (set(message) == {"v", "generation", "id", "ok", "error"}
-                                and message["ok"] is False and type(message["error"]) is dict
-                                and set(message["error"]) == {"code"}
-                                and type(message["error"]["code"]) is str
-                                and message["error"]["code"] in {"CANCELLED", "INVALID_REQUEST", "SDK_FAILED", "WALLET_MISMATCH",
-                                                                   "DEVICE_MISMATCH", "UNSUPPORTED", "BUSY", "UI_FAILED"}):
-                            raise HelperError(message["error"]["code"])
-                        raise HelperError("PROTOCOL")
-                    return message["result"]
-            except (OSError, ValueError, TypeError, RecursionError, HelperError) as error:
-                self.close()
-                if isinstance(error, HelperError):
-                    raise
-                raise HelperError("IO") from None
-        finally:
-            self._serial.release()
+                return self._dispatch(op, params, deadline, cancelled, on_ui)
+            except (SessionError, LinkError) as error:
+                self.generation = None
+                self._wallets.clear()
+                raise HelperError(error.code) from None
+            except HelperError:
+                self.generation = None
+                raise
+            except Exception:
+                self.generation = None
+                self._wallets.clear()
+                raise HelperError("SDK_FAILED") from None
 
     def shutdown(self):
-        try:
-            if self.process is not None:
-                self.call("dispose", {}, timeout=2, generation=self.generation)
-        except HelperError:
-            pass
-        finally:
-            self.close()
+        with self._lock:
+            self._wallets.clear()
+            self.generation = None
 
     def close(self):
-        process, self.process = self.process, None
-        self.generation = None
-        if process is not None:
-            if process.poll() is None:
-                process.kill()
-            process.wait(timeout=5)
+        self.shutdown()
+
+    def _dispatch(self, op, params, deadline, cancelled, on_ui):
+        if op == "hello":
+            return {"protocol": 1, "sdkVersion": SDK_VERSION}
+        if op == "search":
+            if params:
+                raise SessionError("INVALID_REQUEST")
+            return self._search(deadline, cancelled, on_ui)
+        if op in ("cancel", "ui", "dispose"):
+            if op == "dispose":
+                self._wallets.clear()
+            return None
+        connect_id = params.get("connectId")
+        if type(connect_id) is not str or not connect_id:
+            raise SessionError("INVALID_REQUEST")
+        link = self._open(connect_id)
+        try:
+            session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
+                              cache=self._wallets, connect_id=connect_id)
+            session.handshake()
+            if op == "state":
+                return session.state()
+            if op == "open":
+                if params.get("mode") not in ("standard", "select-hidden"):
+                    raise SessionError("INVALID_REQUEST")
+                return session.open(params["mode"])
+            if op == "xpub":
+                return session.xpub(params.get("binding"), params.get("coin"), params.get("path"), params.get("scriptType"))
+            if op == "address":
+                return session.address(params.get("binding"), params.get("coin"), params.get("path"), params.get("scriptType"))
+            if op == "sign":
+                return session.sign(params.get("binding"), params.get("coin"), params.get("inputs"), params.get("outputs"),
+                                    params.get("refTxs"), params.get("version"), params.get("locktime"))
+            raise SessionError("INVALID_REQUEST")
+        finally:
+            link.close()
+
+    def _search(self, deadline, cancelled, on_ui):
+        paths = list(self.ports) if self.ports is not None else list_paths()
+        found = []
+        for path in paths:
+            link = self._open(path)
             try:
-                self._outgoing.put_nowait(None)
-            except queue.Full:
-                pass
-            for thread in self._threads:
-                thread.join(timeout=1)
-            process.stdin.close()
-            process.stdout.close()
+                session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
+                                  cache=self._wallets, connect_id=path)
+                session.handshake()
+                try:
+                    state = session.state()
+                except SessionError as error:
+                    if error.code == "UNSUPPORTED":
+                        continue
+                    raise
+                found.append({"connectId": path, "deviceId": state["deviceId"],
+                              "serialNo": state["serialNo"], "model": state["model"]})
+            finally:
+                link.close()
+        return found
+
+    def _open(self, connect_id):
+        if self.ports is not None:
+            link = self.ports.get(connect_id)
+            if link is None:
+                raise SessionError("SDK_FAILED")
+            return link
+        return open_path(connect_id)
+
