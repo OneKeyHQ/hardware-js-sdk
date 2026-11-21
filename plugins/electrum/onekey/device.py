@@ -69,12 +69,17 @@ def _binding(value):
 
 
 def _sign_budget(inputs, outputs, ref_txs):
-    steps = len(inputs) + len(outputs) + len(inputs) + 1
+    refs = {}
     if type(ref_txs) is list:
         for item in ref_txs:
-            if type(item) is not dict:
-                continue
-            steps += 1 + len(item.get("inputs") or []) + len(item.get("bin_outputs") or [])
+            if type(item) is dict and type(item.get("hash")) is str:
+                refs[item["hash"]] = 1 + len(item.get("inputs") or []) + len(item.get("bin_outputs") or [])
+    # One pass over the new transaction, the previous transaction again for
+    # every input, then the inputs once more while signatures come back.
+    steps = len(inputs) + len(outputs) + len(inputs) + 1
+    for item in inputs:
+        if type(item) is dict:
+            steps += refs.get(item.get("prev_hash"), 0)
     return steps + 4
 
 
