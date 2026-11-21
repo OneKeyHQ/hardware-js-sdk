@@ -2167,6 +2167,10 @@ export const switchTransport = ({
       TransportManager.setTransport(nextTransport, plugin);
       _deviceList = undefined;
       DevicePool.resetState();
+      deviceCacheMap.clear();
+      preWarmInflight.clear();
+      preWarmDoneAt.clear();
+      preConnectCache = { passphraseState: undefined };
       _connector = undefined;
       initConnector();
     });

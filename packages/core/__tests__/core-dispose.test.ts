@@ -1,10 +1,11 @@
-import { HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 
 import Core, { init, initConnector, initCore, switchTransport } from '../src/core';
 import DataManager from '../src/data-manager/DataManager';
 import TransportManager from '../src/data-manager/TransportManager';
+import { Device } from '../src/device/Device';
 import { DevicePool } from '../src/device/DevicePool';
-import { UI_EVENT, UI_RESPONSE } from '../src/events';
+import { IFRAME, UI_EVENT, UI_RESPONSE } from '../src/events';
 
 import type { CoreContext } from '../src/core';
 import type { UiPromiseResponse } from '../src/events/ui-promise';
@@ -304,4 +305,77 @@ describe('Core.dispose', () => {
       }
     }
   );
+
+  test('switchTransport invalidates cached BLE devices so calls bind to the new transport', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const transportA = {
+      name: 'TransportA',
+      init: jest.fn(),
+      configure: jest.fn(),
+      configureProtocolV2: jest.fn(),
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    const transportB = {
+      name: 'TransportB',
+      init: jest.fn(),
+      configure: jest.fn(),
+      configureProtocolV2: jest.fn(),
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    const seenDevices: Device[] = [];
+    const fromDescriptorSpy = jest.spyOn(Device, 'fromDescriptor').mockImplementation((...args) => {
+      const device = new Device(...args);
+      seenDevices.push(device);
+      return device;
+    });
+    jest
+      .spyOn(Device.prototype, 'acquire')
+      .mockRejectedValue(ERRORS.TypedError(HardwareErrorCode.BleUnavailableWhileUsbConnected));
+    jest.spyOn(TransportManager, 'configure').mockResolvedValue(undefined);
+    jest.spyOn(DataManager, 'load').mockImplementation(next => {
+      DataManager.settings = next;
+      return Promise.resolve();
+    });
+
+    function TransportA() {
+      return transportA;
+    }
+    const core = await init({ ...settings, env: 'desktop-web-ble' }, TransportA);
+    if (!core) throw new Error('Core initialization failed');
+
+    try {
+      await core.handleMessage({
+        id: 1,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'getFeatures', connectId: 'ble-device-1' },
+      });
+      expect(fromDescriptorSpy).toHaveBeenCalledTimes(1);
+
+      await switchTransport({
+        env: 'desktop-web-ble',
+        Transport: function TransportB() {
+          return transportB;
+        },
+      });
+      expect(transportA.stop).toHaveBeenCalledTimes(1);
+
+      await core.handleMessage({
+        id: 2,
+        event: IFRAME.CALL,
+        type: IFRAME.CALL,
+        payload: { method: 'getFeatures', connectId: 'ble-device-1' },
+      });
+      expect(fromDescriptorSpy).toHaveBeenCalledTimes(2);
+      expect(seenDevices).toHaveLength(2);
+      expect(seenDevices[0]).not.toBe(seenDevices[1]);
+      expect(seenDevices[0].deviceConnector).not.toBe(seenDevices[1].deviceConnector);
+      expect(TransportManager.getTransport()).toBe(transportB);
+    } finally {
+      await core.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
 });

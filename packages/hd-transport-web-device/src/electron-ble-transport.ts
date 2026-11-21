@@ -284,6 +284,29 @@ export default class ElectronBleTransport {
     this.Log?.debug('[Electron BLE] Transport initialized');
   }
 
+  async stop(): Promise<void> {
+    this.hostDisconnectCleanup?.();
+    this.hostDisconnectCleanup = undefined;
+
+    const trackedDeviceIds = new Set<string>([
+      ...this.connectedDevices,
+      ...this.retainedDevices,
+      ...this.acquiringDevices,
+      ...this.notificationCleanups.keys(),
+      ...this.mtuCleanups.keys(),
+      ...this.deviceProtocol.keys(),
+      ...this.v1Buffers.keys(),
+      ...this.v2Assemblers.keys(),
+    ]);
+
+    await Promise.all(Array.from(trackedDeviceIds, deviceId => this.releaseNative(deviceId)));
+    this.acquiringDevices.clear();
+    this.protocolV2CallCounts.clear();
+    await this.protocolV2Links
+      .dispose('Electron BLE transport stopped')
+      .catch(error => this.Log?.debug('[Electron BLE] link dispose failed:', error));
+  }
+
   /**
    * One host subscription for the whole transport lifetime. init() can run
    * again after an SDK reset, so drop the previous listener first rather than
