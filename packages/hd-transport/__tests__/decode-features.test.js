@@ -1,8 +1,8 @@
 /* eslint-disable import/order */
-const ProtoBuf = require('protobufjs/light');
 const ByteBuffer = require('bytebuffer');
 
 const { decode } = require('../src/serialization/protobuf/decode');
+const { parseConfigure } = require('../src/serialization/protobuf/messages');
 const { decodeEnvelope } = require('../src/protocols/v1/decode');
 
 // Reuse the messages.json already committed alongside @onekeyfe/hd-core
@@ -55,7 +55,7 @@ const fixtures = [
 ];
 
 describe('Fix messages decode', () => {
-  const Messages = ProtoBuf.Root.fromJSON(messages);
+  const Messages = parseConfigure(messages);
   const Message = Messages.lookup(`Features`);
   fixtures.forEach(f => {
     describe(f.name, () => {

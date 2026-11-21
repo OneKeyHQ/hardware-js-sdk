@@ -10,7 +10,7 @@ import type {
   ProtocolType,
 } from '@onekeyfe/hd-transport';
 
-const { check, ProtocolV1, parseConfigure } = transport;
+const { check, ProtocolV1, parseTransportConfigure } = transport;
 
 type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
@@ -19,7 +19,7 @@ type IncompleteRequestOptions = {
 };
 
 export default class EmulatorTransport {
-  _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   name = 'EmulatorTransport';
 
@@ -72,7 +72,7 @@ export default class EmulatorTransport {
   }
 
   configure(signedData: any) {
-    const messages = parseConfigure(signedData);
+    const messages = parseTransportConfigure(signedData);
     this.configured = true;
     this._messages = messages;
   }

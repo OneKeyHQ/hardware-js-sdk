@@ -1,12 +1,18 @@
 import ByteBuffer from 'bytebuffer';
-import { Reader, Type } from 'protobufjs/light';
+// eslint-disable-next-line import/no-unresolved
+import { BinaryReader } from '@bufbuild/protobuf/wire';
 
 import { encodeEnvelopeMessage, encodeMessageChunks, encodeTransportPackets } from './v1/packets';
 import { decodeFirstChunk } from './v1/decode';
 import { decodeMessage as decodeV1Message } from './v1/receive';
-import { createMessageFromName, createMessageFromType } from '../serialization/protobuf/messages';
+import {
+  createMessageFromName,
+  createMessageFromType,
+  parseTransportConfigure,
+} from '../serialization/protobuf/messages';
 import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
 import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
+import { ensureTextEncoding } from '../serialization/protobuf/text-encoding';
 import {
   decodeFrame as decodeV2Frame,
   encodeProtobufFrame,
@@ -14,13 +20,15 @@ import {
   isAckFrame,
 } from './v2';
 
-import type { Root } from 'protobufjs/light';
+import legacyProtocolInfo from '../serialization/protobuf/legacy-protocol-info.json';
+
+import type { ProtobufRoot } from '../serialization/protobuf/descriptor';
 
 export const PROTOCOL_V2_SYS_MESSAGE_THRESHOLD = 60000;
 
 type ProtocolV2Schemas = {
-  protocolV1: Root;
-  protocolV2: Root;
+  protocolV1: ProtobufRoot;
+  protocolV2: ProtobufRoot;
 };
 
 type ProtocolV2FrameOptions = {
@@ -30,30 +38,11 @@ type ProtocolV2FrameOptions = {
   seq?: number;
 };
 
-const LEGACY_PROTOCOL_V2_PROTOCOL_INFO = Type.fromJSON('LegacyProtocolInfo', {
-  fields: {
-    version: {
-      rule: 'required',
-      type: 'uint32',
-      id: 1,
-    },
-    supported_messages: {
-      rule: 'repeated',
-      type: 'uint32',
-      id: 2,
-      options: {
-        packed: false,
-      },
-    },
-    protobuf_definition: {
-      type: 'string',
-      id: 3,
-    },
-  },
-});
+const LEGACY_PROTOCOL_V2_PROTOCOL_INFO =
+  parseTransportConfigure(legacyProtocolInfo).lookupType('LegacyProtocolInfo');
 
 const decodeLegacyProtocolV2ProtocolInfo = (pbPayload: Uint8Array) => {
-  const byteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
+  const byteBuffer = ByteBuffer.wrap(pbPayload);
   const legacy = decodeProtobuf(LEGACY_PROTOCOL_V2_PROTOCOL_INFO, byteBuffer);
 
   return {
@@ -66,15 +55,12 @@ const decodeLegacyProtocolV2ProtocolInfo = (pbPayload: Uint8Array) => {
 };
 
 const isLegacyProtocolV2ProtocolInfoWireLayout = (pbPayload: Uint8Array) => {
-  const reader = Reader.create(pbPayload);
+  ensureTextEncoding();
+  const reader = new BinaryReader(pbPayload);
   let hasVersion = false;
   try {
     while (reader.pos < reader.len) {
-      const tag = reader.uint32();
-      // eslint-disable-next-line no-bitwise
-      const fieldNumber = tag >>> 3;
-      // eslint-disable-next-line no-bitwise
-      const wireType = tag & 0x07;
+      const [fieldNumber, wireType] = reader.tag();
       if (fieldNumber === 1) {
         if (wireType !== 0) return false;
         hasVersion = true;
@@ -87,7 +73,7 @@ const isLegacyProtocolV2ProtocolInfoWireLayout = (pbPayload: Uint8Array) => {
       } else {
         return false;
       }
-      reader.skipType(wireType);
+      reader.skip(wireType);
     }
   } catch {
     return false;
@@ -198,7 +184,7 @@ export const ProtocolV2 = {
   decodeFrame(schemas: ProtocolV2Schemas, frame: Uint8Array) {
     const { messageTypeId, pbPayload, seq, messageName } = this.inspectFrame(schemas, frame);
     const { Message } = createProtocolV2MessageFromType(messageTypeId, schemas);
-    const rxByteBuffer = ByteBuffer.wrap(Buffer.from(pbPayload) as unknown as ArrayBuffer);
+    const rxByteBuffer = ByteBuffer.wrap(pbPayload);
     let message: ReturnType<typeof decodeProtobuf>;
     try {
       message = decodeProtobuf(Message, rxByteBuffer);

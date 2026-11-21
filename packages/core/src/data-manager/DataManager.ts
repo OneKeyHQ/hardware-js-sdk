@@ -438,7 +438,8 @@ export default class DataManager {
     };
   }
 
-  static async load(settings: ConnectSettings): Promise<boolean> {
+  static async load(settings: ConnectSettings, signal?: AbortSignal): Promise<boolean> {
+    if (signal?.aborted) return false;
     this.settings = settings;
     this.protocolV2ResourcesConfigError = undefined;
     this.protocolV2NeoResourcesConfigError = undefined;
@@ -468,29 +469,47 @@ export default class DataManager {
     let fetchMethod: 'configFetcher' | 'axios' | 'none' = 'none';
     if (settings.configFetcher) {
       Log.debug('[DataConfig] Trying client configFetcher...');
+      let onAbort: (() => void) | undefined;
       try {
-        data = await settings.configFetcher(urlWithCache);
+        const request = settings.configFetcher(urlWithCache);
+        if (signal) {
+          const aborted = new Promise<null>(resolve => {
+            onAbort = () => resolve(null);
+            signal.addEventListener('abort', onAbort, { once: true });
+            if (signal.aborted) onAbort();
+          });
+          // A host callback may never finish. Stop waiting without applying its late result.
+          data = await Promise.race([request, aborted]);
+        } else {
+          data = await request;
+        }
         if (data) {
           fetchMethod = 'configFetcher';
         }
       } catch (e) {
         Log.warn('[DataConfig] Client configFetcher failed:', e);
+      } finally {
+        if (onAbort) signal?.removeEventListener('abort', onAbort);
       }
     }
+    if (signal?.aborted) return false;
     if (!data) {
       Log.debug('[DataConfig] Trying SDK-managed config request...');
       try {
         const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
           // Keep the config request below the 20-second iframe initialization timeout.
           timeout: 7000,
+          ...(signal ? { signal } : {}),
         });
         data = response.data;
         fetchMethod = 'axios';
         Log.log('[DataConfig] SDK-managed config request succeeded');
       } catch (e) {
+        if (signal?.aborted) return false;
         Log.warn('[DataConfig] SDK-managed config request failed:', e);
       }
     }
+    if (signal?.aborted) return false;
 
     if (data) {
       this.applyRemoteConfig(data);

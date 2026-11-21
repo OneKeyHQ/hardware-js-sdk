@@ -1,4 +1,4 @@
-import EventEmitter from 'events';
+import { EventEmitter } from 'events';
 import HardwareSdk, {
   DEVICE,
   DEVICE_EVENT,

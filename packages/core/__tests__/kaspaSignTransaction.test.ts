@@ -559,17 +559,20 @@ describe('KaspaSignTransaction wire encoding', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const { decode } = require('../../hd-transport/src/serialization/protobuf/decode');
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+    const { parseConfigure } = require('../../hd-transport/src/serialization/protobuf/messages');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const ByteBuffer = require('bytebuffer');
 
     const root = protobuf.Root.fromJSON(messagesJson);
     const KaspaTxRequest = root.lookupType('KaspaTxRequest');
+    const transportKaspaTxRequest = parseConfigure(messagesJson).lookupType('KaspaTxRequest');
 
     // Enums travel as numbers on the wire (KASPA_TX_OUTPUT = 1).
     const encoded = KaspaTxRequest.encode(
       KaspaTxRequest.fromObject({ request_type: 1, request_index: 0 })
     ).finish();
 
-    const message = decode(KaspaTxRequest, ByteBuffer.wrap(Buffer.from(encoded)));
+    const message = decode(transportKaspaTxRequest, ByteBuffer.wrap(Buffer.from(encoded)));
     expect(message.request_type).toBe('KASPA_TX_OUTPUT');
     // Absent optional sub-message must decode to null, not crash the decoder
     // (the device's first request legitimately carries no signature).

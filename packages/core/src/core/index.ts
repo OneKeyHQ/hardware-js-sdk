@@ -127,11 +127,13 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
 });
 
 let _core: Core | undefined;
+const runtimeCores = new WeakSet<Core>();
 let transportSwitchGeneration = 0;
 let pendingTransportSwitch: Promise<void> = Promise.resolve();
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
-let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
+type PendingUiPromises = UiPromise<UiPromiseResponse['type']>[];
+type UiRequestContext = Pick<CoreContext, 'uiPromises' | 'isActive' | 'postUiMessage'>;
 
 const deviceCacheMap = new Map<string, Device>();
 const pollingManager = new PollingStateManager();
@@ -492,30 +494,31 @@ const onCallDevice = async (
   }
 
   registerHardwareUiEventListeners(device, {
-    pin: onDevicePinHandler,
+    pin: (...event) => onDevicePinHandler(context, ...event),
     pinOnDevice: onEnterPinOnDeviceHandler,
     pinOnDeviceComplete: onPinOnDeviceCompleteHandler,
     button: onDeviceButtonHandler,
     passphrase: message.payload.useEmptyPassphrase
       ? onEmptyPassphraseHandler
-      : onDevicePassphraseHandler,
+      : (...event) => onDevicePassphraseHandler(context, ...event),
     passphraseOnDevice: onEnterPassphraseOnDeviceHandler,
     attachPinOnDevice: onEnterAttachPinOnDeviceHandler,
   });
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
   device.on(DEVICE.STATE, onDeviceStateHandler);
-  device.on(
-    DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
-    onSelectDeviceInBootloaderForWebDeviceHandler
+  device.on(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE, (...event) =>
+    onSelectDeviceInBootloaderForWebDeviceHandler(context, ...event)
   );
 
-  const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(device, postMessage);
+  const protocolV2UiCoordinator = new ProtocolV2UiInteractionCoordinator(
+    device,
+    context.postUiMessage
+  );
   let protocolV2Operation = false;
   let protocolV2CloseEmitted = false;
   device.beginProtocolV2UiInteraction();
-  device.on(
-    DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
-    onSelectDeviceForSwitchFirmwareWebDeviceHandler
+  device.on(DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE, (...event) =>
+    onSelectDeviceForSwitchFirmwareWebDeviceHandler(context, ...event)
   );
 
   try {
@@ -844,12 +847,12 @@ const onCallDevice = async (
           protocolV2Operation: true,
         });
       }
-      if (!protocolV2CloseEmitted) {
+      if (!protocolV2CloseEmitted && context.isActive()) {
         closePopup();
       }
     }
 
-    cleanup();
+    cleanup(context.uiPromises);
 
     if (device) {
       const stillActive = getActiveRequestsByDeviceInstance(device.instanceId);
@@ -1519,8 +1522,8 @@ export const cancel = (context: CoreContext, connectId?: string) => {
     }
   }
 
-  cleanup(connectId);
-  if (!connectId || _uiPromises.length === 0) {
+  cleanup(context.uiPromises, connectId);
+  if (context.isActive() && (!connectId || context.uiPromises.length === 0)) {
     closePopup();
   }
 };
@@ -1560,16 +1563,16 @@ const shouldCheckPassphraseState = (method: BaseMethod, device: Device) => {
   return device.hasUsePassphrase();
 };
 
-const cleanup = (connectId?: string) => {
+const cleanup = (uiPromises: PendingUiPromises, connectId?: string) => {
   const pendingUiPromises = connectId
-    ? _uiPromises.filter(
+    ? uiPromises.filter(
         uiPromise =>
           uiPromise.data?.mainId === connectId || uiPromise.data?.getConnectId() === connectId
       )
-    : _uiPromises;
-  _uiPromises = connectId
-    ? _uiPromises.filter(uiPromise => !pendingUiPromises.includes(uiPromise))
-    : [];
+    : uiPromises.splice(0);
+  if (connectId) {
+    pendingUiPromises.forEach(promise => removeUiPromise(uiPromises, promise));
+  }
   rejectUiPromises(
     pendingUiPromises,
     ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'UI request was cancelled')
@@ -1614,12 +1617,15 @@ const onTransportDeviceDisconnectHandler = (event: TransportDeviceDisconnectEven
   DevicePool.emitter.emit(DEVICE.DISCONNECT, device);
 };
 
-const onDevicePinHandler = (...[device, type, callback]: DeviceEvents['pin']) => {
+const onDevicePinHandler = (
+  context: UiRequestContext,
+  ...[device, type, callback]: DeviceEvents['pin']
+) => {
   Log.log('request Input PIN');
   // create ui promise
-  const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
+  const uiPromise = createUiPromise(context, UI_RESPONSE.RECEIVE_PIN, device);
   // request pin view
-  postMessage(
+  context.postUiMessage(
     createUiMessage(UI_REQUEST.REQUEST_PIN, {
       device: device.toMessageObject() as unknown as KnownDevice,
       type,
@@ -1659,11 +1665,12 @@ const onDeviceStateHandler = (...[_, stateEvent]: [...DeviceEvents['state']]) =>
 };
 
 const onDevicePassphraseHandler = (
+  context: UiRequestContext,
   ...[device, requestPayload, callback]: DeviceEvents['passphrase']
 ) => {
   Log.debug('onDevicePassphraseHandler');
-  const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PASSPHRASE, device);
-  postMessage(
+  const uiPromise = createUiPromise(context, UI_RESPONSE.RECEIVE_PASSPHRASE, device);
+  context.postUiMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
@@ -1754,11 +1761,16 @@ const onPinOnDeviceCompleteHandler = (
 };
 
 const onSelectDeviceInBootloaderForWebDeviceHandler = (
+  context: UiRequestContext,
   ...[device, callback]: [...DeviceEvents['select_device_in_bootloader_for_web_device']]
 ) => {
   Log.debug('onSelectDeviceInBootloaderForWebDeviceHandler');
-  const uiPromise = createUiPromise(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE, device);
-  postMessage(
+  const uiPromise = createUiPromise(
+    context,
+    UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+    device
+  );
+  context.postUiMessage(
     createUiMessage(UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
     })
@@ -1771,14 +1783,16 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = (
 };
 
 const onSelectDeviceForSwitchFirmwareWebDeviceHandler = (
+  context: UiRequestContext,
   ...[device, callback]: [...DeviceEvents['select_device_for_switch_firmware_web_device']]
 ) => {
   Log.debug('onSelectDeviceForSwitchFirmwareWebDeviceHandler');
   const uiPromise = createUiPromise(
+    context,
     UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
     device
   );
-  postMessage(
+  context.postUiMessage(
     createUiMessage(UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
     })
@@ -1804,8 +1818,23 @@ const postMessage = (message: CoreMessage) => {
   _core.emit(CORE_EVENT, message);
 };
 
-const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, device?: Device) => {
+function matchesUiResponse<T extends UiPromiseResponse['type']>(
+  response: UiPromiseResponse,
+  event: T
+): response is Extract<UiPromiseResponse, { type: T }> {
+  return response.type === event;
+}
+
+const createUiPromise = <T extends UiPromiseResponse['type']>(
+  context: UiRequestContext,
+  promiseEvent: T,
+  device: Device
+) => {
   const uiPromise: UiPromise<T> = createDeferred(promiseEvent, device);
+  if (!context.isActive()) {
+    uiPromise.reject(ERRORS.TypedError(HardwareErrorCode.NotInitialized));
+    return uiPromise;
+  }
   if (
     device &&
     (promiseEvent === UI_RESPONSE.RECEIVE_PIN || promiseEvent === UI_RESPONSE.RECEIVE_PASSPHRASE)
@@ -1816,13 +1845,19 @@ const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, d
       deviceId: publicDeviceId || device.instanceId,
     };
   }
-  _uiPromises.push(uiPromise as any);
+  context.uiPromises.push({
+    ...uiPromise,
+    resolve: response => {
+      if (matchesUiResponse(response, promiseEvent)) uiPromise.resolve(response);
+    },
+  });
 
   return uiPromise;
 };
 
-const removeUiPromise = (promise: Deferred<any>) => {
-  _uiPromises = _uiPromises.filter(p => p !== promise);
+const removeUiPromise = (uiPromises: PendingUiPromises, promise: PendingUiPromises[number]) => {
+  const index = uiPromises.indexOf(promise);
+  if (index !== -1) uiPromises.splice(index, 1);
 };
 
 export default class Core extends EventEmitter {
@@ -1831,6 +1866,8 @@ export default class Core extends EventEmitter {
   public readonly sdkInstanceId: string;
 
   private requestQueue = new RequestQueue();
+
+  private uiPromises: PendingUiPromises = [];
 
   getOwnedUsbDeviceIdentity(descriptor: Parameters<typeof getOwnedUsbDeviceIdentity>[0]) {
     return getOwnedUsbDeviceIdentity(descriptor, this.requestQueue);
@@ -1855,6 +1892,11 @@ export default class Core extends EventEmitter {
       sdkInstanceId: this.sdkInstanceId,
       tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
+      uiPromises: this.uiPromises,
+      isActive: () => this.isActive(),
+      postUiMessage: (message: CoreMessage) => {
+        if (this.isActive()) this.emit(CORE_EVENT, message);
+      },
       methodSynchronize: this.methodSynchronize,
       getPrePendingCallPromise: (connectId: string) => this.prePendingCallPromises.get(connectId),
       setPrePendingCallPromise: (connectId: string, promise?: Promise<void>) => {
@@ -1889,17 +1931,24 @@ export default class Core extends EventEmitter {
     };
   }
 
+  private isActive() {
+    return !this.disposePromise && (_core ? _core === this : !runtimeCores.has(this));
+  }
+
   async handleMessage(message: CoreMessage) {
+    if (!this.isActive()) {
+      throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+    }
     switch (message.type) {
       case UI_RESPONSE.RECEIVE_PIN:
       case UI_RESPONSE.RECEIVE_PASSPHRASE:
       case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
       case UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
-        const uiPromise = findUiPromiseForResponse(_uiPromises, message);
+        const uiPromise = findUiPromiseForResponse(this.uiPromises, message);
         if (uiPromise) {
           Log.log('receive UI Response: ', message.type);
           uiPromise.resolve(message);
-          removeUiPromise(uiPromise);
+          removeUiPromise(this.uiPromises, uiPromise);
         } else if (
           message.type === UI_RESPONSE.RECEIVE_PIN ||
           message.type === UI_RESPONSE.RECEIVE_PASSPHRASE
@@ -1969,11 +2018,20 @@ export default class Core extends EventEmitter {
 
   private async disposeResources(): Promise<void> {
     Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    if ((_core && _core !== this) || (runtimeCores.has(this) && _core !== this)) {
+      // A superseded instance owns its queue, never the current runtime's shared resources.
+      this.requestQueue.abortAllRequests();
+      cleanup(this.uiPromises);
+      this.prePendingCallPromises.clear();
+      this.removeAllListeners();
+      cleanupSdkInstance(this.sdkInstanceId);
+      return;
+    }
     transportSwitchGeneration += 1;
     pendingTransportSwitch = Promise.resolve();
     pollingManager.stopAll();
     this.requestQueue.abortAllRequests();
-    cleanup();
+    cleanup(this.uiPromises);
 
     _connector?.stop();
     let transportCleanup: Promise<void>;
@@ -1989,6 +2047,7 @@ export default class Core extends EventEmitter {
     // Preserve synchronous dispose semantics for in-memory state and listeners.
     _deviceList = undefined;
     _connector = undefined;
+    TransportManager.plugin = null;
     DevicePool.dispose();
     deviceCacheMap.clear();
     preWarmInflight.clear();
@@ -2002,12 +2061,19 @@ export default class Core extends EventEmitter {
     // Transports, especially Node USB, may release native handles asynchronously.
     await transportCleanup;
   }
+
+  resetForTransportSwitch() {
+    this.requestQueue.abortAllRequests();
+    cleanup(this.uiPromises);
+    this.prePendingCallPromises.clear();
+  }
 }
 
 export const initCore = () => {
   transportSwitchGeneration += 1;
   pendingTransportSwitch = Promise.resolve();
   const core = new Core();
+  runtimeCores.add(core);
   _core = core;
   return core;
 };
@@ -2033,12 +2099,15 @@ const initTransport = (Transport: any, plugin?: LowlevelTransportSharedPlugin) =
 export const init = async (
   settings: ConnectSettings,
   Transport: any,
-  plugin?: LowlevelTransportSharedPlugin
+  plugin?: LowlevelTransportSharedPlugin,
+  signal?: AbortSignal
 ) => {
   try {
+    if (signal?.aborted) return undefined;
     transportSwitchGeneration += 1;
     pendingTransportSwitch = Promise.resolve();
-    await DataManager.load(settings);
+    await DataManager.load(settings, signal);
+    if (signal?.aborted) return undefined;
     initTransport(Transport, plugin);
     enableLog(DataManager.getSettings('debug'));
     if (DataManager.getSettings('env') !== 'react-native') {
@@ -2054,32 +2123,68 @@ export const init = async (
   }
 };
 
+type TransportSwitchOptions = {
+  env: ConnectSettings['env'];
+  plugin?: LowlevelTransportSharedPlugin;
+} & (
+  | { Transport: any; loadTransport?: never; owner?: never }
+  | {
+      Transport?: never;
+      loadTransport: () => Promise<new (...args: never[]) => unknown>;
+      owner: Core;
+    }
+);
+
 export const switchTransport = ({
   env,
   Transport,
   plugin,
-}: {
-  env: ConnectSettings['env'];
-  Transport: any;
-  plugin?: LowlevelTransportSharedPlugin;
-}) => {
+  loadTransport,
+  owner,
+}: TransportSwitchOptions) => {
   const generation = transportSwitchGeneration;
+  const assertCurrent = () => {
+    if (generation !== transportSwitchGeneration || (owner && owner !== _core)) {
+      throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+    }
+  };
   // Preserve request order while native transport cleanup is pending.
   const switching = pendingTransportSwitch
     .catch(() => undefined)
     .then(async () => {
-      if (generation !== transportSwitchGeneration) {
-        throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+      assertCurrent();
+      if (env === 'lowlevel' && !plugin) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.TransportNotConfigured,
+          'Lowlevel transport must have plugin'
+        );
       }
+      const nextTransport = loadTransport
+        ? await loadTransport().catch((error: unknown) => {
+            assertCurrent();
+            throw error;
+          })
+        : Transport;
+      assertCurrent();
+      if (typeof nextTransport !== 'function') {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.TransportNotConfigured,
+          'Transport constructor is not available'
+        );
+      }
+      pollingManager.stopAll();
+      _core?.resetForTransportSwitch();
       _connector?.stop();
       await TransportManager.getTransport()?.stop?.();
-      if (generation !== transportSwitchGeneration) {
-        throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
-      }
+      assertCurrent();
       DataManager.updateEnv(env);
-      TransportManager.setTransport(Transport, plugin);
+      TransportManager.setTransport(nextTransport, plugin);
       _deviceList = undefined;
       DevicePool.resetState();
+      deviceCacheMap.clear();
+      preWarmInflight.clear();
+      preWarmDoneAt.clear();
+      preConnectCache = { passphraseState: undefined };
       _connector = undefined;
       initConnector();
     });

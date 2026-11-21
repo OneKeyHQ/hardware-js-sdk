@@ -29,7 +29,7 @@ import type {
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-const { parseConfigure, ProtocolV1, check } = transport;
+const { parseTransportConfigure, ProtocolV1, check } = transport;
 
 const PACKET_SIZE = PROTOCOL_V1_USB_PACKET_SIZE;
 const REPORT_ID = PROTOCOL_V1_REPORT_ID;
@@ -163,10 +163,10 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
  * Modeled after WebUsbTransport.
  */
 export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string> {
-  messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   /** Protobuf schema for Protocol V2 transports. */
-  messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   private protocolV2SchemaSource: string | undefined;
 
@@ -225,7 +225,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
   }
 
   configure(signedData: any) {
-    const messages = parseConfigure(signedData);
+    const messages = parseTransportConfigure(signedData);
     this.configured = true;
     this.messages = messages;
     return Promise.resolve();
@@ -239,7 +239,7 @@ export default class NodeUsbTransport extends ProtocolV2UsbTransportBase<string>
     if (schemaSource === this.protocolV2SchemaSource) return;
 
     const hadProtocolV2Schema = this.protocolV2SchemaSource !== undefined;
-    this.messagesV2 = parseConfigure(signedData);
+    this.messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaSource = schemaSource;
     if (!hadProtocolV2Schema) return;
 

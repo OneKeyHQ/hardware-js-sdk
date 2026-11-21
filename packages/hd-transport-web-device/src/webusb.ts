@@ -33,7 +33,7 @@ import type {
   TransportCallOptions,
 } from '@onekeyfe/hd-transport';
 
-const { parseConfigure, check, ProtocolV1 } = transport;
+const { parseTransportConfigure, check, ProtocolV1 } = transport;
 
 const CONFIGURATION_ID = 1;
 const INTERFACE_ID = 0;
@@ -135,10 +135,10 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
 
   private deviceLogIds = new WeakMap<USBDevice, number>();
 
-  messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   /** Protobuf schema for Protocol V2 transports. */
-  messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   private protocolV2SchemaSource: string | undefined;
 
@@ -505,7 +505,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
    * Configure Protocol V1 protobuf schema (legacy chunked 0x3F framing).
    */
   configure(signedData: any) {
-    const messages = parseConfigure(signedData);
+    const messages = parseTransportConfigure(signedData);
     this.configured = true;
     this.messages = messages;
   }
@@ -521,7 +521,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
     if (schemaSource === this.protocolV2SchemaSource) return;
 
     const hadProtocolV2Schema = this.protocolV2SchemaSource !== undefined;
-    this.messagesV2 = parseConfigure(signedData);
+    this.messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaSource = schemaSource;
     if (!hadProtocolV2Schema) return;
 
@@ -1828,8 +1828,7 @@ export default class WebUsbTransport extends ProtocolV2UsbTransportBase<string> 
       }
     }
     decoded.reset();
-    const result = decoded.toBuffer();
-    return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
+    return decoded.toString('hex');
   }
 
   /**

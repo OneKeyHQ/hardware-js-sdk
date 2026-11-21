@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
+  HardwareSDKLowLevel as HardwareLowLevelSdk,
   CORE_EVENT,
   DEVICE,
   DEVICE_EVENT,
@@ -19,6 +20,7 @@ import HardwareSdk, {
   parseConnectSettings,
   probeUsbDeviceIdentitiesWithTransport,
   setLoggerPostMessage,
+  switchTransport as switchCoreTransport,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
@@ -47,9 +49,14 @@ const getTransport = async (env: ConnectSettings['env']) => {
   if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
   if (env === 'node-usb') {
-    // Dynamic import — usb is a native Node.js module (libusb C++ bindings)
-    // that cannot be resolved by browser/React Native bundlers
     const { default: NodeUsbTransport } = await import('@onekeyfe/hd-transport-usb');
+    // Browser bundlers replace this Node-only package with an empty module.
+    if (typeof NodeUsbTransport !== 'function') {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.TransportNotConfigured,
+        'Node USB requires Node.js'
+      );
+    }
     return NodeUsbTransport;
   }
   if (env === 'emulator') return EmulatorTransport;
@@ -57,7 +64,10 @@ const getTransport = async (env: ConnectSettings['env']) => {
 };
 
 let _core: Core | undefined;
+let _plugin: LowlevelTransportSharedPlugin | undefined;
 let _settings = parseConnectSettings();
+let lifecycle = Promise.resolve<unknown>(undefined);
+const pendingInitializations = new Set<AbortController>();
 
 const usbIdentityProbeTransports: Partial<Record<UsbDeviceIdentity['commType'], WebUsbTransport>> =
   {};
@@ -95,26 +105,35 @@ export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 const dispose = async () => {
   const core = _core;
+  pendingInitializations.forEach(controller => controller.abort());
+  pendingInitializations.clear();
+  const pending = lifecycle.catch(() => undefined);
   _core = undefined;
+  _plugin = undefined;
   eventEmitter.removeAllListeners();
   Object.keys(messagePromises).forEach(key => {
     delete messagePromises[Number(key)];
   });
   _settings = parseConnectSettings();
-  await core?.dispose?.();
+  const disposing = Promise.all([pending, core?.dispose()]);
+  lifecycle = disposing;
+  await disposing;
 };
 
 const uiResponse = (response: UiResponseEvent) => {
   if (!_core) {
     throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
   }
-  const { type, payload } = response;
-  _core.handleMessage({ event: UI_EVENT, type, payload } as CoreMessage);
+  _core
+    .handleMessage({ ...response, event: UI_EVENT } as CoreMessage)
+    .catch(error => Log.error(createErrorMessage(error)));
 };
 
 const cancel = (connectId?: string) => {
   if (_core === undefined) return;
-  _core.handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
+  _core
+    .handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } })
+    .catch(error => Log.debug('cancel error: ', error));
 };
 
 function handleMessage(message: CoreMessage) {
@@ -177,29 +196,53 @@ async function postMessage(message: CoreMessage, usePromise = true) {
   _core.handleMessage(message);
 }
 
-const init = async (
+const init = (
   settings: Partial<ConnectSettings>,
   _?: LowLevelCoreApi,
   plugin?: LowlevelTransportSharedPlugin
 ) => {
   _settings = { ..._settings, ...settings, env: settings.env ?? 'node' };
+  const initSettings = _settings;
+  const controller = new AbortController();
+  const { signal } = controller;
+  pendingInitializations.add(controller);
 
-  enableLog(!!settings.debug);
+  const initialize = async () => {
+    if (signal.aborted) return false;
+    enableLog(!!settings.debug);
+    Log.debug('init');
 
-  Log.debug('init');
+    try {
+      const Transport = await getTransport(initSettings.env);
+      if (signal.aborted) return false;
 
-  try {
-    const Transport = await getTransport(_settings.env);
-    _core = await initCore(_settings, Transport, plugin);
-    _core?.on(CORE_EVENT, handleMessage);
-    setLoggerPostMessage(handleMessage);
+      const previous = _core;
+      _core = undefined;
+      _plugin = undefined;
+      if (previous) await previous.dispose();
+      if (signal.aborted) return false;
+      const core = await initCore(initSettings, Transport, plugin, signal);
+      if (!core) return false;
+      if (signal.aborted) {
+        await core.dispose();
+        return false;
+      }
+      _core = core;
+      _plugin = plugin;
+      core.on(CORE_EVENT, handleMessage);
+      setLoggerPostMessage(handleMessage);
+      return true;
+    } catch (error) {
+      Log.error(createErrorMessage(error));
+      return false;
+    }
+  };
 
-    return true;
-  } catch (error) {
-    Log.error(createErrorMessage(error));
-
-    return false;
-  }
+  const initializing = lifecycle.then(initialize, initialize).finally(() => {
+    pendingInitializations.delete(controller);
+  });
+  lifecycle = initializing;
+  return initializing;
 };
 
 const call = async (params: any) => {
@@ -212,17 +255,22 @@ const call = async (params: any) => {
       Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
+        const emitBleUiWarning = (message: CoreMessage) => {
+          postMessage(message, false).catch(error =>
+            Log.debug('postMessage warning error: ', error)
+          );
+        };
         if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
-          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED));
         }
         if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
-          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF));
         }
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
-          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION));
         }
         if (response.payload?.code === HardwareErrorCode.BleLocationError) {
-          postMessage(createUiMessage(UI_REQUEST.LOCATION_PERMISSION), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.LOCATION_PERMISSION));
         }
       }
 
@@ -238,6 +286,58 @@ const call = async (params: any) => {
 
 const updateSettings = () => Promise.resolve(true);
 const switchTransport = () => Promise.resolve({ success: true });
+
+const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
+  [
+    UI_EVENT,
+    LOG_EVENT,
+    FIRMWARE_EVENT,
+    DEVICE.CONNECT,
+    DEVICE.DISCONNECT,
+    DEVICE.FEATURES,
+    DEVICE.STATE,
+    DEVICE.SUPPORT_FEATURES,
+  ].forEach(eventName => {
+    eventEmitter.on(eventName, (message: CoreMessage) => {
+      // Match the Web SDK envelope for device events emitted as payloads.
+      const envelope = message as { event?: string; type?: string } | null | undefined;
+      let emitMessage = message;
+      if (envelope && typeof envelope === 'object' && !envelope.event && !envelope.type) {
+        emitMessage = { ...message };
+        Object.assign(emitMessage, { event: eventName, type: eventName });
+      }
+      listener(emitMessage);
+    });
+  });
+};
+
+export const HardwareSDKLowLevel = HardwareLowLevelSdk({
+  eventEmitter,
+  init: (settings, sdk, plugin) => init({ ..._settings, ...settings }, sdk, plugin),
+  call,
+  cancel,
+  dispose,
+  addHardwareGlobalEventListener,
+  uiResponse,
+  updateSettings: (settings: Partial<ConnectSettings>) => {
+    if (_core || pendingInitializations.size > 0) {
+      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized));
+    }
+    _settings = parseConnectSettings({ ..._settings, ...settings });
+    return Promise.resolve(true);
+  },
+  switchTransport: async (env: ConnectSettings['env']) => {
+    const owner = _core;
+    if (!owner) throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+    await switchCoreTransport({
+      env,
+      owner,
+      loadTransport: () => getTransport(env),
+      plugin: _plugin,
+    });
+    return { success: true, payload: {} };
+  },
+});
 
 const HardwareCommonConnectSdk = HardwareSdk({
   eventEmitter,

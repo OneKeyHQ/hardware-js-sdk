@@ -1,23 +1,33 @@
-import * as protobuf from 'protobufjs/light';
+import { createProtobufRoot } from './descriptor';
 
-export function parseConfigure(data: protobuf.INamespace) {
-  // @ts-ignore [compatiblity]: connect is sending stringified json
-  if (typeof data === 'string') {
-    return protobuf.Root.fromJSON(JSON.parse(data));
-  }
-  return protobuf.Root.fromJSON(data);
+import type { ProtobufNamespaceJson, ProtobufRoot } from './descriptor';
+
+export type {
+  ProtobufEnumType,
+  ProtobufFieldInfo,
+  ProtobufMessageType,
+  ProtobufNamespaceJson,
+  ProtobufRoot,
+} from './descriptor';
+
+export function parseConfigure(data: ProtobufNamespaceJson | string): ProtobufRoot {
+  return createProtobufRoot(data);
 }
 
-export const createMessageFromName = (messages: protobuf.Root, name: string) => {
+export function parseTransportConfigure(data: ProtobufNamespaceJson | string): ProtobufRoot {
+  return createProtobufRoot(data);
+}
+
+export const createMessageFromName = (messages: ProtobufRoot, name: string) => {
   const Message = messages.lookupType(name);
   const MessageType = messages.lookupEnum('MessageType');
-  let messageTypeId = MessageType.values[`MessageType_${name}`];
+  let messageTypeId: unknown = MessageType.values[`MessageType_${name}`];
 
   if (messageTypeId == null && Message.options) {
     messageTypeId = Message.options['(wire_type)'];
   }
 
-  if (!Number.isInteger(messageTypeId)) {
+  if (typeof messageTypeId !== 'number' || !Number.isInteger(messageTypeId)) {
     throw new Error(`MessageType for "${name}" is not defined in protobuf schema`);
   }
 
@@ -27,7 +37,7 @@ export const createMessageFromName = (messages: protobuf.Root, name: string) => 
   };
 };
 
-export const createMessageFromType = (messages: protobuf.Root, typeId: number) => {
+export const createMessageFromType = (messages: ProtobufRoot, typeId: number) => {
   const MessageType = messages.lookupEnum('MessageType');
 
   const rawMessageName = MessageType.valuesById[typeId];

@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport",
-  "version": "1.2.11-alpha.2",
+  "version": "1.2.11-alpha.7",
   "description": "Transport layer abstractions and utilities for OneKey hardware SDK.",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -16,16 +16,20 @@
     "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "update:protobuf": "./scripts/protobuf-build.sh"
+    "update:protobuf": "./scripts/protobuf-build.sh",
+    "test:static-csp": "node --disallow-code-generation-from-strings scripts/protobuf-static-csp.js",
+    "check:source": "node scripts/protobuf-source-check.js"
   },
   "devDependencies": {
     "@types/bytebuffer": "^5.0.42",
     "@types/w3c-web-usb": "^1.0.10",
-    "@types/web-bluetooth": "^0.0.21"
+    "@types/web-bluetooth": "^0.0.21",
+    "long": "^4.0.0",
+    "protobufjs": "6.11.6"
   },
   "dependencies": {
-    "bytebuffer": "^5.0.1",
-    "long": "^4.0.0",
-    "protobufjs": "^6.11.2"
+    "@bufbuild/protobuf": "^2.11.0",
+    "buffer": "^6.0.3",
+    "bytebuffer": "^5.0.1"
   }
 }

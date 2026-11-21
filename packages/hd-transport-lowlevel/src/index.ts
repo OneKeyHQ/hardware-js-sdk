@@ -22,7 +22,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
 
-const { check, ProtocolV1, parseConfigure } = transport;
+const { check, ProtocolV1, parseTransportConfigure } = transport;
 
 const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
@@ -69,9 +69,9 @@ function readProtocolV1PayloadLength(data: Uint8Array) {
 }
 
 export default class LowlevelTransport {
-  _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
-  _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   configured = false;
 
@@ -90,6 +90,12 @@ export default class LowlevelTransport {
   private protocolV2Generations: Map<string, number> = new Map();
 
   private connectedDevices: Set<string> = new Set();
+
+  private acquiringDevices: Set<string> = new Set();
+
+  private stopped = false;
+
+  private stopPromise?: Promise<void>;
 
   private protocolV2PacketCapacities: Map<string, number> = new Map();
 
@@ -132,6 +138,8 @@ export default class LowlevelTransport {
   }
 
   init(logger: any, emitter: EventEmitter, plugin: LowlevelTransportSharedPlugin) {
+    this.stopped = false;
+    this.stopPromise = undefined;
     this.Log = logger;
     this.emitter = emitter;
     this.plugin = plugin;
@@ -139,7 +147,7 @@ export default class LowlevelTransport {
   }
 
   configure(signedData: any) {
-    const messages = parseConfigure(signedData);
+    const messages = parseTransportConfigure(signedData);
     this.configured = true;
     this._messages = messages;
   }
@@ -151,7 +159,7 @@ export default class LowlevelTransport {
     }
 
     const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
-    this._messagesV2 = parseConfigure(signedData);
+    this._messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaConfiguration = configuration;
 
     if (isReconfiguration) {
@@ -170,56 +178,79 @@ export default class LowlevelTransport {
     return devices;
   }
 
-  async acquire(input: LowLevelAcquireInput) {
-    const alreadyConnected = this.connectedDevices.has(input.uuid);
-    try {
-      await this.plugin.connect(input.uuid);
-      await this.refreshProtocolV2PacketCapacity(input.uuid);
-      if (!alreadyConnected) {
-        this.connectedDevices.add(input.uuid);
-        this.advanceProtocolV2Generation(input.uuid);
-      }
-    } catch (error) {
-      this.connectedDevices.delete(input.uuid);
-      this.Log.debug('lowlelvel transport connect error: ', error);
-      throw ERRORS.TypedError(
-        HardwareErrorCode.LowlevelTrasnportConnectError,
-        error.message ?? error
-      );
+  private assertRunning() {
+    if (this.stopped) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Lowlevel transport is stopped');
     }
+  }
 
-    this.protocolV2Assemblers.set(
-      input.uuid,
-      new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES)
-    );
-    const protocolHint = input.expectedProtocol
-      ? undefined
-      : input.protocolHint ?? this.deviceProtocolHints.get(input.uuid);
+  async acquire(input: LowLevelAcquireInput) {
+    this.assertRunning();
+    const alreadyConnected = this.connectedDevices.has(input.uuid);
+    this.acquiringDevices.add(input.uuid);
     try {
-      const protocolType = await this.detectProtocol(
-        input.uuid,
-        input.expectedProtocol,
-        protocolHint
-      );
-      return { uuid: input.uuid, protocolType };
-    } catch (error) {
       try {
-        await this.protocolV2Links.invalidateLink(input.uuid, 'Lowlevel transport acquire failed');
-      } catch (cleanupError) {
-        this.Log?.debug('[LowlevelTransport] acquire link cleanup failed:', cleanupError);
-      }
-      try {
-        await this.plugin.disconnect(input.uuid);
-      } catch (cleanupError) {
-        this.Log?.debug('[LowlevelTransport] acquire disconnect failed:', cleanupError);
-      } finally {
+        await this.plugin.connect(input.uuid);
+        await this.refreshProtocolV2PacketCapacity(input.uuid);
+        if (this.stopped) {
+          await this.plugin.disconnect?.(input.uuid).catch(() => undefined);
+          this.assertRunning();
+        }
+        if (!alreadyConnected) {
+          this.connectedDevices.add(input.uuid);
+          this.advanceProtocolV2Generation(input.uuid);
+        }
+      } catch (error) {
         this.connectedDevices.delete(input.uuid);
-        this.deviceProtocol.delete(input.uuid);
-        this.protocolV2Assemblers.delete(input.uuid);
-        this.protocolV2PacketCapacities.delete(input.uuid);
-        this.advanceProtocolV2Generation(input.uuid);
+        if (this.stopped) {
+          throw error;
+        }
+        this.Log?.debug('lowlelvel transport connect error: ', error);
+        throw ERRORS.TypedError(
+          HardwareErrorCode.LowlevelTrasnportConnectError,
+          error.message ?? error
+        );
       }
-      throw error;
+
+      this.protocolV2Assemblers.set(
+        input.uuid,
+        new ProtocolV2FrameAssembler(PROTOCOL_V2_BLE_FRAME_MAX_BYTES)
+      );
+      const protocolHint = input.expectedProtocol
+        ? undefined
+        : input.protocolHint ?? this.deviceProtocolHints.get(input.uuid);
+      try {
+        const protocolType = await this.detectProtocol(
+          input.uuid,
+          input.expectedProtocol,
+          protocolHint
+        );
+        this.assertRunning();
+        return { uuid: input.uuid, protocolType };
+      } catch (error) {
+        try {
+          await this.protocolV2Links.invalidateLink(
+            input.uuid,
+            'Lowlevel transport acquire failed'
+          );
+        } catch (cleanupError) {
+          this.Log?.debug('[LowlevelTransport] acquire link cleanup failed:', cleanupError);
+        }
+        try {
+          await this.plugin.disconnect(input.uuid);
+        } catch (cleanupError) {
+          this.Log?.debug('[LowlevelTransport] acquire disconnect failed:', cleanupError);
+        } finally {
+          this.connectedDevices.delete(input.uuid);
+          this.deviceProtocol.delete(input.uuid);
+          this.protocolV2Assemblers.delete(input.uuid);
+          this.protocolV2PacketCapacities.delete(input.uuid);
+          this.advanceProtocolV2Generation(input.uuid);
+        }
+        throw error;
+      }
+    } finally {
+      this.acquiringDevices.delete(input.uuid);
     }
   }
 
@@ -237,6 +268,46 @@ export default class LowlevelTransport {
       this.Log.debug('lowlelvel transport disconnect error: ', error);
       return false;
     }
+  }
+
+  stop(): Promise<void> {
+    this.stopped = true;
+    if (!this.stopPromise) {
+      this.stopPromise = this.stopResources();
+    }
+    return this.stopPromise;
+  }
+
+  private async stopResources(): Promise<void> {
+    const trackedDeviceIds = new Set<string>([
+      ...this.connectedDevices,
+      ...this.acquiringDevices,
+      ...this.deviceProtocol.keys(),
+      ...this.protocolV2Assemblers.keys(),
+      ...this.protocolV2PacketCapacities.keys(),
+    ]);
+
+    await Promise.all(
+      Array.from(trackedDeviceIds, async uuid => {
+        const shouldDisconnect = this.connectedDevices.has(uuid) || this.acquiringDevices.has(uuid);
+        this.advanceProtocolV2Generation(uuid);
+        this.connectedDevices.delete(uuid);
+        this.deviceProtocol.delete(uuid);
+        this.protocolV2Assemblers.delete(uuid);
+        this.protocolV2PacketCapacities.delete(uuid);
+        if (shouldDisconnect && typeof this.plugin?.disconnect === 'function') {
+          try {
+            await this.plugin.disconnect(uuid);
+          } catch (error) {
+            this.Log?.debug(`[LowlevelTransport] stop disconnect failed: ${uuid}`, error);
+          }
+        }
+      })
+    );
+
+    await this.protocolV2Links
+      .dispose('Lowlevel transport stopped')
+      .catch(error => this.Log?.debug('[LowlevelTransport] link dispose failed:', error));
   }
 
   async call(
@@ -436,12 +507,20 @@ export default class LowlevelTransport {
       );
     }
 
+    this.assertRunning();
     try {
       await this.plugin.connect(uuid);
       await this.refreshProtocolV2PacketCapacity(uuid);
+      if (this.stopped) {
+        await this.plugin.disconnect?.(uuid).catch(() => undefined);
+        this.assertRunning();
+      }
       this.connectedDevices.add(uuid);
       this.advanceProtocolV2Generation(uuid);
     } catch (error) {
+      if (this.stopped) {
+        throw error;
+      }
       this.Log?.debug(
         `[LowlevelTransport] reconnect after Protocol ${protocol} probe failed:`,
         error

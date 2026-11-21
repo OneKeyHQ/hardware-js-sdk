@@ -563,4 +563,58 @@ describe('LowlevelTransport protocol framing', () => {
     });
     expect(lowlevel.getProtocolType('flaky-pro2-id')).toBeUndefined();
   });
+
+  test('stop() disconnects connected plugin devices and clears protocol state idempotently', async () => {
+    const probeResponse = ProtocolV2.encodeFrame(
+      schemas,
+      'Success',
+      { message: 'ok' },
+      { router: PROTOCOL_V2_CHANNEL_BLE_UART }
+    );
+    const plugin = createPlugin({
+      devices: [{ id: 'stop-pro2-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [bytesToHex(probeResponse)],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(
+      lowlevel.acquire({ uuid: 'stop-pro2-id', expectedProtocol: 'V2' })
+    ).resolves.toEqual({
+      uuid: 'stop-pro2-id',
+      protocolType: 'V2',
+    });
+    expect(lowlevel.getProtocolType('stop-pro2-id')).toBe('V2');
+
+    await lowlevel.stop();
+
+    expect(plugin.disconnect).toHaveBeenCalledTimes(1);
+    expect(plugin.disconnect).toHaveBeenCalledWith('stop-pro2-id');
+    expect(lowlevel.getProtocolType('stop-pro2-id')).toBeUndefined();
+
+    // Calling stop() again is a safe no-op.
+    await lowlevel.stop();
+    expect(plugin.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  test('stop() aborts an in-flight acquire() and disconnects without leaking the connection', async () => {
+    let resolveConnect;
+    const connectPromise = new Promise(resolve => {
+      resolveConnect = resolve;
+    });
+    const plugin = createPlugin({
+      devices: [{ id: 'inflight-stop-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [],
+    });
+    plugin.connect.mockImplementation(() => connectPromise);
+    const lowlevel = configureTransport(plugin);
+
+    const acquiring = lowlevel.acquire({ uuid: 'inflight-stop-id', expectedProtocol: 'V2' });
+    const stopping = lowlevel.stop();
+    resolveConnect();
+
+    await expect(acquiring).rejects.toThrow(/Lowlevel transport is stopped/);
+    await stopping;
+    expect(plugin.disconnect).toHaveBeenCalledWith('inflight-stop-id');
+    expect(lowlevel.getProtocolType('inflight-stop-id')).toBeUndefined();
+  });
 });

@@ -1,82 +1,214 @@
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
-import { Enum } from 'protobufjs/light';
+import { ScalarType, create, toBinary } from '@bufbuild/protobuf';
+// eslint-disable-next-line import/no-unresolved, camelcase
+import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
 
-import { isPrimitiveField } from '../../utils/protobuf';
+import { ensureTextEncoding } from './text-encoding';
 
-import type { Type } from 'protobufjs/light';
+import type { DescEnum, DescField, DescMessage, Message } from '@bufbuild/protobuf';
+import type { ProtobufMessageType } from './descriptor';
 
-const transform = (fieldType: string, value: any) => {
-  if (fieldType === 'bytes') {
-    // special edge case
-    // for example MultisigRedeemScriptType might have field signatures ['', '', ''] (check in TrezorConnect signTransactionMultisig test fixtures).
-    // trezor needs to receive such field as signatures: [b'', b'', b'']. If we transfer this to empty buffer with protobufjs, this will be decoded by
-    // trezor as signatures: [] (empty array)
-    if (typeof value === 'string' && !value) return value;
+const is64BitScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT64 ||
+  scalar === ScalarType.UINT64 ||
+  scalar === ScalarType.SINT64 ||
+  scalar === ScalarType.FIXED64 ||
+  scalar === ScalarType.SFIXED64;
 
-    // normal flow
-    return Buffer.from(value, 'hex');
+const isUnsigned64Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT64 || scalar === ScalarType.FIXED64;
+
+const isUnsigned32Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT32 || scalar === ScalarType.FIXED32;
+
+const isSigned32Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT32 || scalar === ScalarType.SINT32 || scalar === ScalarType.SFIXED32;
+
+const toBigInt64 = (scalar: ScalarType, value: unknown): bigint => {
+  let raw: bigint;
+  if (typeof value === 'bigint') {
+    raw = value;
+  } else if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value)) {
+      throw new RangeError('field value is not within safe integer range');
+    }
+    raw = BigInt(value);
+  } else if (typeof value === 'string') {
+    if (value === '') {
+      throw new Error('empty string');
+    }
+    raw = BigInt(value);
+  } else if (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { toString: unknown }).toString === 'function'
+  ) {
+    raw = BigInt(String(value));
+  } else {
+    throw new TypeError(`Unsupported 64-bit integer value: ${typeof value}`);
   }
-  if (typeof value === 'number' && !Number.isSafeInteger(value)) {
-    throw new RangeError('field value is not within safe integer range');
-  }
-  return value;
+  return isUnsigned64Scalar(scalar) ? BigInt.asUintN(64, raw) : BigInt.asIntN(64, raw);
 };
 
-export function patch(Message: Type, payload: any) {
-  const patched: any = {};
-
-  if (!Message.fields) {
-    return patched;
+const encodeScalar = (scalar: ScalarType, value: unknown): unknown => {
+  if (
+    typeof value === 'number' &&
+    scalar !== ScalarType.FLOAT &&
+    scalar !== ScalarType.DOUBLE &&
+    !Number.isSafeInteger(value)
+  ) {
+    throw new RangeError('field value is not within safe integer range');
   }
 
-  Object.keys(Message.fields).forEach(key => {
-    const field = Message.fields[key];
-    const value = payload[key];
-
-    // no value for this field
-    if (typeof value === 'undefined') {
-      return;
+  if (scalar === ScalarType.BYTES) {
+    if (typeof value === 'string') {
+      return value.length === 0 ? new Uint8Array(0) : new Uint8Array(Buffer.from(value, 'hex'));
     }
-    // primitive type
-    if (field && isPrimitiveField(field.type)) {
-      if (field.repeated) {
-        patched[key] = value.map((v: any) => transform(field.type, v));
-      } else {
-        patched[key] = transform(field.type, value);
+    if (value instanceof Uint8Array) {
+      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    }
+    if (Array.isArray(value)) {
+      return Uint8Array.from(value as number[]);
+    }
+    return new Uint8Array(Buffer.from(value as string, 'hex'));
+  }
+
+  if (is64BitScalar(scalar)) {
+    return toBigInt64(scalar, value);
+  }
+
+  if (scalar === ScalarType.BOOL) {
+    return Boolean(value);
+  }
+
+  if (scalar === ScalarType.STRING) {
+    return typeof value === 'string' ? value : String(value);
+  }
+
+  const num = Number(value);
+  if (isUnsigned32Scalar(scalar) && Number.isInteger(num) && num >= -0x80000000 && num < 0) {
+    // Preserve legacy protobufjs 32-bit bit-pattern compatibility for signed int32 inputs
+    // passed to uint32/fixed32 fields (e.g. BTC RefTransaction.version with high bit set).
+    return num + 0x100000000;
+  }
+  if (isSigned32Scalar(scalar) && Number.isInteger(num) && num > 0x7fffffff && num <= 0xffffffff) {
+    return num - 0x100000000;
+  }
+  return num;
+};
+
+const encodeEnum = (enumDesc: DescEnum, value: unknown): number | undefined => {
+  if (typeof value === 'string') {
+    const matched = enumDesc.values.find(v => v.name === value);
+    if (matched) return matched.number;
+    if (value.trim() !== '') {
+      const numeric = Number(value);
+      if (Number.isInteger(numeric)) return numeric;
+    }
+    return undefined;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value)) {
+      throw new RangeError('field value is not within safe integer range');
+    }
+    return value;
+  }
+  return undefined;
+};
+
+const zeroValueForScalar = (scalar: ScalarType): unknown => {
+  if (scalar === ScalarType.BYTES) return new Uint8Array(0);
+  if (scalar === ScalarType.STRING) return '';
+  if (scalar === ScalarType.BOOL) return false;
+  if (is64BitScalar(scalar)) return BigInt(0);
+  return 0;
+};
+
+const defaultForRequiredScalarOrEnum = (field: DescField): unknown => {
+  if (field.fieldKind === 'scalar') {
+    const explicit = field.getDefaultValue();
+    if (explicit !== undefined) return explicit;
+    return zeroValueForScalar(field.scalar);
+  }
+  if (field.fieldKind === 'enum') {
+    const explicit = field.getDefaultValue();
+    if (explicit !== undefined) return explicit;
+    return field.enum.values[0]?.number ?? 0;
+  }
+  return undefined;
+};
+
+function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Message {
+  const msg = create(desc) as unknown as Record<string, unknown>;
+
+  for (const field of desc.fields) {
+    const value = payload[field.name];
+    if (value === undefined || value === null) {
+      if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] =
+          field.fieldKind === 'message'
+            ? buildMessage(field.message, {})
+            : defaultForRequiredScalarOrEnum(field);
       }
-      return;
+    } else if (field.fieldKind === 'list') {
+      if (Array.isArray(value)) {
+        if (field.listKind === 'scalar') {
+          msg[field.localName] = value.map(v =>
+            v === undefined || v === null
+              ? zeroValueForScalar(field.scalar)
+              : encodeScalar(field.scalar, v)
+          );
+        } else if (field.listKind === 'enum') {
+          msg[field.localName] = value
+            .map(v => encodeEnum(field.enum, v))
+            .filter((v): v is number => v !== undefined);
+        } else if (field.listKind === 'message') {
+          msg[field.localName] = value.map(v =>
+            buildMessage(field.message, (v ?? {}) as Record<string, unknown>)
+          );
+        }
+      }
+    } else if (field.fieldKind === 'scalar') {
+      const encodedScalar = encodeScalar(field.scalar, value);
+      // Match protobufjs fromObject: 0-length bytes from a Buffer/Uint8Array or non-empty
+      // non-hex string (e.g. Buffer.from('0x...', 'hex')) are omitted on optional bytes fields,
+      // whereas an explicit empty string '' is still encoded as 0-length bytes.
+      const omitEmptyOptionalBytes =
+        field.scalar === ScalarType.BYTES &&
+        field.proto.label !== FieldLabel.REQUIRED &&
+        encodedScalar instanceof Uint8Array &&
+        encodedScalar.byteLength === 0 &&
+        value !== '';
+      if (!omitEmptyOptionalBytes) {
+        msg[field.localName] = encodedScalar;
+      }
+    } else if (field.fieldKind === 'enum') {
+      const enumNumber = encodeEnum(field.enum, value);
+      if (enumNumber !== undefined) {
+        msg[field.localName] = enumNumber;
+      } else if (field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] = defaultForRequiredScalarOrEnum(field);
+      }
+    } else if (field.fieldKind === 'message') {
+      if (typeof value === 'object') {
+        msg[field.localName] = buildMessage(field.message, value as Record<string, unknown>);
+      } else if (field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] = buildMessage(field.message, {});
+      }
     }
-    // repeated
-    if (field.repeated) {
-      const RefMessage = Message.lookupTypeOrEnum(field.type);
-      patched[key] =
-        RefMessage instanceof Enum
-          ? value.map((v: any) => transform(field.type, v))
-          : value.map((v: any) => patch(RefMessage, v));
-    }
-    // message type
-    else if (typeof value === 'object' && value !== null) {
-      const RefMessage = Message.lookupType(field.type);
-      patched[key] = patch(RefMessage, value);
-    }
-    // enum type
-    else if (typeof value === 'number') {
-      const RefMessage = Message.lookupEnum(field.type);
-      patched[key] = RefMessage.values[value];
-    } else {
-      patched[key] = value;
-    }
-  });
+  }
 
-  return patched;
+  return msg as unknown as Message;
 }
 
-export const encode = (Message: Type, data: Record<string, unknown>) => {
-  const payload = patch(Message, data);
-  const message = Message.fromObject(payload);
-  // Encode a message to an Uint8Array (browser) or Buffer (node)
-  const buffer = Message.encode(message).finish();
+export const encode = (
+  messageType: ProtobufMessageType,
+  data: Record<string, unknown>
+): ByteBuffer => {
+  ensureTextEncoding();
+  const message = buildMessage(messageType.desc, data ?? {});
+  const buffer = toBinary(messageType.desc, message);
   const bytebuffer = new ByteBuffer(buffer.byteLength);
   bytebuffer.append(buffer);
   bytebuffer.reset();
