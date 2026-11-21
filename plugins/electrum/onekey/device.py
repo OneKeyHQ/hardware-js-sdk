@@ -7,8 +7,6 @@ then the legacy Bitcoin messages.
 
 import importlib
 
-from .link import LinkError
-
 # Electrum mounts this zip as electrum_external_plugins.onekey. A package-level
 # "from . import codec" then looks up electrum_external_plugins, which is not a
 # module. Importing the sibling by its full name stays inside the mounted package.
@@ -28,6 +26,10 @@ class SessionError(Exception):
 
 def _fail(code):
     raise SessionError(code)
+
+
+def _session_id(value):
+    return type(value) is bytes and len(value) == 32 and any(value)
 
 
 def _text(value, max_len=256):
@@ -135,7 +137,7 @@ class Session:
             status, info = self._main_pin(status, info)
             if status.get("passphrase_enabled"):
                 self._passphrase("", on_device=False)
-            self._call(codec.DEVICE_SESSION_GET, codec.encode_session_get(), codec.DEVICE_SESSION)
+            _address, session_id = self._session()
             wallet_type, passphrase_state = "standard", None
         elif mode == "select-hidden":
             if status.get("unlocked") is not True:
@@ -143,25 +145,19 @@ class Session:
                 status, info = self.identity()
             self.on_ui("passphrase-select")
             self._passphrase(None, on_device=True)
-            passphrase_state = codec.decode_session(self._call(
-                codec.DEVICE_SESSION_GET, codec.encode_session_get(), codec.DEVICE_SESSION))
-            if not passphrase_state:
-                _fail("WALLET_MISMATCH")
+            passphrase_state, session_id = self._session()
             wallet_type = "hidden"
         else:
             # Attach PIN is the wallet selector. AskPassphrase clears that unlock.
             status, info = self._attach_pin(status, info)
-            passphrase_state = codec.decode_session(self._call(
-                codec.DEVICE_SESSION_GET, codec.encode_session_get(), codec.DEVICE_SESSION))
-            if not passphrase_state:
-                _fail("WALLET_MISMATCH")
+            passphrase_state, session_id = self._session()
             wallet_type = "attach-pin"
         status, info = self.identity()
         if not status["device_id"]:
             _fail("DEVICE_MISMATCH")
         result = {"deviceId": status["device_id"], "serialNo": info["serial_no"],
                   "walletType": wallet_type, "passphraseState": passphrase_state}
-        self.cache[self.connect_id] = (wallet_type, passphrase_state, status["device_id"])
+        self._remember(wallet_type, passphrase_state, status["device_id"], session_id)
         return result
 
     def xpub(self, binding, coin, path, script_type):
@@ -225,34 +221,81 @@ class Session:
             _fail("DEVICE_MISMATCH")
         if status["device_id"] is not None and status["device_id"] != binding["deviceId"]:
             _fail("DEVICE_MISMATCH")
-        cached = self.cache.get(self.connect_id)
-        wanted = (binding["walletType"], binding["passphraseState"], binding["deviceId"])
-        if status.get("unlocked") and status["device_id"] == binding["deviceId"] and cached == wanted:
-            return status, info
         self._eventless_session()
+        # A cache hit is a live resume. Locking clears every SE session while the
+        # USB interface stays claimed, and an on-device wallet change keeps the
+        # same device_id. The tuple alone cannot prove which seed is loaded.
+        if self._resume(binding, status):
+            return status, info
         kind = binding["walletType"]
         if kind == "standard":
             status, info = self._main_pin(status, info)
             if status.get("passphrase_enabled"):
                 self._passphrase("", on_device=False)
-            self._call(codec.DEVICE_SESSION_GET, codec.encode_session_get(), codec.DEVICE_SESSION)
+            _address, session_id = self._session()
         elif kind == "hidden":
-            # Saved hidden wallets resume by address. A new on-device passphrase
-            # would select a different wallet, including after an attach-PIN unlock.
             if status.get("unlocked") is not True or status.get("unlocked_by_attach_to_pin") is True:
                 self._pin(codec.PIN_MAIN)
-            restored = codec.decode_session(self._call(
-                codec.DEVICE_SESSION_GET, codec.encode_session_get(binding["passphraseState"]), codec.DEVICE_SESSION))
+                status, info = self.identity()
+            if self._resume(binding, status):
+                return status, info
+            # Address-only Get is a hint. A miss calls SESSION_NEW and returns the
+            # new wallet. Resume uses the in-memory session id; after lock the
+            # passphrase has to be entered on the device again.
+            self.on_ui("passphrase")
+            self._passphrase(None, on_device=True)
+            restored, session_id = self._session()
             if restored != binding["passphraseState"]:
                 _fail("WALLET_MISMATCH")
         else:
             status, info = self._attach_pin(status, info)
-            restored = codec.decode_session(self._call(
-                codec.DEVICE_SESSION_GET, codec.encode_session_get(), codec.DEVICE_SESSION))
+            restored, session_id = self._session()
             if restored != binding["passphraseState"]:
                 _fail("WALLET_MISMATCH")
-        self.cache[self.connect_id] = wanted
+        self._remember(kind, binding["passphraseState"], binding["deviceId"], session_id)
         return status, info
+
+    def _resume(self, binding, status):
+        cached = self.cache.get(self.connect_id)
+        if type(cached) is not tuple or len(cached) != 4:
+            return False
+        wallet_type, passphrase_state, device_id, session_id = cached
+        wanted = (binding["walletType"], binding["passphraseState"], binding["deviceId"])
+        if (wallet_type, passphrase_state, device_id) != wanted or not _session_id(session_id):
+            return False
+        if status.get("unlocked") is not True or status.get("device_id") != binding["deviceId"]:
+            return False
+        attach = status.get("unlocked_by_attach_to_pin") is True
+        if binding["walletType"] == "attach-pin":
+            if not attach:
+                return False
+        elif attach:
+            return False
+        address = None if binding["walletType"] == "standard" else binding["passphraseState"]
+        try:
+            opened, new_id = self._session(address, session_id)
+        except SessionError as error:
+            if error.code != "WALLET_SESSION_INVALID":
+                raise
+            self.cache.pop(self.connect_id, None)
+            return False
+        if binding["walletType"] != "standard" and opened != binding["passphraseState"]:
+            self.cache.pop(self.connect_id, None)
+            return False
+        self._remember(wallet_type, passphrase_state, device_id, new_id or session_id)
+        return True
+
+    def _session(self, address=None, session_id=None):
+        payload = self._call(codec.DEVICE_SESSION_GET, codec.encode_session_get(address, session_id), codec.DEVICE_SESSION)
+        opened, new_id = codec.decode_session(payload)
+        if not opened:
+            _fail("WALLET_MISMATCH")
+        return opened, new_id
+
+    def _remember(self, wallet_type, passphrase_state, device_id, session_id):
+        if not _session_id(session_id):
+            session_id = None
+        self.cache[self.connect_id] = (wallet_type, passphrase_state, device_id, session_id)
 
     def _main_pin(self, status, info):
         # Main PIN while attach-unlocked is the wrong unlock. Firmware relocks and
@@ -292,17 +335,16 @@ class Session:
                    codec.encode_ask_passphrase(passphrase, on_device=on_device), codec.SUCCESS)
 
     def _call(self, msg_type, payload, expect):
-        try:
-            kind, body = self.link.exchange(msg_type, payload, deadline=self.deadline, cancelled=self.cancelled)
-        except LinkError as error:
-            raise SessionError(error.code) from None
+        kind, body = self.link.exchange(msg_type, payload, deadline=self.deadline, cancelled=self.cancelled)
         while kind == codec.BUTTON_REQUEST:
             self.on_ui("button")
-            try:
-                kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self.deadline, cancelled=self.cancelled)
-            except LinkError as error:
-                raise SessionError(error.code) from None
+            kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self.deadline, cancelled=self.cancelled)
         if kind == codec.FAILURE:
+            _code, subcode, _message = codec.decode_failure(body)
+            if subcode == codec.SESSION_INVALID:
+                _fail("WALLET_SESSION_INVALID")
+            if subcode == codec.SESSION_CANCELLED:
+                _fail("CANCELLED")
             _fail("SDK_FAILED")
         if kind != expect:
             _fail("PROTOCOL")

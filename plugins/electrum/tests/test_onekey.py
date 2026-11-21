@@ -529,6 +529,26 @@ class TestOneKeyClient(unittest.TestCase):
         helper.shutdown.assert_not_called()
         self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list))
 
+    def test_cancelled_device_prompt_during_storage_unlock_keeps_the_open_wallet(self):
+        client, helper, handler = self.make_client()
+        standard = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
+                        walletType="standard", passphraseState=None)
+        account = ([0x80000054, 0x80000000, 0x80000000], "p2wpkh", self.public_key())
+        client.binding = dict(standard)
+        client.account = account
+        client.device_id = STATE["deviceId"]
+        handler.choose_wallet.return_value = "standard"
+        helper.call.side_effect = HelperError("CANCELLED")
+        client.begin_storage_unlock_selection()
+        with self.assertRaises(UserCancelled):
+            client.get_xpub(get_derivation_used_for_hw_device_encryption(), "standard")
+        self.assertEqual(standard, client.binding)
+        self.assertEqual(account, client.account)
+        self.assertEqual(STATE["deviceId"], client.device_id)
+        self.assertFalse(client.closed)
+        self.assertFalse(client._unlock_selection)
+        helper.shutdown.assert_not_called()
+
     def test_storage_encryption_can_select_a_wallet_without_becoming_the_account(self):
         client, helper, handler = self.make_client()
         encryption_xpub = self.encryption_xpub()

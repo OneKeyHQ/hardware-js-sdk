@@ -177,16 +177,19 @@ class Helper:
                 self.generation = uuid.uuid4().hex
             try:
                 return self._dispatch(op, params, deadline, cancelled, on_ui)
-            except (SessionError, LinkError) as error:
-                self.generation = None
-                self._wallets.clear()
+            except LinkError as error:
+                # The pipe failed. Drop only that interface; other devices keep
+                # their generation and claimed links.
+                raise HelperError(error.code) from None
+            except SessionError as error:
+                # Cancel and wallet mismatch are not a dead USB link.
                 raise HelperError(error.code) from None
             except HelperError:
-                self.generation = None
                 raise
             except Exception:
                 self.generation = None
                 self._wallets.clear()
+                self._release_links()
                 raise HelperError("SDK_FAILED") from None
 
     def shutdown(self):
@@ -214,7 +217,8 @@ class Helper:
         if type(connect_id) is not str or not connect_id:
             raise SessionError("INVALID_REQUEST")
         # The wallet session lives with the claimed interface. Releasing USB
-        # between calls would depend on firmware keeping that session.
+        # between calls would depend on firmware keeping that session. A cancel
+        # or a wallet mismatch leaves the interface up; a broken pipe does not.
         link = self._acquire(connect_id)
         try:
             session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
@@ -234,7 +238,16 @@ class Helper:
                 return session.sign(params.get("binding"), params.get("coin"), params.get("inputs"), params.get("outputs"),
                                     params.get("refTxs"), params.get("version"), params.get("locktime"))
             raise SessionError("INVALID_REQUEST")
+        except LinkError as error:
+            self._wallets.pop(connect_id, None)
+            if error.code != "CANCELLED":
+                self._drop(connect_id)
+            raise
+        except SessionError:
+            self._wallets.pop(connect_id, None)
+            raise
         except BaseException:
+            self._wallets.pop(connect_id, None)
             self._drop(connect_id)
             raise
 
@@ -257,6 +270,12 @@ class Helper:
                     raise
                 found.append({"connectId": path, "deviceId": state["deviceId"],
                               "serialNo": state["serialNo"], "model": state["model"]})
+            except LinkError as error:
+                if held and error.code != "CANCELLED":
+                    self._drop(path)
+                raise
+            except SessionError:
+                raise
             except BaseException:
                 if held:
                     self._drop(path)

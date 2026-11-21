@@ -5,7 +5,7 @@ from unittest import mock
 from onekey import codec
 from onekey.frame import SeqCounter, decode, encode, pop_frame
 from onekey.ipc import Helper, HelperError
-from onekey.link import Link
+from onekey.link import Link, LinkError
 
 
 ACCOUNT = [0x80000000 + 84, 0x80000000, 0x80000000]
@@ -37,7 +37,18 @@ class Scripted:
         self.attach_to_pin_enabled = False
         self.order = []
         self.session_queries = []
+        self.session_id = None
+        self.session_address = None
+        self.session_serial = 0
+        self.hidden_xpub = None
+        self.passphrase_address = None
+        self.broken = False
         self.steps = [codec.TX_INPUT, codec.TX_OUTPUT, codec.TX_META, codec.TX_FINISHED]
+
+    def install_session(self, address):
+        self.session_serial += 1
+        self.session_id = bytes([self.session_serial]) + bytes(31)
+        self.session_address = address
 
     def status(self):
         device_id = None if self.locked else self.device_id
@@ -52,6 +63,8 @@ class Scripted:
             unlocked_by_attach_to_pin=self.unlocked_by_attach and not self.locked)
 
     def handle(self, kind, payload):
+        if self.broken:
+            raise LinkError("PROTOCOL")
         if kind == codec.PING:
             return codec.SUCCESS, b""
         if kind == codec.DEVICE_STATUS_GET:
@@ -67,26 +80,44 @@ class Scripted:
             self.locked = False
             self.device_id = "synthetic-device"
             self.unlocked_by_attach = self.pins[-1] == codec.PIN_ATTACH
+            # Main PIN unlocks the device and clears SE sessions. Attach PIN loads
+            # the bound passphrase, which an empty Get then reads.
+            if self.unlocked_by_attach:
+                self.install_session(self.hidden)
+            else:
+                self.session_id = None
+                self.session_address = None
             return codec.SUCCESS, b""
         if kind == codec.DEVICE_SESSION_ASK_PASSPHRASE:
             passphrase, on_device, _domains = codec.decode_ask_passphrase(payload)
             self.on_device.append((on_device, passphrase))
+            if on_device:
+                self.install_session(self.passphrase_address or self.hidden)
+            elif passphrase == "":
+                self.install_session("standard-wallet")
             return codec.SUCCESS, b""
         if kind == codec.DEVICE_SESSION_GET:
-            query = codec.decode_session_get(payload)
-            self.session_queries.append(query)
-            if query:
-                address = query
-            elif self.unlocked_by_attach:
-                address = self.hidden
-            elif self.on_device and self.on_device[-1][0]:
-                address = self.hidden
-            else:
-                address = "standard-wallet"
-            return codec.DEVICE_SESSION, codec.encode_session(address)
+            session_id, address = codec.decode_session_get(payload)
+            self.session_queries.append((session_id, address))
+            if session_id:
+                if session_id != self.session_id or (address and address != self.session_address):
+                    return codec.FAILURE, codec.enc_uint(1, 5) + codec.enc_uint(2, codec.SESSION_INVALID)
+                return codec.DEVICE_SESSION, codec.encode_session(self.session_address, self.session_id)
+            if address:
+                if address != self.session_address:
+                    # Firmware treats the address as a hint and starts a new session.
+                    self.install_session("replaced-wallet")
+                return codec.DEVICE_SESSION, codec.encode_session(self.session_address, self.session_id)
+            if self.session_id is None:
+                if self.unlocked_by_attach or (self.on_device and self.on_device[-1][0]):
+                    self.install_session(self.hidden)
+                else:
+                    self.install_session("standard-wallet")
+            return codec.DEVICE_SESSION, codec.encode_session(self.session_address, self.session_id)
         if kind == codec.GET_PUBLIC_KEY:
             self.material = True
-            return codec.PUBLIC_KEY, codec.encode_public_key(self.xpub, 0x01020304)
+            xpub = self.hidden_xpub if self.session_address == self.hidden and self.hidden_xpub else self.xpub
+            return codec.PUBLIC_KEY, codec.encode_public_key(xpub, 0x01020304)
         if kind == codec.GET_ADDRESS:
             self.material = True
             return codec.ADDRESS, codec.encode_address(self.address)
@@ -199,6 +230,10 @@ class TestFrames(unittest.TestCase):
         self.assertIs(True, attached["unlocked_by_attach_to_pin"])
         self.assertEqual(codec.PIN_ATTACH, codec.decode_ask_pin(codec.encode_ask_pin(codec.PIN_ATTACH)))
         self.assertIs(True, codec.decode_protocol_info_request(codec.encode_protocol_info_request(True)))
+        session_id = bytes(range(32))
+        self.assertEqual((session_id, "addr"), codec.decode_session_get(codec.encode_session_get("addr", session_id)))
+        self.assertEqual(("addr", session_id), codec.decode_session(codec.encode_session("addr", session_id)))
+        self.assertEqual(codec.SESSION_INVALID, codec.decode_failure(codec.enc_uint(1, 5) + codec.enc_uint(2, 2))[1])
 
 
 class TestDeviceSession(unittest.TestCase):
@@ -223,13 +258,15 @@ class TestDeviceSession(unittest.TestCase):
             result = call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                                            "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
             self.assertEqual("xpub-test", result["xpub"])
-            self.assertFalse(any(on_device for on_device, _value in locked.on_device))
-            self.assertEqual([locked.hidden], [item for item in locked.session_queries if item])
+            self.assertEqual([(True, None)], locked.on_device)
+            self.assertEqual([(None, None)], locked.session_queries)
+            self.assertEqual(locked.hidden, locked.session_address)
             address = call(helper, "address", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                                                "path": ADDRESS_PATH, "scriptType": "SPENDWITNESS"})
             self.assertEqual("bc1qexample", address["address"])
             self.assertEqual([codec.PIN_MAIN], locked.pins)
-            self.assertFalse(any(on_device for on_device, _value in locked.on_device))
+            self.assertEqual([(True, None)], locked.on_device)
+            self.assertEqual((locked.session_id, locked.hidden), locked.session_queries[-1])
             signed = self.sign(helper, binding)
             self.assertEqual(SIGNATURE.hex(), signed["signatures"][0]["signature"])
             self.assertEqual([codec.TX_INPUT, codec.TX_OUTPUT, codec.TX_META, codec.TX_FINISHED], locked.order)
@@ -264,7 +301,7 @@ class TestDeviceSession(unittest.TestCase):
                               "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
         self.assertEqual([codec.PIN_ATTACH], locked.pins)
         self.assertEqual([], locked.on_device)
-        self.assertEqual([None], locked.session_queries)
+        self.assertEqual([(None, None)], locked.session_queries)
 
         current = Scripted()
         current.locked = False
@@ -275,6 +312,36 @@ class TestDeviceSession(unittest.TestCase):
                               "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
         self.assertEqual([], current.pins)
         self.assertEqual([], current.on_device)
+
+    def test_cached_standard_wallet_does_not_follow_an_attach_pin_unlock(self):
+        device = Scripted()
+        helper, device = helper_for(device)
+        opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        binding = dict(deviceId=opened["deviceId"], serialNo=opened["serialNo"],
+                       walletType="standard", passphraseState=None)
+        device.hidden_xpub = "xpub-attach"
+        device.unlocked_by_attach = True
+        device.install_session(device.hidden)
+        result = call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
+                                       "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
+        self.assertEqual("xpub-test", result["xpub"])
+        self.assertEqual(codec.PIN_MAIN, device.pins[-1])
+        self.assertEqual("standard-wallet", device.session_address)
+
+    def test_hidden_restore_rejects_a_different_passphrase_without_a_hint_session(self):
+        device = Scripted()
+        device.passphrase_address = "other-wallet"
+        helper, device = helper_for(device)
+        binding = dict(deviceId="synthetic-device", serialNo="synthetic-serial",
+                       walletType="hidden", passphraseState=device.hidden)
+        with self.assertRaises(HelperError) as raised:
+            call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
+                                  "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
+        self.assertEqual("WALLET_MISMATCH", raised.exception.code)
+        self.assertEqual([(True, None)], device.on_device)
+        self.assertEqual([(None, None)], device.session_queries)
+        self.assertEqual("other-wallet", device.session_address)
+        self.assertIsNotNone(helper.generation)
 
     def test_usb_interface_stays_open_across_wallet_calls(self):
         device = Scripted()
@@ -292,16 +359,24 @@ class TestDeviceSession(unittest.TestCase):
             call(helper, "search", {})
             self.assertEqual(2, open_path.call_count)
             self.assertEqual([], closed)
+            generation = helper.generation
             with self.assertRaises(HelperError) as raised:
                 call(helper, "open", {"connectId": "001:1", "mode": "nope"})
             self.assertEqual("INVALID_REQUEST", raised.exception.code)
-            self.assertEqual([True], closed)
-            closed.clear()
-            call(helper, "search", {})
-            self.assertEqual([True], closed)
-            closed.clear()
+            self.assertEqual([], closed)
+            self.assertEqual(generation, helper.generation)
             call(helper, "state", {"connectId": "001:1"})
-            self.assertEqual(4, open_path.call_count)
+            self.assertEqual(2, open_path.call_count)
+            device.broken = True
+            with self.assertRaises(HelperError) as raised:
+                call(helper, "state", {"connectId": "001:1"})
+            self.assertEqual("PROTOCOL", raised.exception.code)
+            self.assertEqual([True], closed)
+            self.assertEqual(generation, helper.generation)
+            closed.clear()
+            device.broken = False
+            call(helper, "state", {"connectId": "001:1"})
+            self.assertEqual(3, open_path.call_count)
             self.assertEqual([], closed)
             helper.shutdown()
             self.assertEqual([True], closed)

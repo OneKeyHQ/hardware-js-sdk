@@ -225,22 +225,39 @@ def decode_ask_passphrase(payload):
     return opt_str(fields, 1), opt_bool(fields, 2), packed_uints(fields, 3)
 
 
-def encode_session_get(btc_test_address=None):
-    if not btc_test_address:
-        return b""
-    return enc_str(2, btc_test_address)
+# DeviceSessionErrorCode. A resume that misses is InvalidSession and must not
+# be treated as a new wallet. UserCancelled is the passphrase or PIN back-out.
+SESSION_CANCELLED = 1
+SESSION_INVALID = 2
+
+
+def encode_session_get(btc_test_address=None, session_id=None):
+    body = b""
+    if session_id:
+        body += enc_bytes(1, session_id)
+    if btc_test_address:
+        body += enc_str(2, btc_test_address)
+    return body
 
 
 def decode_session_get(payload):
-    return opt_str(decode_fields(payload), 2)
+    fields = decode_fields(payload)
+    return _last(fields, 1, 2), opt_str(fields, 2)
 
 
-def encode_session(btc_test_address):
-    return enc_bytes(1, b"\x01") + enc_str(2, btc_test_address) + enc_bytes(3, encode_varint(SEED_STANDARD))
+def encode_session(btc_test_address, session_id=None):
+    body = enc_bytes(1, session_id) if session_id else b""
+    return body + enc_str(2, btc_test_address) + enc_bytes(3, encode_varint(SEED_STANDARD))
 
 
 def decode_session(payload):
-    return opt_str(decode_fields(payload), 2)
+    fields = decode_fields(payload)
+    return opt_str(fields, 2), _last(fields, 1, 2)
+
+
+def decode_failure(payload):
+    fields = decode_fields(payload)
+    return opt_uint(fields, 1), opt_uint(fields, 2), opt_str(fields, 3)
 
 
 def _path(address_n):

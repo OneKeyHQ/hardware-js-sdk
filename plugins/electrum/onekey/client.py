@@ -118,7 +118,8 @@ class OneKeyClient(HardwareClientBase):
             return self.helper.call(op, params, generation=self.generation,
                                     cancelled=self.cancelled, on_ui=self._ui)
         except HelperError as error:
-            self.closed = True
+            # flow() closes the client when this call belongs to the open wallet.
+            # A storage-unlock cancel passes close_on_error=False and must keep it.
             if error.code == "CANCELLED":
                 raise UserCancelled() from None
             raise UserFacingException(str(error)) from None
