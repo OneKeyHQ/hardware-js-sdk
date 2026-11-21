@@ -32,6 +32,9 @@ class Scripted:
         self.mismatch = None
         self.material = False
         self.on_device = []
+        self.pins = []
+        self.unlocked_by_attach = False
+        self.attach_to_pin_enabled = False
         self.order = []
         self.session_queries = []
         self.steps = [codec.TX_INPUT, codec.TX_OUTPUT, codec.TX_META, codec.TX_FINISHED]
@@ -43,7 +46,10 @@ class Scripted:
         elif self.material and self.mismatch == "other":
             device_id = "other-device"
         return codec.DEVICE_STATUS, codec.encode_status(
-            device_id, unlocked=not self.locked, init_states=True, passphrase_enabled=self.passphrase_enabled)
+            device_id, unlocked=not self.locked, init_states=True,
+            passphrase_enabled=self.passphrase_enabled,
+            attach_to_pin_enabled=self.attach_to_pin_enabled,
+            unlocked_by_attach_to_pin=self.unlocked_by_attach and not self.locked)
 
     def handle(self, kind, payload):
         if kind == codec.PING:
@@ -57,8 +63,10 @@ class Scripted:
                 raise AssertionError("eventless_wallet_session")
             return codec.PROTOCOL_INFO, codec.enc_uint(1, 1) + codec.enc_str(2, "firmware-pro2")
         if kind == codec.DEVICE_SESSION_ASK_PIN:
+            self.pins.append(codec.decode_ask_pin(payload))
             self.locked = False
             self.device_id = "synthetic-device"
+            self.unlocked_by_attach = self.pins[-1] == codec.PIN_ATTACH
             return codec.SUCCESS, b""
         if kind == codec.DEVICE_SESSION_ASK_PASSPHRASE:
             passphrase, on_device, _domains = codec.decode_ask_passphrase(payload)
@@ -69,6 +77,8 @@ class Scripted:
             self.session_queries.append(query)
             if query:
                 address = query
+            elif self.unlocked_by_attach:
+                address = self.hidden
             elif self.on_device and self.on_device[-1][0]:
                 address = self.hidden
             else:
@@ -94,9 +104,9 @@ class Scripted:
         raise AssertionError(kind)
 
 
-def helper_for(device=None):
-    device = device or Scripted()
+def pipe_link(device, on_close=None):
     pipe = bytearray()
+    incoming = bytearray()
 
     def write(data):
         pipe.extend(data)
@@ -109,8 +119,6 @@ def helper_for(device=None):
             if reply is not None:
                 incoming.extend(encode_reply(*reply))
 
-    incoming = bytearray()
-
     def read(size, _timeout):
         if not incoming:
             return b""
@@ -118,8 +126,12 @@ def helper_for(device=None):
         del incoming[:size]
         return chunk
 
-    link = Link(read, write)
-    helper = Helper(ports={"usb1": link})
+    return Link(read, write, on_close)
+
+
+def helper_for(device=None):
+    device = device or Scripted()
+    helper = Helper(ports={"usb1": pipe_link(device)})
     call(helper, "search", {})
     device.material = False
     return helper, device
@@ -181,6 +193,11 @@ class TestFrames(unittest.TestCase):
         self.assertEqual(0, codec.decode_tx_request(codec.encode_tx_request(codec.TX_INPUT))["request_type"])
         self.assertIsNone(codec.decode_status(codec.encode_status(None))["device_id"])
         self.assertEqual("abc", codec.decode_status(codec.encode_status("abc"))["device_id"])
+        attached = codec.decode_status(codec.encode_status(
+            "abc", attach_to_pin_enabled=True, unlocked_by_attach_to_pin=True))
+        self.assertIs(True, attached["attach_to_pin_enabled"])
+        self.assertIs(True, attached["unlocked_by_attach_to_pin"])
+        self.assertEqual(codec.PIN_ATTACH, codec.decode_ask_pin(codec.encode_ask_pin(codec.PIN_ATTACH)))
         self.assertIs(True, codec.decode_protocol_info_request(codec.encode_protocol_info_request(True)))
 
 
@@ -191,6 +208,7 @@ class TestDeviceSession(unittest.TestCase):
             opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
             self.assertEqual("standard", opened["walletType"])
             self.assertIsNone(opened["passphraseState"])
+            self.assertEqual([codec.PIN_MAIN], device.pins)
             self.assertIn((False, ""), device.on_device)
             hidden = Scripted()
             helper, hidden = helper_for(hidden)
@@ -210,6 +228,8 @@ class TestDeviceSession(unittest.TestCase):
             address = call(helper, "address", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                                                "path": ADDRESS_PATH, "scriptType": "SPENDWITNESS"})
             self.assertEqual("bc1qexample", address["address"])
+            self.assertEqual([codec.PIN_MAIN], locked.pins)
+            self.assertFalse(any(on_device for on_device, _value in locked.on_device))
             signed = self.sign(helper, binding)
             self.assertEqual(SIGNATURE.hex(), signed["signatures"][0]["signature"])
             self.assertEqual([codec.TX_INPUT, codec.TX_OUTPUT, codec.TX_META, codec.TX_FINISHED], locked.order)
@@ -220,6 +240,71 @@ class TestDeviceSession(unittest.TestCase):
             self.assertEqual(10, len(long_device.order))
             self.assertEqual(SIGNATURE.hex(), signed["signatures"][0]["signature"])
             popen.assert_not_called()
+
+    def test_attach_pin_selects_and_restores_without_passphrase(self):
+        device = Scripted()
+        helper, device = helper_for(device)
+        opened = call(helper, "open", {"connectId": "usb1", "mode": "select-attach-pin"})
+        self.assertEqual("attach-pin", opened["walletType"])
+        self.assertEqual(device.hidden, opened["passphraseState"])
+        self.assertEqual([codec.PIN_ATTACH], device.pins)
+        self.assertEqual([], device.on_device)
+        device.pins.clear()
+        binding = dict(deviceId=opened["deviceId"], serialNo=opened["serialNo"],
+                       walletType="attach-pin", passphraseState=opened["passphraseState"])
+        result = call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
+                                       "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
+        self.assertEqual("xpub-test", result["xpub"])
+        self.assertEqual([], device.pins)
+        self.assertEqual([], device.on_device)
+
+        locked = Scripted()
+        helper, locked = helper_for(locked)
+        call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
+                              "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
+        self.assertEqual([codec.PIN_ATTACH], locked.pins)
+        self.assertEqual([], locked.on_device)
+        self.assertEqual([None], locked.session_queries)
+
+        current = Scripted()
+        current.locked = False
+        current.device_id = "synthetic-device"
+        current.unlocked_by_attach = True
+        helper, current = helper_for(current)
+        call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
+                              "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
+        self.assertEqual([], current.pins)
+        self.assertEqual([], current.on_device)
+
+    def test_usb_interface_stays_open_across_wallet_calls(self):
+        device = Scripted()
+        closed = []
+        link = pipe_link(device, lambda: closed.append(True))
+        with mock.patch("onekey.ipc.list_paths", return_value=["001:1"]), \
+                mock.patch("onekey.ipc.open_path", return_value=link) as open_path:
+            helper = Helper()
+            call(helper, "search", {})
+            self.assertEqual(1, open_path.call_count)
+            self.assertEqual([True], closed)
+            closed.clear()
+            call(helper, "state", {"connectId": "001:1"})
+            call(helper, "state", {"connectId": "001:1"})
+            call(helper, "search", {})
+            self.assertEqual(2, open_path.call_count)
+            self.assertEqual([], closed)
+            with self.assertRaises(HelperError) as raised:
+                call(helper, "open", {"connectId": "001:1", "mode": "nope"})
+            self.assertEqual("INVALID_REQUEST", raised.exception.code)
+            self.assertEqual([True], closed)
+            closed.clear()
+            call(helper, "search", {})
+            self.assertEqual([True], closed)
+            closed.clear()
+            call(helper, "state", {"connectId": "001:1"})
+            self.assertEqual(4, open_path.call_count)
+            self.assertEqual([], closed)
+            helper.shutdown()
+            self.assertEqual([True], closed)
 
     def test_post_call_identity_hides_material(self):
         for op, params, secret in (

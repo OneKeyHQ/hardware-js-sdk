@@ -66,17 +66,27 @@ class OneKeyQtHandler(QtHandlerBase):
     @pyqtSlot()
     def _choose_wallet(self):
         try:
-            buttons = QMessageBox.StandardButton
-            result = QMessageBox.question(
-                self.top_level_window(), "OneKey",
-                _("Open a hidden OneKey wallet? Yes: hidden wallet. No: standard wallet. "
-                  "Cancel: stop without selecting a wallet."),
-                buttons.Yes | buttons.No | buttons.Cancel, buttons.Cancel,
-            )
-            if result == buttons.Yes:
-                self._wallet_choice = "select-hidden"
-            elif result == buttons.No:
+            box = QMessageBox(self.top_level_window())
+            box.setIcon(QMessageBox.Icon.Question)
+            box.setWindowTitle("OneKey")
+            box.setText(_(
+                "Choose the OneKey wallet. Standard uses the main PIN. "
+                "Hidden asks for the passphrase on the device. "
+                "Attach PIN uses the device attach PIN. Cancel stops without a choice."
+            ))
+            standard = box.addButton(_("Standard"), QMessageBox.ButtonRole.AcceptRole)
+            hidden = box.addButton(_("Hidden"), QMessageBox.ButtonRole.ActionRole)
+            attach = box.addButton(_("Attach PIN"), QMessageBox.ButtonRole.ActionRole)
+            cancel = box.addButton(QMessageBox.StandardButton.Cancel)
+            box.setDefaultButton(cancel)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is standard:
                 self._wallet_choice = "standard"
+            elif clicked is hidden:
+                self._wallet_choice = "select-hidden"
+            elif clicked is attach:
+                self._wallet_choice = "select-attach-pin"
         finally:
             self._wallet_choice_done.set()
 

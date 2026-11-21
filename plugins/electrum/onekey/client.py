@@ -32,7 +32,8 @@ def check_binding(value):
             or any(type(value[k]) is not str or not value[k] or len(value[k]) > 256
                    for k in ("serialNo", "deviceId"))
             or not ((value["walletType"] == "standard" and value["passphraseState"] is None)
-                    or (value["walletType"] == "hidden" and type(value["passphraseState"]) is str
+                    or (value["walletType"] in ("hidden", "attach-pin")
+                        and type(value["passphraseState"]) is str
                         and 0 < len(value["passphraseState"]) <= 256))):
         raise UserFacingException(_("Invalid OneKey wallet binding. Reconnect using the wallet wizard."))
     return dict(value)
@@ -126,6 +127,7 @@ class OneKeyClient(HardwareClientBase):
         text = {"pin": _("Enter the PIN on your OneKey."),
                 "passphrase": _("Enter the passphrase on your OneKey."),
                 "passphrase-select": _("Select the hidden wallet on your OneKey. Enter its passphrase on the device."),
+                "attach-pin": _("Enter the attach PIN on your OneKey."),
                 "button": _("Check and confirm on your OneKey.")}.get(event)
         if text and self.handler:
             self.handler.show_message(text, on_cancel=self.cancelled.set)
@@ -150,7 +152,7 @@ class OneKeyClient(HardwareClientBase):
             return
         self.handler.finished()
         mode = self.handler.choose_wallet()
-        if mode not in ("standard", "select-hidden"):
+        if mode not in ("standard", "select-hidden", "select-attach-pin"):
             raise UserCancelled()
         self.binding = check_binding(self._call("open", {"connectId": self.connect_id, "mode": mode}))
         if self.binding["serialNo"] != self.serial:

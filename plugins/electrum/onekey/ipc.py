@@ -156,6 +156,7 @@ class Helper:
         self.generation = None
         self._lock = threading.RLock()
         self._wallets = {}
+        self._links = {}
 
     def call(self, op, params, timeout=120, generation=None, cancelled=None, on_ui=None):
         if threading.current_thread() is threading.main_thread():
@@ -192,6 +193,7 @@ class Helper:
         with self._lock:
             self._wallets.clear()
             self.generation = None
+            self._release_links()
 
     def close(self):
         self.shutdown()
@@ -206,11 +208,14 @@ class Helper:
         if op in ("cancel", "ui", "dispose"):
             if op == "dispose":
                 self._wallets.clear()
+                self._release_links()
             return None
         connect_id = params.get("connectId")
         if type(connect_id) is not str or not connect_id:
             raise SessionError("INVALID_REQUEST")
-        link = self._open(connect_id)
+        # The wallet session lives with the claimed interface. Releasing USB
+        # between calls would depend on firmware keeping that session.
+        link = self._acquire(connect_id)
         try:
             session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
                               cache=self._wallets, connect_id=connect_id)
@@ -218,7 +223,7 @@ class Helper:
             if op == "state":
                 return session.state()
             if op == "open":
-                if params.get("mode") not in ("standard", "select-hidden"):
+                if params.get("mode") not in ("standard", "select-hidden", "select-attach-pin"):
                     raise SessionError("INVALID_REQUEST")
                 return session.open(params["mode"])
             if op == "xpub":
@@ -229,15 +234,18 @@ class Helper:
                 return session.sign(params.get("binding"), params.get("coin"), params.get("inputs"), params.get("outputs"),
                                     params.get("refTxs"), params.get("version"), params.get("locktime"))
             raise SessionError("INVALID_REQUEST")
-        finally:
-            link.close()
+        except BaseException:
+            self._drop(connect_id)
+            raise
 
     def _search(self, deadline, cancelled, on_ui):
         paths = list(self.ports) if self.ports is not None else list_paths()
         found = []
         for path in paths:
-            link = self._open(path)
+            held = self.ports is None and path in self._links
+            link = None
             try:
+                link = self._links[path] if held else self._borrow(path)
                 session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
                                   cache=self._wallets, connect_id=path)
                 session.handshake()
@@ -249,15 +257,46 @@ class Helper:
                     raise
                 found.append({"connectId": path, "deviceId": state["deviceId"],
                               "serialNo": state["serialNo"], "model": state["model"]})
+            except BaseException:
+                if held:
+                    self._drop(path)
+                raise
             finally:
-                link.close()
+                if link is not None and not held:
+                    try:
+                        link.close()
+                    except Exception:
+                        pass
         return found
 
-    def _open(self, connect_id):
+    def _acquire(self, connect_id):
+        if self.ports is not None:
+            return self._borrow(connect_id)
+        link = self._links.get(connect_id)
+        if link is not None:
+            return link
+        link = open_path(connect_id)
+        self._links[connect_id] = link
+        return link
+
+    def _borrow(self, connect_id):
         if self.ports is not None:
             link = self.ports.get(connect_id)
             if link is None:
                 raise SessionError("SDK_FAILED")
             return link
         return open_path(connect_id)
+
+    def _drop(self, connect_id):
+        link = self._links.pop(connect_id, None)
+        if link is None:
+            return
+        try:
+            link.close()
+        except Exception:
+            pass
+
+    def _release_links(self):
+        for connect_id in list(self._links):
+            self._drop(connect_id)
 

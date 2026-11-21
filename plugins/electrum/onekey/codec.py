@@ -30,6 +30,7 @@ DEVICE_SESSION_ASK_PASSPHRASE = 61203
 
 PIN_ANY = 1
 PIN_MAIN = 2
+PIN_ATTACH = 3
 SEED_STANDARD = 1
 DEVICE_PRO2 = 0x07
 DEVICE_NEO = 0x08
@@ -182,11 +183,13 @@ def encode_device_info(model, serial_no):
     return enc_uint(1, 1) + enc_msg(100, hardware)
 
 
-def encode_status(device_id=None, *, unlocked=False, init_states=True, passphrase_enabled=False):
+def encode_status(device_id=None, *, unlocked=False, init_states=True, passphrase_enabled=False,
+                  attach_to_pin_enabled=False, unlocked_by_attach_to_pin=False):
     body = b""
     if device_id is not None:
         body += enc_str(1, device_id)
-    body += enc_bool(2, unlocked) + enc_bool(3, init_states) + enc_bool(10, passphrase_enabled)
+    body += (enc_bool(2, unlocked) + enc_bool(3, init_states) + enc_bool(10, passphrase_enabled)
+             + enc_bool(11, attach_to_pin_enabled) + enc_bool(12, unlocked_by_attach_to_pin))
     return body
 
 
@@ -198,11 +201,17 @@ def decode_status(payload):
         "unlocked": opt_bool(fields, 2),
         "init_states": opt_bool(fields, 3),
         "passphrase_enabled": opt_bool(fields, 10),
+        "attach_to_pin_enabled": opt_bool(fields, 11),
+        "unlocked_by_attach_to_pin": opt_bool(fields, 12),
     }
 
 
 def encode_ask_pin(pin_type):
     return enc_uint(1, pin_type)
+
+
+def decode_ask_pin(payload):
+    return opt_uint(decode_fields(payload), 1)
 
 
 def encode_ask_passphrase(passphrase=None, *, on_device, domains=(SEED_STANDARD,)):

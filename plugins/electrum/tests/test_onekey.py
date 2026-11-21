@@ -589,8 +589,9 @@ class TestOneKeyClient(unittest.TestCase):
         key = OneKeyKeyStore(dict(xpub=self.public_key(), derivation="m/84'/0'/0'"))
         with self.assertRaisesRegex(UserFacingException, "no OneKey device binding"):
             client.bind_keystore(key)
+        self.assertEqual("attach-pin", check_binding({**BINDING, "walletType": "attach-pin"})["walletType"])
         for bad in ({**BINDING, "walletType": "standard"}, {**BINDING, "passphraseState": None},
-                    {**BINDING, "sessionId": "forbidden"}):
+                    {**BINDING, "sessionId": "forbidden"}, {**BINDING, "walletType": "attach"}):
             with self.assertRaises(UserFacingException):
                 check_binding(bad)
         client, helper, _ = self.make_client()
