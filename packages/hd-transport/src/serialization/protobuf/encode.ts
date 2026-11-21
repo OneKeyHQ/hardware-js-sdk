@@ -102,8 +102,10 @@ const encodeEnum = (enumDesc: DescEnum, value: unknown): number | undefined => {
   if (typeof value === 'string') {
     const matched = enumDesc.values.find(v => v.name === value);
     if (matched) return matched.number;
-    const numeric = Number(value);
-    if (Number.isInteger(numeric)) return numeric;
+    if (value.trim() !== '') {
+      const numeric = Number(value);
+      if (Number.isInteger(numeric)) return numeric;
+    }
     return undefined;
   }
   if (typeof value === 'number') {
@@ -115,15 +117,19 @@ const encodeEnum = (enumDesc: DescEnum, value: unknown): number | undefined => {
   return undefined;
 };
 
+const zeroValueForScalar = (scalar: ScalarType): unknown => {
+  if (scalar === ScalarType.BYTES) return new Uint8Array(0);
+  if (scalar === ScalarType.STRING) return '';
+  if (scalar === ScalarType.BOOL) return false;
+  if (is64BitScalar(scalar)) return BigInt(0);
+  return 0;
+};
+
 const defaultForRequiredScalarOrEnum = (field: DescField): unknown => {
   if (field.fieldKind === 'scalar') {
     const explicit = field.getDefaultValue();
     if (explicit !== undefined) return explicit;
-    if (field.scalar === ScalarType.BYTES) return new Uint8Array(0);
-    if (field.scalar === ScalarType.STRING) return '';
-    if (field.scalar === ScalarType.BOOL) return false;
-    if (is64BitScalar(field.scalar)) return BigInt(0);
-    return 0;
+    return zeroValueForScalar(field.scalar);
   }
   if (field.fieldKind === 'enum') {
     const explicit = field.getDefaultValue();
@@ -148,7 +154,11 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
     } else if (field.fieldKind === 'list') {
       if (Array.isArray(value)) {
         if (field.listKind === 'scalar') {
-          msg[field.localName] = value.map(v => encodeScalar(field.scalar, v));
+          msg[field.localName] = value.map(v =>
+            v === undefined || v === null
+              ? zeroValueForScalar(field.scalar)
+              : encodeScalar(field.scalar, v)
+          );
         } else if (field.listKind === 'enum') {
           msg[field.localName] = value
             .map(v => encodeEnum(field.enum, v))
@@ -177,10 +187,14 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
       const enumNumber = encodeEnum(field.enum, value);
       if (enumNumber !== undefined) {
         msg[field.localName] = enumNumber;
+      } else if (field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] = defaultForRequiredScalarOrEnum(field);
       }
     } else if (field.fieldKind === 'message') {
       if (typeof value === 'object') {
         msg[field.localName] = buildMessage(field.message, value as Record<string, unknown>);
+      } else if (field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] = buildMessage(field.message, {});
       }
     }
   }

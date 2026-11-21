@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import {
   ScalarType,
   create,
@@ -407,30 +408,95 @@ function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unkn
   return out;
 }
 
+function coerceRawEnumValue(enumDesc: DescEnum, val: unknown): number | undefined {
+  if (typeof val === 'number' && Number.isInteger(val)) return val;
+  if (typeof val === 'string') {
+    const matched = enumDesc.values.find(v => v.name === val);
+    if (matched) return matched.number;
+    if (val.trim() !== '') {
+      const numeric = Number(val);
+      if (Number.isInteger(numeric)) return numeric;
+    }
+  }
+  return undefined;
+}
+
+function coerceRawBytes(val: unknown): Uint8Array {
+  if (val instanceof Uint8Array) {
+    return new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
+  }
+  if (typeof val === 'string') {
+    return val.length === 0 ? new Uint8Array(0) : new Uint8Array(Buffer.from(val, 'hex'));
+  }
+  if (Array.isArray(val)) {
+    return Uint8Array.from(val as number[]);
+  }
+  return new Uint8Array(val as ArrayBuffer);
+}
+
+function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unknown {
+  const field = desc.fields.find(f => f.name === fieldName);
+  if (!field) return undefined;
+  if (field.fieldKind === 'scalar') {
+    const explicit = field.getDefaultValue();
+    if (explicit !== undefined) return explicit;
+    if (
+      field.scalar === ScalarType.INT64 ||
+      field.scalar === ScalarType.UINT64 ||
+      field.scalar === ScalarType.SINT64 ||
+      field.scalar === ScalarType.FIXED64 ||
+      field.scalar === ScalarType.SFIXED64
+    ) {
+      return BigInt(0);
+    }
+  }
+  return getFieldDefaultValue(desc, fieldName);
+}
+
 function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): Message {
   const msg = create(desc) as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     const val = input[field.name];
-    if (val !== undefined && val !== null) {
-      if (field.fieldKind === 'list') {
-        if (Array.isArray(val)) {
-          if (field.listKind === 'message') {
-            msg[field.localName] = val.map(v =>
-              plainToRawMessage(field.message, (v ?? {}) as Record<string, unknown>)
-            );
-          } else if (field.listKind === 'scalar' && field.scalar === ScalarType.BYTES) {
-            msg[field.localName] = val.map(v => (v instanceof Uint8Array ? v : new Uint8Array(v)));
-          } else {
-            msg[field.localName] = [...val];
-          }
-        }
-      } else if (field.fieldKind === 'message' && typeof val === 'object') {
-        msg[field.localName] = plainToRawMessage(field.message, val as Record<string, unknown>);
-      } else if (field.fieldKind === 'scalar' && field.scalar === ScalarType.BYTES) {
-        msg[field.localName] = val instanceof Uint8Array ? val : new Uint8Array(val as ArrayBuffer);
-      } else {
-        msg[field.localName] = val;
+    if (val === undefined || val === null) {
+      if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] =
+          field.fieldKind === 'message'
+            ? plainToRawMessage(field.message, {})
+            : defaultRawValueForRequired(desc, field.name);
       }
+    } else if (field.fieldKind === 'list') {
+      if (Array.isArray(val)) {
+        if (field.listKind === 'message') {
+          msg[field.localName] = val.map(v =>
+            plainToRawMessage(field.message, (v ?? {}) as Record<string, unknown>)
+          );
+        } else if (field.listKind === 'scalar' && field.scalar === ScalarType.BYTES) {
+          msg[field.localName] = val.map(v => coerceRawBytes(v));
+        } else if (field.listKind === 'enum') {
+          msg[field.localName] = val
+            .map(v => coerceRawEnumValue(field.enum, v))
+            .filter((v): v is number => v !== undefined);
+        } else {
+          msg[field.localName] = [...val];
+        }
+      }
+    } else if (field.fieldKind === 'message') {
+      if (typeof val === 'object') {
+        msg[field.localName] = plainToRawMessage(field.message, val as Record<string, unknown>);
+      } else if (field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] = plainToRawMessage(field.message, {});
+      }
+    } else if (field.fieldKind === 'enum') {
+      const enumNumber = coerceRawEnumValue(field.enum, val);
+      if (enumNumber !== undefined) {
+        msg[field.localName] = enumNumber;
+      } else if (field.proto.label === FieldLabel.REQUIRED) {
+        msg[field.localName] = defaultRawValueForRequired(desc, field.name);
+      }
+    } else if (field.fieldKind === 'scalar' && field.scalar === ScalarType.BYTES) {
+      msg[field.localName] = coerceRawBytes(val);
+    } else {
+      msg[field.localName] = val;
     }
   }
   return msg as unknown as Message;

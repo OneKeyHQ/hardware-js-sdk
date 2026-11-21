@@ -297,4 +297,38 @@ describe('@bufbuild/protobuf boundary semantics', () => {
       })
     ).toThrow();
   });
+
+  test('ignores empty/whitespace enum strings, coerces nullish repeated scalars, and falls back on invalid required fields', () => {
+    const { Message: GetAddress } = createMessageFromName(v1Root, 'GetAddress');
+    expect(encode(GetAddress, { script_type: '' }).toString('hex')).toBe('');
+    expect(encode(GetAddress, { script_type: '   ' }).toString('hex')).toBe('');
+
+    const { Message: Features } = createMessageFromName(v1Root, 'Features');
+    const emptyEnumList = encode(Features, { capabilities: ['', '   ', 5] });
+    expect(decode(Features, emptyEnumList).capabilities).toStrictEqual([5]);
+
+    const nullishRepeatedScalar = encode(GetAddress, { address_n: [1, undefined, null, 2] });
+    expect(decode(GetAddress, nullishRepeatedScalar).address_n).toStrictEqual([1, 0, 0, 2]);
+
+    // Invalid value on a required enum field falls back to the required default instead of omitting it.
+    const { Message: V2Failure } = createMessageFromName(v2Root, 'Failure');
+    const invalidRequiredEnum = encode(V2Failure, { code: 'NotARealCode', message: 'fallback' });
+    const decodedFailure = decode(V2Failure, invalidRequiredEnum);
+    expect(decodedFailure.message).toBe('fallback');
+    expect(decodedFailure.code).toBeDefined();
+  });
+
+  test('Message.encode() supports enum string names, required defaults, and hex bytes', () => {
+    const { Message: GetAddress } = createMessageFromName(v1Root, 'GetAddress');
+    const rawAddr = GetAddress.encode({ script_type: 'SPENDWITNESS' }).finish();
+    expect(decode(GetAddress, ByteBuffer.wrap(rawAddr)).script_type).toBe('SPENDWITNESS');
+
+    const { Message: V2Failure } = createMessageFromName(v2Root, 'Failure');
+    const rawFailure = V2Failure.encode({ message: 'default-code' }).finish();
+    expect(V2Failure.decode(rawFailure).message).toBe('default-code');
+
+    const { Message: Ping } = createMessageFromName(v1Root, 'Ping');
+    const rawPing = Ping.encode({ message: 'hi' }).finish();
+    expect(Ping.decode(rawPing).message).toBe('hi');
+  });
 });

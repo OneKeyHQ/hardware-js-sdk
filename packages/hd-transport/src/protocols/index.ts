@@ -12,6 +12,7 @@ import {
 } from '../serialization/protobuf/messages';
 import { encode as encodeProtobuf } from '../serialization/protobuf/encode';
 import { decode as decodeProtobuf } from '../serialization/protobuf/decode';
+import { ensureTextEncoding } from '../serialization/protobuf/text-encoding';
 import {
   decodeFrame as decodeV2Frame,
   encodeProtobufFrame,
@@ -54,6 +55,7 @@ const decodeLegacyProtocolV2ProtocolInfo = (pbPayload: Uint8Array) => {
 };
 
 const isLegacyProtocolV2ProtocolInfoWireLayout = (pbPayload: Uint8Array) => {
+  ensureTextEncoding();
   const reader = new BinaryReader(pbPayload);
   let hasVersion = false;
   try {

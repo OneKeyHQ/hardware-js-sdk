@@ -131,7 +131,9 @@ const uiResponse = (response: UiResponseEvent) => {
 
 const cancel = (connectId?: string) => {
   if (_core === undefined) return;
-  _core.handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
+  _core
+    .handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } })
+    .catch(error => Log.debug('cancel error: ', error));
 };
 
 function handleMessage(message: CoreMessage) {
@@ -253,17 +255,22 @@ const call = async (params: any) => {
       Log.debug('response: ', blockLog ? '[REDACTED]' : response);
 
       if (!response.success) {
+        const emitBleUiWarning = (message: CoreMessage) => {
+          postMessage(message, false).catch(error =>
+            Log.debug('postMessage warning error: ', error)
+          );
+        };
         if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
-          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED));
         }
         if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
-          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF));
         }
         if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
-          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION));
         }
         if (response.payload?.code === HardwareErrorCode.BleLocationError) {
-          postMessage(createUiMessage(UI_REQUEST.LOCATION_PERMISSION), false);
+          emitBleUiWarning(createUiMessage(UI_REQUEST.LOCATION_PERMISSION));
         }
       }
 
@@ -293,9 +300,9 @@ const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void
   ].forEach(eventName => {
     eventEmitter.on(eventName, (message: CoreMessage) => {
       // Match the Web SDK envelope for device events emitted as payloads.
-      const envelope: { event?: string; type?: string } = message;
+      const envelope = message as { event?: string; type?: string } | null | undefined;
       let emitMessage = message;
-      if (!envelope.event && !envelope.type) {
+      if (envelope && typeof envelope === 'object' && !envelope.event && !envelope.type) {
         emitMessage = { ...message };
         Object.assign(emitMessage, { event: eventName, type: eventName });
       }

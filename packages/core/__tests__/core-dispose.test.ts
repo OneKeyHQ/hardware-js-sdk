@@ -378,4 +378,96 @@ describe('Core.dispose', () => {
       DataManager.settings = settings;
     }
   });
+
+  test('switchTransport resets webUsbInit and reactNativeInit so replacement transports initialize', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const transportA = {
+      name: 'WebUsbA',
+      init: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    const transportB = {
+      name: 'WebUsbB',
+      init: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    function WebUsbA() {
+      return transportA;
+    }
+    function WebUsbB() {
+      return transportB;
+    }
+    jest.spyOn(DataManager, 'load').mockImplementation(next => {
+      DataManager.settings = next;
+      return Promise.resolve();
+    });
+
+    const core = await init({ ...settings, env: 'webusb' }, WebUsbA);
+    if (!core) throw new Error('Core initialization failed');
+
+    try {
+      await TransportManager.ensureInitialized();
+      expect(transportA.init).toHaveBeenCalledTimes(1);
+      expect(TransportManager.webUsbInit).toBe(true);
+
+      await switchTransport({ env: 'webusb', Transport: WebUsbB });
+      expect(TransportManager.webUsbInit).toBe(false);
+      expect(TransportManager.reactNativeInit).toBe(false);
+
+      await TransportManager.ensureInitialized();
+      expect(transportB.init).toHaveBeenCalledTimes(1);
+    } finally {
+      await core.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
+
+  test('switchTransport validates nextTransport before stopping and cancels active UI waiters', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const activeOld = {
+      name: 'ActiveOld',
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    const next = {
+      name: 'NextTransport',
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    function NextTransport() {
+      return next;
+    }
+    TransportManager.transport = activeOld as never;
+    DataManager.settings = { ...settings, env: 'webusb' };
+    const core = initCore();
+    initConnector();
+    const waiter = createDeferred<UiPromiseResponse, typeof UI_RESPONSE.RECEIVE_PIN>(
+      UI_RESPONSE.RECEIVE_PIN
+    );
+    (core as unknown as { getCoreContext: () => CoreContext })
+      .getCoreContext()
+      .uiPromises.push(waiter);
+    const waiterRejected = expect(waiter.promise).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.ActionCancelled,
+    });
+
+    try {
+      // Invalid nextTransport must fail before stopping the active transport.
+      await expect(
+        switchTransport({ env: 'emulator', Transport: null as never })
+      ).rejects.toMatchObject({ errorCode: HardwareErrorCode.TransportNotConfigured });
+      expect(activeOld.stop).not.toHaveBeenCalled();
+
+      await switchTransport({ env: 'emulator', Transport: NextTransport });
+      await waiterRejected;
+      expect(activeOld.stop).toHaveBeenCalledTimes(1);
+      expect(TransportManager.transport).toBe(next);
+      expect(DataManager.getSettings('env')).toBe('emulator');
+    } finally {
+      await core.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
 });

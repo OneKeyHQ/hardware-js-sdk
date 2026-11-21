@@ -595,4 +595,26 @@ describe('LowlevelTransport protocol framing', () => {
     await lowlevel.stop();
     expect(plugin.disconnect).toHaveBeenCalledTimes(1);
   });
+
+  test('stop() aborts an in-flight acquire() and disconnects without leaking the connection', async () => {
+    let resolveConnect;
+    const connectPromise = new Promise(resolve => {
+      resolveConnect = resolve;
+    });
+    const plugin = createPlugin({
+      devices: [{ id: 'inflight-stop-id', name: 'OneKey Pro 2', commType: 'ble' }],
+      responses: [],
+    });
+    plugin.connect.mockImplementation(() => connectPromise);
+    const lowlevel = configureTransport(plugin);
+
+    const acquiring = lowlevel.acquire({ uuid: 'inflight-stop-id', expectedProtocol: 'V2' });
+    const stopping = lowlevel.stop();
+    resolveConnect();
+
+    await expect(acquiring).rejects.toThrow(/Lowlevel transport is stopped/);
+    await stopping;
+    expect(plugin.disconnect).toHaveBeenCalledWith('inflight-stop-id');
+    expect(lowlevel.getProtocolType('inflight-stop-id')).toBeUndefined();
+  });
 });

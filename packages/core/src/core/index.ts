@@ -2061,6 +2061,12 @@ export default class Core extends EventEmitter {
     // Transports, especially Node USB, may release native handles asynchronously.
     await transportCleanup;
   }
+
+  resetForTransportSwitch() {
+    this.requestQueue.abortAllRequests();
+    cleanup(this.uiPromises);
+    this.prePendingCallPromises.clear();
+  }
 }
 
 export const initCore = () => {
@@ -2160,6 +2166,14 @@ export const switchTransport = ({
           })
         : Transport;
       assertCurrent();
+      if (typeof nextTransport !== 'function') {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.TransportNotConfigured,
+          'Transport constructor is not available'
+        );
+      }
+      pollingManager.stopAll();
+      _core?.resetForTransportSwitch();
       _connector?.stop();
       await TransportManager.getTransport()?.stop?.();
       assertCurrent();
