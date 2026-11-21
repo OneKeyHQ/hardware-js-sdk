@@ -4,6 +4,8 @@ import { ScalarType, create, toBinary } from '@bufbuild/protobuf';
 // eslint-disable-next-line import/no-unresolved, camelcase
 import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
 
+import { ensureTextEncoding } from './text-encoding';
+
 import type { DescEnum, DescField, DescMessage, Message } from '@bufbuild/protobuf';
 import type { ProtobufMessageType } from './descriptor';
 
@@ -16,6 +18,12 @@ const is64BitScalar = (scalar: ScalarType): boolean =>
 
 const isUnsigned64Scalar = (scalar: ScalarType): boolean =>
   scalar === ScalarType.UINT64 || scalar === ScalarType.FIXED64;
+
+const isUnsigned32Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT32 || scalar === ScalarType.FIXED32;
+
+const isSigned32Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT32 || scalar === ScalarType.SINT32 || scalar === ScalarType.SFIXED32;
 
 const toBigInt64 = (scalar: ScalarType, value: unknown): bigint => {
   let raw: bigint;
@@ -78,7 +86,16 @@ const encodeScalar = (scalar: ScalarType, value: unknown): unknown => {
     return typeof value === 'string' ? value : String(value);
   }
 
-  return Number(value);
+  const num = Number(value);
+  if (isUnsigned32Scalar(scalar) && Number.isInteger(num) && num >= -0x80000000 && num < 0) {
+    // Preserve legacy protobufjs 32-bit bit-pattern compatibility for signed int32 inputs
+    // passed to uint32/fixed32 fields (e.g. BTC RefTransaction.version with high bit set).
+    return num + 0x100000000;
+  }
+  if (isSigned32Scalar(scalar) && Number.isInteger(num) && num > 0x7fffffff && num <= 0xffffffff) {
+    return num - 0x100000000;
+  }
+  return num;
 };
 
 const encodeEnum = (enumDesc: DescEnum, value: unknown): number | undefined => {
@@ -175,6 +192,7 @@ export const encode = (
   messageType: ProtobufMessageType,
   data: Record<string, unknown>
 ): ByteBuffer => {
+  ensureTextEncoding();
   const message = buildMessage(messageType.desc, data ?? {});
   const buffer = toBinary(messageType.desc, message);
   const bytebuffer = new ByteBuffer(buffer.byteLength);

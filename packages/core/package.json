@@ -31,8 +31,10 @@
     "bignumber.js": "^9.0.2",
     "buffer": "^6.0.3",
     "bytebuffer": "^5.0.1",
+    "events": "^3.3.0",
     "jpeg-js": "^0.4.4",
     "jszip": "^3.10.1",
+    "lodash": "^4.17.21",
     "parse-uri": "^1.0.7",
     "semver": "^7.3.7"
   },

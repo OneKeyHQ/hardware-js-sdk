@@ -21,6 +21,8 @@ import {
   // eslint-disable-next-line import/no-unresolved
 } from '@bufbuild/protobuf/wkt';
 
+import { ensureTextEncoding } from './text-encoding';
+
 import type { DescEnum, DescMessage, FileRegistry, Message } from '@bufbuild/protobuf';
 import type {
   DescriptorProto,
@@ -341,7 +343,11 @@ function assertRawRequiredFields(desc: DescMessage, msg: Message): void {
       }
     } else {
       if (field.proto.label === FieldLabel.REQUIRED && !isFieldSet(msg, field)) {
-        throw new Error(`missing required '${field.name}'`);
+        const hasUnknownEnumWireValue =
+          field.fieldKind === 'enum' && msg.$unknown?.some(u => u.no === field.number) === true;
+        if (!hasUnknownEnumWireValue) {
+          throw new Error(`missing required '${field.name}'`);
+        }
       }
       if (field.fieldKind === 'message' && isFieldSet(msg, field)) {
         const sub = record[field.localName];
@@ -491,10 +497,14 @@ export function createProtobufRoot(data: ProtobufNamespaceJson | string): Protob
       },
       encode(message: Record<string, unknown>) {
         return {
-          finish: () => toBinary(desc, plainToRawMessage(desc, message ?? {})),
+          finish: () => {
+            ensureTextEncoding();
+            return toBinary(desc, plainToRawMessage(desc, message ?? {}));
+          },
         };
       },
       decode(reader: Uint8Array | Buffer) {
+        ensureTextEncoding();
         const bytes =
           reader instanceof Uint8Array
             ? new Uint8Array(reader.buffer, reader.byteOffset, reader.byteLength)

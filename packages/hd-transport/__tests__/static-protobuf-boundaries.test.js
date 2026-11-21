@@ -1,5 +1,7 @@
 import ByteBuffer from 'bytebuffer';
 import Long from 'long';
+// eslint-disable-next-line import/no-unresolved
+import { BinaryWriter, WireType } from '@bufbuild/protobuf/wire';
 
 import v1 from '@onekeyfe/hd-core/src/data/messages/messages.json';
 import v2 from '../messages-protocol-v2.json';
@@ -190,5 +192,109 @@ describe('@bufbuild/protobuf boundary semantics', () => {
       code: 'Failure_ActionCancelled',
       message: 'Cancelled',
     });
+  });
+
+  test('works on runtimes without global TextDecoder or TextEncoder (React Native / Hermes)', () => {
+    const symbol = Symbol.for('@bufbuild/protobuf/text-encoding');
+    const prevEncoding = globalThis[symbol];
+    const prevTextDecoder = globalThis.TextDecoder;
+    const prevTextEncoder = globalThis.TextEncoder;
+
+    try {
+      delete globalThis[symbol];
+      globalThis.TextDecoder = undefined;
+      globalThis.TextEncoder = undefined;
+
+      const { Message: GetFeatures } = createMessageFromName(v1Root, 'GetFeatures');
+      const emptyProbe = encode(GetFeatures, {});
+      expect(emptyProbe.toString('hex')).toBe('');
+
+      const { Message: Ping } = createMessageFromName(v1Root, 'Ping');
+      const utf8Encoded = encode(Ping, { message: '🚀中文hello' });
+      expect(decode(Ping, utf8Encoded).message).toBe('🚀中文hello');
+
+      // Strict UTF-8 validation still rejects invalid sequences.
+      const fallback = globalThis[symbol];
+      expect(() => fallback.decodeUtf8(new Uint8Array([0xff, 0xfe]), true)).toThrow(TypeError);
+    } finally {
+      globalThis[symbol] = prevEncoding;
+      globalThis.TextDecoder = prevTextDecoder;
+      globalThis.TextEncoder = prevTextEncoder;
+    }
+  });
+
+  test('preserves wire presence for unknown closed enum values on required fields (Pro2 Failure.code)', () => {
+    const { Message: V2Failure } = createMessageFromName(v2Root, 'Failure');
+    // Field 1 (required code = 9999 unknown enum), Field 3 (message = "new firmware error")
+    const wireBytes = new BinaryWriter()
+      .tag(1, WireType.Varint)
+      .int32(9999)
+      .tag(3, WireType.LengthDelimited)
+      .string('new firmware error')
+      .finish();
+
+    const decoded = decode(V2Failure, ByteBuffer.wrap(wireBytes));
+    expect(decoded.message).toBe('new firmware error');
+    expect(decoded.code).toBeUndefined();
+
+    const rawDecoded = V2Failure.decode(wireBytes);
+    expect(rawDecoded.message).toBe('new firmware error');
+
+    // Truly missing required code still throws.
+    const missingCodeBytes = new BinaryWriter()
+      .tag(3, WireType.LengthDelimited)
+      .string('no code')
+      .finish();
+    expect(() => decode(V2Failure, ByteBuffer.wrap(missingCodeBytes))).toThrow(
+      /missing required 'code'/
+    );
+  });
+
+  test('preserves 32-bit signed/unsigned bit-pattern compatibility (BTC RefTransaction.version)', () => {
+    const { Message: TxAckPrevMeta } = createMessageFromName(v1Root, 'TxAckPrevMeta');
+    const signedVersion = -2147483648; // 0x80000000 as signed int32
+    const unsignedVersion = 0x80000000;
+
+    const fromSigned = encode(TxAckPrevMeta, {
+      tx: {
+        version: signedVersion,
+        lock_time: 0,
+        inputs_count: 1,
+        outputs_count: 1,
+      },
+    });
+    const fromUnsigned = encode(TxAckPrevMeta, {
+      tx: {
+        version: unsignedVersion,
+        lock_time: 0,
+        inputs_count: 1,
+        outputs_count: 1,
+      },
+    });
+
+    expect(fromSigned.toString('hex')).toBe(fromUnsigned.toString('hex'));
+    expect(decode(TxAckPrevMeta, fromSigned).tx.version).toBe(unsignedVersion);
+
+    // Out-of-range values are still rejected.
+    expect(() =>
+      encode(TxAckPrevMeta, {
+        tx: {
+          version: -2147483649,
+          lock_time: 0,
+          inputs_count: 1,
+          outputs_count: 1,
+        },
+      })
+    ).toThrow();
+    expect(() =>
+      encode(TxAckPrevMeta, {
+        tx: {
+          version: 0x100000000,
+          lock_time: 0,
+          inputs_count: 1,
+          outputs_count: 1,
+        },
+      })
+    ).toThrow();
   });
 });

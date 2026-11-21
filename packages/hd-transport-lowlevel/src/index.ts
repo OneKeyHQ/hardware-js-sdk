@@ -239,6 +239,37 @@ export default class LowlevelTransport {
     }
   }
 
+  async stop(): Promise<void> {
+    const trackedDeviceIds = new Set<string>([
+      ...this.connectedDevices,
+      ...this.deviceProtocol.keys(),
+      ...this.protocolV2Assemblers.keys(),
+      ...this.protocolV2PacketCapacities.keys(),
+    ]);
+
+    await Promise.all(
+      Array.from(trackedDeviceIds, async uuid => {
+        const wasConnected = this.connectedDevices.has(uuid);
+        this.advanceProtocolV2Generation(uuid);
+        this.connectedDevices.delete(uuid);
+        this.deviceProtocol.delete(uuid);
+        this.protocolV2Assemblers.delete(uuid);
+        this.protocolV2PacketCapacities.delete(uuid);
+        if (wasConnected && typeof this.plugin?.disconnect === 'function') {
+          try {
+            await this.plugin.disconnect(uuid);
+          } catch (error) {
+            this.Log?.debug(`[LowlevelTransport] stop disconnect failed: ${uuid}`, error);
+          }
+        }
+      })
+    );
+
+    await this.protocolV2Links
+      .dispose('Lowlevel transport stopped')
+      .catch(error => this.Log?.debug('[LowlevelTransport] link dispose failed:', error));
+  }
+
   async call(
     uuid: string,
     name: string,

@@ -4,6 +4,8 @@ import { ScalarType, fromBinary, isFieldSet } from '@bufbuild/protobuf';
 // eslint-disable-next-line import/no-unresolved, camelcase
 import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
 
+import { ensureTextEncoding } from './text-encoding';
+
 import type { DescMessage, Message } from '@bufbuild/protobuf';
 import type { ProtobufMessageType } from './descriptor';
 
@@ -48,7 +50,14 @@ function assertRequiredFields(desc: DescMessage, decoded: Message): void {
       }
     } else {
       if (field.proto.label === FieldLabel.REQUIRED && !isFieldSet(decoded, field)) {
-        throw new Error(`missing required '${field.name}'`);
+        // Proto2 closed enums place unknown wire values (e.g. a newer firmware FailureType)
+        // in `$unknown` instead of setting the field; preserve wire presence so Core still
+        // receives the firmware message and fallback error path.
+        const hasUnknownEnumWireValue =
+          field.fieldKind === 'enum' && decoded.$unknown?.some(u => u.no === field.number) === true;
+        if (!hasUnknownEnumWireValue) {
+          throw new Error(`missing required '${field.name}'`);
+        }
       }
       if (field.fieldKind === 'message' && isFieldSet(decoded, field)) {
         const sub = record[field.localName];
@@ -106,6 +115,7 @@ export const decode = (
   messageType: ProtobufMessageType,
   data: ByteBuffer
 ): Record<string, unknown> => {
+  ensureTextEncoding();
   const buff = data.toBuffer();
   const a = new Uint8Array(buff);
 
