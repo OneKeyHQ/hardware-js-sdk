@@ -37,7 +37,9 @@ class TestPythonDistribution(unittest.TestCase):
                 'from onekey.ipc import Helper; from onekey.device import Session; '
                 'assert Helper().process is None; '
                 'assert Helper.__module__ == "onekey.ipc"; '
-                'import onekey.ipc; assert ".zip/" in onekey.ipc.__file__'], cwd=load_dir, env=env, capture_output=True, text=True)
+                'import onekey.ipc, sys; from pathlib import Path; '
+                'assert Path(onekey.ipc.__loader__.archive) == Path(sys.argv[1])',
+                str(output)], cwd=load_dir, env=env, capture_output=True, text=True)
             self.assertEqual(0, loaded.returncode, loaded.stderr)
 
     def test_python_zip_does_not_pin_an_unused_stale_node_runtime(self):

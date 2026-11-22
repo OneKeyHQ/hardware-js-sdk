@@ -279,12 +279,22 @@ class Helper:
             except LinkError as error:
                 if held:
                     self.release(path)
-                # Legacy USB IDs are candidates, not proof of V2 support. An
-                # unclaimed candidate's failed probe must not hide other devices.
-                if held or error.code not in ("TIMEOUT", "PROTOCOL") or time.monotonic() >= deadline:
+                if error.code == "CANCELLED" or (cancelled is not None and cancelled.is_set()):
+                    raise LinkError("CANCELLED") from None
+                if time.monotonic() >= deadline:
+                    raise LinkError("TIMEOUT") from None
+                # A held device's failed probe must not hide other devices.
+                # Unclaimed legacy USB candidates may time out or reject V2.
+                if not held and error.code not in ("TIMEOUT", "PROTOCOL"):
                     raise
             except SessionError as error:
-                if held or error.code not in ("UNSUPPORTED", "PROTOCOL"):
+                if held:
+                    self.release(path)
+                if error.code == "CANCELLED" or (cancelled is not None and cancelled.is_set()):
+                    raise LinkError("CANCELLED") from None
+                if time.monotonic() >= deadline:
+                    raise LinkError("TIMEOUT") from None
+                if not held and error.code not in ("UNSUPPORTED", "PROTOCOL"):
                     raise
             except BaseException:
                 if held:
@@ -296,6 +306,10 @@ class Helper:
                         link.close()
                     except Exception:
                         pass
+        if cancelled is not None and cancelled.is_set():
+            raise LinkError("CANCELLED")
+        if time.monotonic() >= deadline:
+            raise LinkError("TIMEOUT")
         return found
 
     def _acquire(self, connect_id):

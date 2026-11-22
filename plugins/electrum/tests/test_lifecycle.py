@@ -8,7 +8,10 @@ from types import ModuleType, SimpleNamespace
 import unittest
 from unittest import mock
 
+from onekey import codec
+from onekey.frame import PACKET_TYPE_ACK, encode
 from onekey.ipc import Helper, HelperError
+from onekey.link import LinkError
 from test_protocol import Scripted, pipe_link, call
 
 
@@ -149,6 +152,64 @@ class TestLifecycleRepairs(unittest.TestCase):
             other = pool.submit(self.client, plugin, manager, discovered[1]['connectId']).result(timeout=2)
             self.assertTrue(other.attached())
             self.assertEqual(second.serial, other.serial)
+
+    def test_enumerate_keeps_other_claim_after_held_probe_disconnect_or_bad_ack(self):
+        for failure in ('disconnect', 'bad-ack', 'unexpected-ping', 'framed-failure',
+                        'truncated-status', 'malformed-failure', 'malformed-info'):
+            with self.subTest(failure=failure):
+                plugin, manager = self.make_plugin()
+                first, second = Scripted(), Scripted()
+                second.serial = 'second-synthetic-serial'
+                closed = []
+                links = {path: pipe_link(device, lambda path=path: closed.append(path))
+                         for path, device in (('usb1', first), ('usb2', second))}
+                helper = Helper()
+                plugin.helper = helper
+                self.addCleanup(helper.shutdown)
+                with mock.patch('onekey.ipc.list_paths', return_value=list(links)), \
+                        mock.patch('onekey.ipc.open_path', side_effect=links.__getitem__), \
+                        concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    call(helper, 'hello', {})
+                    clients = [pool.submit(self.client, plugin, manager, path).result(timeout=2)
+                               for path in links]
+                    generation = helper.generation
+                    self.assertEqual(links, helper._links)
+
+                    def failed_read(*_args):
+                        if failure == 'disconnect':
+                            raise LinkError('SDK_FAILED')
+                        ack = encode(b'', seq=links['usb1']._seq._seq, packet_type=PACKET_TYPE_ACK)
+                        return ack[:-1] + bytes((ack[-1] ^ 0xff,))
+
+                    def malformed_reply(kind, payload):
+                        if failure == 'truncated-status' and kind == codec.DEVICE_STATUS_GET:
+                            return codec.DEVICE_STATUS, b'\x08\x80'
+                        if failure == 'malformed-failure' and kind == codec.PING:
+                            return codec.FAILURE, b'\x08\x80'
+                        if failure == 'malformed-info' and kind == codec.DEVICE_INFO_GET:
+                            return codec.DEVICE_INFO, codec.enc_msg(100, b'\x08\x80')
+                        return peer_handle(kind, payload)
+
+                    peer_handle = first.handle
+
+                    with mock.patch.object(links['usb1'], '_read', wraps=links['usb1']._read) as read, \
+                            mock.patch.object(first, 'handle', wraps=first.handle) as handle:
+                        if failure == 'unexpected-ping':
+                            handle.return_value = first.status()
+                        elif failure == 'framed-failure':
+                            handle.return_value = (codec.FAILURE, codec.enc_uint(1, 1))
+                        elif failure in ('truncated-status', 'malformed-failure', 'malformed-info'):
+                            handle.side_effect = malformed_reply
+                        else:
+                            read.side_effect = failed_read
+                        found = pool.submit(plugin.enumerate).result(timeout=2)
+                    self.assertEqual(['usb2'], [device.path for device in found])
+                    self.assertEqual(['usb1'], closed)
+                    self.assertEqual({'usb2': links['usb2']}, helper._links)
+                    self.assertFalse(links['usb2']._closed)
+                    self.assertEqual(generation, helper.generation)
+                    self.assertTrue(clients[1].attached())
+                    self.assertEqual(second.serial, call(helper, 'state', dict(connectId='usb2'))['serialNo'])
 
     def test_actual_storage_unlock_restores_binding_and_allows_real_health_check_after_cancel(self):
         plugin, manager = self.make_plugin()

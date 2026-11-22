@@ -121,8 +121,16 @@ class Session:
         self._call(codec.PING, codec.encode_ping("handshake"), codec.SUCCESS)
 
     def identity(self):
-        status = codec.decode_status(self._call(codec.DEVICE_STATUS_GET, b"", codec.DEVICE_STATUS))
-        info = codec.decode_device_info(self._call(codec.DEVICE_INFO_GET, codec.encode_device_info_get(), codec.DEVICE_INFO))
+        status_body = self._call(codec.DEVICE_STATUS_GET, b"", codec.DEVICE_STATUS)
+        try:
+            status = codec.decode_status(status_body)
+        except ValueError:
+            raise SessionError("PROTOCOL") from None
+        info_body = self._call(codec.DEVICE_INFO_GET, codec.encode_device_info_get(), codec.DEVICE_INFO)
+        try:
+            info = codec.decode_device_info(info_body)
+        except ValueError:
+            raise SessionError("PROTOCOL") from None
         if status.get("init_states") is not True or info["model"] not in ("pro2", "neo") or not info["serial_no"]:
             _fail("UNSUPPORTED")
         return status, info
@@ -369,7 +377,10 @@ class Session:
             self.on_ui("button")
             kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self.deadline, cancelled=self.cancelled)
         if kind == codec.FAILURE:
-            _code, subcode, _message = codec.decode_failure(body)
+            try:
+                _code, subcode, _message = codec.decode_failure(body)
+            except ValueError:
+                raise SessionError("PROTOCOL") from None
             if subcode == codec.SESSION_INVALID:
                 _fail("WALLET_SESSION_INVALID")
             if subcode == codec.SESSION_CANCELLED:

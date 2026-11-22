@@ -192,17 +192,25 @@ class TestProtocolRepairs(unittest.TestCase):
         self.assertEqual(device.hidden, device.session_address)
 
     def test_failed_legacy_probe_does_not_hide_a_pro2(self):
-        device = Scripted()
+        for failure in ('TIMEOUT', 'PROTOCOL', 'unexpected-ping', 'unsupported'):
+            with self.subTest(failure=failure):
+                device, legacy = Scripted(), Scripted()
+                if failure == 'unexpected-ping':
+                    legacy.handle = lambda *_: legacy.status()
+                elif failure == 'unsupported':
+                    legacy.status = lambda: (codec.DEVICE_STATUS, codec.encode_status(None, init_states=False))
 
-        def open_link(path, **kwargs):
-            if path == 'legacy':
-                return Link(lambda *_: (_ for _ in ()).throw(LinkError('TIMEOUT')), lambda _: None)
-            return pipe_link(device)
+                def open_link(path, **kwargs):
+                    if path == 'legacy':
+                        if failure in ('TIMEOUT', 'PROTOCOL'):
+                            return Link(lambda *_: (_ for _ in ()).throw(LinkError(failure)), lambda _: None)
+                        return pipe_link(legacy)
+                    return pipe_link(device)
 
-        with mock.patch('onekey.ipc.list_paths', return_value=['legacy', 'usb1']), mock.patch('onekey.ipc.open_path', side_effect=open_link):
-            helper = Helper()
-            self.addCleanup(helper.shutdown)
-            self.assertEqual(['usb1'], [d['connectId'] for d in call(helper, 'search', {})])
+                with mock.patch('onekey.ipc.list_paths', return_value=['legacy', 'usb1']), mock.patch('onekey.ipc.open_path', side_effect=open_link):
+                    helper = Helper()
+                    self.addCleanup(helper.shutdown)
+                    self.assertEqual(['usb1'], [d['connectId'] for d in call(helper, 'search', {})])
 
     def test_host_cancel_sends_cancel_drops_claim_and_never_reuses_link(self):
         device = Scripted()
@@ -347,7 +355,7 @@ class TestProtocolRepairs(unittest.TestCase):
         self.assertEqual([codec.DEVICE_SESSION_ASK_PIN, codec.CANCEL], kinds)
         self.assertEqual([True], closed)
 
-    def test_discovery_preserves_global_cancel_and_established_link_failures(self):
+    def test_discovery_preserves_global_cancel_and_releases_failed_established_link(self):
         cancelled = threading.Event()
         cancelled.set()
         with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -362,9 +370,43 @@ class TestProtocolRepairs(unittest.TestCase):
             call(helper, 'hello', {})
             call(helper, 'state', dict(connectId='usb1'))
             device.broken = True
-            with self.assertRaisesRegex(HelperError, 'PROTOCOL'):
-                call(helper, 'search', {})
+            self.assertEqual([], call(helper, 'search', {}))
             self.assertEqual({}, helper._links)
+
+    def test_discovery_never_returns_partial_results_after_global_cancel_or_deadline(self):
+        for cancel, failure in ((cancel, failure) for cancel in (False, True)
+                                for failure in ('link-error', 'unexpected-ping', 'framed-failure', 'final-state')):
+            with self.subTest(cancel=cancel, failure=failure):
+                first, second = Scripted(), Scripted()
+                second_link = pipe_link(second)
+                helper = Helper(ports={'usb1': pipe_link(first), 'usb2': second_link})
+                self.addCleanup(helper.shutdown)
+                cancelled = threading.Event()
+                clock = [100.0]
+                if failure == 'unexpected-ping':
+                    second.handle = lambda *_: second.status()
+                elif failure == 'framed-failure':
+                    second.handle = lambda *_: (codec.FAILURE, codec.enc_uint(1, 1))
+                exchange = second_link.exchange
+
+                def fail_probe(*args, **kwargs):
+                    reply = exchange(*args, **kwargs)
+                    if failure == 'final-state' and args[0] != codec.DEVICE_INFO_GET:
+                        return reply
+                    # Abort after the framed reply arrives, before Session validates it.
+                    if cancel:
+                        cancelled.set()
+                    else:
+                        clock[0] = 102.0
+                    if failure == 'link-error':
+                        raise LinkError('PROTOCOL')
+                    return reply
+
+                second_link.exchange = fail_probe
+                with mock.patch('onekey.ipc.time.monotonic', side_effect=lambda: clock[0]), \
+                        concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    with self.assertRaisesRegex(HelperError, 'CANCELLED' if cancel else 'TIMEOUT'):
+                        pool.submit(helper.call, 'search', {}, timeout=1, cancelled=cancelled).result(timeout=2)
 
     def test_explicit_hidden_selection_exits_attach_unlock_before_passphrase(self):
         device = Scripted()
