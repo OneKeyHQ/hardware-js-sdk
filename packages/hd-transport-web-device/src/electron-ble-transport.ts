@@ -166,7 +166,7 @@ export default class ElectronBleTransport {
       this.v2Assemblers.get(uuid)?.reset();
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       this.Log?.debug('[Electron BLE] Protocol V2 link invalidated:', uuid, reason);
-      if (reason.startsWith('Protocol V2 link-fatal error:')) {
+      if (!this.stopped && reason.startsWith('Protocol V2 link-fatal error:')) {
         await this.releaseNative(uuid, { forceNative: true });
       }
     },
@@ -666,14 +666,17 @@ export default class ElectronBleTransport {
       protocolHint === 'V2' || this.deviceProtocol.get(uuid) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
     for (let i = 0; i < probeOrder.length; i += 1) {
+      this.assertRunning();
       const protocol = probeOrder[i];
       if (i > 0) {
         // Keep the physical BLE link while switching probes. Reconnecting here can
         // summon a second OS pairing prompt for a device that is still onboarding.
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
+        this.assertRunning();
       }
       const detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+      this.assertRunning();
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
@@ -772,6 +775,7 @@ export default class ElectronBleTransport {
   }
 
   private async writeOnce(uuid: string, hexData: string): Promise<void> {
+    this.assertRunning();
     const nobleBle = window.desktopApi?.nobleBle;
     if (!nobleBle) {
       throw new Error('Noble BLE API not available');
@@ -779,6 +783,7 @@ export default class ElectronBleTransport {
 
     try {
       await invokeNobleBle(nobleBle.write(uuid, hexData, { pacingDelayMs: 0 }));
+      this.assertRunning();
     } catch (error) {
       this.handleBluetoothError(error);
     }

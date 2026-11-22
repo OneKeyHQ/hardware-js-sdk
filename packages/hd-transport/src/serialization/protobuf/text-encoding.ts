@@ -89,6 +89,31 @@ export const ensureTextEncoding = (): void => {
     typeof globalThis.TextEncoder === 'function' &&
     typeof globalThis.TextDecoder === 'function'
   ) {
+    const te = new globalThis.TextEncoder();
+    const td = new globalThis.TextDecoder('utf-8', { ignoreBOM: true });
+    let tdStrict: TextDecoder | undefined;
+    configureTextEncoding({
+      encodeUtf8(text: string): Uint8Array {
+        return te.encode(text);
+      },
+      decodeUtf8(bytes: Uint8Array, strict?: boolean): string {
+        if (strict) {
+          if (tdStrict === undefined) {
+            tdStrict = new globalThis.TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+          }
+          return tdStrict.decode(bytes);
+        }
+        return td.decode(bytes);
+      },
+      checkUtf8(text: string): boolean {
+        try {
+          encodeURIComponent(text);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    });
     return;
   }
   configureTextEncoding({

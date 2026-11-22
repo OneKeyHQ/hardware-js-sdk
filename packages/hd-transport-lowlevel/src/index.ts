@@ -259,7 +259,9 @@ export default class LowlevelTransport {
   async release(uuid: string) {
     try {
       await this.protocolV2Links.invalidateLink(uuid, 'Lowlevel transport released');
-      await this.plugin.disconnect(uuid);
+      if (!this.stopped) {
+        await this.plugin.disconnect(uuid);
+      }
       this.connectedDevices.delete(uuid);
       this.deviceProtocol.delete(uuid);
       // Confirmed protocol stays on the device endpoint; BLE names are not a probe hint.
@@ -267,7 +269,7 @@ export default class LowlevelTransport {
       this.protocolV2PacketCapacities.delete(uuid);
       return true;
     } catch (error) {
-      this.Log.debug('lowlelvel transport disconnect error: ', error);
+      this.Log?.debug('lowlelvel transport disconnect error: ', error);
       return false;
     }
   }

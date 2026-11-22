@@ -56,6 +56,7 @@ import {
   UI_REQUEST,
   UI_RESPONSE,
   createDeviceMessage,
+  createErrorMessage,
   createResponseMessage,
   createUiMessage,
   formatLogMethodLabel,
@@ -1870,6 +1871,10 @@ export default class Core extends EventEmitter {
 
   private uiPromises: PendingUiPromises = [];
 
+  private transportGeneration = 0;
+
+  private teardownCancelCounter = 0;
+
   getOwnedUsbDeviceIdentity(descriptor: Parameters<typeof getOwnedUsbDeviceIdentity>[0]) {
     return getOwnedUsbDeviceIdentity(descriptor, this.requestQueue);
   }
@@ -1889,14 +1894,16 @@ export default class Core extends EventEmitter {
   }
 
   private getCoreContext() {
+    const generation = this.transportGeneration;
+    const isContextActive = () => this.isActive() && this.transportGeneration === generation;
     return {
       sdkInstanceId: this.sdkInstanceId,
       tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
       uiPromises: this.uiPromises,
-      isActive: () => this.isActive(),
+      isActive: isContextActive,
       postUiMessage: (message: CoreMessage) => {
-        if (this.isActive()) this.emit(CORE_EVENT, message);
+        if (isContextActive()) this.emit(CORE_EVENT, message);
       },
       methodSynchronize: this.methodSynchronize,
       getPrePendingCallPromise: (connectId: string) => this.prePendingCallPromises.get(connectId),
@@ -1970,12 +1977,23 @@ export default class Core extends EventEmitter {
       }
 
       case IFRAME.CALL: {
+        const cancelMark = this.teardownCancelCounter;
         while (transportSwitchTeardown) {
           // Wait for an in-progress transport switch teardown to finish so new calls
           // (including discovery calls bypassing requestQueue) never hit the outgoing transport.
           await transportSwitchTeardown.promise;
           if (!this.isActive()) {
             throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+          }
+          if (this.teardownCancelCounter !== cancelMark) {
+            return {
+              ...createErrorMessage(ERRORS.TypedError(HardwareErrorCode.ActionCancelled)),
+              payload: {
+                ...createErrorMessage(ERRORS.TypedError(HardwareErrorCode.ActionCancelled)).payload,
+                connectId: message.payload?.connectId ?? '',
+                deviceId: message.payload?.deviceId ?? '',
+              },
+            };
           }
         }
         const logBlockLabel = getLogBlockLabel(message);
@@ -2004,6 +2022,7 @@ export default class Core extends EventEmitter {
       }
       case IFRAME.CANCEL: {
         Log.log('cancel API: ', message);
+        this.teardownCancelCounter += 1;
         cancel(this.getCoreContext(), message.payload.connectId);
         break;
       }
@@ -2074,6 +2093,7 @@ export default class Core extends EventEmitter {
   }
 
   resetForTransportSwitch() {
+    this.transportGeneration += 1;
     this.requestQueue.abortAllRequests();
     cleanup(this.uiPromises);
     // Replace the array so a late finally() from a pre-switch call only cleans its own
