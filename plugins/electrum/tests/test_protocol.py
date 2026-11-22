@@ -33,6 +33,7 @@ class Scripted:
         self.material = False
         self.on_device = []
         self.pins = []
+        self.locks = 0
         self.unlocked_by_attach = False
         self.attach_to_pin_enabled = False
         self.order = []
@@ -75,6 +76,12 @@ class Scripted:
             if codec.decode_protocol_info_request(payload) is not True:
                 raise AssertionError("eventless_wallet_session")
             return codec.PROTOCOL_INFO, codec.enc_uint(1, 1) + codec.enc_str(2, "firmware-pro2")
+        if kind == codec.LOCK_DEVICE:
+            self.locks += 1
+            self.locked = True
+            self.unlocked_by_attach = False
+            self.session_id = self.session_address = None
+            return codec.SUCCESS, b""
         if kind == codec.DEVICE_SESSION_ASK_PIN:
             self.pins.append(codec.decode_ask_pin(payload))
             self.locked = False

@@ -111,6 +111,53 @@ class TestProtocolRepairs(unittest.TestCase):
         self.assertEqual([24], locks)
         self.assertEqual([codec.PIN_ATTACH], device.pins)
 
+    def test_saved_attach_wallet_switches_from_another_attach_slot(self):
+        for cached in (False, True):
+            with self.subTest(cached=cached):
+                helper, device = helper_for()
+                self.addCleanup(helper.shutdown)
+                expected = binding('attach-pin')
+                if cached:
+                    public_key(helper, expected)
+                device.pins.clear()
+                device.material = False
+                device.locked = False
+                device.device_id = 'synthetic-device'
+                device.unlocked_by_attach = True
+                device.install_session('other-attach-wallet')
+
+                self.assertEqual('xpub-test', public_key(helper, expected)['xpub'])
+                self.assertEqual(1, device.locks)
+                self.assertEqual([codec.PIN_ATTACH], device.pins)
+                self.assertEqual(expected['passphraseState'], device.session_address)
+                self.assertEqual([], device.on_device)
+                self.assertTrue(device.material)
+
+    def test_saved_attach_wallet_retry_prompts_after_wrong_slot(self):
+        device = Scripted()
+        device.locked = False
+        device.device_id = 'synthetic-device'
+        device.unlocked_by_attach = True
+        device.install_session('other-attach-wallet')
+        expected = binding('attach-pin')
+        device.hidden = 'wrong-attach-wallet'
+        helper, device = helper_for(device)
+        self.addCleanup(helper.shutdown)
+
+        with self.assertRaises(HelperError) as raised:
+            public_key(helper, expected)
+        self.assertEqual('WALLET_MISMATCH', raised.exception.code)
+        self.assertEqual(1, device.locks)
+        self.assertEqual([codec.PIN_ATTACH], device.pins)
+        self.assertFalse(device.material)
+
+        device.hidden = expected['passphraseState']
+        self.assertEqual('xpub-test', public_key(helper, expected)['xpub'])
+        self.assertEqual(2, device.locks)
+        self.assertEqual([codec.PIN_ATTACH, codec.PIN_ATTACH], device.pins)
+        self.assertEqual(expected['passphraseState'], device.session_address)
+        self.assertEqual([], device.on_device)
+
     def test_pin_switch_refreshes_identity_before_reading_material(self):
         device = Scripted()
         original = device.handle

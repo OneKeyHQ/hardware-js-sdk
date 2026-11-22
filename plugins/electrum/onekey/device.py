@@ -262,6 +262,17 @@ class Session:
             if restored != binding["passphraseState"]:
                 _fail("WALLET_MISMATCH")
         else:
+            if status.get("unlocked_by_attach_to_pin") is True:
+                restored, session_id = self._session()
+                if restored == binding["passphraseState"]:
+                    self._confirm(binding)
+                    self._remember(kind, restored, binding["deviceId"], session_id)
+                    return status, info
+                # A different Attach PIN slot needs a fresh PIN selection.
+                self._call(codec.LOCK_DEVICE, b"", codec.SUCCESS)
+                status, info = self.identity()
+                if status.get("unlocked") is not False:
+                    _fail("WALLET_MISMATCH")
             status, info = self._attach_pin(status, info)
             restored, session_id = self._session()
             if restored != binding["passphraseState"]:
