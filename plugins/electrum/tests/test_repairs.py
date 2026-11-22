@@ -72,6 +72,52 @@ class TestProtocolRepairs(unittest.TestCase):
         self.assertEqual(23, len(seen))
         self.assertEqual([0, 1], [s['index'] for s in result['signatures']])
 
+    def test_three_input_native_segwit_signing_completes_all_serialization_and_witness_rounds(self):
+        self._three_input_segwit_signing('SPENDWITNESS', 84)
+
+    def test_three_input_nested_segwit_signing_completes_all_serialization_and_witness_rounds(self):
+        self._three_input_segwit_signing('SPENDP2SHWITNESS', 49)
+
+    def _three_input_segwit_signing(self, script_type, purpose):
+        helper, device = helper_for(Scripted())
+        hashes = ['11' * 32, '22' * 32, '33' * 32]
+        # Firmware steps 1-3: approve inputs/outputs, then verify each previous transaction.
+        requests = [(codec.TX_INPUT, i, b'', None) for i in range(3)]
+        requests += [(codec.TX_OUTPUT, i, b'', None) for i in range(2)]
+        for i, txid in enumerate(hashes):
+            requests += [(codec.TX_INPUT, i, b'', None)]
+            requests += [(kind, 0, bytes.fromhex(txid), None) for kind in (codec.TX_META, codec.TX_INPUT, codec.TX_OUTPUT)]
+        # Steps 4-7: serialize inputs/outputs, sign witnesses, then finish.
+        requests += [(codec.TX_INPUT, i, b'', None) for i in range(3)]
+        requests += [(codec.TX_OUTPUT, i, b'', None) for i in range(2)]
+        # Each signature travels with the next request, including the last at TX_FINISHED.
+        requests += [(codec.TX_INPUT, i, b'', i - 1 if i else None) for i in range(3)]
+        requests += [(codec.TX_FINISHED, 0, b'', 2)]
+        self.assertEqual(26, len(requests))
+        original = device.handle
+        seen = []
+
+        def handle(kind, payload):
+            if kind in (codec.SIGN_TX, codec.TX_ACK):
+                request, index, tx_hash, signature_index = requests[len(seen)]
+                seen.append(request)
+                return codec.TX_REQUEST, codec.encode_tx_request(request, index=index, tx_hash=tx_hash,
+                    signature=SIGNATURE if signature_index is not None else None, signature_index=signature_index)
+            return original(kind, payload)
+
+        device.handle = handle
+        path = [0x80000000 + purpose, 0x80000000, 0x80000000, 0, 0]
+        inputs = [dict(prev_hash=h, prev_index=0, amount='1000', sequence=0xffffffff,
+                       address_n=path, script_type=script_type) for h in hashes]
+        outputs = [dict(amount='1400', address='synthetic-address', script_type='PAYTOADDRESS')] * 2
+        previous = [dict(hash=h, version=1, lock_time=0, inputs=[dict(prev_hash='44'*32, prev_index=0,
+                    script_sig='', sequence=0xffffffff)], bin_outputs=[dict(amount='1000', script_pubkey='00')]) for h in hashes]
+        result = call(helper, 'sign', dict(connectId='usb1', binding=binding('standard'), coin='Bitcoin',
+                       inputs=inputs, outputs=outputs, refTxs=previous, version=2, locktime=0))
+        self.assertEqual(26, len(seen))
+        self.assertEqual(codec.TX_FINISHED, seen[-1])
+        self.assertEqual([dict(index=i, signature=SIGNATURE.hex()) for i in range(3)], result['signatures'])
+
     def test_cold_matching_hidden_and_attach_wallet_do_not_prompt(self):
         for attached in (False, True):
             with self.subTest(attached=attached):

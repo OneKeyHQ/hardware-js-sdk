@@ -76,16 +76,17 @@ def _sign_budget(inputs, outputs, ref_txs):
         for item in ref_txs:
             if type(item) is dict and type(item.get("hash")) is str:
                 refs[item["hash"]] = 1 + len(item.get("inputs") or []) + len(item.get("bin_outputs") or [])
-    # One pass over the new transaction, the previous transaction again for
-    # every input, then the inputs once more while signatures come back.
-    steps = len(inputs) + len(outputs) + len(inputs) + 1
+    # With serialization enabled, approve and verify every input, approve and
+    # serialize every output, then process TX_FINISHED.
+    steps = 2 * len(inputs) + 2 * len(outputs) + 1
     for item in inputs:
         if type(item) is dict:
             steps += refs.get(item.get("prev_hash"), 0)
-    # Legacy SIGHASH_ALL re-reads every input/output for each legacy input,
-    # followed by the final output serialization pass.
+    # Legacy SIGHASH_ALL re-reads every input/output for each legacy input.
+    # SegWit inputs are requested again for serialization and witness signing.
     legacy = sum(item.get("script_type") == "SPENDADDRESS" for item in inputs)
-    return steps + legacy * (len(inputs) + len(outputs)) + len(outputs) + 4
+    segwit = sum(item.get("script_type") in ("SPENDWITNESS", "SPENDP2SHWITNESS") for item in inputs)
+    return steps + legacy * (len(inputs) + len(outputs)) + 2 * segwit
 
 
 def _der(signature):
