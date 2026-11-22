@@ -16,9 +16,9 @@ LIBRARY_VERSION = SDK_VERSION
 MODELS = {"pro2": "OneKey Pro 2", "neo": "OneKey Neo"}
 INPUT_SCRIPT_TYPES = {"standard": "SPENDADDRESS", "p2pkh": "SPENDADDRESS",
                       "p2wpkh-p2sh": "SPENDP2SHWITNESS", "p2wpkh": "SPENDWITNESS",
-                      "p2wsh": "SPENDWITNESS"}
+                      "p2wsh": "SPENDWITNESS", "p2wsh-p2sh": "SPENDP2SHWITNESS"}
 OUTPUT_SCRIPT_TYPES = {"p2pkh": "PAYTOADDRESS", "p2wpkh-p2sh": "PAYTOP2SHWITNESS", "p2wpkh": "PAYTOWITNESS",
-                       "p2wsh": "PAYTOWITNESS"}
+                       "p2wsh": "PAYTOWITNESS", "p2wsh-p2sh": "PAYTOP2SHWITNESS"}
 
 
 def coin_name():
@@ -44,12 +44,15 @@ def check_binding(value):
 def account_path(path, xtype):
     path = convert_bip32_strpath_to_intpath(path) if isinstance(path, str) else list(path)
     coin = 1 if coin_name() == "Testnet" else 0
-    # Native segwit multisig is the BIP48 account m/48'/coin'/account'/2'.
-    if xtype == "p2wsh":
+    # BIP48 account m/48'/coin'/account'/script'. Index 2 is native p2wsh, index 1 is nested p2wsh-p2sh.
+    script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}.get(xtype)
+    if script_index is not None:
         if (len(path) != 4 or path[0] != 48 + 0x80000000 or path[1] != coin + 0x80000000
                 or type(path[2]) is not int or not 0x80000000 <= path[2] <= 0xffffffff
-                or path[3] != 2 + 0x80000000):
-            raise UserFacingException(_("OneKey requires the BIP48 native segwit account derivation."))
+                or path[3] != script_index + 0x80000000):
+            message = (_("OneKey requires the BIP48 native segwit account derivation.") if xtype == "p2wsh"
+                       else _("OneKey requires the BIP48 nested segwit account derivation."))
+            raise UserFacingException(message)
         return path
     purpose = {"standard": 44, "p2pkh": 44, "p2wpkh-p2sh": 49, "p2wpkh": 84}.get(xtype)
     if (len(path) != 3 or purpose is None or path[0] != purpose + 0x80000000

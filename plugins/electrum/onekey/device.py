@@ -16,6 +16,9 @@ codec = importlib.import_module(__package__ + ".codec")
 STORAGE_ENCRYPTION_PATH = (0x80000000 + 4541509, 0x80000000 + 1112098098)
 _PURPOSES = {"SPENDADDRESS": 44, "SPENDP2SHWITNESS": 49, "SPENDWITNESS": 84,
              "PAYTOADDRESS": 44, "PAYTOP2SHWITNESS": 49, "PAYTOWITNESS": 84}
+# BIP48 script-type index. 1 is nested p2wsh-p2sh, 2 is native p2wsh.
+_BIP48_SCRIPT_INDEX = {"SPENDP2SHWITNESS": 1, "PAYTOP2SHWITNESS": 1,
+                       "SPENDWITNESS": 2, "PAYTOWITNESS": 2}
 
 
 class SessionError(Exception):
@@ -51,11 +54,12 @@ def _path(value, coin, script_type):
         _fail("INVALID_REQUEST")
     for item in value:
         _uint(item)
-    # m/48'/coin'/account'/2'[/change/index]. Script-type index 2 is native segwit.
+    # m/48'/coin'/account'/script'[/change/index]. Index 1 is nested, index 2 is native.
     if len(value) in (4, 6):
-        if (script_type not in ("SPENDWITNESS", "PAYTOWITNESS") or value[0] != 0x80000000 + 48
+        script_index = _BIP48_SCRIPT_INDEX.get(script_type)
+        if (script_index is None or value[0] != 0x80000000 + 48
                 or value[1] != 0x80000000 + _coin_index(coin) or value[2] < 0x80000000
-                or value[3] != 0x80000000 + 2
+                or value[3] != 0x80000000 + script_index
                 or (len(value) == 6 and not (value[4] in (0, 1) and value[5] < 0x80000000))):
             _fail("INVALID_REQUEST")
         return
@@ -128,9 +132,10 @@ def _check_signing_item(coin, item, *, output):
     _path(address_n, coin, script_type)
     if output and "address" in item:
         _fail("INVALID_REQUEST")
-    witness = "PAYTOWITNESS" if output else "SPENDWITNESS"
+    multisig_types = (("PAYTOWITNESS", "PAYTOP2SHWITNESS") if output
+                      else ("SPENDWITNESS", "SPENDP2SHWITNESS"))
     if len(address_n) == 6:
-        if script_type != witness or multisig is None:
+        if script_type not in multisig_types or multisig is None:
             _fail("INVALID_REQUEST")
     elif len(address_n) == 5:
         if multisig is not None:
@@ -138,7 +143,7 @@ def _check_signing_item(coin, item, *, output):
     else:
         _fail("INVALID_REQUEST")
     if multisig is not None:
-        if script_type != witness:
+        if script_type not in multisig_types:
             _fail("INVALID_REQUEST")
         _multisig(multisig, address_n)
 
@@ -277,7 +282,7 @@ class Session:
     def address(self, binding, coin, path, script_type, multisig=None):
         self._account(binding, coin, path, script_type, address=True)
         if len(path) == 6 or multisig is not None:
-            if multisig is None or script_type != "SPENDWITNESS" or len(path) != 6:
+            if multisig is None or script_type not in ("SPENDWITNESS", "SPENDP2SHWITNESS") or len(path) != 6:
                 _fail("INVALID_REQUEST")
             _multisig(multisig, path)
         self._ready(binding)
@@ -544,8 +549,8 @@ class Session:
         if script_type not in codec.INPUT_SCRIPTS:
             _fail("INVALID_REQUEST")
         if address:
-            if len(path) == 5 or (len(path) == 6 and script_type == "SPENDWITNESS"):
+            if len(path) == 5 or (len(path) == 6 and script_type in ("SPENDWITNESS", "SPENDP2SHWITNESS")):
                 return
-        elif len(path) == 3 or (len(path) == 4 and script_type == "SPENDWITNESS"):
+        elif len(path) == 3 or (len(path) == 4 and script_type in ("SPENDWITNESS", "SPENDP2SHWITNESS")):
             return
         _fail("INVALID_REQUEST")

@@ -798,13 +798,14 @@ class TestOneKeyMessage(unittest.TestCase):
 
 
 class TestOneKeyMultisig(unittest.TestCase):
-    def make_wallet(self, thresh=2):
+    def make_wallet(self, thresh=2, script_type="p2wsh"):
         coin = 1 if constants.net.TESTNET else 0
-        prefix = f"m/48'/{coin}'/0'/2'"
+        script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}[script_type]
+        prefix = f"m/48'/{coin}'/0'/{script_index}'"
         accounts = []
         roots = []
         for seed in (b"\x11" * 32, b"\x22" * 32, b"\x33" * 32):
-            root = BIP32Node.from_rootseed(seed, xtype="p2wsh")
+            root = BIP32Node.from_rootseed(seed, xtype=script_type)
             roots.append(root)
             accounts.append(root.subkey_at_private_derivation(prefix))
         fingerprint = roots[0].calc_fingerprint_of_this_node()
@@ -820,6 +821,8 @@ class TestOneKeyMultisig(unittest.TestCase):
                 providers.append(descriptor.PubkeyProvider(None, public, f"/{change}/{addr_index}"))
             multi = descriptor.MultisigDescriptor(providers, thresh, True)
             desc = descriptor.WSHDescriptor(multi)
+            if script_type == "p2wsh-p2sh":
+                desc = descriptor.SHDescriptor(desc)
             output = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=value)
             output.script_descriptor = desc
             pubkey = keys[0].eckey.get_public_key_bytes(compressed=True)
@@ -875,6 +878,31 @@ class TestOneKeyMultisig(unittest.TestCase):
                 self.assertNotIn("multisig", outputs[0])
                 self.assertIn("address", outputs[0])
                 self.assertEqual("PAYTOWITNESS", outputs[1]["script_type"])
+                self.assertEqual([1, 2], outputs[1]["address_n"][-2:])
+                self.assertEqual(2, outputs[1]["multisig"]["m"])
+
+    def test_partial_nested_segwit_signature_is_kept(self):
+        for network in (constants.BitcoinMainnet, constants.BitcoinTestnet):
+            with self.subTest(network=network), mock.patch.object(constants, "net", network):
+                keystore, tx, keys = self.make_wallet(script_type="p2wsh-p2sh")
+                signature = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())[:-1]
+                plugin, client = TestOneKeySigning().plugin(signature)
+                plugin.sign_transaction(keystore, tx)
+                txin = tx.inputs()[0]
+                our_pubkey = keys[0].eckey.get_public_key_bytes(compressed=True)
+                self.assertIn(our_pubkey, txin.sigs_ecdsa)
+                self.assertEqual(1, len(txin.sigs_ecdsa))
+                self.assertFalse(tx.is_complete())
+                self.assertEqual((1, 2), txin.get_satisfaction_progress())
+                self.assertEqual(23, len(txin.utxo.outputs()[0].scriptpubkey))
+                signed, outputs, _previous = client.sign_tx.call_args.args
+                self.assertEqual("SPENDP2SHWITNESS", signed[0]["script_type"])
+                self.assertEqual([0x80000000 + 48, 0x80000000 + (1 if network.TESTNET else 0),
+                                  0x80000000, 0x80000000 + 1, 0, 0], signed[0]["address_n"])
+                self.assertEqual(0x80000001, signed[0]["multisig"]["pubkeys"][0]["child_num"])
+                self.assertNotIn("multisig", outputs[0])
+                self.assertTrue(outputs[0]["address"].startswith("2" if network.TESTNET else "3"))
+                self.assertEqual("PAYTOP2SHWITNESS", outputs[1]["script_type"])
                 self.assertEqual([1, 2], outputs[1]["address_n"][-2:])
                 self.assertEqual(2, outputs[1]["multisig"]["m"])
 
@@ -949,6 +977,20 @@ class TestOneKeyMultisig(unittest.TestCase):
             with self.subTest(path=path, xtype=xtype), self.assertRaises(UserFacingException):
                 account_path(path, xtype)
 
+    def test_account_path_accepts_only_bip48_script_type_one(self):
+        self.assertEqual([0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 1],
+                         account_path("m/48'/0'/0'/1'", "p2wsh-p2sh"))
+        with mock.patch.object(constants, "net", constants.BitcoinTestnet):
+            self.assertEqual([0x80000000 + 48, 0x80000000 + 1, 0x80000000 + 3, 0x80000000 + 1],
+                             account_path("m/48'/1'/3'/1'", "p2wsh-p2sh"))
+            with self.assertRaises(UserFacingException):
+                account_path("m/48'/0'/0'/1'", "p2wsh-p2sh")
+        for path, xtype in (("m/45'/0", "p2wsh-p2sh"), ("m/48'/0'/0'/2'", "p2wsh-p2sh"),
+                            ("m/48'/0'/0'/1'/0/0", "p2wsh-p2sh"), ("m/49'/0'/0'", "p2wsh-p2sh"),
+                            ("m/48'/0'/0'/1'", "p2wpkh-p2sh"), ("m/48'/1'/0'/1'", "p2wsh-p2sh")):
+            with self.subTest(path=path, xtype=xtype), self.assertRaises(UserFacingException):
+                account_path(path, xtype)
+
     def test_show_address_sends_the_redeem_script_and_compares_it(self):
         keystore, tx, _keys = self.make_wallet()
         desc = tx.inputs()[0].script_descriptor
@@ -973,6 +1015,25 @@ class TestOneKeyMultisig(unittest.TestCase):
             plugin.show_address(wallet, other_address, keystore)
         plugin.get_client.assert_not_called()
 
+    def test_show_nested_address_sends_the_redeem_script_and_compares_it(self):
+        keystore, tx, _keys = self.make_wallet(script_type="p2wsh-p2sh")
+        desc = tx.inputs()[0].script_descriptor
+        address = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=0).address
+        wallet = SimpleNamespace(
+            txin_type="p2wsh-p2sh", is_mine=lambda _address: True, get_address_index=lambda _address: (0, 0),
+            get_script_descriptor_for_address=lambda _address: desc, get_keystore=lambda: keystore)
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        client = mock.Mock()
+        plugin.get_client = mock.Mock(return_value=client)
+        plugin.show_address(wallet, address, keystore)
+        path, script_type, expected, payload = client.show_address.call_args.args
+        self.assertEqual("p2wsh-p2sh", script_type)
+        self.assertEqual(address, expected)
+        self.assertTrue(address.startswith("3"))
+        self.assertEqual([0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 1, 0, 0], path)
+        self.assertEqual(2, payload["m"])
+        self.assertEqual(0x80000001, payload["pubkeys"][0]["child_num"])
+
     def test_zpub_from_the_device_is_stored_as_a_multisig_xpub(self):
         account = BIP32Node.from_rootseed(b"\x44" * 32, xtype="p2wsh").subkey_at_private_derivation("m/48'/0'/0'/2'")
         client, helper, _handler = TestOneKeyClient().make_client()
@@ -983,6 +1044,22 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertEqual(4, len(sent["path"]))
         with self.assertRaises(UserFacingException):
             client.get_xpub("m/48'/0'/0'/1'", "p2wsh")
+
+    def test_ypub_from_the_device_is_stored_as_a_nested_multisig_xpub(self):
+        account = BIP32Node.from_rootseed(b"\x44" * 32, xtype="p2wsh-p2sh").subkey_at_private_derivation("m/48'/0'/0'/1'")
+        device_xpub = account._replace(xtype="p2wpkh-p2sh").to_xpub()
+        client, helper, _handler = TestOneKeyClient().make_client()
+        helper.call.side_effect = [BINDING, dict(xpub=device_xpub, rootFingerprint=None)]
+        stored = client.get_xpub("m/48'/0'/0'/1'", "p2wsh-p2sh")
+        self.assertTrue(device_xpub.startswith("ypub"))
+        self.assertEqual(account.to_xpub(), stored)
+        self.assertTrue(stored.startswith("Ypub"))
+        sent = helper.call.call_args.args[1]
+        self.assertEqual("SPENDP2SHWITNESS", sent["scriptType"])
+        self.assertEqual(4, len(sent["path"]))
+        self.assertEqual(0x80000001, sent["path"][-1])
+        with self.assertRaises(UserFacingException):
+            client.get_xpub("m/48'/0'/0'/2'", "p2wsh-p2sh")
 
     def test_singlesig_still_has_to_be_complete(self):
         signer = TestOneKeySigning()

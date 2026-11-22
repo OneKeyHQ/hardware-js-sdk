@@ -82,7 +82,7 @@ class OneKeyKeyStore(Hardware_KeyStore):
 class OneKeyPlugin(HW_PluginBase):
     keystore_class = OneKeyKeyStore
     DEVICE_IDS = ("OneKey",)
-    SUPPORTED_XTYPES = ("standard", "p2wpkh-p2sh", "p2wpkh", "p2wsh")
+    SUPPORTED_XTYPES = ("standard", "p2wpkh-p2sh", "p2wpkh", "p2wsh", "p2wsh-p2sh")
     minimum_library = (1, 2, 10)
     maximum_library = (1, 2, 11)
     libraries_URL = "https://github.com/OneKeyHQ/hardware-js-sdk/tree/feat/electrum-plugin/plugins/electrum"
@@ -209,7 +209,7 @@ class OneKeyPlugin(HW_PluginBase):
         keystore = keystore or wallet.get_keystore()
         if not self.show_address_helper(wallet, address, keystore):
             return
-        if wallet.txin_type == "p2wsh":
+        if wallet.txin_type in ("p2wsh", "p2wsh-p2sh"):
             self._show_p2wsh_address(wallet, address, keystore)
             return
         if wallet.txin_type not in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
@@ -227,20 +227,22 @@ class OneKeyPlugin(HW_PluginBase):
 
     def _show_p2wsh_address(self, wallet, address, keystore):
         from .client import account_path
+        script_type = wallet.txin_type
         desc = wallet.get_script_descriptor_for_address(address)
         multi = desc.get_simple_multisig() if desc is not None else None
-        if desc is None or multi is None or not multi.is_sorted or desc.to_legacy_electrum_script_type() != "p2wsh":
-            raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
-        if BIP32Node.from_xkey(keystore.xpub).xtype != "p2wsh":
+        if (script_type not in ("p2wsh", "p2wsh-p2sh") or desc is None or multi is None or not multi.is_sorted
+                or desc.to_legacy_electrum_script_type() != script_type):
+            raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+        if BIP32Node.from_xkey(keystore.xpub).xtype != script_type:
             raise UserFacingException(_("Script type does not match the OneKey account."))
         suffix = list(wallet.get_address_index(address))
-        prefix = account_path(keystore.get_derivation_prefix(), "p2wsh")
+        prefix = account_path(keystore.get_derivation_prefix(), script_type)
         pubkey = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
         payload = self._multisig_payload(multi, pubkey, suffix)
         expected = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=0).address
         if expected != address:
             raise UserFacingException(_("Electrum address does not match the OneKey account."))
-        self.get_client(keystore).show_address(prefix + suffix, "p2wsh", address, payload)
+        self.get_client(keystore).show_address(prefix + suffix, script_type, address, payload)
 
     @staticmethod
     def _owned_path(keystore, item, script_type, *, change=False):
@@ -262,8 +264,8 @@ class OneKeyPlugin(HW_PluginBase):
         desc = item.script_descriptor
         multi = desc.get_simple_multisig() if desc is not None else None
         if multi is not None:
-            if script_type != "p2wsh" or not multi.is_sorted or desc.to_legacy_electrum_script_type() != "p2wsh":
-                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            if script_type not in ("p2wsh", "p2wsh-p2sh") or not multi.is_sorted or desc.to_legacy_electrum_script_type() != script_type:
+                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             return list(path), desc.expand().output_script, OneKeyPlugin._multisig_payload(multi, derived, suffix)
         expected_script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
             pubkey=derived.hex(), script_type=script_type).expand().output_script
@@ -282,14 +284,14 @@ class OneKeyPlugin(HW_PluginBase):
         if (multi.is_range() or not multi.is_sorted or not 1 <= multi.thresh <= len(multi.pubkeys) <= 15
                 or len(suffix) != 2 or type(suffix[0]) is not int or suffix[0] not in (0, 1)
                 or type(suffix[1]) is not int or not 0 <= suffix[1] < 0x80000000):
-            raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
         nodes = []
         found = False
         seen = set()
         for provider in multi.pubkeys:
             node = provider.extkey
             if node is None or provider.is_range() or node.is_private():
-                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             provider_suffix = list(provider.get_der_suffix_int_list())
             if provider_suffix != list(suffix):
                 raise UserFacingException(_("Input or change does not belong to this OneKey account."))
@@ -297,7 +299,7 @@ class OneKeyPlugin(HW_PluginBase):
             chain = node.chaincode
             if (type(node.depth) is not int or not 1 <= node.depth <= 255 or len(chain) != 32
                     or len(pubkey) != 33 or pubkey[0] not in (2, 3) or pubkey in seen):
-                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             seen.add(pubkey)
             child = node.subkey_at_public_derivation(provider_suffix).eckey.get_public_key_bytes(compressed=True)
             found = found or child == our_pubkey
@@ -321,8 +323,8 @@ class OneKeyPlugin(HW_PluginBase):
             desc = txin.script_descriptor
             if not txin.is_mine or desc is None:
                 raise UserFacingException(_("Only single-signature inputs from this OneKey wallet are supported."))
-            if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() != "p2wsh":
-                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in ("p2wsh", "p2wsh-p2sh"):
+                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             script_type = desc.to_legacy_electrum_script_type()
             if script_type not in OUTPUT_SCRIPT_TYPES:
                 raise UserFacingException(_("Unsupported OneKey input script type."))
@@ -350,8 +352,8 @@ class OneKeyPlugin(HW_PluginBase):
                 desc = txout.script_descriptor
                 if not txout.is_mine or desc is None:
                     raise UserFacingException(_("Unsupported OneKey change script."))
-                if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() != "p2wsh":
-                    raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+                if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in ("p2wsh", "p2wsh-p2sh"):
+                    raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
                 script_type = desc.to_legacy_electrum_script_type()
                 if script_type not in OUTPUT_SCRIPT_TYPES:
                     raise UserFacingException(_("Unsupported OneKey change script."))
@@ -371,7 +373,7 @@ class OneKeyPlugin(HW_PluginBase):
         change_multisig = ["multisig" in item for item in outputs if "address_n" in item]
         if (any("multisig" in item for item in inputs) != all("multisig" in item for item in inputs)
                 or (multisig and not all(change_multisig)) or (not multisig and any(change_multisig))):
-            raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
 
         client = self.get_client(keystore)
         try:
