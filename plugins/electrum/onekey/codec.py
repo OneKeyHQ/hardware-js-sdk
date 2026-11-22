@@ -16,6 +16,8 @@ BUTTON_REQUEST = 26
 BUTTON_ACK = 27
 GET_ADDRESS = 29
 ADDRESS = 30
+SIGN_MESSAGE = 38
+MESSAGE_SIGNATURE = 40
 PROTOCOL_INFO_REQUEST = 60200
 PROTOCOL_INFO = 60201
 PING = 60206
@@ -293,8 +295,12 @@ def decode_public_key(payload):
     return opt_str(fields, 2), opt_uint(fields, 3)
 
 
-def encode_get_address(address_n, coin, script_type, show_display=True):
-    return _path(address_n) + enc_str(2, coin) + enc_bool(3, show_display) + enc_uint(5, INPUT_SCRIPTS[script_type])
+def encode_get_address(address_n, coin, script_type, show_display=True, multisig=None):
+    # Field 4 is optional. Singlesig GetAddress stays path, coin, show, script type.
+    body = _path(address_n) + enc_str(2, coin) + enc_bool(3, show_display)
+    if multisig is not None:
+        body += enc_msg(4, encode_multisig(multisig))
+    return body + enc_uint(5, INPUT_SCRIPTS[script_type])
 
 
 def encode_address(address):
@@ -303,6 +309,36 @@ def encode_address(address):
 
 def decode_address(payload):
     return opt_str(decode_fields(payload), 1)
+
+
+def encode_sign_message(address_n, message, coin, script_type, no_script_type):
+    # Legacy SignMessage. Field 10 (BIP-322) stays absent: Electrum verifies the
+    # Bitcoin Core message, and no_script_type keeps the recovery byte in 27-34.
+    body = _path(address_n) + enc_bytes(2, message) + enc_str(3, coin) + enc_uint(4, INPUT_SCRIPTS[script_type])
+    if no_script_type:
+        body += enc_bool(5, True)
+    return body
+
+
+def decode_sign_message(payload):
+    fields = decode_fields(payload)
+    return {
+        "address_n": [value for wire, value in fields.get(1, ()) if wire == 0],
+        "message": _last(fields, 2, 2),
+        "coin_name": opt_str(fields, 3),
+        "script_type": opt_uint(fields, 4),
+        "no_script_type": opt_bool(fields, 5),
+        "is_bip322_simple": opt_bool(fields, 10),
+    }
+
+
+def encode_message_signature(address, signature):
+    return enc_str(1, address) + enc_bytes(2, signature)
+
+
+def decode_message_signature(payload):
+    fields = decode_fields(payload)
+    return opt_str(fields, 1), _last(fields, 2, 2)
 
 
 def encode_sign_tx(inputs_count, outputs_count, coin, version, lock_time):
@@ -353,6 +389,44 @@ def _hash(hex_value):
     return bytes.fromhex(hex_value)
 
 
+def _hd_node(node):
+    # HDNodeType has no private-key field. The node is the account xpub.
+    return (enc_uint(1, node["depth"]) + enc_uint(2, node["fingerprint"]) + enc_uint(3, node["child_num"])
+            + enc_bytes(4, bytes.fromhex(node["chain_code"])) + enc_bytes(6, bytes.fromhex(node["public_key"])))
+
+
+def _hd_path(node):
+    body = enc_msg(1, _hd_node(node))
+    body += b"".join(enc_uint(2, step) for step in node["address_n"])
+    return body
+
+
+def encode_multisig(multisig):
+    # Firmware writes the redeem script in this order and does not sort it.
+    # Empty signature slots are omitted; the device pads them.
+    body = b"".join(enc_msg(1, _hd_path(node)) for node in multisig["pubkeys"])
+    return body + enc_uint(3, multisig["m"])
+
+
+def decode_multisig(payload):
+    fields = decode_fields(payload)
+    pubkeys = []
+    for wire, value in fields.get(1, ()):
+        if wire != 2:
+            continue
+        node_fields = decode_fields(value)
+        node = decode_fields(_last(node_fields, 1, 2) or b"")
+        pubkeys.append({
+            "depth": opt_uint(node, 1),
+            "fingerprint": opt_uint(node, 2),
+            "child_num": opt_uint(node, 3),
+            "chain_code": _last(node, 4, 2),
+            "public_key": _last(node, 6, 2),
+            "address_n": [item for item_wire, item in node_fields.get(2, ()) if item_wire == 0],
+        })
+    return {"m": opt_uint(fields, 3), "pubkeys": pubkeys, "signatures": fields.get(2, ())}
+
+
 def _input(item, *, prev):
     body = b"" if prev else _path(item["address_n"])
     body += enc_bytes(2, _hash(item["prev_hash"])) + enc_uint(3, item["prev_index"])
@@ -360,7 +434,10 @@ def _input(item, *, prev):
         body += enc_bytes(4, bytes.fromhex(item["script_sig"]))
     body += enc_uint(5, item["sequence"])
     if not prev:
-        body += enc_uint(6, INPUT_SCRIPTS[item["script_type"]]) + enc_uint(8, int(item["amount"]))
+        body += enc_uint(6, INPUT_SCRIPTS[item["script_type"]])
+        if "multisig" in item:
+            body += enc_msg(7, encode_multisig(item["multisig"]))
+        body += enc_uint(8, int(item["amount"]))
     return body
 
 
@@ -371,6 +448,8 @@ def _output(item):
     if "address_n" in item:
         body += b"".join(enc_uint(2, step) for step in item["address_n"])
     body += enc_uint(3, int(item["amount"])) + enc_uint(4, OUTPUT_SCRIPTS[item["script_type"]])
+    if "multisig" in item:
+        body += enc_msg(5, encode_multisig(item["multisig"]))
     if "op_return_data" in item:
         body += enc_bytes(6, bytes.fromhex(item["op_return_data"]))
     return body

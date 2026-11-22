@@ -1,6 +1,6 @@
 import copy
 
-from electrum import descriptor
+from electrum import bitcoin, descriptor
 from electrum.bip32 import BIP32Node
 from electrum.hw_wallet import HW_PluginBase
 from electrum.hw_wallet.plugin import trezor_validate_op_return_output_and_get_data
@@ -45,7 +45,34 @@ class OneKeyKeyStore(Hardware_KeyStore):
         raise UserFacingException(_("Message decryption is not supported by this OneKey plugin."))
 
     def sign_message(self, sequence, message, password, *, script_type=None):
-        raise UserFacingException(_("Message signing is not supported by this OneKey plugin."))
+        # Same contract as Trezor and Ledger: raw 65-byte recoverable signature.
+        # no_script_type is set on the wire so Electrum and Bitcoin Core can verify it.
+        if script_type not in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
+            raise UserFacingException(_("Only single-signature legacy and SegWit wallets are supported."))
+        if type(message) is not str:
+            raise UserFacingException(_("OneKey can sign a Bitcoin message of 1 to 1024 bytes."))
+        raw = message.encode("utf-8")
+        if not 1 <= len(raw) <= 1024:
+            raise UserFacingException(_("OneKey can sign a Bitcoin message of 1 to 1024 bytes."))
+        if (type(sequence) not in (tuple, list) or len(sequence) != 2
+                or type(sequence[0]) is not int or sequence[0] not in (0, 1)
+                or type(sequence[1]) is not int or not 0 <= sequence[1] < 0x80000000):
+            raise UserFacingException(_("Input or change does not belong to this OneKey account."))
+        if BIP32Node.from_xkey(self.xpub).xtype != {"p2pkh": "standard"}.get(script_type, script_type):
+            raise UserFacingException(_("Script type does not match the OneKey account."))
+        from .client import account_path
+        path = account_path(self.get_derivation_prefix(), script_type) + list(sequence)
+        pubkey = BIP32Node.from_xkey(self.xpub).subkey_at_public_derivation(list(sequence)).eckey.get_public_key_bytes(compressed=True)
+        script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
+            pubkey=pubkey.hex(), script_type=script_type).expand().output_script
+        expected = PartialTxOutput(scriptpubkey=script, value=0).address
+        client = self.get_client()
+        if client is None:
+            raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+        signature = client.sign_message(path, script_type, raw, expected)
+        if not bitcoin.verify_usermessage_with_address(expected, signature, raw):
+            raise UserFacingException(_("Invalid OneKey signature encoding."))
+        return signature
 
     def sign_transaction(self, tx, password):
         if not tx.is_complete():
@@ -55,7 +82,7 @@ class OneKeyKeyStore(Hardware_KeyStore):
 class OneKeyPlugin(HW_PluginBase):
     keystore_class = OneKeyKeyStore
     DEVICE_IDS = ("OneKey",)
-    SUPPORTED_XTYPES = ("standard", "p2wpkh-p2sh", "p2wpkh")
+    SUPPORTED_XTYPES = ("standard", "p2wpkh-p2sh", "p2wpkh", "p2wsh")
     minimum_library = (1, 2, 10)
     maximum_library = (1, 2, 11)
     libraries_URL = "https://github.com/OneKeyHQ/hardware-js-sdk/tree/feat/electrum-plugin/plugins/electrum"
@@ -182,6 +209,9 @@ class OneKeyPlugin(HW_PluginBase):
         keystore = keystore or wallet.get_keystore()
         if not self.show_address_helper(wallet, address, keystore):
             return
+        if wallet.txin_type == "p2wsh":
+            self._show_p2wsh_address(wallet, address, keystore)
+            return
         if wallet.txin_type not in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
             raise UserFacingException(_("Only single-signature legacy and SegWit wallets are supported."))
         from .client import account_path
@@ -195,6 +225,23 @@ class OneKeyPlugin(HW_PluginBase):
             raise UserFacingException(_("Electrum address does not match the OneKey account."))
         self.get_client(keystore).show_address(path + suffix, wallet.txin_type, address)
 
+    def _show_p2wsh_address(self, wallet, address, keystore):
+        from .client import account_path
+        desc = wallet.get_script_descriptor_for_address(address)
+        multi = desc.get_simple_multisig() if desc is not None else None
+        if desc is None or multi is None or not multi.is_sorted or desc.to_legacy_electrum_script_type() != "p2wsh":
+            raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+        if BIP32Node.from_xkey(keystore.xpub).xtype != "p2wsh":
+            raise UserFacingException(_("Script type does not match the OneKey account."))
+        suffix = list(wallet.get_address_index(address))
+        prefix = account_path(keystore.get_derivation_prefix(), "p2wsh")
+        pubkey = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
+        payload = self._multisig_payload(multi, pubkey, suffix)
+        expected = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=0).address
+        if expected != address:
+            raise UserFacingException(_("Electrum address does not match the OneKey account."))
+        self.get_client(keystore).show_address(prefix + suffix, "p2wsh", address, payload)
+
     @staticmethod
     def _owned_path(keystore, item, script_type, *, change=False):
         from .client import account_path
@@ -202,20 +249,69 @@ class OneKeyPlugin(HW_PluginBase):
         if BIP32Node.from_xkey(keystore.xpub).xtype != {"p2pkh": "standard"}.get(script_type, script_type):
             raise UserFacingException(_("Script type does not match the OneKey account."))
         pubkey, path = keystore.find_my_pubkey_in_txinout(item)
-        if (not path or len(path) != len(prefix) + 2 or list(path[:3]) != prefix
-                or type(path[3]) is not int or path[3] not in (0, 1)
-                or type(path[4]) is not int or not 0 <= path[4] < 0x80000000
-                or (change and path[3] != 1)):
+        branch = len(prefix)
+        if (not path or len(path) != branch + 2 or list(path[:branch]) != list(prefix)
+                or type(path[branch]) is not int or path[branch] not in (0, 1)
+                or type(path[branch + 1]) is not int or not 0 <= path[branch + 1] < 0x80000000
+                or (change and path[branch] != 1)):
             raise UserFacingException(_("Input or change does not belong to this OneKey account."))
-        derived = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(path[3:]).eckey.get_public_key_bytes(compressed=True)
+        suffix = list(path[branch:])
+        derived = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
         if pubkey != derived:
             raise UserFacingException(_("OneKey account public key mismatch."))
+        desc = item.script_descriptor
+        multi = desc.get_simple_multisig() if desc is not None else None
+        if multi is not None:
+            if script_type != "p2wsh" or not multi.is_sorted or desc.to_legacy_electrum_script_type() != "p2wsh":
+                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            return list(path), desc.expand().output_script, OneKeyPlugin._multisig_payload(multi, derived, suffix)
         expected_script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
             pubkey=derived.hex(), script_type=script_type).expand().output_script
-        desc = item.script_descriptor
-        if desc is None or desc.get_simple_multisig() or desc.expand().output_script != expected_script:
+        if desc is None or desc.expand().output_script != expected_script:
             raise UserFacingException(_("OneKey ownership script mismatch."))
-        return list(path), expected_script
+        return list(path), expected_script, None
+
+    @staticmethod
+    def _u32(value):
+        if type(value) is int:
+            return value
+        return int.from_bytes(value, "big")
+
+    @staticmethod
+    def _multisig_payload(multi, our_pubkey, suffix):
+        if (multi.is_range() or not multi.is_sorted or not 1 <= multi.thresh <= len(multi.pubkeys) <= 15
+                or len(suffix) != 2 or type(suffix[0]) is not int or suffix[0] not in (0, 1)
+                or type(suffix[1]) is not int or not 0 <= suffix[1] < 0x80000000):
+            raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+        nodes = []
+        found = False
+        seen = set()
+        for provider in multi.pubkeys:
+            node = provider.extkey
+            if node is None or provider.is_range() or node.is_private():
+                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            provider_suffix = list(provider.get_der_suffix_int_list())
+            if provider_suffix != list(suffix):
+                raise UserFacingException(_("Input or change does not belong to this OneKey account."))
+            pubkey = node.eckey.get_public_key_bytes(compressed=True)
+            chain = node.chaincode
+            if (type(node.depth) is not int or not 1 <= node.depth <= 255 or len(chain) != 32
+                    or len(pubkey) != 33 or pubkey[0] not in (2, 3) or pubkey in seen):
+                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
+            seen.add(pubkey)
+            child = node.subkey_at_public_derivation(provider_suffix).eckey.get_public_key_bytes(compressed=True)
+            found = found or child == our_pubkey
+            nodes.append({
+                "depth": node.depth,
+                "fingerprint": OneKeyPlugin._u32(node.fingerprint),
+                "child_num": OneKeyPlugin._u32(node.child_number),
+                "chain_code": chain.hex(),
+                "public_key": pubkey.hex(),
+                "address_n": provider_suffix,
+            })
+        if not found:
+            raise UserFacingException(_("OneKey account public key mismatch."))
+        return {"m": multi.thresh, "pubkeys": nodes}
 
     @runs_in_hwd_thread
     def sign_transaction(self, keystore, tx: PartialTransaction):
@@ -223,14 +319,16 @@ class OneKeyPlugin(HW_PluginBase):
         inputs, previous = [], {}
         for txin in tx.inputs():
             desc = txin.script_descriptor
-            if not txin.is_mine or desc is None or desc.get_simple_multisig():
+            if not txin.is_mine or desc is None:
                 raise UserFacingException(_("Only single-signature inputs from this OneKey wallet are supported."))
+            if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() != "p2wsh":
+                raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
             script_type = desc.to_legacy_electrum_script_type()
             if script_type not in OUTPUT_SCRIPT_TYPES:
                 raise UserFacingException(_("Unsupported OneKey input script type."))
             if txin.sighash not in (None, Sighash.ALL):
                 raise UserFacingException(_("OneKey requires SIGHASH_ALL."))
-            path, script = self._owned_path(keystore, txin, script_type)
+            path, script, payload = self._owned_path(keystore, txin, script_type)
             prev = txin.utxo
             index = txin.prevout.out_idx
             if (prev is None or prev.txid() != txin.prevout.txid.hex()
@@ -239,29 +337,41 @@ class OneKeyPlugin(HW_PluginBase):
                     or prev.outputs()[index].value != txin.value_sats()):
                 raise UserFacingException(_("Missing or mismatched full previous transaction."))
             previous[txin.prevout.txid.hex()] = self._previous_transaction(prev)
-            inputs.append(dict(prev_hash=txin.prevout.txid.hex(), prev_index=index,
-                               amount=str(txin.value_sats()), sequence=txin.nsequence,
-                               address_n=path, script_type=INPUT_SCRIPT_TYPES[script_type]))
+            item = dict(prev_hash=txin.prevout.txid.hex(), prev_index=index,
+                        amount=str(txin.value_sats()), sequence=txin.nsequence,
+                        address_n=path, script_type=INPUT_SCRIPT_TYPES[script_type])
+            if payload is not None:
+                item["multisig"] = payload
+            inputs.append(item)
 
         outputs = []
         for txout in tx.outputs():
             if txout.is_change:
                 desc = txout.script_descriptor
-                if not txout.is_mine or desc is None or desc.get_simple_multisig():
+                if not txout.is_mine or desc is None:
                     raise UserFacingException(_("Unsupported OneKey change script."))
+                if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() != "p2wsh":
+                    raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
                 script_type = desc.to_legacy_electrum_script_type()
                 if script_type not in OUTPUT_SCRIPT_TYPES:
                     raise UserFacingException(_("Unsupported OneKey change script."))
-                path, script = self._owned_path(keystore, txout, script_type, change=True)
+                path, script, payload = self._owned_path(keystore, txout, script_type, change=True)
                 if script != txout.scriptpubkey:
                     raise UserFacingException(_("OneKey change script does not match its derivation."))
-                outputs.append(dict(amount=str(txout.value), address_n=path,
-                                    script_type=OUTPUT_SCRIPT_TYPES[script_type]))
+                item = dict(amount=str(txout.value), address_n=path, script_type=OUTPUT_SCRIPT_TYPES[script_type])
+                if payload is not None:
+                    item["multisig"] = payload
+                outputs.append(item)
             elif txout.address:
                 outputs.append(dict(amount=str(txout.value), address=txout.address, script_type="PAYTOADDRESS"))
             else:
                 outputs.append(dict(amount=str(txout.value), script_type="PAYTOOPRETURN",
                                     op_return_data=trezor_validate_op_return_output_and_get_data(txout).hex()))
+        multisig = any("multisig" in item for item in inputs)
+        change_multisig = ["multisig" in item for item in outputs if "address_n" in item]
+        if (any("multisig" in item for item in inputs) != all("multisig" in item for item in inputs)
+                or (multisig and not all(change_multisig)) or (not multisig and any(change_multisig))):
+            raise UserFacingException(_("Only native segwit multisig from this OneKey wallet is supported."))
 
         client = self.get_client(keystore)
         try:
@@ -278,16 +388,30 @@ class OneKeyPlugin(HW_PluginBase):
                 checked.append(self._signature(entry["signature"]) + Sighash.to_sigbytes(Sighash.ALL))
             # Electrum recovers/verifies against each ORIGINAL transaction input. Test a copy first
             # so a partial, reordered, or foreign signature cannot mutate the user's transaction.
+            # One cosigner of an m-of-n script does not finish the transaction.
+            # A singlesig signature still has to make every input complete.
             candidate = copy.deepcopy(tx)
             candidate.update_signatures(checked)
-            if not candidate.is_complete():
-                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+            self._require_applied_signatures(keystore, candidate, multisig)
             tx.update_signatures(checked)
-            if not tx.is_complete():
-                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+            self._require_applied_signatures(keystore, tx, multisig)
         except BaseException:
             client.close()
             raise
+
+    @staticmethod
+    def _require_applied_signatures(keystore, tx, multisig):
+        if not multisig:
+            if not tx.is_complete():
+                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+            return
+        for txin in tx.inputs():
+            pubkey, _path = keystore.find_my_pubkey_in_txinout(txin)
+            if pubkey is None or pubkey not in txin.sigs_ecdsa:
+                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
+            have, need = txin.get_satisfaction_progress()
+            if have >= need and not txin.is_complete():
+                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
 
     @staticmethod
     def _signature(value):
@@ -333,9 +457,9 @@ class OneKeyPlugin(HW_PluginBase):
         wizard.navmap_merge({
             "onekey_start": {"next": "onekey_xpub"},
             "onekey_xpub": {
-                "next": lambda d: wizard.wallet_password_view(d),
+                "next": lambda d: wizard.wallet_password_view(d) if wizard.last_cosigner(d) else "multisig_cosigner_keystore",
                 "accept": wizard.maybe_master_pubkey,
-                "last": lambda d: wizard.is_single_password(),
+                "last": lambda d: wizard.is_single_password() and wizard.last_cosigner(d),
             },
             "onekey_not_initialized": {},
             "onekey_unlock": {"last": True},

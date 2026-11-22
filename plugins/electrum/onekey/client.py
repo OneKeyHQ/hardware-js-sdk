@@ -15,8 +15,10 @@ from .ipc import HelperError, SDK_VERSION
 LIBRARY_VERSION = SDK_VERSION
 MODELS = {"pro2": "OneKey Pro 2", "neo": "OneKey Neo"}
 INPUT_SCRIPT_TYPES = {"standard": "SPENDADDRESS", "p2pkh": "SPENDADDRESS",
-                      "p2wpkh-p2sh": "SPENDP2SHWITNESS", "p2wpkh": "SPENDWITNESS"}
-OUTPUT_SCRIPT_TYPES = {"p2pkh": "PAYTOADDRESS", "p2wpkh-p2sh": "PAYTOP2SHWITNESS", "p2wpkh": "PAYTOWITNESS"}
+                      "p2wpkh-p2sh": "SPENDP2SHWITNESS", "p2wpkh": "SPENDWITNESS",
+                      "p2wsh": "SPENDWITNESS"}
+OUTPUT_SCRIPT_TYPES = {"p2pkh": "PAYTOADDRESS", "p2wpkh-p2sh": "PAYTOP2SHWITNESS", "p2wpkh": "PAYTOWITNESS",
+                       "p2wsh": "PAYTOWITNESS"}
 
 
 def coin_name():
@@ -41,8 +43,15 @@ def check_binding(value):
 
 def account_path(path, xtype):
     path = convert_bip32_strpath_to_intpath(path) if isinstance(path, str) else list(path)
-    purpose = {"standard": 44, "p2pkh": 44, "p2wpkh-p2sh": 49, "p2wpkh": 84}.get(xtype)
     coin = 1 if coin_name() == "Testnet" else 0
+    # Native segwit multisig is the BIP48 account m/48'/coin'/account'/2'.
+    if xtype == "p2wsh":
+        if (len(path) != 4 or path[0] != 48 + 0x80000000 or path[1] != coin + 0x80000000
+                or type(path[2]) is not int or not 0x80000000 <= path[2] <= 0xffffffff
+                or path[3] != 2 + 0x80000000):
+            raise UserFacingException(_("OneKey requires the BIP48 native segwit account derivation."))
+        return path
+    purpose = {"standard": 44, "p2pkh": 44, "p2wpkh-p2sh": 49, "p2wpkh": 84}.get(xtype)
     if (len(path) != 3 or purpose is None or path[0] != purpose + 0x80000000
             or path[1] != coin + 0x80000000 or type(path[2]) is not int
             or not 0x80000000 <= path[2] <= 0xffffffff):
@@ -362,12 +371,14 @@ class OneKeyClient(HardwareClientBase):
         return self.root_fingerprint
 
     @runs_in_hwd_thread
-    def show_address(self, path, script_type, expected_address):
+    def show_address(self, path, script_type, expected_address, multisig=None):
         with self.flow():
             self._verify_account()
-            response = self._call("address", dict(connectId=self.connect_id, binding=self.binding,
-                                                  coin=coin_name(), path=path,
-                                                  scriptType=INPUT_SCRIPT_TYPES[script_type]))
+            request = dict(connectId=self.connect_id, binding=self.binding,
+                           coin=coin_name(), path=path, scriptType=INPUT_SCRIPT_TYPES[script_type])
+            if multisig is not None:
+                request["multisig"] = multisig
+            response = self._call("address", request)
             if type(response) is not dict or response != {"address": expected_address}:
                 raise UserFacingException(_("OneKey returned a different address. Check the selected wallet."))
 
@@ -381,3 +392,21 @@ class OneKeyClient(HardwareClientBase):
             if type(response) is not dict or set(response) != {"signatures"}:
                 raise UserFacingException(_("Invalid OneKey signatures response."))
             return response["signatures"]
+
+    @runs_in_hwd_thread
+    def sign_message(self, path, script_type, message, expected_address):
+        with self.flow():
+            self._verify_account()
+            response = self._call("sign-message", dict(
+                connectId=self.connect_id, binding=self.binding, coin=coin_name(), path=path,
+                scriptType=INPUT_SCRIPT_TYPES[script_type], message=message.hex()))
+            if (type(response) is not dict or set(response) != {"address", "signature"}
+                    or response["address"] != expected_address or type(response["signature"]) is not str):
+                raise UserFacingException(_("OneKey returned a different address. Check the selected wallet."))
+            try:
+                signature = bytes.fromhex(response["signature"])
+            except ValueError:
+                raise UserFacingException(_("Invalid OneKey signature encoding.")) from None
+            if len(signature) != 65:
+                raise UserFacingException(_("Invalid OneKey signature encoding."))
+            return signature

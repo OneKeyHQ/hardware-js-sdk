@@ -13,7 +13,7 @@ import zipfile
 from types import SimpleNamespace
 from unittest import mock
 
-from electrum import constants, descriptor
+from electrum import bitcoin, constants, descriptor
 from electrum.bip32 import BIP32Node, convert_bip32_strpath_to_intpath
 from electrum.keystore import load_keystore, register_keystore
 from electrum.plugin import run_in_hwd_thread
@@ -24,7 +24,7 @@ from electrum.wallet_db import WalletDB
 from electrum.wizard import NewWalletWizard
 from electrum.zip_importer import MemoryZipImporter
 
-from onekey.client import OneKeyClient, coin_name, check_binding
+from onekey.client import OneKeyClient, account_path, coin_name, check_binding
 from onekey.onekey import OneKeyKeyStore, OneKeyPlugin
 from onekey.ipc import HelperError
 from build import build, build_distribution
@@ -740,3 +740,283 @@ class TestOneKeySigning(unittest.TestCase):
         for value in ("00", "300602010102010101", "300702020001020101", "3006020180020101", "3006020100020101"):
             with self.assertRaises(UserFacingException):
                 OneKeyPlugin._signature(value)
+
+
+class TestOneKeyMessage(unittest.TestCase):
+    def test_sign_message_returns_bytes_electrum_can_verify(self):
+        signer = TestOneKeySigning()
+        for network in (constants.BitcoinMainnet, constants.BitcoinTestnet):
+            for script_type in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
+                with self.subTest(network=network, script=script_type), mock.patch.object(constants, "net", network):
+                    keystore, _tx, node = signer.make_transaction(script_type)
+                    message = "OneKey"
+                    signature = bitcoin.ecdsa_sign_usermessage(node.eckey, message, is_compressed=True)
+                    pubkey = node.eckey.get_public_key_bytes(compressed=True).hex()
+                    script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
+                        pubkey=pubkey, script_type=script_type).expand().output_script
+                    address = PartialTxOutput(scriptpubkey=script, value=0).address
+                    plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+                    client = mock.Mock()
+                    client.sign_message.return_value = signature
+                    plugin.get_client = mock.Mock(return_value=client)
+                    keystore.plugin = plugin
+                    result = keystore.sign_message((0, 0), message, None, script_type=script_type)
+                    self.assertEqual(signature, result)
+                    self.assertTrue(bitcoin.verify_usermessage_with_address(address, result, message.encode()))
+                    path, asked, raw, expected = client.sign_message.call_args.args
+                    self.assertEqual(script_type, asked)
+                    self.assertEqual(message.encode(), raw)
+                    self.assertEqual(address, expected)
+                    self.assertEqual([0, 0], path[-2:])
+
+    def test_sign_message_rejects_unsupported_input_before_the_device(self):
+        keystore, _tx, _node = TestOneKeySigning().make_transaction()
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.get_client = mock.Mock()
+        keystore.plugin = plugin
+        cases = (
+            ("", "p2wpkh", (0, 0)),
+            ("a" * 1025, "p2wpkh", (0, 0)),
+            ("ok", "p2tr", (0, 0)),
+            ("ok", None, (0, 0)),
+            ("ok", "p2wpkh", (2, 0)),
+            ("ok", "p2pkh", (0, 0)),
+        )
+        for message, script_type, sequence in cases:
+            with self.subTest(script=script_type, size=len(message)), self.assertRaises(UserFacingException):
+                keystore.sign_message(sequence, message, None, script_type=script_type)
+        plugin.get_client.assert_not_called()
+        with self.assertRaises(UserFacingException):
+            keystore.decrypt_message((0, 0), "cipher", None)
+        plugin.get_client.assert_not_called()
+        client = mock.Mock()
+        client.sign_message.return_value = b"\x1f" + b"\x11" * 64
+        plugin.get_client = mock.Mock(return_value=client)
+        with self.assertRaisesRegex(UserFacingException, "signature encoding"):
+            keystore.sign_message((0, 0), "a" * 1024, None, script_type="p2wpkh")
+        self.assertEqual(1024, len(client.sign_message.call_args.args[2]))
+
+
+class TestOneKeyMultisig(unittest.TestCase):
+    def make_wallet(self, thresh=2):
+        coin = 1 if constants.net.TESTNET else 0
+        prefix = f"m/48'/{coin}'/0'/2'"
+        accounts = []
+        roots = []
+        for seed in (b"\x11" * 32, b"\x22" * 32, b"\x33" * 32):
+            root = BIP32Node.from_rootseed(seed, xtype="p2wsh")
+            roots.append(root)
+            accounts.append(root.subkey_at_private_derivation(prefix))
+        fingerprint = roots[0].calc_fingerprint_of_this_node()
+        keystore = OneKeyKeyStore(dict(xpub=accounts[0].to_xpub(), derivation=prefix,
+                                      root_fingerprint=fingerprint.hex(), onekey_binding=BINDING))
+
+        def make_output(change, addr_index, value):
+            keys = []
+            providers = []
+            for account in accounts:
+                keys.append(account.subkey_at_private_derivation([change, addr_index]))
+                public = account.convert_to_public()._replace(xtype="standard").to_xpub()
+                providers.append(descriptor.PubkeyProvider(None, public, f"/{change}/{addr_index}"))
+            multi = descriptor.MultisigDescriptor(providers, thresh, True)
+            desc = descriptor.WSHDescriptor(multi)
+            output = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=value)
+            output.script_descriptor = desc
+            pubkey = keys[0].eckey.get_public_key_bytes(compressed=True)
+            output.bip32_paths[pubkey] = (fingerprint, convert_bip32_strpath_to_intpath(prefix) + [change, addr_index])
+            return output, keys
+
+        funding_output, input_keys = make_output(0, 0, 100000)
+        script = funding_output.scriptpubkey
+        raw = (bytes.fromhex("0200000001") + bytes(32) + bytes.fromhex("ffffffff0100ffffffff01")
+               + (100000).to_bytes(8, "little") + bytes([len(script)]) + script + bytes(4))
+        funding = Transaction(raw.hex())
+        txin = PartialTxInput(prevout=TxOutpoint(txid=bytes.fromhex(funding.txid()), out_idx=0))
+        txin.utxo = funding
+        txin.script_descriptor = funding_output.script_descriptor
+        txin.bip32_paths = dict(funding_output.bip32_paths)
+        txin.is_mine = True
+        recipient, _keys = make_output(0, 1, 60000)
+        recipient.is_mine = True
+        change, _keys = make_output(1, 2, 39000)
+        change.is_mine = change.is_change = True
+        tx = PartialTransaction.from_io(inputs=[txin], outputs=[recipient, change],
+                                        version=2, locktime=123, BIP69_sort=False)
+        return keystore, tx, input_keys
+
+    def test_partial_native_segwit_signature_is_kept(self):
+        for network in (constants.BitcoinMainnet, constants.BitcoinTestnet):
+            with self.subTest(network=network), mock.patch.object(constants, "net", network):
+                keystore, tx, keys = self.make_wallet()
+                signature = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())[:-1]
+                plugin, client = TestOneKeySigning().plugin(signature)
+                plugin.sign_transaction(keystore, tx)
+                txin = tx.inputs()[0]
+                our_pubkey = keys[0].eckey.get_public_key_bytes(compressed=True)
+                self.assertIn(our_pubkey, txin.sigs_ecdsa)
+                self.assertEqual(1, len(txin.sigs_ecdsa))
+                self.assertFalse(tx.is_complete())
+                self.assertEqual((1, 2), txin.get_satisfaction_progress())
+                signed, outputs, _previous = client.sign_tx.call_args.args
+                self.assertEqual("SPENDWITNESS", signed[0]["script_type"])
+                self.assertEqual(6, len(signed[0]["address_n"]))
+                self.assertEqual([0, 0], signed[0]["address_n"][-2:])
+                multisig = signed[0]["multisig"]
+                self.assertEqual(2, multisig["m"])
+                self.assertEqual(3, len(multisig["pubkeys"]))
+                providers = txin.script_descriptor.get_simple_multisig().pubkeys
+                self.assertEqual([provider.extkey.eckey.get_public_key_bytes(compressed=True).hex()
+                                  for provider in providers],
+                                 [node["public_key"] for node in multisig["pubkeys"]])
+                self.assertEqual(sorted(provider.get_pubkey_bytes() for provider in providers),
+                                 [provider.get_pubkey_bytes() for provider in providers])
+                self.assertEqual([0, 0], multisig["pubkeys"][0]["address_n"])
+                self.assertEqual(0x80000002, multisig["pubkeys"][0]["child_num"])
+                self.assertNotIn("multisig", outputs[0])
+                self.assertIn("address", outputs[0])
+                self.assertEqual("PAYTOWITNESS", outputs[1]["script_type"])
+                self.assertEqual([1, 2], outputs[1]["address_n"][-2:])
+                self.assertEqual(2, outputs[1]["multisig"]["m"])
+
+    def test_one_valid_signature_can_finish_when_the_threshold_is_met(self):
+        keystore, tx, keys = self.make_wallet()
+        other = keys[1].eckey.get_public_key_bytes(compressed=True)
+        other_sig = tx.sign_txin(0, keys[1].eckey.get_secret_bytes())
+        tx.inputs()[0].sigs_ecdsa[other] = other_sig
+        signature = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())[:-1]
+        plugin, _client = TestOneKeySigning().plugin(signature)
+        plugin.sign_transaction(keystore, tx)
+        txin = tx.inputs()[0]
+        our = keys[0].eckey.get_public_key_bytes(compressed=True)
+        self.assertEqual(other_sig, txin.sigs_ecdsa[other])
+        self.assertIn(our, txin.sigs_ecdsa)
+        self.assertTrue(txin.is_complete())
+
+    def test_wrong_or_invalid_signature_leaves_other_cosigners_in_place(self):
+        keystore, tx, keys = self.make_wallet()
+        other_only = tx.sign_txin(0, keys[1].eckey.get_secret_bytes())
+        plugin, _client = TestOneKeySigning().plugin(other_only[:-1])
+        with self.assertRaises(UserFacingException):
+            plugin.sign_transaction(keystore, tx)
+        self.assertEqual({}, tx.inputs()[0].sigs_ecdsa)
+        other = keys[1].eckey.get_public_key_bytes(compressed=True)
+        other_sig = other_only
+        tx.inputs()[0].sigs_ecdsa[other] = other_sig
+        plugin, client = TestOneKeySigning().plugin(other_sig[:-1])
+        with self.assertRaises(UserFacingException):
+            plugin.sign_transaction(keystore, tx)
+        self.assertEqual({other: other_sig}, tx.inputs()[0].sigs_ecdsa)
+        client.sign_tx.return_value = [dict(index=0, signature="00")]
+        with self.assertRaises(UserFacingException):
+            plugin.sign_transaction(keystore, tx)
+        self.assertEqual({other: other_sig}, tx.inputs()[0].sigs_ecdsa)
+
+    def test_other_multisig_kinds_are_rejected_before_the_device(self):
+        keystore, tx, _keys = self.make_wallet()
+        multi = tx.inputs()[0].script_descriptor.get_simple_multisig()
+        cases = {
+            "p2sh": descriptor.SHDescriptor(multi),
+            "nested": descriptor.SHDescriptor(descriptor.WSHDescriptor(multi)),
+            "unsorted": descriptor.WSHDescriptor(descriptor.MultisigDescriptor(list(multi.pubkeys), 2, False)),
+        }
+        for name, desc in cases.items():
+            keystore, tx, _keys = self.make_wallet()
+            tx.inputs()[0].script_descriptor = desc
+            plugin, _client = TestOneKeySigning().plugin(b"")
+            with self.subTest(kind=name), self.assertRaises(UserFacingException):
+                plugin.sign_transaction(keystore, tx)
+            plugin.get_client.assert_not_called()
+        for derivation in ("m/45'/0", "m/48'/0'/0'/1'", "m/48'/0'/0'/0'", "m/48'/0'/0'/2'/0/0"):
+            keystore, tx, _keys = self.make_wallet()
+            keystore = OneKeyKeyStore(dict(xpub=keystore.xpub, derivation=derivation,
+                                          root_fingerprint=keystore.get_root_fingerprint(), onekey_binding=BINDING))
+            plugin, _client = TestOneKeySigning().plugin(b"")
+            with self.subTest(path=derivation), self.assertRaises(UserFacingException):
+                plugin.sign_transaction(keystore, tx)
+            plugin.get_client.assert_not_called()
+
+    def test_account_path_accepts_only_bip48_script_type_two(self):
+        self.assertEqual([0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 2],
+                         account_path("m/48'/0'/0'/2'", "p2wsh"))
+        with mock.patch.object(constants, "net", constants.BitcoinTestnet):
+            self.assertEqual([0x80000000 + 48, 0x80000000 + 1, 0x80000000 + 3, 0x80000000 + 2],
+                             account_path("m/48'/1'/3'/2'", "p2wsh"))
+            with self.assertRaises(UserFacingException):
+                account_path("m/48'/0'/0'/2'", "p2wsh")
+        for path, xtype in (("m/45'/0", "p2wsh"), ("m/48'/0'/0'/1'", "p2wsh"),
+                            ("m/48'/0'/0'/2'/0/0", "p2wsh"), ("m/84'/0'/0'", "p2wsh"),
+                            ("m/48'/0'/0'/2'", "p2wpkh"), ("m/48'/1'/0'/2'", "p2wsh")):
+            with self.subTest(path=path, xtype=xtype), self.assertRaises(UserFacingException):
+                account_path(path, xtype)
+
+    def test_show_address_sends_the_redeem_script_and_compares_it(self):
+        keystore, tx, _keys = self.make_wallet()
+        desc = tx.inputs()[0].script_descriptor
+        address = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=0).address
+        wallet = SimpleNamespace(
+            txin_type="p2wsh", is_mine=lambda _address: True, get_address_index=lambda _address: (0, 0),
+            get_script_descriptor_for_address=lambda _address: desc, get_keystore=lambda: keystore)
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        client = mock.Mock()
+        plugin.get_client = mock.Mock(return_value=client)
+        plugin.show_address(wallet, address, keystore)
+        path, script_type, expected, payload = client.show_address.call_args.args
+        self.assertEqual("p2wsh", script_type)
+        self.assertEqual(address, expected)
+        self.assertEqual([0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 2, 0, 0], path)
+        self.assertEqual(2, payload["m"])
+        self.assertEqual(3, len(payload["pubkeys"]))
+        plugin.get_client.reset_mock()
+        other_address = PartialTxOutput(scriptpubkey=tx.outputs()[0].scriptpubkey, value=0).address
+        self.assertNotEqual(address, other_address)
+        with self.assertRaises(UserFacingException):
+            plugin.show_address(wallet, other_address, keystore)
+        plugin.get_client.assert_not_called()
+
+    def test_zpub_from_the_device_is_stored_as_a_multisig_xpub(self):
+        account = BIP32Node.from_rootseed(b"\x44" * 32, xtype="p2wsh").subkey_at_private_derivation("m/48'/0'/0'/2'")
+        client, helper, _handler = TestOneKeyClient().make_client()
+        helper.call.side_effect = [BINDING, dict(xpub=account._replace(xtype="p2wpkh").to_xpub(), rootFingerprint=None)]
+        self.assertEqual(account.to_xpub(), client.get_xpub("m/48'/0'/0'/2'", "p2wsh"))
+        sent = helper.call.call_args.args[1]
+        self.assertEqual("SPENDWITNESS", sent["scriptType"])
+        self.assertEqual(4, len(sent["path"]))
+        with self.assertRaises(UserFacingException):
+            client.get_xpub("m/48'/0'/0'/1'", "p2wsh")
+
+    def test_singlesig_still_has_to_be_complete(self):
+        signer = TestOneKeySigning()
+        keystore, tx, node = signer.make_transaction()
+        signature = tx.sign_txin(0, node.eckey.get_secret_bytes())[:-1]
+        plugin, client = signer.plugin(signature)
+        plugin.sign_transaction(keystore, tx)
+        self.assertTrue(tx.is_complete())
+        self.assertNotIn("multisig", client.sign_tx.call_args.args[0][0])
+
+    def test_wizard_returns_to_the_next_cosigner(self):
+        class Wizard:
+            single = True
+
+            def wallet_password_view(self, _data):
+                return "wallet_password"
+
+            def maybe_master_pubkey(self, *_args):
+                return None
+
+            def is_single_password(self):
+                return self.single
+
+            def last_cosigner(self, data):
+                return data["last"]
+
+            def navmap_merge(self, mapping):
+                self.nav = mapping
+
+        wizard = Wizard()
+        OneKeyPlugin.extend_wizard(OneKeyPlugin.__new__(OneKeyPlugin), wizard)
+        step = wizard.nav["onekey_xpub"]
+        self.assertEqual("wallet_password", step["next"]({"last": True}))
+        self.assertEqual("multisig_cosigner_keystore", step["next"]({"last": False}))
+        self.assertTrue(step["last"]({"last": True}))
+        wizard.single = False
+        self.assertFalse(step["last"]({"last": True}))

@@ -45,6 +45,10 @@ class Scripted:
         self.passphrase_address = None
         self.broken = False
         self.steps = [codec.TX_INPUT, codec.TX_OUTPUT, codec.TX_META, codec.TX_FINISHED]
+        self.message_signature = None
+        self.signed_message = None
+        self.pending_button = None
+        self.acks = []
 
     def install_session(self, address):
         self.session_serial += 1
@@ -129,6 +133,8 @@ class Scripted:
             self.material = True
             return codec.ADDRESS, codec.encode_address(self.address)
         if kind in (codec.SIGN_TX, codec.TX_ACK):
+            if kind == codec.TX_ACK:
+                self.acks.append(payload)
             step = self.steps[len(self.order)]
             self.order.append(step)
             if step == codec.TX_META:
@@ -137,7 +143,18 @@ class Scripted:
                 self.material = True
                 return codec.TX_REQUEST, codec.encode_tx_request(step, signature=SIGNATURE, signature_index=0)
             return codec.TX_REQUEST, codec.encode_tx_request(step, index=0)
+        if kind == codec.SIGN_MESSAGE:
+            self.signed_message = codec.decode_sign_message(payload)
+            if self.message_signature is None:
+                raise AssertionError("message signature")
+            self.pending_button = (codec.MESSAGE_SIGNATURE, codec.encode_message_signature(self.address, self.message_signature))
+            return codec.BUTTON_REQUEST, b""
         if kind == codec.BUTTON_ACK:
+            if self.pending_button is not None:
+                reply = self.pending_button
+                self.pending_button = None
+                self.material = True
+                return reply
             return codec.SUCCESS, b""
         raise AssertionError(kind)
 
@@ -241,6 +258,44 @@ class TestFrames(unittest.TestCase):
         self.assertEqual((session_id, "addr"), codec.decode_session_get(codec.encode_session_get("addr", session_id)))
         self.assertEqual(("addr", session_id), codec.decode_session(codec.encode_session("addr", session_id)))
         self.assertEqual(codec.SESSION_INVALID, codec.decode_failure(codec.enc_uint(1, 5) + codec.enc_uint(2, 2))[1])
+        signed = codec.decode_sign_message(codec.encode_sign_message(
+            ADDRESS_PATH, b"OneKey", "Bitcoin", "SPENDWITNESS", True))
+        self.assertEqual(ADDRESS_PATH, signed["address_n"])
+        self.assertEqual(b"OneKey", signed["message"])
+        self.assertEqual("Bitcoin", signed["coin_name"])
+        self.assertEqual(3, signed["script_type"])
+        self.assertIs(True, signed["no_script_type"])
+        self.assertIsNone(signed["is_bip322_simple"])
+        self.assertEqual(("bc1qexample", SIGNATURE), codec.decode_message_signature(
+            codec.encode_message_signature("bc1qexample", SIGNATURE)))
+        singlesig_address = codec._path(ADDRESS_PATH) + codec.enc_str(2, "Bitcoin") + codec.enc_bool(3, True) + codec.enc_uint(5, 3)
+        self.assertEqual(singlesig_address, codec.encode_get_address(ADDRESS_PATH, "Bitcoin", "SPENDWITNESS", True))
+        node = {"depth": 4, "fingerprint": 0x01020304, "child_num": 0x80000002,
+                "chain_code": "ab" * 32, "public_key": "02" + "11" * 32, "address_n": [0, 1]}
+        multisig = {"m": 2, "pubkeys": [node, {**node, "public_key": "03" + "22" * 32}]}
+        decoded = codec.decode_multisig(codec.encode_multisig(multisig))
+        self.assertEqual(2, decoded["m"])
+        self.assertEqual((), decoded["signatures"])
+        self.assertEqual(bytes.fromhex(node["public_key"]), decoded["pubkeys"][0]["public_key"])
+        self.assertEqual(bytes.fromhex(node["chain_code"]), decoded["pubkeys"][0]["chain_code"])
+        self.assertEqual([0, 1], decoded["pubkeys"][0]["address_n"])
+        self.assertEqual(0x80000002, decoded["pubkeys"][0]["child_num"])
+        self.assertNotIn(4, codec.decode_fields(codec.encode_get_address(ADDRESS_PATH, "Bitcoin", "SPENDWITNESS", True)))
+        with_multisig = codec.decode_fields(codec.encode_get_address(
+            ADDRESS_PATH, "Bitcoin", "SPENDWITNESS", True, multisig))
+        self.assertEqual(3, codec.opt_uint(with_multisig, 5))
+        self.assertEqual(2, codec.decode_multisig(codec._last(with_multisig, 4, 2))["m"])
+        plain = dict(prev_hash=TXID, prev_index=1, sequence=2, amount="9",
+                     address_n=ADDRESS_PATH, script_type="SPENDWITNESS")
+        self.assertNotIn(7, codec.decode_fields(codec._input(plain, prev=False)))
+        signed_input = dict(plain, address_n=[0x80000030, 0x80000000, 0x80000000, 0x80000002, 0, 1], multisig=multisig)
+        signed_fields = codec.decode_fields(codec._input(signed_input, prev=False))
+        self.assertEqual(multisig["m"], codec.decode_multisig(codec._last(signed_fields, 7, 2))["m"])
+        self.assertEqual(9, codec.opt_uint(signed_fields, 8))
+        change = dict(amount="4", address_n=signed_input["address_n"], script_type="PAYTOWITNESS", multisig=multisig)
+        change_fields = codec.decode_fields(codec._output(change))
+        self.assertEqual([0, 1], codec.decode_multisig(codec._last(change_fields, 5, 2))["pubkeys"][0]["address_n"])
+        self.assertNotIn(7, codec.decode_fields(codec._input(dict(plain, script_sig=""), prev=True)))
 
 
 class TestDeviceSession(unittest.TestCase):
@@ -409,6 +464,84 @@ class TestDeviceSession(unittest.TestCase):
                         call(helper, op, dict(connectId="usb1", binding=binding, coin="Bitcoin", **params))
                 self.assertEqual("DEVICE_MISMATCH", raised.exception.code)
                 self.assertNotIn(secret, str(raised.exception))
+
+    def test_sign_message_uses_core_recovery_byte(self):
+        from electrum.bip32 import BIP32Node
+        from electrum.bitcoin import ecdsa_sign_usermessage, pubkey_to_address, verify_usermessage_with_address
+        node = BIP32Node.from_rootseed(b"\x11" * 32, xtype="p2wpkh").subkey_at_private_derivation("m/84'/0'/0'/0/0")
+        message = "OneKey"
+        signature = ecdsa_sign_usermessage(node.eckey, message, is_compressed=True)
+        address = pubkey_to_address("p2wpkh", node.eckey.get_public_key_hex(compressed=True))
+        device = Scripted()
+        device.address = address
+        device.message_signature = signature
+        helper, device = helper_for(device)
+        binding = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        result = call(helper, "sign-message", dict(
+            connectId="usb1", binding=binding, coin="Bitcoin", path=ADDRESS_PATH,
+            scriptType="SPENDWITNESS", message=message.encode().hex()))
+        self.assertEqual(address, result["address"])
+        self.assertEqual(signature.hex(), result["signature"])
+        self.assertTrue(verify_usermessage_with_address(address, signature, message.encode()))
+        self.assertEqual(b"OneKey", device.signed_message["message"])
+        self.assertIs(True, device.signed_message["no_script_type"])
+        self.assertIsNone(device.signed_message["is_bip322_simple"])
+        self.assertEqual(3, device.signed_message["script_type"])
+        for bad in ("", "abc", "AA", "0" * 2050):
+            with self.subTest(message=bad[:8]), self.assertRaises(HelperError) as raised:
+                call(helper, "sign-message", dict(
+                    connectId="usb1", binding=binding, coin="Bitcoin", path=ADDRESS_PATH,
+                    scriptType="SPENDWITNESS", message=bad))
+            self.assertEqual("INVALID_REQUEST", raised.exception.code)
+        self.assertEqual(b"OneKey", device.signed_message["message"])
+
+    def test_bip48_native_segwit_is_accepted_and_other_multisig_paths_are_not(self):
+        helper, device = helper_for()
+        binding = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        account = [0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 2]
+        opened = call(helper, "xpub", dict(connectId="usb1", binding=binding, coin="Bitcoin",
+                                           path=account, scriptType="SPENDWITNESS"))
+        self.assertEqual("xpub-test", opened["xpub"])
+        node = {"depth": 4, "fingerprint": 1, "child_num": 0x80000002, "chain_code": "cd" * 32,
+                "public_key": "02" + "44" * 32, "address_n": [1, 2]}
+        multisig = {"m": 1, "pubkeys": [node, {**node, "public_key": "03" + "55" * 32, "address_n": [1, 2]}]}
+        path = account + [1, 2]
+        previous = dict(hash=TXID, version=1, lock_time=0,
+                        inputs=[dict(prev_hash="22" * 32, prev_index=0, script_sig="", sequence=0xFFFFFFFF)],
+                        bin_outputs=[dict(amount="1000", script_pubkey="0014" + "33" * 20)])
+        call(helper, "sign", dict(
+            connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0, refTxs=[previous],
+            inputs=[dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=0xFFFFFFFF,
+                         address_n=path, script_type="SPENDWITNESS", multisig=multisig)],
+            outputs=[dict(amount="900", address_n=path, script_type="PAYTOWITNESS", multisig=multisig)]))
+        self.assertEqual(codec.TX_FINISHED, device.order[-1])
+        input_tx = codec.decode_fields(codec._last(codec.decode_fields(device.acks[0]), 1, 2))
+        output_tx = codec.decode_fields(codec._last(codec.decode_fields(device.acks[1]), 1, 2))
+        signed_input = codec.decode_fields(codec._last(input_tx, 2, 2))
+        signed_output = codec.decode_fields(codec._last(output_tx, 5, 2))
+        self.assertEqual(1, codec.decode_multisig(codec._last(signed_input, 7, 2))["m"])
+        self.assertEqual(path[-2:], codec.decode_multisig(codec._last(signed_output, 5, 2))["pubkeys"][0]["address_n"])
+        self.assertEqual(bytes.fromhex(node["public_key"]),
+                         codec.decode_multisig(codec._last(signed_input, 7, 2))["pubkeys"][0]["public_key"])
+        rejected = (
+            dict(path=account + [0, 0], scriptType="SPENDWITNESS"),
+            dict(path=ADDRESS_PATH, scriptType="SPENDWITNESS", multisig=multisig),
+            dict(path=[0x80000000 + 45, 0x80000000, 0, 0], scriptType="SPENDWITNESS", multisig=multisig),
+            dict(path=account + [0, 0], scriptType="SPENDWITNESS", multisig={**multisig, "m": 0}),
+            dict(path=[0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 1, 0, 0],
+                 scriptType="SPENDWITNESS", multisig=multisig),
+        )
+        for params in rejected:
+            device.order.clear()
+            with self.subTest(path=params["path"][0]), self.assertRaises(HelperError) as raised:
+                call(helper, "sign", dict(
+                    connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0, refTxs=[],
+                    inputs=[dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=1,
+                                 address_n=params["path"], script_type=params["scriptType"],
+                                 **({"multisig": params["multisig"]} if "multisig" in params else {}))],
+                    outputs=[dict(amount="1", address="bc1qexample", script_type="PAYTOADDRESS")]))
+            self.assertEqual("INVALID_REQUEST", raised.exception.code)
+            self.assertEqual([], device.order)
 
     def sign(self, helper, binding):
         previous = dict(hash=TXID, version=1, lock_time=0,

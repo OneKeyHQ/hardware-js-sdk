@@ -42,18 +42,105 @@ def _uint(value, limit=0xFFFFFFFF):
         _fail("INVALID_REQUEST")
 
 
+def _coin_index(coin):
+    return 0 if coin == "Bitcoin" else 1
+
+
 def _path(value, coin, script_type):
-    if type(value) is not list or len(value) not in (3, 5):
+    if type(value) is not list or len(value) not in (3, 4, 5, 6):
         _fail("INVALID_REQUEST")
     for item in value:
         _uint(item)
+    # m/48'/coin'/account'/2'[/change/index]. Script-type index 2 is native segwit.
+    if len(value) in (4, 6):
+        if (script_type not in ("SPENDWITNESS", "PAYTOWITNESS") or value[0] != 0x80000000 + 48
+                or value[1] != 0x80000000 + _coin_index(coin) or value[2] < 0x80000000
+                or value[3] != 0x80000000 + 2
+                or (len(value) == 6 and not (value[4] in (0, 1) and value[5] < 0x80000000))):
+            _fail("INVALID_REQUEST")
+        return
     if any(item < 0x80000000 for item in value[:3]):
         _fail("INVALID_REQUEST")
     if len(value) == 5 and not (value[3] <= 1 and value[4] < 0x80000000):
         _fail("INVALID_REQUEST")
     purpose = _PURPOSES.get(script_type)
-    if purpose is None or value[0] != 0x80000000 + purpose or value[1] != 0x80000000 + (0 if coin == "Bitcoin" else 1):
+    if purpose is None or value[0] != 0x80000000 + purpose or value[1] != 0x80000000 + _coin_index(coin):
         _fail("INVALID_REQUEST")
+
+
+def _hex_bytes(value, size):
+    if (type(value) is not str or len(value) != size * 2
+            or any(character not in "0123456789abcdef" for character in value)):
+        _fail("INVALID_REQUEST")
+    return bytes.fromhex(value)
+
+
+def _multisig(value, address_n):
+    if type(value) is not dict or set(value) != {"m", "pubkeys"} or type(value["pubkeys"]) is not list:
+        _fail("INVALID_REQUEST")
+    pubkeys = value["pubkeys"]
+    if not 1 <= len(pubkeys) <= 15:
+        _fail("INVALID_REQUEST")
+    _uint(value["m"])
+    if not 1 <= value["m"] <= len(pubkeys):
+        _fail("INVALID_REQUEST")
+    suffix = address_n[-2:]
+    seen = set()
+    for node in pubkeys:
+        if (type(node) is not dict or set(node) != {
+                "depth", "fingerprint", "child_num", "chain_code", "public_key", "address_n"}):
+            _fail("INVALID_REQUEST")
+        _uint(node["depth"], 255)
+        if node["depth"] < 1:
+            _fail("INVALID_REQUEST")
+        _uint(node["fingerprint"])
+        _uint(node["child_num"])
+        _hex_bytes(node["chain_code"], 32)
+        pubkey = _hex_bytes(node["public_key"], 33)
+        if pubkey[0] not in (2, 3) or pubkey in seen:
+            _fail("INVALID_REQUEST")
+        seen.add(pubkey)
+        steps = node["address_n"]
+        if (type(steps) is not list or len(steps) != 2 or any(type(step) is not int for step in steps)
+                or steps != list(suffix) or suffix[0] not in (0, 1) or suffix[1] >= 0x80000000):
+            _fail("INVALID_REQUEST")
+
+
+def _check_signing_items(coin, inputs, outputs):
+    if type(inputs) is not list or type(outputs) is not list:
+        _fail("INVALID_REQUEST")
+    for item in inputs:
+        _check_signing_item(coin, item, output=False)
+    for item in outputs:
+        _check_signing_item(coin, item, output=True)
+
+
+def _check_signing_item(coin, item, *, output):
+    if type(item) is not dict:
+        _fail("INVALID_REQUEST")
+    script_type = item.get("script_type")
+    multisig = item.get("multisig")
+    if "address_n" not in item:
+        if not output or multisig is not None:
+            _fail("INVALID_REQUEST")
+        return
+    address_n = item["address_n"]
+    _path(address_n, coin, script_type)
+    if output and "address" in item:
+        _fail("INVALID_REQUEST")
+    witness = "PAYTOWITNESS" if output else "SPENDWITNESS"
+    if len(address_n) == 6:
+        if script_type != witness or multisig is None:
+            _fail("INVALID_REQUEST")
+    elif len(address_n) == 5:
+        if multisig is not None:
+            _fail("INVALID_REQUEST")
+    else:
+        _fail("INVALID_REQUEST")
+    if multisig is not None:
+        if script_type != witness:
+            _fail("INVALID_REQUEST")
+        _multisig(multisig, address_n)
 
 
 def _binding(value):
@@ -187,11 +274,15 @@ class Session:
         self._confirm(binding)
         return {"xpub": xpub, "rootFingerprint": fingerprint}
 
-    def address(self, binding, coin, path, script_type):
+    def address(self, binding, coin, path, script_type, multisig=None):
         self._account(binding, coin, path, script_type, address=True)
+        if len(path) == 6 or multisig is not None:
+            if multisig is None or script_type != "SPENDWITNESS" or len(path) != 6:
+                _fail("INVALID_REQUEST")
+            _multisig(multisig, path)
         self._ready(binding)
         text = codec.decode_address(self._call(
-            codec.GET_ADDRESS, codec.encode_get_address(path, coin, script_type, True), codec.ADDRESS))
+            codec.GET_ADDRESS, codec.encode_get_address(path, coin, script_type, True, multisig), codec.ADDRESS))
         if type(text) is not str or not text or len(text) > 128:
             _fail("SDK_FAILED")
         self._confirm(binding)
@@ -203,6 +294,9 @@ class Session:
             _fail("INVALID_REQUEST")
         _uint(version, 0x7FFFFFFF)
         _uint(lock_time)
+        # Previous transactions are checked by the device as raw inputs. Only the
+        # transaction being signed carries BIP48 paths and the redeem script.
+        _check_signing_items(coin, inputs, outputs)
         self._ready(binding)
         self.on_ui("button")
         request = codec.decode_tx_request(self._call(codec.SIGN_TX, codec.encode_sign_tx(
@@ -229,6 +323,25 @@ class Session:
             result.append({"index": index, "signature": signature.hex()})
         self._confirm(binding)
         return {"signatures": result}
+
+    def sign_message(self, binding, coin, path, script_type, message):
+        self._account(binding, coin, path, script_type, address=True)
+        if (type(message) is not str or not message or len(message) > 2048 or len(message) % 2
+                or any(character not in "0123456789abcdef" for character in message)):
+            _fail("INVALID_REQUEST")
+        raw = bytes.fromhex(message)
+        # firmware-pro2 bitcoin validate_message: 1..1024 bytes. The host does not add the magic prefix.
+        if not 1 <= len(raw) <= 1024:
+            _fail("INVALID_REQUEST")
+        self._ready(binding)
+        address, signature = codec.decode_message_signature(self._call(
+            codec.SIGN_MESSAGE, codec.encode_sign_message(path, raw, coin, script_type, True), codec.MESSAGE_SIGNATURE))
+        if type(address) is not str or not address or len(address) > 128:
+            _fail("SDK_FAILED")
+        if type(signature) is not bytes or len(signature) != 65 or not 27 <= signature[0] <= 42:
+            _fail("SDK_FAILED")
+        self._confirm(binding)
+        return {"address": address, "signature": signature.hex()}
 
     def _ready(self, binding):
         status, info = self.identity()
@@ -430,5 +543,9 @@ class Session:
         _path(path, coin, script_type)
         if script_type not in codec.INPUT_SCRIPTS:
             _fail("INVALID_REQUEST")
-        if address and len(path) != 5:
-            _fail("INVALID_REQUEST")
+        if address:
+            if len(path) == 5 or (len(path) == 6 and script_type == "SPENDWITNESS"):
+                return
+        elif len(path) == 3 or (len(path) == 4 and script_type == "SPENDWITNESS"):
+            return
+        _fail("INVALID_REQUEST")

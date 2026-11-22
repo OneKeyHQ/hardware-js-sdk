@@ -19,7 +19,7 @@ VERSION = 1
 MAX_LINE = 1024 * 1024
 SDK_SOURCE = "38f0b8c5d8fb645c1652880eb099866de57280aa"
 SDK_VERSION = "1.2.10"
-OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "cancel", "ui", "dispose"}
+OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "sign-message", "cancel", "ui", "dispose"}
 # Same targets as helper/pin.cjs BUNDLE_PLATFORMS. Linux nodes are the glibc builds.
 DESKTOP_PLATFORMS = ("darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64", "win32-arm64", "win32-x64")
 
@@ -238,10 +238,14 @@ class Helper:
             if op == "xpub":
                 return session.xpub(params.get("binding"), params.get("coin"), params.get("path"), params.get("scriptType"))
             if op == "address":
-                return session.address(params.get("binding"), params.get("coin"), params.get("path"), params.get("scriptType"))
+                return session.address(params.get("binding"), params.get("coin"), params.get("path"),
+                                       params.get("scriptType"), params.get("multisig"))
             if op == "sign":
                 return session.sign(params.get("binding"), params.get("coin"), params.get("inputs"), params.get("outputs"),
                                     params.get("refTxs"), params.get("version"), params.get("locktime"))
+            if op == "sign-message":
+                return session.sign_message(params.get("binding"), params.get("coin"), params.get("path"),
+                                            params.get("scriptType"), params.get("message"))
             raise SessionError("INVALID_REQUEST")
         except LinkError:
             self.release(connect_id)
