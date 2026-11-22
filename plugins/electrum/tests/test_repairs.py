@@ -668,3 +668,113 @@ class TestReceiveFrames(unittest.TestCase):
             self.assertEqual(generation, helper.generation)
             self.assertEqual([codec.PING, codec.DEVICE_STATUS_GET], writes)
             self.assertEqual([True], closed)
+
+
+class TestFrameSizeRepairs(unittest.TestCase):
+    @staticmethod
+    def wire_frame(total, seq=7):
+        from onekey.crc8 import crc8
+        # Build synthetic receive fixtures independently of the encoder's size guard.
+        frame = bytearray((0x5a, total & 0xff, total >> 8, 0, 0, 0, seq))
+        frame[3] = crc8(frame[:3])
+        frame.extend(codec.SUCCESS.to_bytes(2, 'little'))
+        frame.extend(bytes(total - 10))
+        frame.append(crc8(frame))
+        return bytes(frame)
+
+    def link(self, chunks):
+        read = mock.Mock(side_effect=[*chunks, AssertionError('Unexpected additional USB read')])
+        write, close = mock.Mock(), mock.Mock()
+        link = Link(read, write, close)
+        self.addCleanup(link.close)
+        return link, read, write, close
+
+    @staticmethod
+    def exchange(link):
+        return link.exchange(codec.PING, b'', deadline=time.monotonic()+1, cancelled=None)
+
+    def test_encoding_complete_frames_4097_through_4200(self):
+        from onekey.frame import encode_message
+        for total in range(4097, 4201):
+            with self.subTest(total=total):
+                frame = encode_message(codec.SUCCESS, bytes(total - 10), seq=7)
+                self.assertEqual(total, len(frame))
+                self.assertTrue(frame == self.wire_frame(total))
+                self.assertEqual((codec.SUCCESS, bytes(total - 10)), split_message(decode(frame).payload))
+
+    def test_receiving_complete_frames_4097_through_4200_over_usb_reads(self):
+        for total in range(4097, 4201):
+            with self.subTest(total=total):
+                frame = self.wire_frame(total)
+                link, read, write, close = self.link([frame[:4096], frame[4096:]])
+                self.assertEqual((codec.SUCCESS, bytes(total - 10)), self.exchange(link))
+                self.assertEqual([4096, 4096], [args[0] for args, _ in read.call_args_list])
+                self.assertEqual(bytearray(), link._buffer)
+                write.assert_called_once()
+                close.assert_not_called()
+
+    def test_previous_output_tx_ack_4111_bytes_is_written(self):
+        payload = codec.encode_tx_ack(codec.TX_OUTPUT, dict(amount='1', script_pubkey='00' * 4090))
+        self.assertEqual(4111, len(payload) + 10)
+        link, _, write, close = self.link([self.wire_frame(10)])
+        self.assertEqual((codec.SUCCESS, b''), link.exchange(
+            codec.TX_ACK, payload, deadline=time.monotonic()+1, cancelled=None))
+        write.assert_called_once()
+        frame = write.call_args.args[0]
+        self.assertEqual(4111, len(frame))
+        self.assertTrue(split_message(decode(frame).payload) == (codec.TX_ACK, payload))
+        close.assert_not_called()
+
+    def test_oversized_frames_are_rejected_by_encoder_decoder_and_assembler(self):
+        from onekey.frame import encode_message, pop_frame
+        for total in (4201, 65535):
+            frame = self.wire_frame(total)
+            for operation in (lambda: encode_message(codec.SUCCESS, bytes(total - 10), seq=7),
+                              lambda: decode(frame), lambda: pop_frame(bytearray(frame)),
+                              lambda: pop_frame(bytearray(frame), limit=65535)):
+                with self.subTest(total=total, operation=operation), self.assertRaisesRegex(ValueError, 'too large'):
+                    operation()
+
+    def test_oversized_headers_close_link_before_reading_body(self):
+        for total in (4201, 65535):
+            frame = self.wire_frame(total)
+            for header_size in (3, 4, 8):
+                with self.subTest(total=total, header_size=header_size):
+                    link, read, write, close = self.link([frame[:header_size]])
+                    with self.assertRaisesRegex(LinkError, 'PROTOCOL'):
+                        self.exchange(link)
+                    read.assert_called_once()
+                    write.assert_called_once()
+                    close.assert_called_once()
+                    self.assertEqual(bytearray(), link._buffer)
+                    with self.assertRaisesRegex(LinkError, 'STALE'):
+                        self.exchange(link)
+                    write.assert_called_once()
+
+    def test_coalesced_maximum_frames_survive_multiple_usb_reads(self):
+        incoming = self.wire_frame(4200, seq=7) + self.wire_frame(4200, seq=8)
+        link, read, write, close = self.link([incoming[i:i+4096] for i in range(0, len(incoming), 4096)])
+        for _ in range(2):
+            self.assertEqual((codec.SUCCESS, bytes(4190)), self.exchange(link))
+        self.assertEqual([4096] * 3, [args[0] for args, _ in read.call_args_list])
+        self.assertEqual(2, write.call_count)
+        self.assertEqual(bytearray(), link._buffer)
+        close.assert_not_called()
+
+    def test_usb_read_chunks_still_cannot_exceed_4096(self):
+        link, read, write, close = self.link([self.wire_frame(4200)[:4097]])
+        with self.assertRaisesRegex(LinkError, 'PROTOCOL'):
+            self.exchange(link)
+        self.assertEqual(4096, read.call_args.args[0])
+        write.assert_called_once()
+        close.assert_called_once()
+
+    def test_large_frame_crc_corruption_remains_link_fatal(self):
+        frame = self.wire_frame(4200)
+        bad = frame[:-1] + bytes((frame[-1] ^ 0xff,))
+        link, read, write, close = self.link([bad[:4096], bad[4096:]])
+        with self.assertRaisesRegex(LinkError, 'PROTOCOL'):
+            self.exchange(link)
+        self.assertEqual(2, read.call_count)
+        write.assert_called_once()
+        close.assert_called_once()

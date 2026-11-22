@@ -1,7 +1,7 @@
 """proto_link framing, matching firmware-pro2 sys/frame_codec/proto_link.
 
 A USB read is not a frame. Bytes are kept until the little-endian length
-field is satisfied, and nothing longer than the host receive size is accepted.
+field is satisfied, up to the complete-frame protocol limit.
 """
 
 from .crc8 import crc8
@@ -10,6 +10,7 @@ from .crc8 import crc8
 SOF = 0x5A
 HEAD_SIZE = 8
 RX_BUFFER_SIZE = 4096
+FRAME_MAX_SIZE = 4200
 PACKET_TYPE_PACKET = 0
 PACKET_TYPE_ACK = 1
 
@@ -38,7 +39,7 @@ class SeqCounter:
 
 def encode(payload, *, seq, channel=0, packet_src=0, packet_type=PACKET_TYPE_PACKET):
     total = len(payload) + HEAD_SIZE
-    if total > RX_BUFFER_SIZE:
+    if total > FRAME_MAX_SIZE:
         raise ValueError("frame too large")
     frame = bytearray(total)
     frame[0] = SOF
@@ -57,6 +58,8 @@ def decode(buf):
     if len(buf) < HEAD_SIZE or buf[0] != SOF:
         raise ValueError("invalid SOF")
     total = buf[1] | (buf[2] << 8)
+    if total > FRAME_MAX_SIZE:
+        raise ValueError("frame too large")
     if total != len(buf):
         raise ValueError("length mismatch")
     if crc8(buf[:3]) != buf[3] or crc8(buf[:-1]) != buf[-1]:
@@ -81,7 +84,7 @@ def split_message(payload):
     return payload[0] | (payload[1] << 8), payload[2:]
 
 
-def pop_frame(buf, limit=RX_BUFFER_SIZE):
+def pop_frame(buf, limit=FRAME_MAX_SIZE):
     """Remove one complete frame from buf, or return None if more bytes are required."""
     while True:
         sof = buf.find(SOF)
@@ -90,10 +93,12 @@ def pop_frame(buf, limit=RX_BUFFER_SIZE):
             return None
         if sof:
             del buf[:sof]
-        if len(buf) < HEAD_SIZE:
+        if len(buf) < 3:
             return None
         total = buf[1] | (buf[2] << 8)
-        if total < HEAD_SIZE or total > limit:
+        if total > min(limit, FRAME_MAX_SIZE):
+            raise ValueError("frame too large")
+        if total < HEAD_SIZE:
             del buf[:1]
             continue
         if len(buf) < total:

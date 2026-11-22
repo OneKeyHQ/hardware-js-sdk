@@ -51,7 +51,10 @@ class Link:
     def _receive(self, deadline, cancelled, request_seq):
         while True:
             self._check(deadline, cancelled)
-            frame = pop_frame(self._buffer)
+            try:
+                frame = pop_frame(self._buffer)
+            except ValueError:
+                raise LinkError("PROTOCOL") from None
             if frame is None:
                 remaining = max(1, int((deadline - time.monotonic()) * 1000))
                 chunk = self._read(RX_BUFFER_SIZE, min(200, remaining))
