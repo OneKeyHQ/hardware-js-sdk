@@ -1424,4 +1424,29 @@ describe('ElectronBleTransport protocol detection', () => {
     disconnectHandler?.({ ...device, reason: EBleDisconnectReason.DeviceDisconnected });
     expect(transportDisconnect).not.toHaveBeenCalled();
   });
+
+  test('stop() during getDevice() does not let retired acquire disconnect a replacement link', async () => {
+    const device = { id: 'lookup-stop-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let resolveGetDevice: ((value: typeof device) => void) | undefined;
+    nobleBle.getDevice.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveGetDevice = resolve;
+        })
+    );
+    const bleTransport = configureTransport(nobleBle);
+
+    const acquiring = bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    const stopping = bleTransport.stop();
+    await stopping;
+    // Clear disconnect count recorded during stopResources() so we verify the late
+    // retired acquire does not issue another disconnect against a replacement link.
+    nobleBle.disconnect.mockClear();
+
+    resolveGetDevice?.(device);
+    await expect(acquiring).rejects.toThrow(/Electron BLE transport is stopped/);
+    expect(nobleBle.connect).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+  });
 });

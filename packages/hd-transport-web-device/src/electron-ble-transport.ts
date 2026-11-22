@@ -435,6 +435,7 @@ export default class ElectronBleTransport {
 
     this.assertRunning();
     this.acquiringDevices.add(uuid);
+    let connectAttempted = false;
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
@@ -465,6 +466,7 @@ export default class ElectronBleTransport {
       }
 
       try {
+        connectAttempted = true;
         await invokeNobleBle(window.desktopApi.nobleBle.connect(uuid));
         this.connectedDevices.add(uuid);
       } catch (error) {
@@ -509,7 +511,7 @@ export default class ElectronBleTransport {
       this.Log?.error('[Electron BLE] acquire failed:', error);
       try {
         const nobleBle = window.desktopApi?.nobleBle;
-        if (nobleBle) {
+        if (nobleBle && !this.stopped && (connectAttempted || this.connectedDevices.has(uuid))) {
           if (this.connectedDevices.has(uuid)) {
             await invokeNobleBle(nobleBle.unsubscribe(uuid)).catch(cleanupError => {
               this.Log?.debug('[Electron BLE] acquire unsubscribe failed:', cleanupError);

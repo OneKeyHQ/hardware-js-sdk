@@ -237,3 +237,13 @@ test('transport switching waits for completion and propagates rejection', async 
   switchTransport.mockRejectedValueOnce(failure);
   await expect(HardwareSDKLowLevel.switchTransport('webusb')).rejects.toBe(failure);
 });
+
+test('rejects unsupported react-native transport in Common SDK', async () => {
+  await HardwareSDKLowLevel.init({ env: 'webusb' });
+  switchTransport.mockImplementationOnce(async ({ loadTransport }) => {
+    await loadTransport();
+  });
+  await expect(HardwareSDKLowLevel.switchTransport('react-native')).rejects.toMatchObject({
+    errorCode: HardwareErrorCode.TransportNotConfigured,
+  });
+});

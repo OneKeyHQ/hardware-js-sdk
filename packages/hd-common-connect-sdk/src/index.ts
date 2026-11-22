@@ -43,6 +43,12 @@ const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
 const getTransport = async (env: ConnectSettings['env']) => {
+  if (env === 'react-native') {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.TransportNotConfigured,
+      'React Native transport is not supported by @onekeyfe/hd-common-connect-sdk'
+    );
+  }
   if (env === 'desktop-web-ble') {
     return ElectronBleTransport;
   }

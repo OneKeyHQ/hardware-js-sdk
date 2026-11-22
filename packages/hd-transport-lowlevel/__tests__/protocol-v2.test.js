@@ -614,7 +614,43 @@ describe('LowlevelTransport protocol framing', () => {
 
     await expect(acquiring).rejects.toThrow(/Lowlevel transport is stopped/);
     await stopping;
+    // Only stopResources() disconnects the UUID; the retired acquire must not disconnect again.
+    expect(plugin.disconnect).toHaveBeenCalledTimes(1);
     expect(plugin.disconnect).toHaveBeenCalledWith('inflight-stop-id');
     expect(lowlevel.getProtocolType('inflight-stop-id')).toBeUndefined();
+  });
+
+  test('stop() halts in-flight Protocol V1 multi-chunk sends without writing remaining chunks', async () => {
+    let resolveFirstSend;
+    let sendCalls = 0;
+    const plugin = createPlugin({
+      devices: [{ id: 'v1-stop-id', name: 'OneKey Classic', commType: 'ble' }],
+      responses: [],
+    });
+    plugin.send.mockImplementation(() => {
+      sendCalls += 1;
+      if (sendCalls === 1) {
+        return new Promise(resolve => {
+          resolveFirstSend = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+    const lowlevel = configureTransport(plugin);
+    lowlevel.deviceProtocol.set('v1-stop-id', 'V1');
+    lowlevel.connectedDevices.add('v1-stop-id');
+
+    // Payload large enough to require multiple 64-byte Protocol V1 chunks.
+    const calling = lowlevel.call('v1-stop-id', 'Success', { message: 'a'.repeat(200) });
+    await Promise.resolve();
+    expect(sendCalls).toBe(1);
+
+    const stopping = lowlevel.stop();
+    resolveFirstSend();
+
+    await expect(calling).rejects.toThrow(/Lowlevel transport is stopped/);
+    await stopping;
+    expect(sendCalls).toBe(1);
+    expect(plugin.receive).not.toHaveBeenCalled();
   });
 });

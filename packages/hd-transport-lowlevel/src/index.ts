@@ -191,11 +191,9 @@ export default class LowlevelTransport {
     try {
       try {
         await this.plugin.connect(input.uuid);
+        this.assertRunning();
         await this.refreshProtocolV2PacketCapacity(input.uuid);
-        if (this.stopped) {
-          await this.plugin.disconnect?.(input.uuid).catch(() => undefined);
-          this.assertRunning();
-        }
+        this.assertRunning();
         if (!alreadyConnected) {
           this.connectedDevices.add(input.uuid);
           this.advanceProtocolV2Generation(input.uuid);
@@ -237,7 +235,11 @@ export default class LowlevelTransport {
           this.Log?.debug('[LowlevelTransport] acquire link cleanup failed:', cleanupError);
         }
         try {
-          await this.plugin.disconnect(input.uuid);
+          // Once stop() has started, stopResources() owns disconnecting tracked UUIDs;
+          // a late retired acquire must not disconnect a replacement transport's link.
+          if (!this.stopped) {
+            await this.plugin.disconnect(input.uuid);
+          }
         } catch (cleanupError) {
           this.Log?.debug('[LowlevelTransport] acquire disconnect failed:', cleanupError);
         } finally {
@@ -353,6 +355,7 @@ export default class LowlevelTransport {
     data: Record<string, unknown>,
     options?: TransportCallOptions
   ) {
+    this.assertRunning();
     if (!this._messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
@@ -367,9 +370,11 @@ export default class LowlevelTransport {
     let lastLoggedAt = uploadStartedAt;
 
     for (const [index, o] of buffers.entries()) {
+      this.assertRunning();
       const outData = o.toString('hex');
       try {
         await this.plugin.send(uuid, outData, getProtocolV1SendOptions(name));
+        this.assertRunning();
         sentBytes += o.limit;
 
         if (isFirmwareUpload) {
@@ -395,24 +400,33 @@ export default class LowlevelTransport {
           }
         }
       } catch (e) {
-        this.Log.debug('lowlevel transport send error: ', e);
+        if (this.stopped) {
+          throw e;
+        }
+        this.Log?.debug('lowlevel transport send error: ', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);
       }
     }
 
     try {
+      this.assertRunning();
       const response = await this.readProtocolV1Message(uuid, options?.timeoutMs);
+      this.assertRunning();
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
       if (
+        !this.stopped &&
         e?.errorCode === HardwareErrorCode.BleTimeoutError &&
         options?.timeoutMs !== PROTOCOL_PROBE_TIMEOUT_MS
       ) {
         try {
           await this.resetConnectionAfterProbe(uuid, 'V1');
         } catch (resetError) {
-          this.Log.debug('[LowlevelTransport] reset after Protocol V1 timeout failed:', resetError);
+          this.Log?.debug(
+            '[LowlevelTransport] reset after Protocol V1 timeout failed:',
+            resetError
+          );
         }
       }
       if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
@@ -510,11 +524,9 @@ export default class LowlevelTransport {
     this.assertRunning();
     try {
       await this.plugin.connect(uuid);
+      this.assertRunning();
       await this.refreshProtocolV2PacketCapacity(uuid);
-      if (this.stopped) {
-        await this.plugin.disconnect?.(uuid).catch(() => undefined);
-        this.assertRunning();
-      }
+      this.assertRunning();
       this.connectedDevices.add(uuid);
       this.advanceProtocolV2Generation(uuid);
     } catch (error) {
@@ -578,9 +590,11 @@ export default class LowlevelTransport {
   }
 
   private async receiveHex(uuid: string, timeoutMs: number | undefined, commandName: string) {
+    this.assertRunning();
     const response = await withProtocolTimeout(this.plugin.receive(uuid), timeoutMs, () =>
       this.createProtocolTimeoutError(commandName, timeoutMs ?? 0)
     );
+    this.assertRunning();
     if (typeof response !== 'string') {
       throw new Error('Returning data is not string');
     }

@@ -1,5 +1,4 @@
 import semver from 'semver';
-import { isNaN } from 'lodash';
 import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Enum_Capability, type GetPassphraseState } from '@onekeyfe/hd-transport';
 
@@ -391,7 +390,7 @@ export function fixVersion(version: string) {
   while (parts.length < 3) {
     parts.push('0');
   }
-  parts = parts.map(part => (isNaN(parseInt(part, 10)) ? '0' : part));
+  parts = parts.map(part => (Number.isNaN(parseInt(part, 10)) ? '0' : part));
 
   return parts.join('.');
 }

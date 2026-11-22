@@ -2,8 +2,6 @@ import semver from 'semver';
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { bytesToHex } from '@noble/hashes/utils';
 import { blake2s } from '@noble/hashes/blake2s';
-import { isEmpty } from 'lodash';
-
 import { DeviceModelToTypes } from '../../types';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -13,6 +11,11 @@ import { PROTO } from '../../constants';
 import type { DeviceUploadResourceParams, DeviceUploadResourceResponse } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 import type { ResourceUpload } from '@onekeyfe/hd-transport';
+
+const isEmpty = (value: unknown): boolean =>
+  value == null ||
+  ((typeof value === 'string' || Array.isArray(value)) && value.length === 0) ||
+  (typeof value === 'object' && Object.keys(value).length === 0);
 
 export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
   paramsData = {

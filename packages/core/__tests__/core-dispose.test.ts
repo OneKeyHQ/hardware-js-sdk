@@ -470,4 +470,72 @@ describe('Core.dispose', () => {
       DataManager.settings = settings;
     }
   });
+
+  test('switchTransport isolates pre-switch UI waiters and gates new calls during teardown', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const stopEntered = createDeferred<void>();
+    const stopFinish = createDeferred<void>();
+    const oldTransport = {
+      name: 'OldTransport',
+      enumerate: jest.fn().mockResolvedValue([]),
+      stop: jest.fn(() => {
+        stopEntered.resolve();
+        return stopFinish.promise;
+      }),
+    };
+    const newTransport = {
+      name: 'NewTransport',
+      init: jest.fn().mockResolvedValue(undefined),
+      configure: jest.fn().mockResolvedValue(undefined),
+      configureProtocolV2: jest.fn().mockResolvedValue(undefined),
+      enumerate: jest.fn().mockResolvedValue([]),
+      stop: jest.fn().mockResolvedValue(undefined),
+    };
+    function NewTransport() {
+      return newTransport;
+    }
+    TransportManager.transport = oldTransport as never;
+    DataManager.settings = { ...settings, env: 'webusb' };
+    const core = initCore();
+    initConnector();
+
+    const preSwitchUiList = (
+      core as unknown as { getCoreContext: () => CoreContext }
+    ).getCoreContext().uiPromises;
+    const switching = switchTransport({ env: 'emulator', Transport: NewTransport });
+    await stopEntered.promise;
+
+    // Pre-switch uiPromises array was detached from Core.
+    const postSwitchUiList = (
+      core as unknown as { getCoreContext: () => CoreContext }
+    ).getCoreContext().uiPromises;
+    expect(postSwitchUiList).not.toBe(preSwitchUiList);
+
+    // A new call arriving during teardown must wait until the replacement transport is installed.
+    const callPromise = core.handleMessage({
+      id: 99,
+      event: IFRAME.CALL,
+      type: IFRAME.CALL,
+      payload: { method: 'searchDevices' },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(oldTransport.enumerate).not.toHaveBeenCalled();
+
+    stopFinish.resolve();
+    await switching;
+    const callStartedTransport = TransportManager.getTransport();
+    await callPromise;
+    expect(oldTransport.enumerate).not.toHaveBeenCalled();
+    expect(callStartedTransport).toBe(newTransport);
+
+    try {
+      expect(TransportManager.transport).toBe(newTransport);
+    } finally {
+      await core.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
 });

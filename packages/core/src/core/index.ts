@@ -130,6 +130,7 @@ let _core: Core | undefined;
 const runtimeCores = new WeakSet<Core>();
 let transportSwitchGeneration = 0;
 let pendingTransportSwitch: Promise<void> = Promise.resolve();
+let transportSwitchTeardown: Deferred<void> | undefined;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 type PendingUiPromises = UiPromise<UiPromiseResponse['type']>[];
@@ -1969,6 +1970,14 @@ export default class Core extends EventEmitter {
       }
 
       case IFRAME.CALL: {
+        while (transportSwitchTeardown) {
+          // Wait for an in-progress transport switch teardown to finish so new calls
+          // (including discovery calls bypassing requestQueue) never hit the outgoing transport.
+          await transportSwitchTeardown.promise;
+          if (!this.isActive()) {
+            throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+          }
+        }
         const logBlockLabel = getLogBlockLabel(message);
         Log.log(
           formatLogMethodLabel(`[${Date.now()}][CALL_API]`, logBlockLabel),
@@ -2029,6 +2038,8 @@ export default class Core extends EventEmitter {
     }
     transportSwitchGeneration += 1;
     pendingTransportSwitch = Promise.resolve();
+    transportSwitchTeardown?.resolve();
+    transportSwitchTeardown = undefined;
     pollingManager.stopAll();
     this.requestQueue.abortAllRequests();
     cleanup(this.uiPromises);
@@ -2065,6 +2076,9 @@ export default class Core extends EventEmitter {
   resetForTransportSwitch() {
     this.requestQueue.abortAllRequests();
     cleanup(this.uiPromises);
+    // Replace the array so a late finally() from a pre-switch call only cleans its own
+    // detached list and cannot cancel UI waiters registered after the switch.
+    this.uiPromises = [];
     this.prePendingCallPromises.clear();
   }
 }
@@ -2072,6 +2086,8 @@ export default class Core extends EventEmitter {
 export const initCore = () => {
   transportSwitchGeneration += 1;
   pendingTransportSwitch = Promise.resolve();
+  transportSwitchTeardown?.resolve();
+  transportSwitchTeardown = undefined;
   const core = new Core();
   runtimeCores.add(core);
   _core = core;
@@ -2106,6 +2122,8 @@ export const init = async (
     if (signal?.aborted) return undefined;
     transportSwitchGeneration += 1;
     pendingTransportSwitch = Promise.resolve();
+    transportSwitchTeardown?.resolve();
+    transportSwitchTeardown = undefined;
     await DataManager.load(settings, signal);
     if (signal?.aborted) return undefined;
     initTransport(Transport, plugin);
@@ -2172,21 +2190,30 @@ export const switchTransport = ({
           'Transport constructor is not available'
         );
       }
-      pollingManager.stopAll();
-      _core?.resetForTransportSwitch();
-      _connector?.stop();
-      await TransportManager.getTransport()?.stop?.();
-      assertCurrent();
-      DataManager.updateEnv(env);
-      TransportManager.setTransport(nextTransport, plugin);
-      _deviceList = undefined;
-      DevicePool.resetState();
-      deviceCacheMap.clear();
-      preWarmInflight.clear();
-      preWarmDoneAt.clear();
-      preConnectCache = { passphraseState: undefined };
-      _connector = undefined;
-      initConnector();
+      const teardown = createDeferred<void>();
+      transportSwitchTeardown = teardown;
+      try {
+        pollingManager.stopAll();
+        _core?.resetForTransportSwitch();
+        _connector?.stop();
+        await TransportManager.getTransport()?.stop?.();
+        assertCurrent();
+        DataManager.updateEnv(env);
+        TransportManager.setTransport(nextTransport, plugin);
+        _deviceList = undefined;
+        DevicePool.resetState();
+        deviceCacheMap.clear();
+        preWarmInflight.clear();
+        preWarmDoneAt.clear();
+        preConnectCache = { passphraseState: undefined };
+        _connector = undefined;
+        initConnector();
+      } finally {
+        if (transportSwitchTeardown === teardown) {
+          transportSwitchTeardown = undefined;
+        }
+        teardown.resolve();
+      }
     });
   pendingTransportSwitch = switching;
   return switching;
