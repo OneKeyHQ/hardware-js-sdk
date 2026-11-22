@@ -4,14 +4,14 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 
-def build(root=None):
+def build(root=None, *, legacy_runtime=False):
     root = Path(root) if root is not None else Path(__file__).resolve().parent
     plugin = root / "onekey"
     manifest = json.loads((plugin / "manifest.json").read_text())
     output = root / "dist" / f"onekey-{manifest['version']}.zip"
     output.parent.mkdir(exist_ok=True)
     receipt = root / "dist" / "onekey-runtime" / "runtime.json"
-    pin = (hashlib.sha256(receipt.read_bytes()).hexdigest() + "\n") if receipt.is_file() else None
+    pin = (hashlib.sha256(receipt.read_bytes()).hexdigest() + "\n") if legacy_runtime and receipt.is_file() else None
     with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
         for source in sorted(plugin.rglob("*")):
             if not source.is_file() or "__pycache__" in source.parts:
@@ -27,7 +27,7 @@ def build(root=None):
 def build_distribution(root=None):
     root = Path(root) if root is not None else Path(__file__).resolve().parent
     manifest = json.loads((root / "onekey" / "manifest.json").read_text())
-    plugin_zip = build(root)
+    plugin_zip = build(root, legacy_runtime=True)
     runtime = root / "dist" / "onekey-runtime"
     if not (runtime / "runtime.json").is_file():
         raise RuntimeError("Build the runtime first: python3 plugins/electrum/build_runtime.py")
@@ -48,4 +48,4 @@ def build_distribution(root=None):
 
 
 if __name__ == "__main__":
-    print(build_distribution())
+    print(build())

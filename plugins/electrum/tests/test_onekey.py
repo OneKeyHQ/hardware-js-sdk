@@ -40,7 +40,12 @@ BINDING = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"], walletTyp
 class TestOneKeyPackaging(unittest.TestCase):
     def test_external_zip_first_load_has_adapter_but_no_python_usb_or_runtime(self):
         root_name = "onekey_zip_test.onekey"
-        archive = build()
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        import shutil
+        shutil.copytree(Path(__file__).parents[1] / "onekey", root / "onekey")
+        archive = build(root)
         with zipfile.ZipFile(archive) as zipped:
             self.assertIsNone(zipped.testzip())
             names = zipped.namelist()
@@ -346,7 +351,7 @@ class TestOneKeyClient(unittest.TestCase):
             usable.append(cached.has_usable_connection_with_device())
         self.assertEqual([False], usable)
         self.assertEqual([client], list(manager.clients))
-        client.plugin.release_helper.assert_called_once_with(client)
+        client.plugin.release_helper.assert_called_once_with(client, scanning=True)
 
     def test_unplugged_client_is_released_when_the_last_wallet_closes(self):
         plugin = OneKeyPlugin.__new__(OneKeyPlugin)
@@ -381,7 +386,8 @@ class TestOneKeyClient(unittest.TestCase):
         client = run_in_hwd_thread(lambda: OneKeyClient("usb1", mock.Mock(), plugin))
         plugin.device_manager = lambda: SimpleNamespace(clients={})
         self.assertEqual([], OneKeyPlugin.enumerate(plugin))
-        plugin.helper.shutdown.assert_called_once()
+        plugin.helper.shutdown.assert_not_called()
+        plugin.helper.release.assert_called_once_with("usb1")
         self.assertTrue(client.closed)
         self.assertNotIn(client, plugin._live_clients)
 

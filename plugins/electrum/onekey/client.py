@@ -137,15 +137,17 @@ class OneKeyClient(HardwareClientBase):
     def flow(self, *, close_on_error=True):
         if self.handler is None:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
-        self.cancelled.clear()
-        self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
+        previous = self.cancelled
+        self.cancelled = threading.Event()
         try:
+            self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
             yield
         except BaseException:
             if close_on_error:
                 self.close()
             raise
         finally:
+            self.cancelled = previous
             self.handler.finished()
 
     def _select_wallet(self):
@@ -209,8 +211,6 @@ class OneKeyClient(HardwareClientBase):
             # the xpub call. select-hidden would force a new wallet choice.
             if self.device_id is not None and saved["deviceId"] != self.device_id:
                 raise UserFacingException(_("This Electrum wallet is bound to a different OneKey device."))
-            if self.binding is not None and self.binding != saved:
-                raise UserFacingException(_("OneKey wallet selection changed. Reconnect the device."))
             self.binding = saved
             actual = self._xpub(path, xtype)
             if actual != expected:
@@ -248,14 +248,17 @@ class OneKeyClient(HardwareClientBase):
             if lock is not None:
                 lock.release()
 
-    def _release_helper_ref(self):
+    def _release_helper_ref(self, *, scanning=False):
         if self._released:
             return
         self._released = True
         release = getattr(self.plugin, "release_helper", None)
         if release is not None:
-            release(self)
-        elif getattr(self.helper, "generation", None) == self.generation:
+            if scanning:
+                release(self, scanning=True)
+            else:
+                release(self)
+        elif not scanning and getattr(self.helper, "generation", None) == self.generation:
             shutdown = getattr(self.helper, "shutdown", None)
             if shutdown is not None:
                 shutdown()
@@ -273,7 +276,7 @@ class OneKeyClient(HardwareClientBase):
         self.closed = True
         self.binding = None
         self.account = None
-        self._release_helper_ref()
+        self._release_helper_ref(scanning=True)
 
     def is_pairable(self):
         return True

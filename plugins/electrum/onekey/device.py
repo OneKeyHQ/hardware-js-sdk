@@ -82,7 +82,10 @@ def _sign_budget(inputs, outputs, ref_txs):
     for item in inputs:
         if type(item) is dict:
             steps += refs.get(item.get("prev_hash"), 0)
-    return steps + 4
+    # Legacy SIGHASH_ALL re-reads every input/output for each legacy input,
+    # followed by the final output serialization pass.
+    legacy = sum(item.get("script_type") == "SPENDADDRESS" for item in inputs)
+    return steps + legacy * (len(inputs) + len(outputs)) + len(outputs) + 4
 
 
 def _der(signature):
@@ -140,20 +143,23 @@ class Session:
             _address, session_id = self._session()
             wallet_type, passphrase_state = "standard", None
         elif mode == "select-hidden":
-            if status.get("unlocked") is not True:
-                self._pin(codec.PIN_ANY)
-                status, info = self.identity()
+            status, info = self._main_pin(status, info)
             self.on_ui("passphrase-select")
             self._passphrase(None, on_device=True)
             passphrase_state, session_id = self._session()
             wallet_type = "hidden"
         else:
-            # Attach PIN is the wallet selector. AskPassphrase clears that unlock.
+            # An explicit selection must allow choosing another Attach PIN slot.
+            if status.get("unlocked_by_attach_to_pin") is True:
+                self._call(codec.LOCK_DEVICE, b"", codec.SUCCESS)
+                status, info = self.identity()
+                if status.get("unlocked") is not False:
+                    _fail("WALLET_MISMATCH")
             status, info = self._attach_pin(status, info)
             passphrase_state, session_id = self._session()
             wallet_type = "attach-pin"
         status, info = self.identity()
-        if not status["device_id"]:
+        if not status["device_id"] or status.get("unlocked") is not True:
             _fail("DEVICE_MISMATCH")
         result = {"deviceId": status["device_id"], "serialNo": info["serial_no"],
                   "walletType": wallet_type, "passphraseState": passphrase_state}
@@ -234,6 +240,14 @@ class Session:
                 self._passphrase("", on_device=False)
             _address, session_id = self._session()
         elif kind == "hidden":
+            if status.get("unlocked") is True:
+                # Empty Get inspects the current wallet; an address-only hint can
+                # select/create a different wallet and cannot prove ownership.
+                restored, session_id = self._session()
+                if restored == binding["passphraseState"]:
+                    self._confirm(binding)
+                    self._remember(kind, restored, binding["deviceId"], session_id)
+                    return status, info
             if status.get("unlocked") is not True or status.get("unlocked_by_attach_to_pin") is True:
                 self._pin(codec.PIN_MAIN)
                 status, info = self.identity()
@@ -252,6 +266,9 @@ class Session:
             restored, session_id = self._session()
             if restored != binding["passphraseState"]:
                 _fail("WALLET_MISMATCH")
+        # PIN entry may change initialization identity. Check it before any
+        # public key, address or signing command, as well as after the operation.
+        self._confirm(binding)
         self._remember(kind, binding["passphraseState"], binding["deviceId"], session_id)
         return status, info
 
@@ -316,7 +333,8 @@ class Session:
 
     def _confirm(self, binding):
         status, info = self.identity()
-        if status["device_id"] != binding["deviceId"] or info["serial_no"] != binding["serialNo"]:
+        if (status.get("unlocked") is not True or status["device_id"] != binding["deviceId"]
+                or info["serial_no"] != binding["serialNo"]):
             self.cache.pop(self.connect_id, None)
             _fail("DEVICE_MISMATCH")
 
@@ -370,7 +388,7 @@ class Session:
 
     @staticmethod
     def _previous(ref_txs, tx_hash):
-        display = tx_hash[::-1].hex()
+        display = tx_hash.hex()
         for item in ref_txs:
             if item["hash"] == display:
                 return item

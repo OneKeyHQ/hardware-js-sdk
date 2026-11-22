@@ -10,7 +10,7 @@
     "OneKey wallet"
   ],
   "icon": "onekey.svg",
-  "requires": [],
+  "requires": [["usb1", "libusb1"]],
   "available_for": [
     "qt"
   ]

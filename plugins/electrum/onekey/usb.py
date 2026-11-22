@@ -1,10 +1,11 @@
-"""USB transport for Pro 2 and Neo, using the libusb Electrum already ships.
+"""USB transport for Pro 2 and Neo, using host Python/native libusb.
 
 The native library is loaded from the host, never from a member of the plugin zip.
 Enumeration follows firmware-pro2: vendor 0x1209, the 0x4Fxx ids first, then 0x53xx,
 and the vendor-class interface 0xFF.
 """
 
+from .frame import RX_BUFFER_SIZE
 from .link import Link, LinkError
 
 
@@ -23,6 +24,15 @@ def _usb1():
     except Exception:
         raise LinkError("USB_UNAVAILABLE") from None
     return usb1
+
+
+def check_available():
+    try:
+        context = _usb1().USBContext()
+        context.open()
+        context.close()
+    except Exception:
+        raise ImportError("OneKey requires python-libusb1 and native libusb") from None
 
 
 def _context():
@@ -122,5 +132,16 @@ def open_path(path):
             finally:
                 handle.close()
 
+        try:
+            # Reclaim does not flush a device endpoint. Discard the old claim's
+            # replies before issuing the new, response-validated V2 probe.
+            for _ in range(20):
+                if not read(RX_BUFFER_SIZE, 50):
+                    break
+            else:
+                raise LinkError("PROTOCOL")
+        except BaseException:
+            close()
+            raise
         return Link(read, write, close)
     raise LinkError("SDK_FAILED")

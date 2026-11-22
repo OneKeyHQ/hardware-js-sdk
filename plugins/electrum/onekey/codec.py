@@ -8,8 +8,10 @@ session use the latest field numbers. Both ride the same proto_link frame.
 GET_PUBLIC_KEY = 11
 PUBLIC_KEY = 12
 SIGN_TX = 15
+CANCEL = 20
 TX_REQUEST = 21
 TX_ACK = 22
+LOCK_DEVICE = 24
 BUTTON_REQUEST = 26
 BUTTON_ACK = 27
 GET_ADDRESS = 29
@@ -348,7 +350,7 @@ def encode_tx_request(request_type, *, index=0, tx_hash=b"", signature=None, sig
 
 
 def _hash(hex_value):
-    return bytes.fromhex(hex_value)[::-1]
+    return bytes.fromhex(hex_value)
 
 
 def _input(item, *, prev):

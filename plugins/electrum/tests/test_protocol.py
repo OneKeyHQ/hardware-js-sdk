@@ -11,7 +11,7 @@ from onekey.link import Link, LinkError
 ACCOUNT = [0x80000000 + 84, 0x80000000, 0x80000000]
 STORAGE = [0x80000000 + 4541509, 0x80000000 + 1112098098]
 ADDRESS_PATH = ACCOUNT + [0, 0]
-TXID = "11" * 32
+TXID = bytes(range(32)).hex()
 SIGNATURE = bytes.fromhex("3006020101020102")
 
 
@@ -125,7 +125,7 @@ class Scripted:
             step = self.steps[len(self.order)]
             self.order.append(step)
             if step == codec.TX_META:
-                return codec.TX_REQUEST, codec.encode_tx_request(step, tx_hash=bytes.fromhex(TXID)[::-1])
+                return codec.TX_REQUEST, codec.encode_tx_request(step, tx_hash=bytes.fromhex(TXID))
             if step == codec.TX_FINISHED:
                 self.material = True
                 return codec.TX_REQUEST, codec.encode_tx_request(step, signature=SIGNATURE, signature_index=0)
@@ -346,9 +346,11 @@ class TestDeviceSession(unittest.TestCase):
     def test_usb_interface_stays_open_across_wallet_calls(self):
         device = Scripted()
         closed = []
-        link = pipe_link(device, lambda: closed.append(True))
+        def new_link(_path):
+            return pipe_link(device, lambda: closed.append(True))
+
         with mock.patch("onekey.ipc.list_paths", return_value=["001:1"]), \
-                mock.patch("onekey.ipc.open_path", return_value=link) as open_path:
+                mock.patch("onekey.ipc.open_path", side_effect=new_link) as open_path:
             helper = Helper()
             call(helper, "search", {})
             self.assertEqual(1, open_path.call_count)

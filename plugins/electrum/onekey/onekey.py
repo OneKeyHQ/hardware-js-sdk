@@ -93,7 +93,6 @@ class OneKeyPlugin(HW_PluginBase):
         connected = self._connected_clients()
         if connected is None:
             return
-        dropped = None
         for live in list(self._live_clients):
             if live is keep or live in connected:
                 continue
@@ -102,22 +101,26 @@ class OneKeyPlugin(HW_PluginBase):
             live.account = None
             live._released = True
             self._live_clients.discard(live)
-            dropped = live
-        if keep is not None or self._live_clients or dropped is None:
-            return
-        if dropped.helper.generation == dropped.generation:
-            dropped.helper.shutdown()
+            self._release_device(live)
+        # DeviceMgr may already have collected the next discovery result. Keep
+        # its generation valid even when the last old client was removed.
 
-    def release_helper(self, client):
-        # One Electrum wallet closing must not kill a second wallet still using this process.
+    def _release_device(self, client):
+        if (client.helper.generation == client.generation
+                and not any(live.connect_id == client.connect_id and live.generation == client.generation
+                            for live in self._live_clients)):
+            client.helper.release(client.connect_id)
+
+    def release_helper(self, client, *, scanning=False):
         self._sweep_unplugged(keep=client)
         self._live_clients.discard(client)
-        if self._live_clients:
-            return
-        if client.helper.generation == client.generation:
+        self._release_device(client)
+        if not scanning and not self._live_clients and client.helper.generation == client.generation:
             client.helper.shutdown()
 
     def get_library_version(self):
+        from .usb import check_available
+        check_available()
         return SDK_VERSION
 
     @runs_in_hwd_thread

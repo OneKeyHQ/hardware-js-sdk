@@ -2,3 +2,4 @@ Electrum @ https://download.electrum.org/4.8.4/Electrum-4.8.4.tar.gz
 PyQt6~=6.10.2
 pytest>=8
 flake8>=7,<8
+libusb1>=1.6.4

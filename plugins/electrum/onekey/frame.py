@@ -11,6 +11,7 @@ SOF = 0x5A
 HEAD_SIZE = 8
 RX_BUFFER_SIZE = 4096
 PACKET_TYPE_PACKET = 0
+PACKET_TYPE_ACK = 1
 
 
 class Frame:
@@ -61,7 +62,12 @@ def decode(buf):
     if crc8(buf[:3]) != buf[3] or crc8(buf[:-1]) != buf[-1]:
         raise ValueError("bad CRC")
     attr = buf[5]
-    return Frame(buf[4], (attr >> 2) & 0x0F, attr & 0x03, buf[6], bytes(buf[7:-1]))
+    packet_type = attr & 0x03
+    if buf[6] == 0 or packet_type not in (PACKET_TYPE_PACKET, PACKET_TYPE_ACK):
+        raise ValueError("invalid sequence or packet type")
+    if packet_type == PACKET_TYPE_ACK and total != HEAD_SIZE:
+        raise ValueError("invalid ACK length")
+    return Frame(buf[4], (attr >> 2) & 0x0F, packet_type, buf[6], bytes(buf[7:-1]))
 
 
 def encode_message(msg_type, payload, *, seq, channel=0, packet_src=0):
