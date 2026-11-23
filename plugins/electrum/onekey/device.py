@@ -239,13 +239,14 @@ def _der(signature):
 
 
 class Session:
-    def __init__(self, link, *, deadline, cancelled, on_ui, cache, connect_id):
+    def __init__(self, link, *, deadline, cancelled, on_ui, cache, connect_id, features=None):
         self.link = link
         self.deadline = deadline
         self.cancelled = cancelled
         self.on_ui = on_ui or (lambda _event: None)
         self.cache = cache
         self.connect_id = connect_id
+        self.features = features
         self._eventless = False
 
     def handshake(self):
@@ -300,6 +301,8 @@ class Session:
         status, info = self.identity()
         if not status["device_id"] or status.get("unlocked") is not True:
             _fail("DEVICE_MISMATCH")
+        if self.features is not None:
+            self.features[self.connect_id] = status.get("attach_to_pin_enabled") is True
         result = {"deviceId": status["device_id"], "serialNo": info["serial_no"],
                   "walletType": wallet_type, "passphraseState": passphrase_state}
         self._remember(wallet_type, passphrase_state, status["device_id"], session_id)

@@ -731,7 +731,7 @@ class TestProtocolRepairs(unittest.TestCase):
             other = run_in_hwd_thread(lambda: OneKeyClient('usb2', mock.Mock(), plugin))
             manager.clients[client] = client.serial
             manager.clients[other] = other.serial
-            client.handler.choose_wallet.return_value = 'select-hidden'
+            client.request_wallet_mode('select-hidden')
             generation = helper.generation
             with self.assertRaises(UserCancelled):
                 client.get_xpub("m/84'/0'/0'", 'p2wpkh')
@@ -774,11 +774,11 @@ class TestProtocolRepairs(unittest.TestCase):
             plugin, manager = self._plugin(helper)
             handler = mock.Mock()
             handler.show_message.side_effect = show_message
-            handler.choose_wallet.return_value = 'select-hidden'
             client = run_in_hwd_thread(lambda: OneKeyClient('usb1', handler, plugin))
             other = run_in_hwd_thread(lambda: OneKeyClient('usb2', mock.Mock(), plugin))
             manager.clients[client] = client.serial
             manager.clients[other] = other.serial
+            client.request_wallet_mode('select-hidden')
             generation = helper.generation
             with self.assertRaises(UserCancelled):
                 client.get_xpub("m/84'/0'/0'", 'p2wpkh')

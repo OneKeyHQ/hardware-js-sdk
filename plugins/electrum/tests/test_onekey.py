@@ -224,7 +224,7 @@ class TestOneKeyClient(unittest.TestCase):
         helper = mock.Mock(generation="generation-one")
         helper.call.return_value = dict(STATE)
         handler = mock.Mock()
-        handler.choose_wallet.return_value = "select-hidden"
+        handler.choose_wallet.side_effect = AssertionError("wallet dialog")
         plugin = SimpleNamespace(helper=helper, SUPPORTED_XTYPES=OneKeyPlugin.SUPPORTED_XTYPES,
                                  remember_wallet_binding=mock.Mock())
         client = run_in_hwd_thread(lambda: OneKeyClient("usb1", handler, plugin))
@@ -239,6 +239,7 @@ class TestOneKeyClient(unittest.TestCase):
         client, helper, handler = self.make_client()
         xpub = self.public_key()
         helper.call.side_effect = [BINDING, dict(xpub=xpub, rootFingerprint=0x01020304)]
+        client.request_wallet_mode("select-hidden")
         self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
         self.assertEqual("01020304", client.request_root_fingerprint_from_device())
         self.assertEqual("select-hidden", helper.call.call_args_list[-2].args[1]["mode"])
@@ -246,7 +247,7 @@ class TestOneKeyClient(unittest.TestCase):
         helper.call.side_effect = None
         helper.call.return_value = dict(xpub=xpub, rootFingerprint=None)
         client.bind_keystore(keystore)
-        handler.choose_wallet.assert_called_once()
+        handler.choose_wallet.assert_not_called()
         self.assertEqual(BINDING, helper.call.call_args.args[1]["binding"])
         self.assertEqual(BINDING, keystore.dump()["onekey_binding"])
         self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list[-1:]))
@@ -272,7 +273,6 @@ class TestOneKeyClient(unittest.TestCase):
         helper = mock.Mock(generation="generation-one")
         helper.call.return_value = dict(deviceId=None, serialNo="synthetic-serial", model="pro2")
         handler = mock.Mock()
-        handler.choose_wallet.return_value = "standard"
         plugin = SimpleNamespace(helper=helper, SUPPORTED_XTYPES=OneKeyPlugin.SUPPORTED_XTYPES,
                                  remember_wallet_binding=mock.Mock())
         client = run_in_hwd_thread(lambda: OneKeyClient("usb1", handler, plugin))
@@ -311,10 +311,12 @@ class TestOneKeyClient(unittest.TestCase):
         client.binding = dict(BINDING)
         client.account = ("previous",)
         client.begin_new_wallet_selection()
+        client.request_wallet_mode("select-hidden")
         xpub = self.public_key()
         helper.call.side_effect = [BINDING, dict(xpub=xpub, rootFingerprint=None)]
         self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
-        handler.choose_wallet.assert_called_once()
+        handler.choose_wallet.assert_not_called()
+        self.assertEqual("select-hidden", helper.call.call_args_list[-2].args[1]["mode"])
         self.assertEqual(BINDING["passphraseState"], client.binding["passphraseState"])
 
     def test_closing_one_client_leaves_the_other_helper_running(self):
@@ -506,7 +508,8 @@ class TestOneKeyClient(unittest.TestCase):
         path = get_derivation_used_for_hw_device_encryption()
         self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
         self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
-        handler.choose_wallet.assert_called_once()
+        handler.choose_wallet.assert_not_called()
+        self.assertEqual("standard", helper.call.call_args_list[1].args[1]["mode"])
         self.assertEqual(["state", "open", "xpub", "xpub"], [call.args[0] for call in helper.call.call_args_list])
         self.assertEqual(BINDING, helper.call.call_args_list[2].args[1]["binding"])
         self.assertEqual(standard, helper.call.call_args_list[3].args[1]["binding"])
@@ -517,23 +520,26 @@ class TestOneKeyClient(unittest.TestCase):
         self.assertFalse(client._unlock_selection)
         client.plugin.remember_wallet_binding.assert_not_called()
 
-    def test_cancelled_storage_unlock_keeps_the_open_wallet(self):
+    def test_storage_unlock_opens_standard_without_asking(self):
         client, helper, handler = self.make_client()
         standard = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
                         walletType="standard", passphraseState=None)
         account = ([0x80000054, 0x80000000, 0x80000000], "p2wpkh", self.public_key())
         client.binding = dict(standard)
         client.account = account
-        handler.choose_wallet.side_effect = UserCancelled()
+        client.device_id = STATE["deviceId"]
+        handler.choose_wallet.side_effect = AssertionError("wallet dialog")
+        encryption_xpub = self.encryption_xpub()
+        helper.call.side_effect = [dict(standard), dict(xpub=encryption_xpub, rootFingerprint=None)]
         client.begin_storage_unlock_selection()
-        with self.assertRaises(UserCancelled):
-            client.get_xpub(get_derivation_used_for_hw_device_encryption(), "standard")
+        self.assertEqual(encryption_xpub, client.get_xpub(get_derivation_used_for_hw_device_encryption(), "standard"))
+        self.assertEqual("standard", helper.call.call_args_list[-2].args[1]["mode"])
         self.assertEqual(standard, client.binding)
         self.assertEqual(account, client.account)
         self.assertFalse(client.closed)
         self.assertFalse(client._unlock_selection)
+        handler.choose_wallet.assert_not_called()
         helper.shutdown.assert_not_called()
-        self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list))
 
     def test_cancelled_device_prompt_during_storage_unlock_keeps_the_open_wallet(self):
         client, helper, handler = self.make_client()
@@ -543,7 +549,6 @@ class TestOneKeyClient(unittest.TestCase):
         client.binding = dict(standard)
         client.account = account
         client.device_id = STATE["deviceId"]
-        handler.choose_wallet.return_value = "standard"
         helper.call.side_effect = HelperError("CANCELLED")
         client.begin_storage_unlock_selection()
         with self.assertRaises(UserCancelled):
@@ -562,9 +567,10 @@ class TestOneKeyClient(unittest.TestCase):
         path = get_derivation_used_for_hw_device_encryption()
         self.assertEqual(encryption_xpub, client.get_xpub(path, "standard"))
         self.assertIsNone(client.account)
-        handler.choose_wallet.assert_called_once()
+        handler.choose_wallet.assert_not_called()
         client.plugin.remember_wallet_binding.assert_not_called()
         self.assertEqual("open", helper.call.call_args_list[-2].args[0])
+        self.assertEqual("standard", helper.call.call_args_list[-2].args[1]["mode"])
 
     def test_storage_encryption_path_is_not_a_general_account_exception(self):
         client, helper, _ = self.make_client()
@@ -575,13 +581,26 @@ class TestOneKeyClient(unittest.TestCase):
                 client.get_xpub(requested, xtype)
         self.assertEqual(1, helper.call.call_count)
 
-    def test_cancelled_selection_does_not_open_standard_wallet(self):
+    def test_unspecified_selection_opens_the_standard_wallet(self):
         client, helper, handler = self.make_client()
-        handler.choose_wallet.side_effect = UserCancelled()
-        with self.assertRaises(UserCancelled):
-            client.get_xpub("m/84'/0'/0'", "p2wpkh")
-        self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list))
-        helper.shutdown.assert_called_once()
+        handler.choose_wallet.side_effect = AssertionError("wallet dialog")
+        opened = dict(deviceId=STATE["deviceId"], serialNo=STATE["serialNo"],
+                      walletType="standard", passphraseState=None)
+        xpub = self.public_key()
+        helper.call.side_effect = [opened, dict(xpub=xpub, rootFingerprint=None)]
+        self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
+        self.assertEqual("standard", helper.call.call_args_list[-2].args[1]["mode"])
+        handler.choose_wallet.assert_not_called()
+        helper.shutdown.assert_not_called()
+
+    def test_attach_pin_enabled_follows_the_feature_and_fails_closed(self):
+        client, helper, _handler = self.make_client()
+        helper.call.return_value = {"attachToPinEnabled": True}
+        self.assertTrue(client.attach_pin_enabled())
+        self.assertEqual("features", helper.call.call_args.args[0])
+        helper.call.side_effect = HelperError("STALE")
+        self.assertFalse(client.attach_pin_enabled())
+        self.assertFalse(client.closed)
 
     def test_account_xpub_omitting_fingerprint_clears_the_cache(self):
         client, helper, _handler = self.make_client()
@@ -1292,23 +1311,32 @@ class TestOneKeyMultisig(unittest.TestCase):
             with self.subTest(xtype=xtype), self.assertRaisesRegex(UserFacingException, "BIP48 segwit multisig"):
                 WCOneKeyXPub.get_xpub_from_client(step, client, "m/44'/0'/0'", xtype)
             client.begin_new_wallet_selection.assert_not_called()
+            client.request_wallet_mode.assert_not_called()
         for xtype, path in (("p2wsh", "m/48'/0'/0'/2'"), ("p2wsh-p2sh", "m/48'/0'/0'/1'")):
             client.reset_mock()
             with mock.patch("electrum.gui.qt.wizard.wallet.WCHWXPub.get_xpub_from_client", return_value="xpub") as parent:
                 self.assertEqual("xpub", WCOneKeyXPub.get_xpub_from_client(step, client, path, xtype))
             client.begin_new_wallet_selection.assert_called_once()
+            client.request_wallet_mode.assert_called_once_with("standard")
             parent.assert_called_once_with(client, path, xtype)
         step.wizard_data = {"wallet_type": "standard"}
         client.reset_mock()
         with mock.patch("electrum.gui.qt.wizard.wallet.WCHWXPub.get_xpub_from_client", return_value="xpub") as parent:
             self.assertEqual("xpub", WCOneKeyXPub.get_xpub_from_client(step, client, "m/44'/0'/0'", "standard"))
         client.begin_new_wallet_selection.assert_called_once()
+        client.request_wallet_mode.assert_called_once_with("standard")
         parent.assert_called_once()
+        step.wizard_data = {"wallet_type": "standard", "onekey_wallet_mode": "select-hidden"}
+        client.reset_mock()
+        with mock.patch("electrum.gui.qt.wizard.wallet.WCHWXPub.get_xpub_from_client", return_value="xpub"):
+            self.assertEqual("xpub", WCOneKeyXPub.get_xpub_from_client(step, client, "m/84'/0'/0'", "p2wpkh"))
+        client.request_wallet_mode.assert_called_once_with("select-hidden")
         step.wizard_data = {"wallet_type": "imported"}
         client.reset_mock()
         with self.assertRaisesRegex(UserFacingException, "Only single-signature"):
             WCOneKeyXPub.get_xpub_from_client(step, client, "m/84'/0'/0'", "p2wpkh")
         client.begin_new_wallet_selection.assert_not_called()
+        client.request_wallet_mode.assert_not_called()
 
     def test_singlesig_still_has_to_be_complete(self):
         signer = TestOneKeySigning()

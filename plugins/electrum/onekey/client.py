@@ -98,6 +98,7 @@ class OneKeyClient(HardwareClientBase):
         self._released = False
         self._fresh_selection = False
         self._unlock_selection = False
+        self._requested_mode = None
         try:
             state = self._call("state", {"connectId": path})
             self._check_state(state)
@@ -179,11 +180,25 @@ class OneKeyClient(HardwareClientBase):
                 return True
         return False
 
+    def request_wallet_mode(self, mode):
+        # The next open uses this. Unset means the standard wallet.
+        if mode not in ("standard", "select-hidden", "select-attach-pin"):
+            raise UserFacingException(_("Invalid OneKey wallet binding. Reconnect using the wallet wizard."))
+        self._requested_mode = mode
+
+    def attach_pin_enabled(self):
+        try:
+            value = self._call("features", {"connectId": self.connect_id})
+        except Exception:
+            return False
+        return type(value) is dict and value.get("attachToPinEnabled") is True
+
     def _select_wallet(self):
         if self.binding is not None:
             return
         self.handler.finished()
-        mode = self.handler.choose_wallet()
+        mode = self._requested_mode or "standard"
+        self._requested_mode = None
         if mode not in ("standard", "select-hidden", "select-attach-pin"):
             raise UserCancelled()
         self.binding = check_binding(self._call("open", {"connectId": self.connect_id, "mode": mode}))

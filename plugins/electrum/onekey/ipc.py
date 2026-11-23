@@ -19,7 +19,8 @@ VERSION = 1
 MAX_LINE = 1024 * 1024
 SDK_SOURCE = "38f0b8c5d8fb645c1652880eb099866de57280aa"
 SDK_VERSION = "1.2.10"
-OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "sign-message", "cancel", "ui", "dispose"}
+OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "sign-message",
+              "features", "cancel", "ui", "dispose"}
 # Same targets as helper/pin.cjs BUNDLE_PLATFORMS. Linux nodes are the glibc builds.
 DESKTOP_PLATFORMS = ("darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64", "win32-arm64", "win32-x64")
 
@@ -157,6 +158,7 @@ class Helper:
         self.generation = None
         self._lock = threading.RLock()
         self._wallets = {}
+        self._features = {}
         self._links = {}
         self._sequences = {}
 
@@ -191,18 +193,21 @@ class Helper:
             except Exception:
                 self.generation = None
                 self._wallets.clear()
+                self._features.clear()
                 self._release_links()
                 raise HelperError("SDK_FAILED") from None
 
     def shutdown(self):
         with self._lock:
             self._wallets.clear()
+            self._features.clear()
             self.generation = None
             self._release_links()
 
     def release(self, connect_id):
         with self._lock:
             self._wallets.pop(connect_id, None)
+            self._features.pop(connect_id, None)
             self._drop(connect_id)
 
     def close(self):
@@ -218,8 +223,14 @@ class Helper:
         if op in ("cancel", "ui", "dispose"):
             if op == "dispose":
                 self._wallets.clear()
+                self._features.clear()
                 self._release_links()
             return None
+        if op == "features":
+            connect_id = params.get("connectId")
+            if type(connect_id) is not str or not connect_id:
+                raise SessionError("INVALID_REQUEST")
+            return {"attachToPinEnabled": self._features.get(connect_id) is True}
         connect_id = params.get("connectId")
         if type(connect_id) is not str or not connect_id:
             raise SessionError("INVALID_REQUEST")
@@ -227,7 +238,7 @@ class Helper:
         link = self._acquire(connect_id)
         try:
             session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
-                              cache=self._wallets, connect_id=connect_id)
+                              cache=self._wallets, connect_id=connect_id, features=self._features)
             session.handshake()
             if op == "state":
                 return session.state()
@@ -274,7 +285,7 @@ class Helper:
                 link = self._links[path] if path in self._links else self._borrow(path)
                 probe_deadline = deadline if held else min(deadline, time.monotonic() + 1)
                 session = Session(link, deadline=probe_deadline, cancelled=cancelled, on_ui=on_ui,
-                                  cache=self._wallets, connect_id=path)
+                                  cache=self._wallets, connect_id=path, features=self._features)
                 session.handshake()
                 try:
                     state = session.state()

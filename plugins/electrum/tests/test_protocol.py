@@ -340,6 +340,20 @@ class TestDeviceSession(unittest.TestCase):
             self.assertEqual(SIGNATURE.hex(), signed["signatures"][0]["signature"])
             popen.assert_not_called()
 
+    def test_open_records_attach_pin_availability_without_changing_the_binding(self):
+        device = Scripted()
+        device.attach_to_pin_enabled = True
+        helper, _device = helper_for(device)
+        self.assertEqual({"attachToPinEnabled": False}, call(helper, "features", {"connectId": "usb1"}))
+        opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        self.assertEqual({"deviceId", "serialNo", "walletType", "passphraseState"}, set(opened))
+        self.assertEqual({"attachToPinEnabled": True}, call(helper, "features", {"connectId": "usb1"}))
+        plain = Scripted()
+        helper, _plain = helper_for(plain)
+        call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        self.assertEqual({"attachToPinEnabled": False}, call(helper, "features", {"connectId": "usb1"}))
+        self.assertEqual({"attachToPinEnabled": False}, call(helper, "features", {"connectId": "other"}))
+
     def test_attach_pin_selects_and_restores_without_passphrase(self):
         device = Scripted()
         helper, device = helper_for(device)
