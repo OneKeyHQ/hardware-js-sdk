@@ -105,6 +105,8 @@ class WCOneKeyXPub(WCHWXPub):
     def get_xpub_from_client(self, client, derivation, xtype):
         if self.wizard_data["wallet_type"] not in ("standard", "multisig"):
             raise UserFacingException(_("Only single-signature OneKey wallets are supported."))
+        if self.wizard_data["wallet_type"] == "multisig" and xtype not in ("p2wsh", "p2wsh-p2sh"):
+            raise UserFacingException(_("OneKey supports only BIP48 segwit multisig wallets."))
         # DeviceMgr keeps one client per serial. A new wallet must not inherit the previous choice.
         client.begin_new_wallet_selection()
         return super().get_xpub_from_client(client, derivation, xtype)

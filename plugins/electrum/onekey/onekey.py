@@ -382,32 +382,44 @@ class OneKeyPlugin(HW_PluginBase):
             )
             if type(signatures) is not list or len(signatures) != len(inputs):
                 raise UserFacingException(_("OneKey did not sign all inputs."))
+            # Every input is still sent. Applying a signature to one Electrum already
+            # finalized clears that input's scriptSig and witness.
+            already_complete = [txin.is_complete() for txin in tx.inputs()]
             checked = []
             for index, entry in enumerate(signatures):
                 if (type(entry) is not dict or set(entry) != {"index", "signature"}
                         or type(entry["index"]) is not int or entry["index"] != index):
                     raise UserFacingException(_("Invalid OneKey signature index."))
-                checked.append(self._signature(entry["signature"]) + Sighash.to_sigbytes(Sighash.ALL))
+                if already_complete[index]:
+                    checked.append(None)
+                else:
+                    checked.append(self._signature(entry["signature"]) + Sighash.to_sigbytes(Sighash.ALL))
             # Electrum recovers/verifies against each ORIGINAL transaction input. Test a copy first
             # so a partial, reordered, or foreign signature cannot mutate the user's transaction.
             # One cosigner of an m-of-n script does not finish the transaction.
             # A singlesig signature still has to make every input complete.
             candidate = copy.deepcopy(tx)
-            candidate.update_signatures(checked)
-            self._require_applied_signatures(keystore, candidate, multisig)
-            tx.update_signatures(checked)
-            self._require_applied_signatures(keystore, tx, multisig)
+            for target in (candidate, tx):
+                preserved = [(txin.script_sig, txin.witness) for txin in target.inputs()]
+                target.update_signatures(checked)
+                self._require_applied_signatures(keystore, target, multisig, already_complete, preserved)
         except BaseException:
             client.close()
             raise
 
     @staticmethod
-    def _require_applied_signatures(keystore, tx, multisig):
+    def _require_applied_signatures(keystore, tx, multisig, already_complete, preserved):
+        for index, txin in enumerate(tx.inputs()):
+            if already_complete[index] and (
+                    not txin.is_complete() or (txin.script_sig, txin.witness) != preserved[index]):
+                raise UserFacingException(_("OneKey returned invalid transaction signatures."))
         if not multisig:
             if not tx.is_complete():
                 raise UserFacingException(_("OneKey returned invalid transaction signatures."))
             return
-        for txin in tx.inputs():
+        for index, txin in enumerate(tx.inputs()):
+            if already_complete[index]:
+                continue
             pubkey, _path = keystore.find_my_pubkey_in_txinout(txin)
             if pubkey is None or pubkey not in txin.sigs_ecdsa:
                 raise UserFacingException(_("OneKey returned invalid transaction signatures."))

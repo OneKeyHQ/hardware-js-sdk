@@ -798,7 +798,7 @@ class TestOneKeyMessage(unittest.TestCase):
 
 
 class TestOneKeyMultisig(unittest.TestCase):
-    def make_wallet(self, thresh=2, script_type="p2wsh"):
+    def make_wallet(self, thresh=2, script_type="p2wsh", input_count=1):
         coin = 1 if constants.net.TESTNET else 0
         script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}[script_type]
         prefix = f"m/48'/{coin}'/0'/{script_index}'"
@@ -829,23 +829,30 @@ class TestOneKeyMultisig(unittest.TestCase):
             output.bip32_paths[pubkey] = (fingerprint, convert_bip32_strpath_to_intpath(prefix) + [change, addr_index])
             return output, keys
 
-        funding_output, input_keys = make_output(0, 0, 100000)
-        script = funding_output.scriptpubkey
-        raw = (bytes.fromhex("0200000001") + bytes(32) + bytes.fromhex("ffffffff0100ffffffff01")
-               + (100000).to_bytes(8, "little") + bytes([len(script)]) + script + bytes(4))
-        funding = Transaction(raw.hex())
-        txin = PartialTxInput(prevout=TxOutpoint(txid=bytes.fromhex(funding.txid()), out_idx=0))
-        txin.utxo = funding
-        txin.script_descriptor = funding_output.script_descriptor
-        txin.bip32_paths = dict(funding_output.bip32_paths)
-        txin.is_mine = True
-        recipient, _keys = make_output(0, 1, 60000)
+        inputs = []
+        groups = []
+        for index in range(input_count):
+            funding_output, input_keys = make_output(0, index, 100000)
+            script = funding_output.scriptpubkey
+            raw = (bytes.fromhex("0200000001") + bytes(32) + bytes.fromhex("ffffffff0100ffffffff01")
+                   + (100000).to_bytes(8, "little") + bytes([len(script)]) + script + bytes(4))
+            funding = Transaction(raw.hex())
+            txin = PartialTxInput(prevout=TxOutpoint(txid=bytes.fromhex(funding.txid()), out_idx=0))
+            txin.utxo = funding
+            txin.script_descriptor = funding_output.script_descriptor
+            txin.bip32_paths = dict(funding_output.bip32_paths)
+            txin.is_mine = True
+            inputs.append(txin)
+            groups.append(input_keys)
+        recipient, _keys = make_output(0, input_count, 60000)
         recipient.is_mine = True
         change, _keys = make_output(1, 2, 39000)
         change.is_mine = change.is_change = True
-        tx = PartialTransaction.from_io(inputs=[txin], outputs=[recipient, change],
+        tx = PartialTransaction.from_io(inputs=inputs, outputs=[recipient, change],
                                         version=2, locktime=123, BIP69_sort=False)
-        return keystore, tx, input_keys
+        if input_count == 1:
+            return keystore, tx, groups[0]
+        return keystore, tx, groups
 
     def test_partial_native_segwit_signature_is_kept(self):
         for network in (constants.BitcoinMainnet, constants.BitcoinTestnet):
@@ -1035,24 +1042,47 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertEqual(0x80000001, payload["pubkeys"][0]["child_num"])
 
     def test_zpub_from_the_device_is_stored_as_a_multisig_xpub(self):
-        account = BIP32Node.from_rootseed(b"\x44" * 32, xtype="p2wsh").subkey_at_private_derivation("m/48'/0'/0'/2'")
+        stored_xpub = ("Zpub74TUVGDvS4dpUWHB9vKGfah4NfMBw7nfNdbMycrp7zmA6HyQhEVEYDK83jrWPnQNbDuKRVXXJGLhCddTUyNgdbcQ7"
+                       "Jm9eC3u6edjoRjZA5X")
+        device_xpub = ("zpub6sZPN2VUs75T3w7oDFrHqWMFesJvim754Mwh4MbGkDvkU7QVvq6xT6TCF2u2qMBUMkqLYuXQR3xC5U1hBkDjV7Vj"
+                       "GqekEnauCvMsDWEP8vC")
+        stored_node = BIP32Node.from_xkey(stored_xpub)
+        device_node = BIP32Node.from_xkey(device_xpub)
+        self.assertEqual(4, stored_node.depth)
+        self.assertEqual((0x80000002).to_bytes(4, "big"), stored_node.child_number)
+        self.assertEqual(device_node.chaincode, stored_node.chaincode)
+        self.assertEqual(device_node.eckey.get_public_key_bytes(compressed=True),
+                         stored_node.eckey.get_public_key_bytes(compressed=True))
         client, helper, _handler = TestOneKeyClient().make_client()
-        helper.call.side_effect = [BINDING, dict(xpub=account._replace(xtype="p2wpkh").to_xpub(), rootFingerprint=None)]
-        self.assertEqual(account.to_xpub(), client.get_xpub("m/48'/0'/0'/2'", "p2wsh"))
+        helper.call.side_effect = [BINDING, dict(xpub=device_xpub, rootFingerprint=None)]
+        stored = client.get_xpub("m/48'/0'/0'/2'", "p2wsh")
+        self.assertTrue(device_xpub.startswith("zpub"))
+        self.assertEqual(stored_xpub, stored)
+        self.assertTrue(stored.startswith("Zpub"))
         sent = helper.call.call_args.args[1]
         self.assertEqual("SPENDWITNESS", sent["scriptType"])
         self.assertEqual(4, len(sent["path"]))
+        self.assertEqual(0x80000002, sent["path"][-1])
         with self.assertRaises(UserFacingException):
             client.get_xpub("m/48'/0'/0'/1'", "p2wsh")
 
     def test_ypub_from_the_device_is_stored_as_a_nested_multisig_xpub(self):
-        account = BIP32Node.from_rootseed(b"\x44" * 32, xtype="p2wsh-p2sh").subkey_at_private_derivation("m/48'/0'/0'/1'")
-        device_xpub = account._replace(xtype="p2wpkh-p2sh").to_xpub()
+        stored_xpub = ("Ypub6jdDBbZ1HP6Lbi2gW5BCddjJDTye9oyDz4P4qCz14AvPfp2WxXjLyHzirjy73LgNwC2g8qrB83wEde6rWR868Q2Q"
+                       "frWA65enEAgjtYgnrZA")
+        device_xpub = ("ypub6Yj84MpZiRXyB8sJZQiDoZPVVfwNwTHdfnjPuwiTgQ5z3dTcC8M4tB8o431dUuTUhixhGFr4EqYjWUV6DBy8yuuj"
+                       "qPPkggBnLSQsJaxHysa")
+        stored_node = BIP32Node.from_xkey(stored_xpub)
+        device_node = BIP32Node.from_xkey(device_xpub)
+        self.assertEqual(4, stored_node.depth)
+        self.assertEqual((0x80000001).to_bytes(4, "big"), stored_node.child_number)
+        self.assertEqual(device_node.chaincode, stored_node.chaincode)
+        self.assertEqual(device_node.eckey.get_public_key_bytes(compressed=True),
+                         stored_node.eckey.get_public_key_bytes(compressed=True))
         client, helper, _handler = TestOneKeyClient().make_client()
         helper.call.side_effect = [BINDING, dict(xpub=device_xpub, rootFingerprint=None)]
         stored = client.get_xpub("m/48'/0'/0'/1'", "p2wsh-p2sh")
         self.assertTrue(device_xpub.startswith("ypub"))
-        self.assertEqual(account.to_xpub(), stored)
+        self.assertEqual(stored_xpub, stored)
         self.assertTrue(stored.startswith("Ypub"))
         sent = helper.call.call_args.args[1]
         self.assertEqual("SPENDP2SHWITNESS", sent["scriptType"])
@@ -1060,6 +1090,73 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertEqual(0x80000001, sent["path"][-1])
         with self.assertRaises(UserFacingException):
             client.get_xpub("m/48'/0'/0'/2'", "p2wsh-p2sh")
+
+    def test_finished_multisig_input_keeps_its_witness(self):
+        keystore, tx, groups = self.make_wallet(input_count=2)
+        finished = tx.inputs()[0]
+        for key in groups[0][:2]:
+            pubkey = key.eckey.get_public_key_bytes(compressed=True)
+            finished.sigs_ecdsa[pubkey] = tx.sign_txin(0, key.eckey.get_secret_bytes())
+        self.assertTrue(finished.is_complete())
+        saved_paths = dict(finished.bip32_paths)
+        saved_descriptor = finished.script_descriptor
+        finished.finalize()
+        original_script = finished.script_sig
+        original_witness = finished.witness
+        self.assertIsNotNone(original_script)
+        self.assertTrue(original_witness)
+        finished.bip32_paths = saved_paths
+        finished.script_descriptor = saved_descriptor
+        finished.is_mine = True
+        our = groups[1][0]
+        signature = tx.sign_txin(1, our.eckey.get_secret_bytes())[:-1]
+        client = mock.Mock()
+        client.sign_tx.return_value = [
+            dict(index=0, signature="00"),
+            dict(index=1, signature=signature.hex()),
+        ]
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.get_client = mock.Mock(return_value=client)
+        plugin.sign_transaction(keystore, tx)
+        self.assertEqual(original_script, tx.inputs()[0].script_sig)
+        self.assertEqual(original_witness, tx.inputs()[0].witness)
+        self.assertTrue(tx.inputs()[0].is_complete())
+        our_pubkey = our.eckey.get_public_key_bytes(compressed=True)
+        self.assertIn(our_pubkey, tx.inputs()[1].sigs_ecdsa)
+        signed = client.sign_tx.call_args.args[0]
+        self.assertEqual(2, len(signed))
+        self.assertTrue(all("multisig" in item for item in signed))
+
+    def test_legacy_multisig_script_is_refused_before_device_selection(self):
+        try:
+            from onekey.qt import WCOneKeyXPub
+        except Exception as exc:
+            self.skipTest(f"PyQt is unavailable: {exc}")
+        step = WCOneKeyXPub.__new__(WCOneKeyXPub)
+        client = mock.Mock()
+        step.wizard_data = {"wallet_type": "multisig"}
+        for xtype in ("standard", "p2wpkh", "p2wpkh-p2sh"):
+            client.reset_mock()
+            with self.subTest(xtype=xtype), self.assertRaisesRegex(UserFacingException, "BIP48 segwit multisig"):
+                WCOneKeyXPub.get_xpub_from_client(step, client, "m/44'/0'/0'", xtype)
+            client.begin_new_wallet_selection.assert_not_called()
+        for xtype, path in (("p2wsh", "m/48'/0'/0'/2'"), ("p2wsh-p2sh", "m/48'/0'/0'/1'")):
+            client.reset_mock()
+            with mock.patch("electrum.gui.qt.wizard.wallet.WCHWXPub.get_xpub_from_client", return_value="xpub") as parent:
+                self.assertEqual("xpub", WCOneKeyXPub.get_xpub_from_client(step, client, path, xtype))
+            client.begin_new_wallet_selection.assert_called_once()
+            parent.assert_called_once_with(client, path, xtype)
+        step.wizard_data = {"wallet_type": "standard"}
+        client.reset_mock()
+        with mock.patch("electrum.gui.qt.wizard.wallet.WCHWXPub.get_xpub_from_client", return_value="xpub") as parent:
+            self.assertEqual("xpub", WCOneKeyXPub.get_xpub_from_client(step, client, "m/44'/0'/0'", "standard"))
+        client.begin_new_wallet_selection.assert_called_once()
+        parent.assert_called_once()
+        step.wizard_data = {"wallet_type": "imported"}
+        client.reset_mock()
+        with self.assertRaisesRegex(UserFacingException, "Only single-signature"):
+            WCOneKeyXPub.get_xpub_from_client(step, client, "m/84'/0'/0'", "p2wpkh")
+        client.begin_new_wallet_selection.assert_not_called()
 
     def test_singlesig_still_has_to_be_complete(self):
         signer = TestOneKeySigning()
