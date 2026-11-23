@@ -8,6 +8,8 @@ const SENSITIVE_LOG_KEYS = new Set([
   'address',
   'apikey',
   'connectid',
+  'constructorcalldata',
+  'contractaddresssalt',
   'datachunk',
   'devicestate',
   'deviceid',
@@ -35,6 +37,7 @@ const SENSITIVE_LOG_KEYS = new Set([
   'txpubkey',
   'ufvk',
   'uuid',
+  'viewingkey',
   'walletsessionid',
   'watchkey',
   'xprv',
@@ -55,7 +58,7 @@ const isSensitiveLogKey = (key: string) => {
 };
 
 const isSigningMessage = (messageName?: string) =>
-  Boolean(messageName && /(?:sign|txack|transaction|pczt)/i.test(messageName));
+  Boolean(messageName && /(?:sign|txack|transaction|pczt|calldata)/i.test(messageName));
 
 // Key image and tx key exchanges carry per-output secrets under generic field names (iv, blob, salt).
 const isMoneroSecretMessage = (messageName?: string) =>

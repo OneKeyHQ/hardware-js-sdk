@@ -183,3 +183,7 @@ export { default as moneroGetAddress } from './monero/MoneroGetAddress';
 export { default as moneroGetWatchKey } from './monero/MoneroGetWatchKey';
 export { default as moneroKeyImageSync } from './monero/MoneroKeyImageSync';
 export { default as moneroSignTransaction } from './monero/MoneroSignTransaction';
+export { default as starknetGetPublicKey } from './starknet/StarknetGetPublicKey';
+export { default as starknetGetAddress } from './starknet/StarknetGetAddress';
+export { default as starknetSignTransaction } from './starknet/StarknetSignTransaction';
+export { default as starknetExportPrivacyViewingKey } from './starknet/StarknetExportPrivacyViewingKey';
