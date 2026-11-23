@@ -171,12 +171,12 @@ const bigIntToLongLike = (value: bigint, unsigned: boolean) => {
   const highU32 = (u64 - lowU32) / BigInt(0x100000000);
   const low = Number(BigInt.asIntN(32, lowU32));
   const high = Number(BigInt.asIntN(32, highU32));
-  const decimal = normalized.toString();
   const obj = { low, high, unsigned };
+  const current = () => longBitPairToBigInt(obj, Boolean(obj.unsigned));
   Object.defineProperties(obj, {
-    toString: { value: () => decimal, enumerable: false },
-    toJSON: { value: () => decimal, enumerable: false },
-    toNumber: { value: () => Number(normalized), enumerable: false },
+    toString: { value: () => current().toString(), enumerable: false },
+    toJSON: { value: () => current().toString(), enumerable: false },
+    toNumber: { value: () => Number(current()), enumerable: false },
   });
   return obj;
 };
@@ -569,7 +569,7 @@ function coerceRawBytes(val: unknown): Uint8Array {
     return new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
   }
   if (typeof val === 'string') {
-    return val.length === 0 ? new Uint8Array(0) : new Uint8Array(Buffer.from(val, 'hex'));
+    return val.length === 0 ? new Uint8Array(0) : new Uint8Array(Buffer.from(val, 'base64'));
   }
   if (Array.isArray(val)) {
     return Uint8Array.from(val as number[]);

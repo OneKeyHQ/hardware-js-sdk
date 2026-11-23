@@ -500,10 +500,20 @@ describe('@bufbuild/protobuf boundary semantics', () => {
       b: null,
     });
 
-    // JSON.stringify on raw decoded 64-bit TxOutputType matches protobufjs decimal strings.
+    // JSON.stringify on raw decoded 64-bit TxOutputType matches protobufjs decimal strings
+    // and stays consistent if the bit pair is edited in place.
     const TxOutputType = v1Root.lookupType('TxOutputType');
     const rawOut = TxOutputType.encode({ amount: '100000', script_type: 'PAYTOADDRESS' }).finish();
     const decodedOut = TxOutputType.decode(rawOut);
     expect(JSON.parse(JSON.stringify(decodedOut)).amount).toBe('100000');
+    decodedOut.amount.low = 100001;
+    expect(decodedOut.amount.toString()).toBe('100001');
+    expect(decodedOut.amount.toNumber()).toBe(100001);
+    expect(JSON.parse(JSON.stringify(decodedOut)).amount).toBe('100001');
+
+    // Raw Message.encode() interprets string bytes fields as base64 (matching protobufjs).
+    const EthereumTxAck = v1Root.lookupType('EthereumTxAck');
+    const rawEthAck = EthereumTxAck.encode({ data_chunk: 'AQID' }).finish();
+    expect(decode(EthereumTxAck, ByteBuffer.wrap(rawEthAck)).data_chunk).toBe('010203');
   });
 });
