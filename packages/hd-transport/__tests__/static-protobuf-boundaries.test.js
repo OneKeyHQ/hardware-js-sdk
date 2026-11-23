@@ -378,10 +378,27 @@ describe('@bufbuild/protobuf boundary semantics', () => {
     const decodedRawA = Choice.decode(rawA);
     expect(decodedRawA.a).toBe('hello');
     expect(decodedRawA.selection).toBe('a');
+    expect(Object.keys(decodedRawA)).toStrictEqual(['a']);
+    expect({ ...decodedRawA }).toStrictEqual({ a: 'hello' });
+
+    // Re-encoding a decoded object must ignore inherited oneof defaults on its prototype.
+    const reencodedRawA = Choice.decode(Choice.encode(decodedRawA).finish());
+    expect(reencodedRawA.a).toBe('hello');
+    expect(reencodedRawA.selection).toBe('a');
+    const reencodedViaEncode = decode(Choice, encode(Choice, decodedRawA));
+    expect(reencodedViaEncode.a).toBe('hello');
+    expect(reencodedViaEncode.b).toBeNull();
+
+    // Mutating own fields updates the virtual oneof discriminator dynamically.
+    delete decodedRawA.a;
+    decodedRawA.b = 99;
+    expect(decodedRawA.selection).toBe('b');
 
     const rawEmpty = Choice.encode({}).finish();
     const decodedEmpty = Choice.decode(rawEmpty);
     expect(decodedEmpty.selection).toBeUndefined();
+    expect(Choice.decode(Choice.encode(decodedEmpty).finish()).selection).toBeUndefined();
+    expect(decode(Choice, encode(Choice, decodedEmpty))).toStrictEqual({ a: null, b: null });
 
     const encodedB = encode(Choice, { b: 42 });
     const decodedB = decode(Choice, encodedB);

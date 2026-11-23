@@ -592,6 +592,24 @@ describe('Core.dispose', () => {
         payload: {},
       });
       expect(emittedEvents).toHaveLength(0);
+
+      // Disposing Core must also settle active requestQueue tasks so callers never hang.
+      const postSwitchContext = (
+        core as unknown as { getCoreContext: () => CoreContext }
+      ).getCoreContext();
+      const disposeTask = postSwitchContext.requestQueue.createTask({
+        responseID: 778,
+        name: 'getFeatures',
+        connectId: 'dev-1',
+      } as never);
+      disposeTask.callPromise = createDeferred<unknown>();
+
+      await core.dispose();
+
+      await expect(disposeTask.callPromise.promise).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.CallQueueActionCancelled,
+      });
+      expect(postSwitchContext.requestQueue.getTask(778)).toBeUndefined();
     } finally {
       await core.dispose();
       TransportManager.transport = previous;

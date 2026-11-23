@@ -151,7 +151,10 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
   const msg = create(desc) as unknown as Record<string, unknown>;
 
   for (const field of desc.fields) {
-    const value = payload[field.name];
+    // Ignore inherited prototype defaults on decoded objects so re-encoding preserves oneof selection.
+    const isUnsetInheritedOneof =
+      Boolean(field.oneof) && !Object.prototype.hasOwnProperty.call(payload, field.name);
+    const value = isUnsetInheritedOneof ? undefined : payload[field.name];
     if (value === undefined || value === null) {
       if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
         setFieldValue(

@@ -460,6 +460,24 @@ function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unkn
   for (const field of desc.fields) {
     proto[field.name] = getFieldDefaultValue(desc, field.name);
   }
+  for (const oneof of desc.oneofs) {
+    const memberNames = oneof.fields.map(f => f.name);
+    Object.defineProperty(proto, oneof.name, {
+      enumerable: false,
+      configurable: true,
+      get(this: Record<string, unknown>) {
+        for (const memberName of memberNames) {
+          if (
+            Object.prototype.hasOwnProperty.call(this, memberName) &&
+            this[memberName] !== undefined
+          ) {
+            return memberName;
+          }
+        }
+        return undefined;
+      },
+    });
+  }
   const out = Object.create(proto) as Record<string, unknown>;
   for (const field of desc.fields) {
     if (field.fieldKind === 'list') {
@@ -476,15 +494,6 @@ function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unkn
         out[field.name] = rawMessageToPlain(field.message, val as Message);
       } else {
         out[field.name] = val;
-      }
-    }
-  }
-  for (const oneof of desc.oneofs) {
-    const oneofVal = record[oneof.localName] as { case?: string } | undefined;
-    if (oneofVal?.case) {
-      const activeField = oneof.fields.find(f => f.localName === oneofVal.case);
-      if (activeField) {
-        out[oneof.name] = activeField.name;
       }
     }
   }
@@ -549,7 +558,10 @@ const isUnsigned64RawScalar = (scalar: ScalarType): boolean =>
 function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): Message {
   const msg = create(desc) as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
-    const val = input[field.name];
+    // Ignore inherited prototype defaults on decoded objects so re-encoding preserves oneof selection.
+    const isUnsetInheritedOneof =
+      Boolean(field.oneof) && !Object.prototype.hasOwnProperty.call(input, field.name);
+    const val = isUnsetInheritedOneof ? undefined : input[field.name];
     if (val === undefined || val === null) {
       if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
         setFieldValue(

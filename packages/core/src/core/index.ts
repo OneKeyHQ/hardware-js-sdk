@@ -2056,11 +2056,21 @@ export default class Core extends EventEmitter {
     return this.disposePromise;
   }
 
+  private abortAndRejectAllRequests() {
+    this.requestQueue.abortAllRequests();
+    this.requestQueue.getRequestTasksId().forEach(requestId => {
+      this.requestQueue.rejectRequest(
+        requestId,
+        ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
+      );
+    });
+  }
+
   private async disposeResources(): Promise<void> {
     Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
     if ((_core && _core !== this) || (runtimeCores.has(this) && _core !== this)) {
       // A superseded instance owns its queue, never the current runtime's shared resources.
-      this.requestQueue.abortAllRequests();
+      this.abortAndRejectAllRequests();
       cleanup(this.uiPromises);
       this.prePendingCallPromises.clear();
       this.removeAllListeners();
@@ -2072,7 +2082,7 @@ export default class Core extends EventEmitter {
     transportSwitchTeardown?.resolve();
     transportSwitchTeardown = undefined;
     pollingManager.stopAll();
-    this.requestQueue.abortAllRequests();
+    this.abortAndRejectAllRequests();
     cleanup(this.uiPromises);
 
     _connector?.stop();
@@ -2106,13 +2116,7 @@ export default class Core extends EventEmitter {
 
   resetForTransportSwitch() {
     this.transportGeneration += 1;
-    this.requestQueue.abortAllRequests();
-    this.requestQueue.getRequestTasksId().forEach(requestId => {
-      this.requestQueue.rejectRequest(
-        requestId,
-        ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
-      );
-    });
+    this.abortAndRejectAllRequests();
     cleanup(this.uiPromises);
     // Replace the array so a late finally() from a pre-switch call only cleans its own
     // detached list and cannot cancel UI waiters registered after the switch.
