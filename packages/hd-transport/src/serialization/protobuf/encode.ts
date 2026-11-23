@@ -5,7 +5,13 @@ import ByteBuffer from 'bytebuffer';
 // eslint-disable-next-line import/order
 import { ensureTextEncoding } from './text-encoding';
 // eslint-disable-next-line import/order
-import { getMessageDesc, isLongBitPair, longBitPairToBigInt, setFieldValue } from './descriptor';
+import {
+  getMessageDesc,
+  isLongBitPair,
+  isRawDecodedMessage,
+  longBitPairToBigInt,
+  setFieldValue,
+} from './descriptor';
 
 // eslint-disable-next-line import/order
 import { ScalarType, create, toBinary } from '@bufbuild/protobuf';
@@ -149,21 +155,21 @@ const defaultForRequiredScalarOrEnum = (field: DescField): unknown => {
 
 function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Message {
   const msg = create(desc) as unknown as Record<string, unknown>;
+  const skipInheritedDefaults = isRawDecodedMessage(payload);
 
   for (const field of desc.fields) {
-    // Ignore inherited prototype defaults on decoded objects so re-encoding preserves oneof selection.
-    const isUnsetInheritedOneof =
-      Boolean(field.oneof) && !Object.prototype.hasOwnProperty.call(payload, field.name);
-    const value = isUnsetInheritedOneof ? undefined : payload[field.name];
+    // Ignore inherited prototype defaults on raw decoded objects so re-encoding preserves
+    // absent optional fields and oneof selection without hiding caller-supplied prototypes.
+    const value =
+      skipInheritedDefaults && !Object.prototype.hasOwnProperty.call(payload, field.name)
+        ? undefined
+        : payload[field.name];
     if (value === undefined || value === null) {
       if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
-        setFieldValue(
-          msg,
-          field,
-          field.fieldKind === 'message'
-            ? buildMessage(field.message, {})
-            : defaultForRequiredScalarOrEnum(field)
-        );
+        if (field.fieldKind === 'message') {
+          throw new TypeError(`missing required '${desc.typeName}.${field.name}'`);
+        }
+        setFieldValue(msg, field, defaultForRequiredScalarOrEnum(field));
       }
     } else if (field.fieldKind === 'list') {
       if (Array.isArray(value)) {
@@ -178,9 +184,12 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
             .map(v => encodeEnum(field.enum, v))
             .filter((v): v is number => v !== undefined);
         } else if (field.listKind === 'message') {
-          msg[field.localName] = value.map(v =>
-            buildMessage(field.message, (v ?? {}) as Record<string, unknown>)
-          );
+          msg[field.localName] = value.map(v => {
+            if (v === null || v === undefined || typeof v !== 'object' || Array.isArray(v)) {
+              throw new TypeError(`${desc.typeName}.${field.name}: object expected`);
+            }
+            return buildMessage(field.message, v as Record<string, unknown>);
+          });
         }
       }
     } else if (field.fieldKind === 'scalar') {
@@ -205,11 +214,10 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
         setFieldValue(msg, field, defaultForRequiredScalarOrEnum(field));
       }
     } else if (field.fieldKind === 'message') {
-      if (typeof value === 'object') {
-        setFieldValue(msg, field, buildMessage(field.message, value as Record<string, unknown>));
-      } else if (field.proto.label === FieldLabel.REQUIRED) {
-        setFieldValue(msg, field, buildMessage(field.message, {}));
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        throw new TypeError(`${desc.typeName}.${field.name}: object expected`);
       }
+      setFieldValue(msg, field, buildMessage(field.message, value as Record<string, unknown>));
     }
   }
 

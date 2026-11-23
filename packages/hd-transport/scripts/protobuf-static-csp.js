@@ -26,11 +26,27 @@ assert.strictEqual(
 
 const schemas = [v1, legacy, v2, protocolInfo];
 
+function buildMinimalPayload(root, type, seen = new Set()) {
+  if (seen.has(type.fullName)) return {};
+  const nextSeen = new Set(seen);
+  nextSeen.add(type.fullName);
+  const payload = {};
+  for (const field of type.fieldsArray) {
+    if (field.required) {
+      const target = root.lookup(field.type);
+      if (target && 'fields' in target) {
+        payload[field.name] = buildMinimalPayload(root, target, nextSeen);
+      }
+    }
+  }
+  return payload;
+}
+
 let count = 0;
 for (const schema of schemas) {
   const root = transport.parseTransportConfigure(schema);
   for (const type of root.listTypes()) {
-    const encoded = transport.encodeProtobuf(type, {});
+    const encoded = transport.encodeProtobuf(type, buildMinimalPayload(root, type));
     const decoded = transport.decodeProtobuf(type, encoded);
     assert.strictEqual(typeof decoded, 'object');
     count += 1;

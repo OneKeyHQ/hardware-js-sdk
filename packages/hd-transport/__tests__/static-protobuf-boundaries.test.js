@@ -432,7 +432,78 @@ describe('@bufbuild/protobuf boundary semantics', () => {
 
     const rawEncoded = Num.encode(payload).finish();
     const rawDecoded = Num.decode(rawEncoded);
-    expect(rawDecoded.u64).toBe(BigInt(4294967303));
-    expect(rawDecoded.i64).toBe(BigInt(-1));
+    expect(rawDecoded.u64.toString()).toBe('4294967303');
+    expect(rawDecoded.i64.toString()).toBe('-1');
+    expect(JSON.parse(JSON.stringify(rawDecoded))).toStrictEqual({
+      u64: '4294967303',
+      i64: '-1',
+    });
+  });
+
+  test('rejects missing or non-object required submessages (e.g. BTC signing TxAckInput/TxAckOutput)', () => {
+    const { Message: TxAckInput } = createMessageFromName(v1Root, 'TxAckInput');
+    const { Message: TxAckOutput } = createMessageFromName(v1Root, 'TxAckOutput');
+
+    expect(() => encode(TxAckInput, {})).toThrow(/missing required/);
+    expect(() => encode(TxAckInput, { tx: { input: undefined } })).toThrow(/missing required/);
+    expect(() => encode(TxAckOutput, { tx: { output: undefined } })).toThrow(/missing required/);
+    expect(() => encode(TxAckInput, { tx: { input: 123 } })).toThrow(/object expected/);
+
+    expect(() => TxAckInput.encode({}).finish()).toThrow(/missing required/);
+    expect(() => TxAckInput.encode({ tx: { input: undefined } }).finish()).toThrow(
+      /missing required/
+    );
+    expect(() => TxAckInput.encode({ tx: { input: 'bad' } }).finish()).toThrow(/object expected/);
+
+    const listRoot = parseConfigure({
+      nested: {
+        Batch: {
+          fields: {
+            items: { rule: 'repeated', type: 'Item', id: 1 },
+          },
+        },
+        Item: {
+          fields: { x: { type: 'uint32', id: 1 } },
+        },
+      },
+    });
+    const Batch = listRoot.lookupType('Batch');
+    expect(() => encode(Batch, { items: [undefined] })).toThrow(/object expected/);
+    expect(() => encode(Batch, { items: [null] })).toThrow(/object expected/);
+    expect(() => encode(Batch, { items: [123] })).toThrow(/object expected/);
+    expect(() => Batch.encode({ items: [undefined] }).finish()).toThrow(/object expected/);
+  });
+
+  test('preserves absent optional fields when re-encoding raw messages and keeps caller prototype values', () => {
+    const { Message: Ping } = createMessageFromName(v1Root, 'Ping');
+    const emptyPing = Ping.decode(new Uint8Array(0));
+    expect(Buffer.from(Ping.encode(emptyPing).finish()).toString('hex')).toBe('');
+    expect(encode(Ping, emptyPing).toString('hex')).toBe('');
+
+    const oneofRoot = parseConfigure({
+      nested: {
+        Choice: {
+          oneofs: {
+            selection: { oneof: ['a', 'b'] },
+          },
+          fields: {
+            a: { type: 'string', id: 1 },
+            b: { type: 'uint32', id: 2 },
+          },
+        },
+      },
+    });
+    const Choice = oneofRoot.lookupType('Choice');
+    const inheritedPayload = Object.create({ a: 'hello' });
+    expect(decode(Choice, encode(Choice, inheritedPayload))).toStrictEqual({
+      a: 'hello',
+      b: null,
+    });
+
+    // JSON.stringify on raw decoded 64-bit TxOutputType matches protobufjs decimal strings.
+    const TxOutputType = v1Root.lookupType('TxOutputType');
+    const rawOut = TxOutputType.encode({ amount: '100000', script_type: 'PAYTOADDRESS' }).finish();
+    const decodedOut = TxOutputType.decode(rawOut);
+    expect(JSON.parse(JSON.stringify(decodedOut)).amount).toBe('100000');
   });
 });

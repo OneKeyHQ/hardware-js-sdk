@@ -137,6 +137,13 @@ export const setFieldValue = (
   }
 };
 
+export const RAW_DECODED_SYMBOL = Symbol.for('@onekeyfe/hd-transport/raw-decoded');
+
+export const isRawDecodedMessage = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  Boolean((value as Record<PropertyKey, unknown>)[RAW_DECODED_SYMBOL]);
+
 export const isLongBitPair = (
   value: unknown
 ): value is { low: number; high: number; unsigned?: boolean } =>
@@ -155,6 +162,23 @@ export const longBitPairToBigInt = (
   const highU32 = BigInt.asUintN(32, BigInt(value.high));
   const combined = highU32 * BigInt(0x100000000) + lowU32;
   return unsigned ? BigInt.asUintN(64, combined) : BigInt.asIntN(64, combined);
+};
+
+const bigIntToLongLike = (value: bigint, unsigned: boolean) => {
+  const normalized = unsigned ? BigInt.asUintN(64, value) : BigInt.asIntN(64, value);
+  const u64 = BigInt.asUintN(64, normalized);
+  const lowU32 = u64 % BigInt(0x100000000);
+  const highU32 = (u64 - lowU32) / BigInt(0x100000000);
+  const low = Number(BigInt.asIntN(32, lowU32));
+  const high = Number(BigInt.asIntN(32, highU32));
+  const decimal = normalized.toString();
+  const obj = { low, high, unsigned };
+  Object.defineProperties(obj, {
+    toString: { value: () => decimal, enumerable: false },
+    toJSON: { value: () => decimal, enumerable: false },
+    toNumber: { value: () => Number(normalized), enumerable: false },
+  });
+  return obj;
 };
 
 const SCALAR_TYPE_MAP: Record<string, FieldType> = {
@@ -454,9 +478,23 @@ function getFieldDefaultValue(desc: DescMessage, fieldName: string): unknown {
   return null;
 }
 
+const is64BitRawScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT64 ||
+  scalar === ScalarType.UINT64 ||
+  scalar === ScalarType.SINT64 ||
+  scalar === ScalarType.FIXED64 ||
+  scalar === ScalarType.SFIXED64;
+
+const isUnsigned64RawScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT64 || scalar === ScalarType.FIXED64;
+
 function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unknown> {
   const record = msg as unknown as Record<string, unknown>;
-  const proto: Record<string, unknown> = {};
+  const proto: Record<PropertyKey, unknown> = {};
+  Object.defineProperty(proto, RAW_DECODED_SYMBOL, {
+    value: true,
+    enumerable: false,
+  });
   for (const field of desc.fields) {
     proto[field.name] = getFieldDefaultValue(desc, field.name);
   }
@@ -469,7 +507,8 @@ function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unkn
         for (const memberName of memberNames) {
           if (
             Object.prototype.hasOwnProperty.call(this, memberName) &&
-            this[memberName] !== undefined
+            this[memberName] !== undefined &&
+            this[memberName] !== null
           ) {
             return memberName;
           }
@@ -483,15 +522,27 @@ function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unkn
     if (field.fieldKind === 'list') {
       const list = record[field.localName];
       if (Array.isArray(list) && list.length > 0) {
-        out[field.name] =
-          field.listKind === 'message'
-            ? list.map(v => rawMessageToPlain(field.message, v as Message))
-            : [...list];
+        if (field.listKind === 'message') {
+          out[field.name] = list.map(v => rawMessageToPlain(field.message, v as Message));
+        } else if (field.listKind === 'scalar' && is64BitRawScalar(field.scalar)) {
+          const unsigned = isUnsigned64RawScalar(field.scalar);
+          out[field.name] = list.map(v =>
+            typeof v === 'bigint' ? bigIntToLongLike(v, unsigned) : v
+          );
+        } else {
+          out[field.name] = [...list];
+        }
       }
     } else if (isFieldSet(msg, field)) {
       const val = getFieldValue(record, field);
       if (field.fieldKind === 'message' && val != null) {
         out[field.name] = rawMessageToPlain(field.message, val as Message);
+      } else if (
+        field.fieldKind === 'scalar' &&
+        is64BitRawScalar(field.scalar) &&
+        typeof val === 'bigint'
+      ) {
+        out[field.name] = bigIntToLongLike(val, isUnsigned64RawScalar(field.scalar));
       } else {
         out[field.name] = val;
       }
@@ -545,39 +596,32 @@ function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unkno
   return getFieldDefaultValue(desc, fieldName);
 }
 
-const is64BitRawScalar = (scalar: ScalarType): boolean =>
-  scalar === ScalarType.INT64 ||
-  scalar === ScalarType.UINT64 ||
-  scalar === ScalarType.SINT64 ||
-  scalar === ScalarType.FIXED64 ||
-  scalar === ScalarType.SFIXED64;
-
-const isUnsigned64RawScalar = (scalar: ScalarType): boolean =>
-  scalar === ScalarType.UINT64 || scalar === ScalarType.FIXED64;
-
 function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): Message {
   const msg = create(desc) as unknown as Record<string, unknown>;
+  const skipInheritedDefaults = isRawDecodedMessage(input);
   for (const field of desc.fields) {
-    // Ignore inherited prototype defaults on decoded objects so re-encoding preserves oneof selection.
-    const isUnsetInheritedOneof =
-      Boolean(field.oneof) && !Object.prototype.hasOwnProperty.call(input, field.name);
-    const val = isUnsetInheritedOneof ? undefined : input[field.name];
+    // Ignore inherited prototype defaults on raw decoded objects so re-encoding preserves
+    // absent optional fields and oneof selection without hiding caller-supplied prototypes.
+    const val =
+      skipInheritedDefaults && !Object.prototype.hasOwnProperty.call(input, field.name)
+        ? undefined
+        : input[field.name];
     if (val === undefined || val === null) {
       if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
-        setFieldValue(
-          msg,
-          field,
-          field.fieldKind === 'message'
-            ? plainToRawMessage(field.message, {})
-            : defaultRawValueForRequired(desc, field.name)
-        );
+        if (field.fieldKind === 'message') {
+          throw new TypeError(`missing required '${desc.typeName}.${field.name}'`);
+        }
+        setFieldValue(msg, field, defaultRawValueForRequired(desc, field.name));
       }
     } else if (field.fieldKind === 'list') {
       if (Array.isArray(val)) {
         if (field.listKind === 'message') {
-          msg[field.localName] = val.map(v =>
-            plainToRawMessage(field.message, (v ?? {}) as Record<string, unknown>)
-          );
+          msg[field.localName] = val.map(v => {
+            if (v === null || v === undefined || typeof v !== 'object' || Array.isArray(v)) {
+              throw new TypeError(`${desc.typeName}.${field.name}: object expected`);
+            }
+            return plainToRawMessage(field.message, v as Record<string, unknown>);
+          });
         } else if (field.listKind === 'scalar' && field.scalar === ScalarType.BYTES) {
           msg[field.localName] = val.map(v => coerceRawBytes(v));
         } else if (field.listKind === 'scalar' && is64BitRawScalar(field.scalar)) {
@@ -594,11 +638,10 @@ function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): M
         }
       }
     } else if (field.fieldKind === 'message') {
-      if (typeof val === 'object') {
-        setFieldValue(msg, field, plainToRawMessage(field.message, val as Record<string, unknown>));
-      } else if (field.proto.label === FieldLabel.REQUIRED) {
-        setFieldValue(msg, field, plainToRawMessage(field.message, {}));
+      if (typeof val !== 'object' || Array.isArray(val)) {
+        throw new TypeError(`${desc.typeName}.${field.name}: object expected`);
       }
+      setFieldValue(msg, field, plainToRawMessage(field.message, val as Record<string, unknown>));
     } else if (field.fieldKind === 'enum') {
       const enumNumber = coerceRawEnumValue(field.enum, val);
       if (enumNumber !== undefined) {
