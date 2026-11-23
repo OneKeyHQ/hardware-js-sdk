@@ -38,12 +38,19 @@ type ProtocolV2FrameOptions = {
   seq?: number;
 };
 
-const LEGACY_PROTOCOL_V2_PROTOCOL_INFO =
-  parseTransportConfigure(legacyProtocolInfo).lookupType('LegacyProtocolInfo');
+let legacyProtocolInfoMessage: ReturnType<ProtobufRoot['lookupType']> | undefined;
+
+const getLegacyProtocolInfoMessage = () => {
+  if (!legacyProtocolInfoMessage) {
+    legacyProtocolInfoMessage =
+      parseTransportConfigure(legacyProtocolInfo).lookupType('LegacyProtocolInfo');
+  }
+  return legacyProtocolInfoMessage;
+};
 
 const decodeLegacyProtocolV2ProtocolInfo = (pbPayload: Uint8Array) => {
   const byteBuffer = ByteBuffer.wrap(pbPayload);
-  const legacy = decodeProtobuf(LEGACY_PROTOCOL_V2_PROTOCOL_INFO, byteBuffer);
+  const legacy = decodeProtobuf(getLegacyProtocolInfoMessage(), byteBuffer);
 
   return {
     version: legacy.version,

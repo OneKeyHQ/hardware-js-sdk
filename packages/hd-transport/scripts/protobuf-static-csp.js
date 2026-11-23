@@ -48,61 +48,62 @@ async function checkBrowserBundle() {
     'Browser bundle must not include protobufjs'
   );
 
-  const context = vm.createContext(
-    {
-      console,
-      Uint8Array,
-      Int8Array,
-      Uint16Array,
-      Int16Array,
-      Uint32Array,
-      Int32Array,
-      Float32Array,
-      Float64Array,
-      DataView,
-      ArrayBuffer,
-      BigInt,
-      TextEncoder,
-      TextDecoder,
-      setTimeout,
-      clearTimeout,
-    },
-    { codeGeneration: { strings: false, wasm: false } }
-  );
-  context.globalThis = context;
-  context.self = context;
-  context.window = context;
+  for (const includeTextGlobals of [true, false]) {
+    const context = vm.createContext(
+      {
+        console,
+        Uint8Array,
+        Int8Array,
+        Uint16Array,
+        Int16Array,
+        Uint32Array,
+        Int32Array,
+        Float32Array,
+        Float64Array,
+        DataView,
+        ArrayBuffer,
+        BigInt,
+        ...(includeTextGlobals ? { TextEncoder, TextDecoder } : {}),
+        setTimeout,
+        clearTimeout,
+      },
+      { codeGeneration: { strings: false, wasm: false } }
+    );
+    context.globalThis = context;
+    context.self = context;
+    context.window = context;
 
-  vm.runInContext(bundleSource, context, { filename: 'browser.global.js' });
-  const browserTransport = context.transport.default;
+    vm.runInContext(bundleSource, context, { filename: 'browser.global.js' });
+    const browserTransport = context.transport.default;
 
-  const v1Root = browserTransport.parseTransportConfigure(v1);
-  const v2Root = browserTransport.parseTransportConfigure(v2);
+    const v1Root = browserTransport.parseTransportConfigure(v1);
+    const v2Root = browserTransport.parseTransportConfigure(v2);
 
-  const v1Envelope = browserTransport.ProtocolV1.encodeEnvelope(v1Root, 'Ping', {
-    message: 'csp-v1',
-  });
-  const v1Decoded = browserTransport.ProtocolV1.decodeMessage(v1Root, v1Envelope.toString('hex'));
-  assert.strictEqual(v1Decoded.type, 'Ping');
-  assert.strictEqual(v1Decoded.message.message, 'csp-v1');
+    const v1Envelope = browserTransport.ProtocolV1.encodeEnvelope(v1Root, 'Ping', {
+      message: '\ufeffcsp-v1-🚀中文',
+    });
+    const v1Decoded = browserTransport.ProtocolV1.decodeMessage(v1Root, v1Envelope.toString('hex'));
+    assert.strictEqual(v1Decoded.type, 'Ping');
+    assert.strictEqual(v1Decoded.message.message, '\ufeffcsp-v1-🚀中文');
 
-  const v2Frame = browserTransport.ProtocolV2.encodeFrame(
-    { protocolV1: v1Root, protocolV2: v2Root },
-    'Ping',
-    { message: 'csp-v2' },
-    { seq: 1 }
-  );
-  const v2Decoded = browserTransport.ProtocolV2.decodeFrame(
-    { protocolV1: v1Root, protocolV2: v2Root },
-    v2Frame
-  );
-  assert.strictEqual(v2Decoded.type, 'Ping');
-  assert.strictEqual(v2Decoded.message.message, 'csp-v2');
+    const v2Frame = browserTransport.ProtocolV2.encodeFrame(
+      { protocolV1: v1Root, protocolV2: v2Root },
+      'Ping',
+      { message: '\ufeffcsp-v2-🚀中文' },
+      { seq: 1 }
+    );
+    const v2Decoded = browserTransport.ProtocolV2.decodeFrame(
+      { protocolV1: v1Root, protocolV2: v2Root },
+      v2Frame
+    );
+    assert.strictEqual(v2Decoded.type, 'Ping');
+    assert.strictEqual(v2Decoded.message.message, '\ufeffcsp-v2-🚀中文');
+  }
 
   console.log(
     `CSP browser IIFE bundle (${(bundleSource.length / 1024).toFixed(
       1
-    )} KB): zero protobufjs, V1/V2 round-trip passed`
+    )} KB): zero protobufjs, V1/V2 round-trip passed (with & without TextEncoder/TextDecoder)`
   );
 }
 

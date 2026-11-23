@@ -1,23 +1,26 @@
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
-import { ScalarType, fromBinary, isFieldSet } from '@bufbuild/protobuf';
-// eslint-disable-next-line import/no-unresolved, camelcase
-import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
 
+import { getProtobuf, getProtobufWkt } from './runtime';
 import { ensureTextEncoding } from './text-encoding';
 
-import type { DescMessage, Message } from '@bufbuild/protobuf';
+import type { DescMessage, Message, ScalarType } from '@bufbuild/protobuf';
 import type { ProtobufMessageType } from './descriptor';
 
-const is64BitScalar = (scalar: ScalarType): boolean =>
-  scalar === ScalarType.INT64 ||
-  scalar === ScalarType.UINT64 ||
-  scalar === ScalarType.SINT64 ||
-  scalar === ScalarType.FIXED64 ||
-  scalar === ScalarType.SFIXED64;
+const is64BitScalar = (scalar: ScalarType): boolean => {
+  const { ScalarType: S } = getProtobuf();
+  return (
+    scalar === S.INT64 ||
+    scalar === S.UINT64 ||
+    scalar === S.SINT64 ||
+    scalar === S.FIXED64 ||
+    scalar === S.SFIXED64
+  );
+};
 
 const decodeScalar = (scalar: ScalarType, value: unknown): unknown => {
-  if (scalar === ScalarType.BYTES) {
+  const { ScalarType: S } = getProtobuf();
+  if (scalar === S.BYTES) {
     if (value instanceof Uint8Array) {
       return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('hex');
     }
@@ -37,6 +40,8 @@ const decodeScalar = (scalar: ScalarType, value: unknown): unknown => {
 };
 
 function assertRequiredFields(desc: DescMessage, decoded: Message): void {
+  const { isFieldSet } = getProtobuf();
+  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const record = decoded as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     if (field.fieldKind === 'list') {
@@ -70,6 +75,8 @@ function assertRequiredFields(desc: DescMessage, decoded: Message): void {
 }
 
 function messageToJSON(desc: DescMessage, decoded: Message): Record<string, unknown> {
+  const { isFieldSet } = getProtobuf();
+  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const record = decoded as unknown as Record<string, unknown>;
   const res: Record<string, unknown> = {};
 
@@ -116,6 +123,7 @@ export const decode = (
   data: ByteBuffer
 ): Record<string, unknown> => {
   ensureTextEncoding();
+  const { fromBinary } = getProtobuf();
   const buff = data.toBuffer();
   const a = new Uint8Array(buff);
 

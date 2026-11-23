@@ -216,6 +216,18 @@ describe('@bufbuild/protobuf boundary semantics', () => {
       // Strict UTF-8 validation still rejects invalid sequences.
       const fallback = globalThis[symbol];
       expect(() => fallback.decodeUtf8(new Uint8Array([0xff, 0xfe]), true)).toThrow(TypeError);
+
+      // Fresh cold-start import with TextEncoder/TextDecoder absent must not throw
+      // while loading @bufbuild/protobuf or @bufbuild/protobuf/wkt descriptors.
+      delete globalThis[symbol];
+      jest.isolateModules(() => {
+        // eslint-disable-next-line global-require
+        const fresh = require('../src/index').default;
+        const freshRoot = fresh.parseTransportConfigure(v1);
+        const { Message: FreshPing } = fresh.createMessageFromName(freshRoot, 'Ping');
+        const roundTrip = FreshPing.decode(FreshPing.encode({ message: '\ufeff🚀中文' }).finish());
+        expect(roundTrip.message).toBe('\ufeff🚀中文');
+      });
     } finally {
       globalThis[symbol] = prevEncoding;
       globalThis.TextDecoder = prevTextDecoder;

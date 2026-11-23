@@ -1,27 +1,6 @@
 import { Buffer } from 'buffer';
-import {
-  ScalarType,
-  create,
-  createFileRegistry,
-  fromBinary,
-  isFieldSet,
-  toBinary,
-} from '@bufbuild/protobuf';
-import {
-  DescriptorProtoSchema,
-  EnumDescriptorProtoSchema,
-  EnumValueDescriptorProtoSchema,
-  FieldDescriptorProtoSchema,
-  // eslint-disable-next-line camelcase
-  FieldDescriptorProto_Label as FieldLabel,
-  // eslint-disable-next-line camelcase
-  FieldDescriptorProto_Type as FieldType,
-  FieldOptionsSchema,
-  FileDescriptorProtoSchema,
-  FileDescriptorSetSchema,
-  // eslint-disable-next-line import/no-unresolved
-} from '@bufbuild/protobuf/wkt';
 
+import { getProtobuf, getProtobufWkt } from './runtime';
 import { ensureTextEncoding } from './text-encoding';
 
 import type { DescEnum, DescMessage, FileRegistry, Message } from '@bufbuild/protobuf';
@@ -29,6 +8,8 @@ import type {
   DescriptorProto,
   EnumDescriptorProto,
   FieldDescriptorProto,
+  // eslint-disable-next-line camelcase
+  FieldDescriptorProto_Type as FieldType,
   FileDescriptorProto,
   // eslint-disable-next-line import/no-unresolved
 } from '@bufbuild/protobuf/wkt';
@@ -98,23 +79,31 @@ export interface ProtobufRoot {
   listTypes(): ProtobufMessageType[];
 }
 
-const SCALAR_TYPE_MAP: Record<string, FieldType> = {
-  double: FieldType.DOUBLE,
-  float: FieldType.FLOAT,
-  int64: FieldType.INT64,
-  uint64: FieldType.UINT64,
-  int32: FieldType.INT32,
-  fixed64: FieldType.FIXED64,
-  fixed32: FieldType.FIXED32,
-  bool: FieldType.BOOL,
-  string: FieldType.STRING,
-  bytes: FieldType.BYTES,
-  uint32: FieldType.UINT32,
-  sfixed32: FieldType.SFIXED32,
-  sfixed64: FieldType.SFIXED64,
-  sint32: FieldType.SINT32,
-  sint64: FieldType.SINT64,
-};
+let cachedScalarTypeMap: Record<string, FieldType> | undefined;
+
+function getScalarTypeMap(): Record<string, FieldType> {
+  if (!cachedScalarTypeMap) {
+    const { FieldDescriptorProto_Type: FieldTypeEnum } = getProtobufWkt();
+    cachedScalarTypeMap = {
+      double: FieldTypeEnum.DOUBLE,
+      float: FieldTypeEnum.FLOAT,
+      int64: FieldTypeEnum.INT64,
+      uint64: FieldTypeEnum.UINT64,
+      int32: FieldTypeEnum.INT32,
+      fixed64: FieldTypeEnum.FIXED64,
+      fixed32: FieldTypeEnum.FIXED32,
+      bool: FieldTypeEnum.BOOL,
+      string: FieldTypeEnum.STRING,
+      bytes: FieldTypeEnum.BYTES,
+      uint32: FieldTypeEnum.UINT32,
+      sfixed32: FieldTypeEnum.SFIXED32,
+      sfixed64: FieldTypeEnum.SFIXED64,
+      sint32: FieldTypeEnum.SINT32,
+      sint64: FieldTypeEnum.SINT64,
+    };
+  }
+  return cachedScalarTypeMap;
+}
 
 function isTypeNode(node: ProtobufNodeJson): node is ProtobufTypeJson {
   return 'fields' in node && typeof node.fields === 'object' && node.fields !== null;
@@ -196,6 +185,8 @@ function resolveTypeName(
 }
 
 function buildEnumProto(name: string, node: ProtobufEnumJson): EnumDescriptorProto {
+  const { create } = getProtobuf();
+  const { EnumDescriptorProtoSchema, EnumValueDescriptorProtoSchema } = getProtobufWkt();
   return create(EnumDescriptorProtoSchema, {
     name,
     value: Object.entries(node.values).map(([valueName, number]) =>
@@ -210,6 +201,13 @@ function buildFieldProto(
   scope: string[],
   index: SymbolIndex
 ): FieldDescriptorProto {
+  const { create } = getProtobuf();
+  const {
+    FieldDescriptorProtoSchema,
+    FieldDescriptorProto_Label: FieldLabel,
+    FieldDescriptorProto_Type: FieldTypeEnum,
+    FieldOptionsSchema,
+  } = getProtobufWkt();
   let label = FieldLabel.OPTIONAL;
   if (field.rule === 'required') {
     label = FieldLabel.REQUIRED;
@@ -217,7 +215,7 @@ function buildFieldProto(
     label = FieldLabel.REPEATED;
   }
 
-  const scalarType = SCALAR_TYPE_MAP[field.type];
+  const scalarType = getScalarTypeMap()[field.type];
   let type: FieldType;
   let typeName: string | undefined;
 
@@ -225,15 +223,15 @@ function buildFieldProto(
     type = scalarType;
   } else {
     const resolved = resolveTypeName(field.type, scope, index);
-    type = resolved.kind === 'enum' ? FieldType.ENUM : FieldType.MESSAGE;
+    type = resolved.kind === 'enum' ? FieldTypeEnum.ENUM : FieldTypeEnum.MESSAGE;
     typeName = `.${resolved.fullName}`;
   }
 
   const isPackable =
     label === FieldLabel.REPEATED &&
-    type !== FieldType.STRING &&
-    type !== FieldType.BYTES &&
-    type !== FieldType.MESSAGE;
+    type !== FieldTypeEnum.STRING &&
+    type !== FieldTypeEnum.BYTES &&
+    type !== FieldTypeEnum.MESSAGE;
   let packed: boolean | undefined;
   if (field.options && typeof field.options.packed === 'boolean') {
     packed = field.options.packed;
@@ -262,6 +260,8 @@ function buildMessageProto(
   parentScope: string[],
   index: SymbolIndex
 ): DescriptorProto {
+  const { create } = getProtobuf();
+  const { DescriptorProtoSchema } = getProtobufWkt();
   const scope = [...parentScope, name];
   const nestedType: DescriptorProto[] = [];
   const enumType: EnumDescriptorProto[] = [];
@@ -295,6 +295,8 @@ function collectPackageFiles(
   files: FileDescriptorProto[]
 ): void {
   if (!nested) return;
+  const { create } = getProtobuf();
+  const { FileDescriptorProtoSchema } = getProtobufWkt();
   const messageType: DescriptorProto[] = [];
   const enumType: EnumDescriptorProto[] = [];
   const childNamespaces: Array<[string, ProtobufNamespaceJson]> = [];
@@ -331,6 +333,8 @@ function collectPackageFiles(
 }
 
 function assertRawRequiredFields(desc: DescMessage, msg: Message): void {
+  const { isFieldSet } = getProtobuf();
+  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const record = msg as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     if (field.fieldKind === 'list') {
@@ -361,6 +365,7 @@ function assertRawRequiredFields(desc: DescMessage, msg: Message): void {
 }
 
 function getFieldDefaultValue(desc: DescMessage, fieldName: string): unknown {
+  const { ScalarType } = getProtobuf();
   const field = desc.fields.find(f => f.name === fieldName);
   if (!field) return undefined;
   if (field.fieldKind === 'list') return [];
@@ -381,6 +386,7 @@ function getFieldDefaultValue(desc: DescMessage, fieldName: string): unknown {
 }
 
 function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unknown> {
+  const { isFieldSet } = getProtobuf();
   const record = msg as unknown as Record<string, unknown>;
   const proto: Record<string, unknown> = {};
   for (const field of desc.fields) {
@@ -435,6 +441,7 @@ function coerceRawBytes(val: unknown): Uint8Array {
 }
 
 function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unknown {
+  const { ScalarType } = getProtobuf();
   const field = desc.fields.find(f => f.name === fieldName);
   if (!field) return undefined;
   if (field.fieldKind === 'scalar') {
@@ -454,6 +461,8 @@ function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unkno
 }
 
 function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): Message {
+  const { ScalarType, create } = getProtobuf();
+  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const msg = create(desc) as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     const val = input[field.name];
@@ -503,6 +512,9 @@ function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): M
 }
 
 export function createProtobufRoot(data: ProtobufNamespaceJson | string): ProtobufRoot {
+  const { create, createFileRegistry, fromBinary, toBinary } = getProtobuf();
+  const { DescriptorProtoSchema, FileDescriptorProtoSchema, FileDescriptorSetSchema } =
+    getProtobufWkt();
   const schema: ProtobufNamespaceJson =
     typeof data === 'string' ? (JSON.parse(data) as ProtobufNamespaceJson) : data;
   const topLevel: Record<string, ProtobufNodeJson> | undefined =
