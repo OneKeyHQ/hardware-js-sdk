@@ -6,12 +6,17 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+from electrum.plugin import run_in_hwd_thread
+from electrum.util import UserCancelled, UserFacingException
+
 from onekey import codec, usb
+from onekey.client import OneKeyClient
 from onekey.device import Session
 from onekey.frame import decode, split_message
 from onekey.ipc import Helper, HelperError
 from onekey.link import Link, LinkError
-from test_protocol import ACCOUNT, SIGNATURE, Scripted, call, encode_reply, helper_for, pipe_link
+from onekey.onekey import OneKeyPlugin
+from test_protocol import ACCOUNT, ADDRESS_PATH, SIGNATURE, TXID, Scripted, call, encode_reply, helper_for, pipe_link
 
 
 def binding(kind="hidden", address="synthetic-public-wallet-identity"):
@@ -547,6 +552,200 @@ class TestProtocolRepairs(unittest.TestCase):
         with self.assertRaisesRegex(LinkError, 'TIMEOUT'):
             link.exchange(codec.PING, b'', deadline=time.monotonic()+.005, cancelled=None)
         self.assertEqual([codec.PING], [split_message(decode(data).payload)[0] for data in written])
+
+    def test_device_open_error_is_usb_unavailable(self):
+        device = mock.Mock()
+        device.open.side_effect = OSError('gone')
+        context = mock.Mock()
+        context.getDeviceIterator.return_value = [device]
+        with mock.patch.object(usb, '_usb1', return_value=SimpleNamespace(USBErrorTimeout=OSError)), \
+                mock.patch.object(usb, '_context', return_value=context), \
+                mock.patch.object(usb, '_path', return_value='usb1'), \
+                mock.patch.object(usb, '_endpoints', return_value=(0, 129, 1)):
+            with self.assertRaises(LinkError) as raised:
+                usb.open_path('usb1')
+        self.assertEqual('USB_UNAVAILABLE', raised.exception.code)
+
+    def test_unclaimed_usb_failure_during_scan_keeps_a_claimed_device(self):
+        for code in ('USB_UNAVAILABLE', 'SDK_FAILED'):
+            with self.subTest(code=code):
+                device = Scripted()
+
+                def open_link(path, code=code):
+                    if path == 'usb2':
+                        raise LinkError(code)
+                    return pipe_link(device)
+
+                with mock.patch('onekey.ipc.list_paths', return_value=['usb1', 'usb2']), \
+                        mock.patch('onekey.ipc.open_path', side_effect=open_link):
+                    helper = Helper()
+                    self.addCleanup(helper.shutdown)
+                    call(helper, 'hello', {})
+                    call(helper, 'state', dict(connectId='usb1'))
+                    generation = helper.generation
+                    plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+                    plugin.helper = helper
+                    plugin._live_clients = set()
+                    plugin.device_manager = lambda: SimpleNamespace(clients={})
+                    with self.assertRaisesRegex(UserFacingException, code):
+                        OneKeyPlugin.enumerate(plugin)
+                    self.assertEqual(generation, helper.generation)
+                    self.assertIn('usb1', helper._links)
+                    call(helper, 'state', dict(connectId='usb1'))
+
+    def test_cancel_during_probe_cleanup_does_not_open_the_next_candidate(self):
+        cancelled = threading.Event()
+        opened = []
+
+        def open_link(path):
+            opened.append(path)
+            return pipe_link(Scripted(), lambda: cancelled.set())
+
+        with mock.patch('onekey.ipc.list_paths', return_value=['usb1', 'usb2']), \
+                mock.patch('onekey.ipc.open_path', side_effect=open_link):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                with self.assertRaisesRegex(HelperError, 'CANCELLED'):
+                    pool.submit(helper.call, 'search', {}, cancelled=cancelled).result(timeout=3)
+        self.assertEqual(['usb1'], opened)
+
+    def test_message_cancel_after_the_request_sends_wire_cancel(self):
+        cancelled = threading.Event()
+        written = []
+
+        def read(*_args):
+            cancelled.set()
+            return b''
+
+        link = Link(read, written.append)
+        with self.assertRaisesRegex(LinkError, 'CANCELLED'):
+            link.exchange(codec.SIGN_MESSAGE, b'', deadline=time.monotonic()+1, cancelled=cancelled)
+        kinds = [split_message(decode(item).payload)[0] for item in written]
+        self.assertEqual([codec.SIGN_MESSAGE, codec.CANCEL], kinds)
+
+    def test_out_of_range_signing_index_is_protocol_and_keeps_the_other_device(self):
+        first, second = Scripted(), Scripted()
+        original = first.handle
+
+        def handle(kind, payload):
+            if kind == codec.SIGN_TX:
+                return codec.TX_REQUEST, codec.encode_tx_request(codec.TX_INPUT, index=1)
+            return original(kind, payload)
+
+        first.handle = handle
+        with mock.patch('onekey.ipc.open_path', side_effect=lambda path: pipe_link(first if path == 'usb1' else second)):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            for path in ('usb1', 'usb2'):
+                call(helper, 'state', dict(connectId=path))
+            generation = helper.generation
+            opened = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+            previous = dict(hash=TXID, version=1, lock_time=0,
+                            inputs=[dict(prev_hash='22' * 32, prev_index=0, script_sig='', sequence=0xFFFFFFFF)],
+                            bin_outputs=[dict(amount='1000', script_pubkey='0014' + '33' * 20)])
+            with self.assertRaises(HelperError) as raised:
+                call(helper, 'sign', dict(
+                    connectId='usb1', binding=opened, coin='Bitcoin', version=2, locktime=0, refTxs=[previous],
+                    inputs=[dict(prev_hash=TXID, prev_index=0, amount='1000', sequence=0xFFFFFFFF,
+                                 address_n=ADDRESS_PATH, script_type='SPENDWITNESS')],
+                    outputs=[dict(amount='900', address='bc1qexample', script_type='PAYTOADDRESS')]))
+            self.assertEqual('PROTOCOL', raised.exception.code)
+            self.assertEqual(generation, helper.generation)
+            self.assertNotIn('usb1', helper._links)
+            self.assertIn('usb2', helper._links)
+            call(helper, 'state', dict(connectId='usb2'))
+
+    def _plugin(self, helper):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.helper = helper
+        plugin._live_clients = set()
+        plugin.retain_client = OneKeyPlugin.retain_client.__get__(plugin)
+        plugin.release_helper = OneKeyPlugin.release_helper.__get__(plugin)
+        plugin._sweep_unplugged = OneKeyPlugin._sweep_unplugged.__get__(plugin)
+        plugin._connected_clients = OneKeyPlugin._connected_clients.__get__(plugin)
+        plugin._release_device = OneKeyPlugin._release_device.__get__(plugin)
+        manager = SimpleNamespace(clients={}, lock=threading.RLock())
+        plugin.device_manager = lambda: manager
+        return plugin, manager
+
+    def test_firmware_cancel_keeps_the_open_client_and_the_other_device(self):
+        first, second = Scripted(), Scripted()
+        original = first.handle
+
+        def handle(kind, payload):
+            if kind == codec.DEVICE_SESSION_ASK_PASSPHRASE:
+                return codec.FAILURE, codec.enc_uint(1, 5) + codec.enc_uint(2, codec.SESSION_CANCELLED)
+            return original(kind, payload)
+
+        first.handle = handle
+        with mock.patch('onekey.ipc.open_path', side_effect=lambda path: pipe_link(first if path == 'usb1' else second)):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            plugin, manager = self._plugin(helper)
+            client = run_in_hwd_thread(lambda: OneKeyClient('usb1', mock.Mock(), plugin))
+            other = run_in_hwd_thread(lambda: OneKeyClient('usb2', mock.Mock(), plugin))
+            manager.clients[client] = client.serial
+            manager.clients[other] = other.serial
+            client.handler.choose_wallet.return_value = 'select-hidden'
+            generation = helper.generation
+            with self.assertRaises(UserCancelled):
+                client.get_xpub("m/84'/0'/0'", 'p2wpkh')
+            self.assertFalse(client.closed)
+            self.assertIn('usb1', helper._links)
+            self.assertFalse(helper._links['usb1']._closed)
+            self.assertEqual(generation, helper.generation)
+            self.assertTrue(other.attached())
+            call(helper, 'state', dict(connectId='usb2'))
+
+    def test_host_cancel_during_passphrase_closes_that_client_only(self):
+        first, second = Scripted(), Scripted()
+        events = []
+        sent = []
+
+        def show_message(_text, on_cancel=None):
+            events.append(on_cancel)
+
+        def open_link(path):
+            device = first if path == 'usb1' else second
+            link = pipe_link(device)
+            if path != 'usb1':
+                return link
+            write = link._write
+
+            def wrapped(data):
+                kind = split_message(decode(data).payload)[0]
+                sent.append(kind)
+                write(data)
+                if kind == codec.DEVICE_SESSION_ASK_PASSPHRASE and events and events[-1] is not None:
+                    events[-1]()
+
+            link._write = wrapped
+            return link
+
+        with mock.patch('onekey.ipc.open_path', side_effect=open_link):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            plugin, manager = self._plugin(helper)
+            handler = mock.Mock()
+            handler.show_message.side_effect = show_message
+            handler.choose_wallet.return_value = 'select-hidden'
+            client = run_in_hwd_thread(lambda: OneKeyClient('usb1', handler, plugin))
+            other = run_in_hwd_thread(lambda: OneKeyClient('usb2', mock.Mock(), plugin))
+            manager.clients[client] = client.serial
+            manager.clients[other] = other.serial
+            generation = helper.generation
+            with self.assertRaises(UserCancelled):
+                client.get_xpub("m/84'/0'/0'", 'p2wpkh')
+            self.assertTrue(client.closed)
+            self.assertIn(codec.CANCEL, sent)
+            self.assertNotIn('usb1', helper._links)
+            self.assertEqual(generation, helper.generation)
+            self.assertTrue(other.attached())
+            call(helper, 'state', dict(connectId='usb2'))
 
 
 class TestReceiveFrames(unittest.TestCase):

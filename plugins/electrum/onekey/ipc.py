@@ -264,6 +264,10 @@ class Helper:
         paths = list(self.ports) if self.ports is not None else list_paths()
         found = []
         for path in paths:
+            if cancelled is not None and cancelled.is_set():
+                raise LinkError("CANCELLED")
+            if time.monotonic() >= deadline:
+                raise LinkError("TIMEOUT")
             held = self.ports is not None or path in self._links
             link = None
             try:

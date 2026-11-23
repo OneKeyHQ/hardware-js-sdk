@@ -97,7 +97,10 @@ def open_path(path):
         if ends is None:
             break
         number, ep_in, ep_out = ends
-        handle = device.open()
+        try:
+            handle = device.open()
+        except Exception:
+            raise LinkError("USB_UNAVAILABLE") from None
         try:
             if handle.kernelDriverActive(number):
                 handle.detachKernelDriver(number)

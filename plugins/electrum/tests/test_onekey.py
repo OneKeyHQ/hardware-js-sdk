@@ -16,7 +16,7 @@ from unittest import mock
 from electrum import bitcoin, constants, descriptor
 from electrum.bip32 import BIP32Node, convert_bip32_strpath_to_intpath
 from electrum.keystore import load_keystore, register_keystore
-from electrum.plugin import run_in_hwd_thread
+from electrum.plugin import DeviceUnpairableError, run_in_hwd_thread
 from electrum.storage import WalletStorage, get_derivation_used_for_hw_device_encryption
 from electrum.transaction import PartialTransaction, PartialTxInput, PartialTxOutput, Transaction, TxOutpoint, Sighash
 from electrum.util import UserCancelled, UserFacingException
@@ -24,7 +24,7 @@ from electrum.wallet_db import WalletDB
 from electrum.wizard import NewWalletWizard
 from electrum.zip_importer import MemoryZipImporter
 
-from onekey.client import OneKeyClient, account_path, coin_name, check_binding
+from onekey.client import OneKeyClient, account_path, coin_name, check_binding, normalized_xpub
 from onekey.onekey import OneKeyKeyStore, OneKeyPlugin
 from onekey.ipc import HelperError
 from build import build, build_distribution
@@ -583,6 +583,89 @@ class TestOneKeyClient(unittest.TestCase):
         self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list))
         helper.shutdown.assert_called_once()
 
+    def test_account_xpub_omitting_fingerprint_clears_the_cache(self):
+        client, helper, _handler = self.make_client()
+        xpub = self.public_key()
+        client.root_fingerprint = "01020304"
+        helper.call.side_effect = [
+            BINDING, dict(xpub=xpub, rootFingerprint=0x01020304),
+            dict(xpub=xpub, rootFingerprint=None),
+        ]
+        self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
+        self.assertEqual("01020304", client.root_fingerprint)
+        self.assertEqual(xpub, client.get_xpub("m/84'/0'/0'", "p2wpkh"))
+        self.assertIsNone(client.root_fingerprint)
+
+    def test_silent_lookup_reuses_a_matched_account_without_a_prompt(self):
+        client, helper, handler = self.make_client()
+        xpub = self.public_key()
+        keystore = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'", onekey_binding=BINDING))
+        client.binding = dict(BINDING)
+        client.account = (account_path("m/84'/0'/0'", "p2wpkh"), "p2wpkh", normalized_xpub(xpub, "p2wpkh"))
+        client.plugin._expected_keystore = keystore
+        client.plugin._allow_user_interaction = False
+        calls = helper.call.call_count
+        self.assertEqual(normalized_xpub(xpub, "p2wpkh"), client.get_xpub("m/84'/0'/0'", "p2wpkh"))
+        self.assertEqual(calls, helper.call.call_count)
+        handler.show_message.assert_not_called()
+        handler.choose_wallet.assert_not_called()
+
+    def test_silent_lookup_does_not_open_a_prompt_for_another_account(self):
+        client, helper, handler = self.make_client()
+        xpub = self.public_key()
+        keystore = OneKeyKeyStore(dict(xpub=xpub, derivation="m/84'/0'/0'", onekey_binding=BINDING))
+        client.plugin._expected_keystore = keystore
+        client.plugin._allow_user_interaction = False
+        with self.assertRaises(UserCancelled):
+            client.get_xpub("m/84'/0'/0'", "p2wpkh")
+        handler.show_message.assert_not_called()
+        handler.choose_wallet.assert_not_called()
+        self.assertFalse(any(call.args[0] == "open" for call in helper.call.call_args_list))
+
+    def test_silent_get_client_skips_bind_unless_the_account_is_already_open(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        keystore = mock.Mock()
+        unbound = mock.Mock()
+        unbound.attached.return_value = True
+        unbound.matches_keystore.return_value = False
+        with mock.patch("electrum.hw_wallet.plugin.HW_PluginBase.get_client", return_value=unbound):
+            self.assertIsNone(OneKeyPlugin.get_client(plugin, keystore, allow_user_interaction=False))
+        unbound.bind_keystore.assert_not_called()
+        matched = mock.Mock()
+        matched.attached.return_value = True
+        matched.matches_keystore.return_value = True
+        with mock.patch("electrum.hw_wallet.plugin.HW_PluginBase.get_client", return_value=matched):
+            self.assertIs(matched, OneKeyPlugin.get_client(plugin, keystore, allow_user_interaction=False))
+        matched.bind_keystore.assert_not_called()
+
+    def test_silent_get_client_returns_none_when_pairing_cannot_prompt(self):
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        with mock.patch("electrum.hw_wallet.plugin.HW_PluginBase.get_client",
+                        side_effect=DeviceUnpairableError("unpairable")):
+            self.assertIsNone(OneKeyPlugin.get_client(plugin, mock.Mock(), allow_user_interaction=False))
+        with mock.patch("electrum.hw_wallet.plugin.HW_PluginBase.get_client",
+                        side_effect=DeviceUnpairableError("unpairable")):
+            with self.assertRaises(DeviceUnpairableError):
+                OneKeyPlugin.get_client(plugin, mock.Mock())
+
+    def test_closed_device_asks_to_reconnect_before_a_transaction(self):
+        keystore, tx, _node = TestOneKeySigning().make_transaction()
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.get_client = mock.Mock(return_value=None)
+        with self.assertRaisesRegex(UserFacingException, "Reconnect OneKey"):
+            plugin.sign_transaction(keystore, tx)
+
+    def test_closed_device_asks_to_reconnect_before_an_address(self):
+        keystore, tx, _node = TestOneKeySigning().make_transaction()
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.get_client = mock.Mock(return_value=None)
+        plugin.show_address_helper = lambda *_args: True
+        wallet = mock.Mock(txin_type="p2wpkh")
+        wallet.get_address_index.return_value = (0, 1)
+        with self.assertRaisesRegex(UserFacingException, "Reconnect OneKey"):
+            plugin.show_address(wallet, tx.outputs()[0].address, keystore)
+        plugin.get_client.assert_called_once_with(keystore)
+
     def test_identity_wallet_or_xpub_mismatch_stops_before_side_effect(self):
         for field in ("deviceId", "serialNo", "passphraseState", "xpub"):
             client, helper, _ = self.make_client()
@@ -704,7 +787,14 @@ class TestOneKeySigning(unittest.TestCase):
             txin, change = tx.inputs()[0], tx.outputs()[1]
             if mode == "foreign": txin.is_mine = False
             if mode == "sighash": txin.sighash = Sighash.NONE
-            if mode == "previous": txin.utxo = None
+            if mode == "previous":
+                # Assigning utxo = None does not clear a previous transaction Electrum already stored.
+                bare = PartialTxInput(prevout=txin.prevout)
+                bare.script_descriptor = txin.script_descriptor
+                bare.bip32_paths = dict(txin.bip32_paths)
+                bare.is_mine = True
+                bare.nsequence = txin.nsequence
+                tx._inputs[0] = bare
             if mode == "input-path":
                 pubkey = next(iter(txin.bip32_paths))
                 fp, path = txin.bip32_paths[pubkey]
@@ -715,9 +805,14 @@ class TestOneKeySigning(unittest.TestCase):
                 change.bip32_paths[pubkey] = (fp, path[:-2] + [0, path[-1]])
             if mode == "change-script": change.scriptpubkey = tx.outputs()[0].scriptpubkey
             plugin, _ = self.plugin(b"")
-            with self.subTest(mode=mode), self.assertRaises(UserFacingException):
-                plugin.sign_transaction(keystore, tx)
-            plugin.get_client.assert_not_called()
+            with self.subTest(mode=mode):
+                if mode == "previous":
+                    with self.assertRaisesRegex(UserFacingException, "previous transaction"):
+                        plugin.sign_transaction(keystore, tx)
+                else:
+                    with self.assertRaises(UserFacingException):
+                        plugin.sign_transaction(keystore, tx)
+                plugin.get_client.assert_not_called()
 
     def test_signature_count_index_encoding_and_original_transaction_verification(self):
         for mode in ("missing", "index", "duplicate", "encoding", "foreign-signature", "changed-transaction"):
@@ -798,7 +893,7 @@ class TestOneKeyMessage(unittest.TestCase):
 
 
 class TestOneKeyMultisig(unittest.TestCase):
-    def make_wallet(self, thresh=2, script_type="p2wsh", input_count=1):
+    def make_wallet(self, thresh=2, script_type="p2wsh", input_count=1, master_cosigner=False):
         coin = 1 if constants.net.TESTNET else 0
         script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}[script_type]
         prefix = f"m/48'/{coin}'/0'/{script_index}'"
@@ -815,9 +910,10 @@ class TestOneKeyMultisig(unittest.TestCase):
         def make_output(change, addr_index, value):
             keys = []
             providers = []
-            for account in accounts:
-                keys.append(account.subkey_at_private_derivation([change, addr_index]))
-                public = account.convert_to_public()._replace(xtype="standard").to_xpub()
+            for index, account in enumerate(accounts):
+                source = roots[index] if master_cosigner and index == len(accounts) - 1 else account
+                keys.append(source.subkey_at_private_derivation([change, addr_index]))
+                public = source.convert_to_public()._replace(xtype="standard").to_xpub()
                 providers.append(descriptor.PubkeyProvider(None, public, f"/{change}/{addr_index}"))
             multi = descriptor.MultisigDescriptor(providers, thresh, True)
             desc = descriptor.WSHDescriptor(multi)
@@ -997,6 +1093,43 @@ class TestOneKeyMultisig(unittest.TestCase):
                             ("m/48'/0'/0'/1'", "p2wpkh-p2sh"), ("m/48'/1'/0'/1'", "p2wsh-p2sh")):
             with self.subTest(path=path, xtype=xtype), self.assertRaises(UserFacingException):
                 account_path(path, xtype)
+
+    def test_depth_zero_master_cosigner_uses_the_same_suffix(self):
+        for script_type in ("p2wsh", "p2wsh-p2sh"):
+            keystore, tx, keys = self.make_wallet(script_type=script_type, master_cosigner=True)
+            signature = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())[:-1]
+            plugin, client = TestOneKeySigning().plugin(signature)
+            with self.subTest(script=script_type):
+                plugin.sign_transaction(keystore, tx)
+                nodes = client.sign_tx.call_args.args[0][0]["multisig"]["pubkeys"]
+                masters = [node for node in nodes if node["depth"] == 0]
+                self.assertEqual([dict(depth=0, fingerprint=0, child_num=0, address_n=[0, 0])],
+                                 [{key: node[key] for key in ("depth", "fingerprint", "child_num", "address_n")}
+                                  for node in masters])
+                self.assertEqual([0x80000000 + 48], client.sign_tx.call_args.args[0][0]["address_n"][:1])
+
+    def test_depth_zero_cosigner_with_a_parent_or_child_is_rejected(self):
+        for fingerprint, child_number in ((b"\x00\x00\x00\x01", b"\x00\x00\x00\x00"),
+                                          (b"\x00\x00\x00\x00", b"\x00\x00\x00\x01")):
+            keystore, tx, _keys = self.make_wallet()
+            provider = tx.inputs()[0].script_descriptor.get_simple_multisig().pubkeys[-1]
+            provider.extkey = provider.extkey._replace(depth=0, fingerprint=fingerprint, child_number=child_number)
+            plugin, _client = TestOneKeySigning().plugin(b"")
+            with self.subTest(fingerprint=fingerprint, child=child_number), self.assertRaises(UserFacingException):
+                plugin.sign_transaction(keystore, tx)
+            plugin.get_client.assert_not_called()
+
+    def test_closed_device_asks_to_reconnect_before_a_multisig_address(self):
+        keystore, tx, _keys = self.make_wallet()
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin.get_client = mock.Mock(return_value=None)
+        plugin.show_address_helper = lambda *_args: True
+        wallet = mock.Mock(txin_type="p2wsh")
+        wallet.get_address_index.return_value = (0, 1)
+        wallet.get_script_descriptor_for_address.return_value = tx.outputs()[0].script_descriptor
+        with self.assertRaisesRegex(UserFacingException, "Reconnect OneKey"):
+            plugin.show_address(wallet, tx.outputs()[0].address, keystore)
+        plugin.get_client.assert_called_once_with(keystore)
 
     def test_show_address_sends_the_redeem_script_and_compares_it(self):
         keystore, tx, _keys = self.make_wallet()

@@ -592,6 +592,64 @@ class TestDeviceSession(unittest.TestCase):
             self.assertEqual("INVALID_REQUEST", raised.exception.code)
             self.assertEqual([], device.order)
 
+    def test_depth_zero_master_is_accepted_and_a_parent_fingerprint_is_not(self):
+        helper, device = helper_for()
+        binding = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        account = [0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 2]
+        node = {"depth": 0, "fingerprint": 0, "child_num": 0, "chain_code": "cd" * 32,
+                "public_key": "02" + "44" * 32, "address_n": [0, 0]}
+        other = {**node, "public_key": "03" + "55" * 32, "depth": 4, "fingerprint": 1, "child_num": 0x80000002}
+        multisig = {"m": 1, "pubkeys": [node, other]}
+        path = account + [0, 0]
+        previous = dict(hash=TXID, version=1, lock_time=0,
+                        inputs=[dict(prev_hash="22" * 32, prev_index=0, script_sig="", sequence=0xFFFFFFFF)],
+                        bin_outputs=[dict(amount="1000", script_pubkey="0014" + "33" * 20)])
+        call(helper, "sign", dict(
+            connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0, refTxs=[previous],
+            inputs=[dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=0xFFFFFFFF,
+                         address_n=path, script_type="SPENDWITNESS", multisig=multisig)],
+            outputs=[dict(amount="900", address_n=path, script_type="PAYTOWITNESS", multisig=multisig)]))
+        self.assertEqual(codec.TX_FINISHED, device.order[-1])
+        for script_index, script_type, output_type in ((1, "SPENDP2SHWITNESS", "PAYTOP2SHWITNESS"),):
+            nested = [0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + script_index]
+            device.order.clear()
+            call(helper, "sign", dict(
+                connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0, refTxs=[previous],
+                inputs=[dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=0xFFFFFFFF,
+                             address_n=nested + [0, 0], script_type=script_type, multisig=multisig)],
+                outputs=[dict(amount="900", address_n=nested + [0, 0], script_type=output_type, multisig=multisig)]))
+            self.assertEqual(codec.TX_FINISHED, device.order[-1])
+        for fingerprint, child_num in ((1, 0), (0, 1)):
+            device.order.clear()
+            rejected = {**node, "fingerprint": fingerprint, "child_num": child_num}
+            with self.subTest(fingerprint=fingerprint, child_num=child_num), self.assertRaises(HelperError) as raised:
+                call(helper, "sign", dict(
+                    connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0, refTxs=[previous],
+                    inputs=[dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=0xFFFFFFFF,
+                                 address_n=path, script_type="SPENDWITNESS",
+                                 multisig={"m": 1, "pubkeys": [rejected, other]})],
+                    outputs=[dict(amount="900", address="bc1qexample", script_type="PAYTOADDRESS")]))
+            self.assertEqual("INVALID_REQUEST", raised.exception.code)
+            self.assertEqual([], device.order)
+
+    def test_previous_output_larger_than_one_frame_is_rejected_before_sign_tx(self):
+        helper, device = helper_for()
+        binding = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        previous = dict(hash=TXID, version=1, lock_time=0,
+                        inputs=[dict(prev_hash="22" * 32, prev_index=0, script_sig="", sequence=0xFFFFFFFF)],
+                        bin_outputs=[dict(amount="1000", script_pubkey="00" * 4200)])
+        device.order.clear()
+        pins = list(device.pins)
+        with self.assertRaises(HelperError) as raised:
+            call(helper, "sign", dict(
+                connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0, refTxs=[previous],
+                inputs=[dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=0xFFFFFFFF,
+                             address_n=ADDRESS_PATH, script_type="SPENDWITNESS")],
+                outputs=[dict(amount="900", address="bc1qexample", script_type="PAYTOADDRESS")]))
+        self.assertEqual("INVALID_REQUEST", raised.exception.code)
+        self.assertEqual([], device.order)
+        self.assertEqual(pins, device.pins)
+
     def sign(self, helper, binding):
         previous = dict(hash=TXID, version=1, lock_time=0,
                         inputs=[dict(prev_hash="22" * 32, prev_index=0, script_sig="", sequence=0xFFFFFFFF)],

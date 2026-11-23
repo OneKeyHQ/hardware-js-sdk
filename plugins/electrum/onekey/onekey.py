@@ -6,7 +6,7 @@ from electrum.hw_wallet import HW_PluginBase
 from electrum.hw_wallet.plugin import trezor_validate_op_return_output_and_get_data
 from electrum.i18n import _
 from electrum.keystore import Hardware_KeyStore
-from electrum.plugin import Device, runs_in_hwd_thread
+from electrum.plugin import Device, DeviceUnpairableError, runs_in_hwd_thread
 from electrum.transaction import PartialTransaction, PartialTxOutput, Sighash
 from electrum.util import UserFacingException
 
@@ -174,7 +174,10 @@ class OneKeyPlugin(HW_PluginBase):
                                      transport_ui_string="USB"))
             return result
         except HelperError as error:
-            self.helper.close()
+            # USB_UNAVAILABLE and SDK_FAILED can come from one unclaimed candidate.
+            # Closing here would drop every device this scan already holds.
+            if error.code not in ("USB_UNAVAILABLE", "SDK_FAILED"):
+                self.helper.close()
             raise UserFacingException(str(error)) from None
 
     @runs_in_hwd_thread
@@ -183,26 +186,43 @@ class OneKeyPlugin(HW_PluginBase):
         return OneKeyClient(device.path, handler, self)
 
     @runs_in_hwd_thread
-    def get_client(self, keystore, *args, **kwargs):
+    def get_client(self, keystore, *args, allow_user_interaction=True, **kwargs):
         previous = getattr(self, "_expected_keystore", None)
+        previous_interaction = getattr(self, "_allow_user_interaction", True)
         self._expected_keystore = keystore
+        self._allow_user_interaction = allow_user_interaction
         self._sweep_unplugged()
         try:
             # DeviceMgr may request an xpub while pairing. Supply the saved wallet intent
             # before that callback, so reconnect cannot enter the wallet-selection flow.
-            client = super().get_client(keystore, *args, **kwargs)
+            client = self._open_client(keystore, allow_user_interaction, *args, **kwargs)
             if client is not None and not client.attached():
                 # Cancel/IPC failure leaves Electrum's per-serial cache pointing at a dead client.
                 client.close()
-                client = super().get_client(keystore, *args, **kwargs)
+                client = self._open_client(keystore, allow_user_interaction, *args, **kwargs)
             if client is not None and not client.attached():
                 client.close()
                 return None
-            if client is not None:
-                client.bind_keystore(keystore)
+            if client is None:
+                return None
+            if not allow_user_interaction:
+                # A silent lookup must not prompt. An already open matching account can be reused.
+                return client if client.matches_keystore(keystore) else None
+            client.bind_keystore(keystore)
             return client
         finally:
             self._expected_keystore = previous
+            self._allow_user_interaction = previous_interaction
+
+    def _open_client(self, keystore, allow_user_interaction, *args, **kwargs):
+        try:
+            return super().get_client(keystore, *args, allow_user_interaction=allow_user_interaction, **kwargs)
+        except DeviceUnpairableError:
+            # force_pair turns a silent UserCancelled into this error. Background pairing
+            # only catches UserCancelled, so a quiet lookup has to stop here.
+            if allow_user_interaction:
+                raise
+            return None
 
     @runs_in_hwd_thread
     def show_address(self, wallet, address, keystore=None):
@@ -223,7 +243,10 @@ class OneKeyPlugin(HW_PluginBase):
         expected = PartialTxOutput(scriptpubkey=script, value=0).address
         if expected != address:
             raise UserFacingException(_("Electrum address does not match the OneKey account."))
-        self.get_client(keystore).show_address(path + suffix, wallet.txin_type, address)
+        client = self.get_client(keystore)
+        if client is None:
+            raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+        client.show_address(path + suffix, wallet.txin_type, address)
 
     def _show_p2wsh_address(self, wallet, address, keystore):
         from .client import account_path
@@ -242,7 +265,10 @@ class OneKeyPlugin(HW_PluginBase):
         expected = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=0).address
         if expected != address:
             raise UserFacingException(_("Electrum address does not match the OneKey account."))
-        self.get_client(keystore).show_address(prefix + suffix, script_type, address, payload)
+        client = self.get_client(keystore)
+        if client is None:
+            raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+        client.show_address(prefix + suffix, script_type, address, payload)
 
     @staticmethod
     def _owned_path(keystore, item, script_type, *, change=False):
@@ -297,16 +323,20 @@ class OneKeyPlugin(HW_PluginBase):
                 raise UserFacingException(_("Input or change does not belong to this OneKey account."))
             pubkey = node.eckey.get_public_key_bytes(compressed=True)
             chain = node.chaincode
-            if (type(node.depth) is not int or not 1 <= node.depth <= 255 or len(chain) != 32
-                    or len(pubkey) != 33 or pubkey[0] not in (2, 3) or pubkey in seen):
+            fingerprint = OneKeyPlugin._u32(node.fingerprint)
+            child_num = OneKeyPlugin._u32(node.child_number)
+            # Firmware derives a master (depth 0, parent fingerprint 0, child 0). Any other depth 0 is not a master.
+            master = node.depth == 0 and fingerprint == 0 and child_num == 0
+            if (type(node.depth) is not int or not 0 <= node.depth <= 255 or (node.depth == 0 and not master)
+                    or len(chain) != 32 or len(pubkey) != 33 or pubkey[0] not in (2, 3) or pubkey in seen):
                 raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             seen.add(pubkey)
             child = node.subkey_at_public_derivation(provider_suffix).eckey.get_public_key_bytes(compressed=True)
             found = found or child == our_pubkey
             nodes.append({
                 "depth": node.depth,
-                "fingerprint": OneKeyPlugin._u32(node.fingerprint),
-                "child_num": OneKeyPlugin._u32(node.child_number),
+                "fingerprint": fingerprint,
+                "child_num": child_num,
                 "chain_code": chain.hex(),
                 "public_key": pubkey.hex(),
                 "address_n": provider_suffix,
@@ -376,6 +406,8 @@ class OneKeyPlugin(HW_PluginBase):
             raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
 
         client = self.get_client(keystore)
+        if client is None:
+            raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
         try:
             signatures = client.sign_tx(
                 inputs, outputs, previous, version=tx.version, lock_time=tx.locktime,

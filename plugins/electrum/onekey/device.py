@@ -11,6 +11,7 @@ import importlib
 # "from . import codec" then looks up electrum_external_plugins, which is not a
 # module. Importing the sibling by its full name stays inside the mounted package.
 codec = importlib.import_module(__package__ + ".codec")
+frame = importlib.import_module(__package__ + ".frame")
 
 
 STORAGE_ENCRYPTION_PATH = (0x80000000 + 4541509, 0x80000000 + 1112098098)
@@ -43,6 +44,12 @@ def _text(value, max_len=256):
 def _uint(value, limit=0xFFFFFFFF):
     if type(value) is not int or value < 0 or value > limit:
         _fail("INVALID_REQUEST")
+
+
+def _request_index(index, items):
+    # bool is an int subclass. A request index has to be a real integer inside the list.
+    if type(index) is not int or type(items) is not list or index < 0 or index >= len(items):
+        _fail("PROTOCOL")
 
 
 def _coin_index(coin):
@@ -95,10 +102,11 @@ def _multisig(value, address_n):
                 "depth", "fingerprint", "child_num", "chain_code", "public_key", "address_n"}):
             _fail("INVALID_REQUEST")
         _uint(node["depth"], 255)
-        if node["depth"] < 1:
-            _fail("INVALID_REQUEST")
         _uint(node["fingerprint"])
         _uint(node["child_num"])
+        # A depth-0 node is the BIP32 master. Any parent fingerprint or child number means it is not.
+        if node["depth"] == 0 and (node["fingerprint"] != 0 or node["child_num"] != 0):
+            _fail("INVALID_REQUEST")
         _hex_bytes(node["chain_code"], 32)
         pubkey = _hex_bytes(node["public_key"], 33)
         if pubkey[0] not in (2, 3) or pubkey in seen:
@@ -160,6 +168,28 @@ def _binding(value):
         _text(value["passphraseState"])
     else:
         _fail("INVALID_REQUEST")
+
+
+def _check_previous_frames(ref_txs):
+    # Reject a previous transaction before SignTx. A later TxAck cannot exceed one frame.
+    if type(ref_txs) is not list:
+        _fail("INVALID_REQUEST")
+    for item in ref_txs:
+        if type(item) is not dict:
+            _fail("INVALID_REQUEST")
+        inputs = item.get("inputs")
+        outputs = item.get("bin_outputs")
+        if type(inputs) is not list or type(outputs) is not list:
+            _fail("INVALID_REQUEST")
+        try:
+            payloads = [codec.encode_tx_ack(
+                codec.TX_META, meta=(item["version"], item["lock_time"], len(inputs), len(outputs)))]
+            payloads.extend(codec.encode_tx_ack(codec.TX_INPUT, txin) for txin in inputs)
+            payloads.extend(codec.encode_tx_ack(codec.TX_OUTPUT, txout) for txout in outputs)
+            for payload in payloads:
+                frame.encode_message(codec.TX_ACK, payload, seq=1)
+        except (ValueError, KeyError, TypeError):
+            _fail("INVALID_REQUEST")
 
 
 def _sign_budget(inputs, outputs, ref_txs):
@@ -302,6 +332,7 @@ class Session:
         # Previous transactions are checked by the device as raw inputs. Only the
         # transaction being signed carries BIP48 paths and the redeem script.
         _check_signing_items(coin, inputs, outputs)
+        _check_previous_frames(ref_txs)
         self._ready(binding)
         self.on_ui("button")
         request = codec.decode_tx_request(self._call(codec.SIGN_TX, codec.encode_sign_tx(
@@ -514,11 +545,13 @@ class Session:
         index = request["request_index"]
         previous = self._previous(ref_txs, request["tx_hash"]) if request["tx_hash"] else None
         if kind == codec.TX_INPUT:
-            item = previous["inputs"][index] if previous else inputs[index]
-            return codec.encode_tx_ack(kind, item)
+            items = inputs if previous is None else previous.get("inputs") if type(previous) is dict else None
+            _request_index(index, items)
+            return codec.encode_tx_ack(kind, items[index])
         if kind == codec.TX_OUTPUT:
-            item = previous["bin_outputs"][index] if previous else outputs[index]
-            return codec.encode_tx_ack(kind, item)
+            items = outputs if previous is None else previous.get("bin_outputs") if type(previous) is dict else None
+            _request_index(index, items)
+            return codec.encode_tx_ack(kind, items[index])
         if kind == codec.TX_META:
             if previous:
                 meta = (previous["version"], previous["lock_time"], len(previous["inputs"]), len(previous["bin_outputs"]))

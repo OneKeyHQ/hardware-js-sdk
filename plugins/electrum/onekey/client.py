@@ -154,13 +154,30 @@ class OneKeyClient(HardwareClientBase):
         try:
             self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
             yield
-        except BaseException:
-            if close_on_error:
+        except BaseException as error:
+            if close_on_error and not self._kept_after_firmware_cancel(error):
                 self.close()
             raise
         finally:
             self.cancelled = previous
             self.handler.finished()
+
+    def _kept_after_firmware_cancel(self, error):
+        # The device cancelled a prompt and the USB claim is still healthy. A host
+        # cancel closes that link before this runs, so the client is still released.
+        if not isinstance(error, UserCancelled):
+            return False
+        helper = self.helper
+        if getattr(helper, "generation", None) != self.generation:
+            return False
+        for name in ("_links", "ports"):
+            mapping = getattr(helper, name, None)
+            if not isinstance(mapping, dict):
+                continue
+            link = mapping.get(self.connect_id)
+            if link is not None and not getattr(link, "_closed", True):
+                return True
+        return False
 
     def _select_wallet(self):
         if self.binding is not None:
@@ -177,16 +194,17 @@ class OneKeyClient(HardwareClientBase):
         elif self.binding["deviceId"] != self.device_id:
             raise UserFacingException(_("OneKey device identity changed."))
 
-    def _xpub(self, path, xtype):
+    def _xpub(self, path, xtype, *, account=True):
         response = self._call("xpub", dict(connectId=self.connect_id, binding=self.binding,
                                           coin=coin_name(), path=path, scriptType=INPUT_SCRIPT_TYPES[xtype]))
         if type(response) is not dict or set(response) != {"xpub", "rootFingerprint"} or type(response["xpub"]) is not str:
             raise UserFacingException(_("Invalid OneKey public key response."))
         fingerprint = response["rootFingerprint"]
-        if fingerprint is not None:
-            if type(fingerprint) is not int or not 0 <= fingerprint <= 0xffffffff:
-                raise UserFacingException(_("Invalid OneKey root fingerprint."))
-            self.root_fingerprint = fingerprint.to_bytes(4, "big").hex()
+        if fingerprint is not None and (type(fingerprint) is not int or not 0 <= fingerprint <= 0xffffffff):
+            raise UserFacingException(_("Invalid OneKey root fingerprint."))
+        # Storage-encryption xpubs are not the open account. Leave its fingerprint alone.
+        if account:
+            self.root_fingerprint = None if fingerprint is None else fingerprint.to_bytes(4, "big").hex()
         xpub = normalized_xpub(response["xpub"], xtype)
         node = BIP32Node.from_xkey(xpub)
         if node.depth != len(path) or node.child_number != path[-1].to_bytes(4, "big"):
@@ -232,6 +250,19 @@ class OneKeyClient(HardwareClientBase):
             # Persist only the public wallet identity, never the firmware session or secrets.
             keystore.onekey_binding = dict(self.binding)
             self.account = (path, xtype, expected)
+
+    def matches_keystore(self, keystore):
+        try:
+            if self.closed or self.account is None or type(self.binding) is not dict:
+                return False
+            saved = keystore.onekey_binding
+            if type(saved) is not dict or saved.get("serialNo") != self.serial:
+                return False
+            xtype = BIP32Node.from_xkey(keystore.xpub).xtype
+            path = account_path(keystore.get_derivation_prefix(), xtype)
+            return self.account == (path, xtype, normalized_xpub(keystore.xpub, xtype))
+        except Exception:
+            return False
 
     def _verify_account(self):
         if self.account is None:
@@ -333,7 +364,7 @@ class OneKeyClient(HardwareClientBase):
                     self.binding = None
                     self.account = None
                 self._select_wallet()
-                return self._xpub(path, "standard")
+                return self._xpub(path, "standard", account=False)
         except BaseException:
             if force and self.closed:
                 self.close()
@@ -354,6 +385,12 @@ class OneKeyClient(HardwareClientBase):
         path = account_path(bip32_path, xtype)
         expected = getattr(self.plugin, "_expected_keystore", None)
         if expected is not None:
+            if not getattr(self.plugin, "_allow_user_interaction", True):
+                if not self.matches_keystore(expected):
+                    raise UserCancelled()
+                if self.account[:2] != (path, xtype):
+                    raise UserCancelled()
+                return self.account[2]
             self.bind_keystore(expected)
             if self.account[:2] != (path, xtype):
                 self.close()

@@ -22,6 +22,10 @@ def load_adapters():
     modules = {name: ModuleType(name) for name in names}
     modules['electrum'].constants = SimpleNamespace()
     modules['electrum'].descriptor = SimpleNamespace()
+    bitcoin = ModuleType('electrum.bitcoin')
+    bitcoin.verify_usermessage_with_address = lambda *_args, **_kwargs: None
+    modules['electrum.bitcoin'] = bitcoin
+    modules['electrum'].bitcoin = bitcoin
     modules['electrum.bip32'].BIP32Node = SimpleNamespace(from_xkey=lambda _: SimpleNamespace(xtype='p2wpkh'))
     modules['electrum.bip32'].convert_bip32_strpath_to_intpath = lambda _: [0x80000054, 0x80000000, 0x80000000]
 
@@ -35,6 +39,7 @@ def load_adapters():
     modules['electrum.i18n']._ = lambda text: text
     modules['electrum.plugin'].runs_in_hwd_thread = lambda method: method
     modules['electrum.plugin'].Device = SimpleNamespace
+    modules['electrum.plugin'].DeviceUnpairableError = type('DeviceUnpairableError', (Exception,), {})
     modules['electrum.storage'].get_derivation_used_for_hw_device_encryption = lambda: 'storage'
     modules['electrum.util'].UserCancelled = type('UserCancelled', (Exception,), {})
     modules['electrum.util'].UserFacingException = type('UserFacingException', (Exception,), {})

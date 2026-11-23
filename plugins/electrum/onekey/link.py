@@ -3,7 +3,8 @@
 import time
 
 from .codec import (BUTTON_ACK, BUTTON_REQUEST, CANCEL, DEVICE_SESSION_ASK_PASSPHRASE,
-                    DEVICE_SESSION_ASK_PIN, GET_ADDRESS, GET_PUBLIC_KEY, SIGN_TX, TX_ACK, TX_REQUEST)
+                    DEVICE_SESSION_ASK_PIN, GET_ADDRESS, GET_PUBLIC_KEY, SIGN_MESSAGE, SIGN_TX,
+                    TX_ACK, TX_REQUEST)
 from .frame import PACKET_TYPE_ACK, RX_BUFFER_SIZE, SeqCounter, decode, encode_message, pop_frame, split_message
 
 
@@ -30,7 +31,7 @@ class Link:
         try:
             self._check(deadline, cancelled)
             self._pending = msg_type in (DEVICE_SESSION_ASK_PIN, DEVICE_SESSION_ASK_PASSPHRASE,
-                                         GET_PUBLIC_KEY, GET_ADDRESS, SIGN_TX, TX_ACK, BUTTON_ACK)
+                                         GET_PUBLIC_KEY, GET_ADDRESS, SIGN_MESSAGE, SIGN_TX, TX_ACK, BUTTON_ACK)
             request_seq = self._seq.next()
             self._write(encode_message(msg_type, payload, seq=request_seq))
             return self._receive(deadline, cancelled, request_seq)
