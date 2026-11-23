@@ -185,7 +185,9 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     method.connector = _connector;
     const shouldPostMessage = createUiProgressMessageFilter();
     method.postMessage = event => {
-      if (context.isActive() && shouldPostMessage(event)) {
+      // Allow terminal batch completion callbacks (e.g. AllNetworkGetAddressByLoop) to settle
+      // and unregister caller listeners even after a transport switch retires this generation.
+      if ((context.isActive() || event.event === IFRAME.CALLBACK) && shouldPostMessage(event)) {
         postMessage(event);
       }
     };
