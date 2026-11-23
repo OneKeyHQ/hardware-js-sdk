@@ -8,7 +8,7 @@ from electrum.i18n import _
 from electrum.keystore import Hardware_KeyStore
 from electrum.plugin import Device, DeviceUnpairableError, runs_in_hwd_thread
 from electrum.transaction import PartialTransaction, PartialTxOutput, Sighash
-from electrum.util import UserFacingException
+from electrum.util import UserCancelled, UserFacingException
 
 from .ipc import Helper, HelperError, SDK_VERSION
 
@@ -434,13 +434,16 @@ class OneKeyPlugin(HW_PluginBase):
             for target in (candidate, tx):
                 preserved = [(txin.script_sig, txin.witness) for txin in target.inputs()]
                 target.update_signatures(checked)
-                self._require_applied_signatures(keystore, target, multisig, already_complete, preserved)
-        except BaseException:
-            client.close()
+                self._require_applied_signatures(
+                    keystore, target, multisig, already_complete, preserved, checked)
+        except BaseException as error:
+            # A firmware cancel leaves this USB claim up. Other failures still release it.
+            if not isinstance(error, UserCancelled) or not client.attached():
+                client.close()
             raise
 
     @staticmethod
-    def _require_applied_signatures(keystore, tx, multisig, already_complete, preserved):
+    def _require_applied_signatures(keystore, tx, multisig, already_complete, preserved, checked):
         for index, txin in enumerate(tx.inputs()):
             if already_complete[index] and (
                     not txin.is_complete() or (txin.script_sig, txin.witness) != preserved[index]):
@@ -453,7 +456,7 @@ class OneKeyPlugin(HW_PluginBase):
             if already_complete[index]:
                 continue
             pubkey, _path = keystore.find_my_pubkey_in_txinout(txin)
-            if pubkey is None or pubkey not in txin.sigs_ecdsa:
+            if pubkey is None or txin.sigs_ecdsa.get(pubkey) != checked[index]:
                 raise UserFacingException(_("OneKey returned invalid transaction signatures."))
             have, need = txin.get_satisfaction_progress()
             if have >= need and not txin.is_complete():

@@ -1042,6 +1042,25 @@ class TestOneKeyMultisig(unittest.TestCase):
             plugin.sign_transaction(keystore, tx)
         self.assertEqual({other: other_sig}, tx.inputs()[0].sigs_ecdsa)
 
+    def test_previous_partial_sig_is_not_treated_as_this_result(self):
+        keystore, tx, keys = self.make_wallet()
+        our = keys[0].eckey.get_public_key_bytes(compressed=True)
+        old = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())
+        tx.inputs()[0].sigs_ecdsa[our] = old
+        plugin, _client = TestOneKeySigning().plugin(bytes.fromhex("3006020101020102"))
+        with self.assertRaises(UserFacingException):
+            plugin.sign_transaction(keystore, tx)
+        self.assertEqual({our: old}, tx.inputs()[0].sigs_ecdsa)
+
+    def test_same_partial_sig_can_be_returned_again(self):
+        keystore, tx, keys = self.make_wallet()
+        full = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())
+        our = keys[0].eckey.get_public_key_bytes(compressed=True)
+        tx.inputs()[0].sigs_ecdsa[our] = full
+        plugin, _client = TestOneKeySigning().plugin(full[:-1])
+        plugin.sign_transaction(keystore, tx)
+        self.assertEqual(full, tx.inputs()[0].sigs_ecdsa[our])
+
     def test_other_multisig_kinds_are_rejected_before_the_device(self):
         keystore, tx, _keys = self.make_wallet()
         multi = tx.inputs()[0].script_descriptor.get_simple_multisig()

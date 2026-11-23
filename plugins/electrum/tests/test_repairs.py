@@ -657,6 +657,48 @@ class TestProtocolRepairs(unittest.TestCase):
             self.assertIn('usb2', helper._links)
             call(helper, 'state', dict(connectId='usb2'))
 
+    def test_truncated_response_is_protocol_and_keeps_the_other_device(self):
+        cases = {
+            'xpub': lambda: call(helper, 'xpub', dict(
+                connectId='usb1', binding=opened, coin='Bitcoin', path=ACCOUNT, scriptType='SPENDWITNESS')),
+            'sign': lambda: call(helper, 'sign', dict(
+                connectId='usb1', binding=opened, coin='Bitcoin', version=2, locktime=0, refTxs=[previous],
+                inputs=[dict(prev_hash=TXID, prev_index=0, amount='1000', sequence=0xFFFFFFFF,
+                             address_n=ADDRESS_PATH, script_type='SPENDWITNESS')],
+                outputs=[dict(amount='900', address='bc1qexample', script_type='PAYTOADDRESS')])),
+        }
+        replies = {'xpub': (codec.GET_PUBLIC_KEY, codec.PUBLIC_KEY), 'sign': (codec.SIGN_TX, codec.TX_REQUEST)}
+        for name, invoke in cases.items():
+            with self.subTest(response=name):
+                first, second = Scripted(), Scripted()
+                original = first.handle
+                watched, reply = replies[name]
+
+                def handle(kind, payload, original=original, watched=watched, reply=reply):
+                    if kind == watched:
+                        return reply, b'\x12\x05abc'
+                    return original(kind, payload)
+
+                first.handle = handle
+                with mock.patch('onekey.ipc.open_path', side_effect=lambda path: pipe_link(first if path == 'usb1' else second)):
+                    helper = Helper()
+                    self.addCleanup(helper.shutdown)
+                    call(helper, 'hello', {})
+                    for path in ('usb1', 'usb2'):
+                        call(helper, 'state', dict(connectId=path))
+                    generation = helper.generation
+                    opened = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+                    previous = dict(hash=TXID, version=1, lock_time=0,
+                                    inputs=[dict(prev_hash='22' * 32, prev_index=0, script_sig='', sequence=0xFFFFFFFF)],
+                                    bin_outputs=[dict(amount='1000', script_pubkey='0014' + '33' * 20)])
+                    with self.assertRaises(HelperError) as raised:
+                        invoke()
+                    self.assertEqual('PROTOCOL', raised.exception.code)
+                    self.assertEqual(generation, helper.generation)
+                    self.assertNotIn('usb1', helper._links)
+                    self.assertIn('usb2', helper._links)
+                    call(helper, 'state', dict(connectId='usb2'))
+
     def _plugin(self, helper):
         plugin = OneKeyPlugin.__new__(OneKeyPlugin)
         plugin.helper = helper

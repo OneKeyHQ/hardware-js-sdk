@@ -32,6 +32,14 @@ def _fail(code):
     raise SessionError(code)
 
 
+def _payload(decode, body):
+    # A short or illegal protobuf body is this session failing, not every device.
+    try:
+        return decode(body)
+    except ValueError:
+        _fail("PROTOCOL")
+
+
 def _session_id(value):
     return type(value) is bytes and len(value) == 32 and any(value)
 
@@ -301,7 +309,7 @@ class Session:
         self._account(binding, coin, path, script_type, address=False)
         status, info = self._ready(binding)
         payload = self._call(codec.GET_PUBLIC_KEY, codec.encode_get_public_key(path, coin, script_type, False), codec.PUBLIC_KEY)
-        xpub, fingerprint = codec.decode_public_key(payload)
+        xpub, fingerprint = _payload(codec.decode_public_key, payload)
         if type(xpub) is not str or not xpub or len(xpub) > 128:
             _fail("SDK_FAILED")
         if fingerprint is not None and not 0 <= fingerprint <= 0xFFFFFFFF:
@@ -316,7 +324,7 @@ class Session:
                 _fail("INVALID_REQUEST")
             _multisig(multisig, path)
         self._ready(binding)
-        text = codec.decode_address(self._call(
+        text = _payload(codec.decode_address, self._call(
             codec.GET_ADDRESS, codec.encode_get_address(path, coin, script_type, True, multisig), codec.ADDRESS))
         if type(text) is not str or not text or len(text) > 128:
             _fail("SDK_FAILED")
@@ -335,7 +343,7 @@ class Session:
         _check_previous_frames(ref_txs)
         self._ready(binding)
         self.on_ui("button")
-        request = codec.decode_tx_request(self._call(codec.SIGN_TX, codec.encode_sign_tx(
+        request = _payload(codec.decode_tx_request, self._call(codec.SIGN_TX, codec.encode_sign_tx(
             len(inputs), len(outputs), coin, version, lock_time), codec.TX_REQUEST))
         signatures = {}
         # Firmware walks the current transaction, then each previous transaction,
@@ -347,7 +355,7 @@ class Session:
             if request["request_type"] == codec.TX_FINISHED:
                 break
             ack = self._ack(request, inputs, outputs, ref_txs, version, lock_time)
-            request = codec.decode_tx_request(self._call(codec.TX_ACK, ack, codec.TX_REQUEST))
+            request = _payload(codec.decode_tx_request, self._call(codec.TX_ACK, ack, codec.TX_REQUEST))
         else:
             _fail("SDK_FAILED")
         if len(signatures) != len(inputs):
@@ -370,7 +378,7 @@ class Session:
         if not 1 <= len(raw) <= 1024:
             _fail("INVALID_REQUEST")
         self._ready(binding)
-        address, signature = codec.decode_message_signature(self._call(
+        address, signature = _payload(codec.decode_message_signature, self._call(
             codec.SIGN_MESSAGE, codec.encode_sign_message(path, raw, coin, script_type, True), codec.MESSAGE_SIGNATURE))
         if type(address) is not str or not address or len(address) > 128:
             _fail("SDK_FAILED")
@@ -473,7 +481,7 @@ class Session:
 
     def _session(self, address=None, session_id=None):
         payload = self._call(codec.DEVICE_SESSION_GET, codec.encode_session_get(address, session_id), codec.DEVICE_SESSION)
-        opened, new_id = codec.decode_session(payload)
+        opened, new_id = _payload(codec.decode_session, payload)
         if not opened:
             _fail("WALLET_MISMATCH")
         return opened, new_id
