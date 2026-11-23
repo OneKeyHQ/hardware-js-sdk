@@ -11,8 +11,7 @@ from .usb import list_paths, open_path
 
 VERSION = 1
 SDK_VERSION = "1.2.10"
-OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "sign-message",
-              "cancel", "ui", "dispose"}
+OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "sign-message", "dispose"}
 
 
 class HelperError(Exception):
@@ -88,10 +87,9 @@ class Helper:
             if params:
                 raise SessionError("INVALID_REQUEST")
             return self._search(deadline, cancelled, on_ui)
-        if op in ("cancel", "ui", "dispose"):
-            if op == "dispose":
-                self._wallets.clear()
-                self._release_links()
+        if op == "dispose":
+            self._wallets.clear()
+            self._release_links()
             return None
         connect_id = params.get("connectId")
         if type(connect_id) is not str or not connect_id:
@@ -101,7 +99,7 @@ class Helper:
         try:
             session = Session(link, deadline=deadline, cancelled=cancelled, on_ui=on_ui,
                               cache=self._wallets, connect_id=connect_id)
-            session.handshake()
+            session.handshake(force=(op == "state"))
             if op == "state":
                 return session.state()
             if op == "open":
@@ -149,7 +147,7 @@ class Helper:
                 probe_deadline = deadline if held else min(deadline, time.monotonic() + 1)
                 session = Session(link, deadline=probe_deadline, cancelled=cancelled, on_ui=on_ui,
                                   cache=self._wallets, connect_id=path)
-                session.handshake()
+                session.handshake(force=True)
                 try:
                     state = session.state()
                 except SessionError as error:

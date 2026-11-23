@@ -27,7 +27,7 @@ class TestPythonDistribution(unittest.TestCase):
                 self.assertIsNone(archive.testzip())
                 self.assertFalse(any('runtime/' in name or name.endswith(('.cjs', '.exe'))
                                      or name == 'install.py' for name in archive.namelist()))
-                for name in ('device.py', 'codec.py', 'frame.py', 'usb.py', 'link.py', 'qt.py'):
+                for name in ('device.py', 'codec.py', 'frame.py', 'validate.py', 'usb.py', 'link.py', 'qt.py'):
                     self.assertIn('onekey/' + name, archive.namelist())
             # Load the actual protocol from the zip, independent of this source directory.
             env = dict(os.environ, PYTHONPATH=str(output))

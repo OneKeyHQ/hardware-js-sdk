@@ -912,6 +912,48 @@ class TestProtocolRepairs(unittest.TestCase):
             found = call(helper, 'search', {})
         self.assertEqual(['usb1'], [item['connectId'] for item in found])
 
+    def test_handshake_ping_runs_once_per_claimed_link_and_still_probes_on_state(self):
+        device = Scripted()
+        pings = 0
+        original = device.handle
+
+        def handle(kind, payload):
+            nonlocal pings
+            if kind == codec.PING:
+                pings += 1
+            return original(kind, payload)
+
+        device.handle = handle
+        with mock.patch('onekey.ipc.open_path', side_effect=lambda _path: pipe_link(device)):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            opened = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+            public_key(helper, opened)
+            public_key(helper, opened)
+            self.assertEqual(1, pings)
+            call(helper, 'state', dict(connectId='usb1'))
+            self.assertEqual(2, pings)
+
+    def test_shared_validate_module_enforces_der_low_s_and_binding_invariants(self):
+        from onekey.validate import SECP256K1_ORDER, parse_der_signature_hex, validate_binding, validate_der_signature
+        # Valid low-S signature
+        self.assertEqual(SIGNATURE, validate_der_signature(SIGNATURE, low_s=True))
+        self.assertEqual(SIGNATURE, parse_der_signature_hex(SIGNATURE.hex(), low_s=True))
+        # High-S signature rejected when low_s=True, accepted when low_s=False
+        high_s = (SECP256K1_ORDER - 1).to_bytes(32, 'big')
+        high_s_der = bytes([0x30, 3 + 2 + 33, 0x02, 0x01, 0x01, 0x02, 0x21, 0x00]) + high_s
+        validate_der_signature(high_s_der, low_s=False)
+        with self.assertRaisesRegex(ValueError, 'high-S'):
+            validate_der_signature(high_s_der, low_s=True)
+        # Uppercase hex rejected
+        upper_hex = bytes([0x30, 6, 2, 1, 0x0a, 2, 1, 1]).hex().upper()
+        with self.assertRaisesRegex(ValueError, 'non-canonical'):
+            parse_der_signature_hex(upper_hex, low_s=True)
+        # Control characters in binding rejected
+        with self.assertRaisesRegex(ValueError, 'invalid'):
+            validate_binding(dict(serialNo='bad\nserial', deviceId='d', walletType='standard', passphraseState=None))
+
 
 class TestReceiveFrames(unittest.TestCase):
     @staticmethod

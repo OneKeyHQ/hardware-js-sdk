@@ -24,6 +24,7 @@ class Link:
         self._closed = False
         self._pending = False
         self._last_response_seq = None
+        self.handshaked = False
         self.eventless = False
 
     def exchange(self, msg_type, payload, *, deadline, cancelled):
@@ -105,6 +106,7 @@ class Link:
             self._closed = True
             self._buffer.clear()
             self._pending = False
+            self.handshaked = False
             self.eventless = False
             self._close()
 

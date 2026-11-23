@@ -11,6 +11,31 @@ from electrum.transaction import PartialTransaction, PartialTxOutput, Sighash
 from electrum.util import UserCancelled, UserFacingException
 
 from .ipc import Helper, HelperError, SDK_VERSION
+from .validate import parse_der_signature_hex
+
+
+def _is_valid_suffix(suffix, *, change_only=False):
+    return (
+        type(suffix) in (tuple, list)
+        and len(suffix) == 2
+        and type(suffix[0]) is int
+        and (suffix[0] == 1 if change_only else suffix[0] in (0, 1))
+        and type(suffix[1]) is int
+        and 0 <= suffix[1] < 0x80000000
+    )
+
+
+def _derive_pubkey(xpub, suffix):
+    return BIP32Node.from_xkey(xpub).subkey_at_public_derivation(list(suffix)).eckey.get_public_key_bytes(compressed=True)
+
+
+def _singlesig_script(pubkey, script_type):
+    return descriptor.get_singlesig_descriptor_from_legacy_leaf(
+        pubkey=pubkey.hex(), script_type=script_type).expand().output_script
+
+
+def _script_address(script):
+    return PartialTxOutput(scriptpubkey=script, value=0).address
 
 
 class OneKeyKeyStore(Hardware_KeyStore):
@@ -54,18 +79,13 @@ class OneKeyKeyStore(Hardware_KeyStore):
         raw = message.encode("utf-8")
         if not 1 <= len(raw) <= 1024:
             raise UserFacingException(_("OneKey can sign a Bitcoin message of 1 to 1024 bytes."))
-        if (type(sequence) not in (tuple, list) or len(sequence) != 2
-                or type(sequence[0]) is not int or sequence[0] not in (0, 1)
-                or type(sequence[1]) is not int or not 0 <= sequence[1] < 0x80000000):
+        if not _is_valid_suffix(sequence):
             raise UserFacingException(_("Input or change does not belong to this OneKey account."))
         if BIP32Node.from_xkey(self.xpub).xtype != {"p2pkh": "standard"}.get(script_type, script_type):
             raise UserFacingException(_("Script type does not match the OneKey account."))
         from .client import account_path
         path = account_path(self.get_derivation_prefix(), script_type) + list(sequence)
-        pubkey = BIP32Node.from_xkey(self.xpub).subkey_at_public_derivation(list(sequence)).eckey.get_public_key_bytes(compressed=True)
-        script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
-            pubkey=pubkey.hex(), script_type=script_type).expand().output_script
-        expected = PartialTxOutput(scriptpubkey=script, value=0).address
+        expected = _script_address(_singlesig_script(_derive_pubkey(self.xpub, sequence), script_type))
         client = self.get_client()
         if client is None:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
@@ -237,10 +257,7 @@ class OneKeyPlugin(HW_PluginBase):
         from .client import account_path
         path = account_path(keystore.get_derivation_prefix(), wallet.txin_type)
         suffix = list(wallet.get_address_index(address))
-        pubkey = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
-        script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
-            pubkey=pubkey.hex(), script_type=wallet.txin_type).expand().output_script
-        expected = PartialTxOutput(scriptpubkey=script, value=0).address
+        expected = _script_address(_singlesig_script(_derive_pubkey(keystore.xpub, suffix), wallet.txin_type))
         if expected != address:
             raise UserFacingException(_("Electrum address does not match the OneKey account."))
         client = self.get_client(keystore)
@@ -260,9 +277,9 @@ class OneKeyPlugin(HW_PluginBase):
             raise UserFacingException(_("Script type does not match the OneKey account."))
         suffix = list(wallet.get_address_index(address))
         prefix = account_path(keystore.get_derivation_prefix(), script_type)
-        pubkey = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
+        pubkey = _derive_pubkey(keystore.xpub, suffix)
         payload = self._multisig_payload(multi, pubkey, suffix)
-        expected = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=0).address
+        expected = _script_address(desc.expand().output_script)
         if expected != address:
             raise UserFacingException(_("Electrum address does not match the OneKey account."))
         client = self.get_client(keystore)
@@ -278,13 +295,10 @@ class OneKeyPlugin(HW_PluginBase):
             raise UserFacingException(_("Script type does not match the OneKey account."))
         pubkey, path = keystore.find_my_pubkey_in_txinout(item)
         branch = len(prefix)
-        if (not path or len(path) != branch + 2 or list(path[:branch]) != list(prefix)
-                or type(path[branch]) is not int or path[branch] not in (0, 1)
-                or type(path[branch + 1]) is not int or not 0 <= path[branch + 1] < 0x80000000
-                or (change and path[branch] != 1)):
+        if not path or len(path) != branch + 2 or list(path[:branch]) != list(prefix) or not _is_valid_suffix(path[branch:], change_only=change):
             raise UserFacingException(_("Input or change does not belong to this OneKey account."))
         suffix = list(path[branch:])
-        derived = BIP32Node.from_xkey(keystore.xpub).subkey_at_public_derivation(suffix).eckey.get_public_key_bytes(compressed=True)
+        derived = _derive_pubkey(keystore.xpub, suffix)
         if pubkey != derived:
             raise UserFacingException(_("OneKey account public key mismatch."))
         desc = item.script_descriptor
@@ -293,8 +307,7 @@ class OneKeyPlugin(HW_PluginBase):
             if script_type not in ("p2wsh", "p2wsh-p2sh") or not multi.is_sorted or desc.to_legacy_electrum_script_type() != script_type:
                 raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             return list(path), desc.expand().output_script, OneKeyPlugin._multisig_payload(multi, derived, suffix)
-        expected_script = descriptor.get_singlesig_descriptor_from_legacy_leaf(
-            pubkey=derived.hex(), script_type=script_type).expand().output_script
+        expected_script = _singlesig_script(derived, script_type)
         if desc is None or desc.expand().output_script != expected_script:
             raise UserFacingException(_("OneKey ownership script mismatch."))
         return list(path), expected_script, None
@@ -308,8 +321,7 @@ class OneKeyPlugin(HW_PluginBase):
     @staticmethod
     def _multisig_payload(multi, our_pubkey, suffix):
         if (multi.is_range() or not multi.is_sorted or not 1 <= multi.thresh <= len(multi.pubkeys) <= 15
-                or len(suffix) != 2 or type(suffix[0]) is not int or suffix[0] not in (0, 1)
-                or type(suffix[1]) is not int or not 0 <= suffix[1] < 0x80000000):
+                or not _is_valid_suffix(suffix)):
             raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
         nodes = []
         found = False
@@ -472,30 +484,9 @@ class OneKeyPlugin(HW_PluginBase):
 
     @staticmethod
     def _signature(value):
-        if type(value) is not str or not 16 <= len(value) <= 144:
-            raise UserFacingException(_("Invalid OneKey signature encoding."))
         try:
-            signature = bytes.fromhex(value)
-            if signature.hex() != value or signature[0] != 0x30 or signature[1] != len(signature) - 2:
-                raise ValueError()
-            offset = 2
-            order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
-            for i in range(2):
-                if signature[offset] != 2:
-                    raise ValueError()
-                size = signature[offset + 1]
-                offset += 2
-                number = signature[offset:offset + size]
-                if (not 1 <= size <= 33 or len(number) != size or number[0] & 0x80
-                        or (size > 1 and number[0] == 0 and not number[1] & 0x80)
-                        or not 0 < int.from_bytes(number, "big") < order
-                        or (i == 1 and int.from_bytes(number, "big") > order // 2)):
-                    raise ValueError()
-                offset += size
-            if offset != len(signature):
-                raise ValueError()
-            return signature
-        except (ValueError, IndexError):
+            return parse_der_signature_hex(value, low_s=True)
+        except ValueError:
             raise UserFacingException(_("Invalid OneKey signature encoding.")) from None
 
     @staticmethod

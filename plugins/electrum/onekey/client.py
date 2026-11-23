@@ -10,6 +10,7 @@ from electrum.storage import get_derivation_used_for_hw_device_encryption
 from electrum.util import UserCancelled, UserFacingException
 
 from .ipc import HelperError, SDK_VERSION
+from .validate import validate_binding
 
 
 LIBRARY_VERSION = SDK_VERSION
@@ -30,15 +31,10 @@ def coin_name():
 
 
 def check_binding(value):
-    if (type(value) is not dict or set(value) != {"serialNo", "deviceId", "walletType", "passphraseState"}
-            or any(type(value[k]) is not str or not value[k] or len(value[k]) > 256
-                   for k in ("serialNo", "deviceId"))
-            or not ((value["walletType"] == "standard" and value["passphraseState"] is None)
-                    or (value["walletType"] in ("hidden", "attach-pin")
-                        and type(value["passphraseState"]) is str
-                        and 0 < len(value["passphraseState"]) <= 256))):
-        raise UserFacingException(_("Invalid OneKey wallet binding. Reconnect using the wallet wizard."))
-    return dict(value)
+    try:
+        return validate_binding(value)
+    except ValueError:
+        raise UserFacingException(_("Invalid OneKey wallet binding. Reconnect using the wallet wizard.")) from None
 
 
 def account_path(path, xtype):
@@ -100,6 +96,7 @@ class OneKeyClient(HardwareClientBase):
         self._unlock_selection = False
         self._requested_mode = None
         self._firmware_cancelled = False
+        self._account_verified = False
         try:
             state = self._call("state", {"connectId": path})
             self._check_state(state)
@@ -161,6 +158,7 @@ class OneKeyClient(HardwareClientBase):
             self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
             yield
         except BaseException as error:
+            self._account_verified = False
             if close_on_error and not self._kept_after_firmware_cancel(error):
                 self.close()
             raise
@@ -252,6 +250,7 @@ class OneKeyClient(HardwareClientBase):
             # Persist only the public wallet identity, never the firmware session or secrets.
             keystore.onekey_binding = dict(self.binding)
             self.account = (path, xtype, expected)
+            self._account_verified = True
 
     def matches_keystore(self, keystore):
         try:
@@ -269,6 +268,9 @@ class OneKeyClient(HardwareClientBase):
     def _verify_account(self):
         if self.account is None:
             raise UserFacingException(_("Verify the OneKey account before displaying or signing."))
+        if self._account_verified:
+            self._account_verified = False
+            return
         path, xtype, expected = self.account
         if self._xpub(path, xtype) != expected:
             raise UserFacingException(_("OneKey account changed. Reconnect the device."))
@@ -313,6 +315,7 @@ class OneKeyClient(HardwareClientBase):
         self.closed = True
         self.binding = None
         self.account = None
+        self._account_verified = False
         self._drop_device_cache()
         self._release_helper_ref()
 
@@ -321,6 +324,7 @@ class OneKeyClient(HardwareClientBase):
         self.closed = True
         self.binding = None
         self.account = None
+        self._account_verified = False
         self._release_helper_ref(scanning=True)
 
     def is_pairable(self):

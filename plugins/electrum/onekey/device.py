@@ -12,6 +12,7 @@ import importlib
 # module. Importing the sibling by its full name stays inside the mounted package.
 codec = importlib.import_module(__package__ + ".codec")
 frame = importlib.import_module(__package__ + ".frame")
+validate = importlib.import_module(__package__ + ".validate")
 
 
 STORAGE_ENCRYPTION_PATH = (0x80000000 + 4541509, 0x80000000 + 1112098098)
@@ -45,7 +46,7 @@ def _session_id(value):
 
 
 def _text(value, max_len=256):
-    if type(value) is not str or not value or len(value) > max_len or any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+    if not validate.is_valid_text(value, max_len=max_len):
         _fail("INVALID_REQUEST")
 
 
@@ -165,16 +166,9 @@ def _check_signing_item(coin, item, *, output):
 
 
 def _binding(value):
-    if type(value) is not dict or set(value) != {"serialNo", "deviceId", "walletType", "passphraseState"}:
-        _fail("INVALID_REQUEST")
-    _text(value["serialNo"])
-    _text(value["deviceId"])
-    if value["walletType"] == "standard":
-        if value["passphraseState"] is not None:
-            _fail("INVALID_REQUEST")
-    elif value["walletType"] in ("hidden", "attach-pin"):
-        _text(value["passphraseState"])
-    else:
+    try:
+        validate.validate_binding(value)
+    except ValueError:
         _fail("INVALID_REQUEST")
 
 
@@ -220,21 +214,9 @@ def _sign_budget(inputs, outputs, ref_txs):
 
 
 def _der(signature):
-    if type(signature) is not bytes or len(signature) < 8 or signature[0] != 0x30 or signature[1] != len(signature) - 2:
-        _fail("SDK_FAILED")
-    offset = 2
-    for _ in range(2):
-        if offset + 1 >= len(signature) or signature[offset] != 2:
-            _fail("SDK_FAILED")
-        size = signature[offset + 1]
-        offset += 2
-        number = signature[offset:offset + size]
-        if not 1 <= size <= 33 or len(number) != size or number[0] & 0x80 or not any(number):
-            _fail("SDK_FAILED")
-        if size > 1 and number[0] == 0 and not number[1] & 0x80:
-            _fail("SDK_FAILED")
-        offset += size
-    if offset != len(signature):
+    try:
+        validate.validate_der_signature(signature)
+    except ValueError:
         _fail("SDK_FAILED")
 
 
@@ -248,8 +230,12 @@ class Session:
         self.connect_id = connect_id
         self._eventless = False
 
-    def handshake(self):
+    def handshake(self, *, force=False):
+        if not force and getattr(self.link, "handshaked", False):
+            return
         self._call(codec.PING, codec.encode_ping("handshake"), codec.SUCCESS)
+        if hasattr(self.link, "handshaked"):
+            self.link.handshaked = True
 
     def identity(self):
         status_body = self._call(codec.DEVICE_STATUS_GET, b"", codec.DEVICE_STATUS)
