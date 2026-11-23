@@ -1,0 +1,44 @@
+name: Electrum Plugin CI
+
+on:
+  push:
+    paths:
+      - 'plugins/electrum/**'
+      - '.github/workflows/electrum-plugin.yml'
+  pull_request:
+    paths:
+      - 'plugins/electrum/**'
+      - '.github/workflows/electrum-plugin.yml'
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0 libsecp256k1-dev autoconf automake libtool
+
+      - name: Install dev dependencies
+        run: python -m pip install -r plugins/electrum/requirements-dev.txt
+
+      - name: Lint Python sources
+        run: flake8 plugins/electrum/onekey plugins/electrum/tests plugins/electrum/build.py --select=E9,F63,F7,F82
+
+      - name: Run unit tests
+        env:
+          PYTHONPATH: plugins/electrum
+        run: python -m unittest discover -s plugins/electrum/tests -v
+
+      - name: Build and verify plugin ZIP
+        run: |
+          output=$(python plugins/electrum/build.py)
+          test -f "$output"
+          size=$(stat -c%s "$output")
+          echo "Built $output ($size bytes)"
+          test "$size" -lt 10000000

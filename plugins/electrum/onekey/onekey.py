@@ -85,7 +85,7 @@ class OneKeyPlugin(HW_PluginBase):
     SUPPORTED_XTYPES = ("standard", "p2wpkh-p2sh", "p2wpkh", "p2wsh", "p2wsh-p2sh")
     minimum_library = (1, 2, 10)
     maximum_library = (1, 2, 11)
-    libraries_URL = "https://github.com/OneKeyHQ/hardware-js-sdk/tree/feat/electrum-plugin/plugins/electrum"
+    libraries_URL = "https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/plugins/electrum"
 
     def __init__(self, parent, config, name):
         super().__init__(parent, config, name)
@@ -352,7 +352,7 @@ class OneKeyPlugin(HW_PluginBase):
         for txin in tx.inputs():
             desc = txin.script_descriptor
             if not txin.is_mine or desc is None:
-                raise UserFacingException(_("Only single-signature inputs from this OneKey wallet are supported."))
+                raise UserFacingException(_("Only inputs from this OneKey wallet are supported."))
             if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in ("p2wsh", "p2wsh-p2sh"):
                 raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
             script_type = desc.to_legacy_electrum_script_type()
@@ -431,6 +431,14 @@ class OneKeyPlugin(HW_PluginBase):
             # One cosigner of an m-of-n script does not finish the transaction.
             # A singlesig signature still has to make every input complete.
             candidate = copy.deepcopy(tx)
+            if multisig:
+                # Clear any pre-existing partial signature under our pubkey on the
+                # candidate copy so Electrum must freshly verify the device reply.
+                for index, txin in enumerate(candidate.inputs()):
+                    if not already_complete[index]:
+                        pubkey, _path = keystore.find_my_pubkey_in_txinout(txin)
+                        if pubkey is not None:
+                            txin.sigs_ecdsa.pop(pubkey, None)
             for target in (candidate, tx):
                 preserved = [(txin.script_sig, txin.witness) for txin in target.inputs()]
                 target.update_signatures(checked)

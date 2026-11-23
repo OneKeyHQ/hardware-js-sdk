@@ -6,16 +6,23 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from electrum.plugin import run_in_hwd_thread
-from electrum.util import UserCancelled, UserFacingException
+try:
+    from electrum.plugin import run_in_hwd_thread
+    from electrum.util import UserCancelled, UserFacingException
+    from onekey.client import OneKeyClient
+    from onekey.onekey import OneKeyPlugin
+    HAS_ELECTRUM = True
+except ModuleNotFoundError:
+    HAS_ELECTRUM = False
+    run_in_hwd_thread = None
+    UserCancelled = UserFacingException = Exception
+    OneKeyClient = OneKeyPlugin = None
 
 from onekey import codec, usb
-from onekey.client import OneKeyClient
-from onekey.device import Session
+from onekey.device import Session, SessionError
 from onekey.frame import decode, split_message
 from onekey.ipc import Helper, HelperError
 from onekey.link import Link, LinkError
-from onekey.onekey import OneKeyPlugin
 from test_protocol import ACCOUNT, ADDRESS_PATH, SIGNATURE, TXID, Scripted, call, encode_reply, helper_for, pipe_link
 
 
@@ -566,6 +573,7 @@ class TestProtocolRepairs(unittest.TestCase):
                 usb.open_path('usb1')
         self.assertEqual('USB_UNAVAILABLE', raised.exception.code)
 
+    @unittest.skipUnless(HAS_ELECTRUM, 'requires electrum')
     def test_unclaimed_usb_failure_during_scan_keeps_a_claimed_device(self):
         for code in ('USB_UNAVAILABLE', 'SDK_FAILED'):
             with self.subTest(code=code):
@@ -587,8 +595,8 @@ class TestProtocolRepairs(unittest.TestCase):
                     plugin.helper = helper
                     plugin._live_clients = set()
                     plugin.device_manager = lambda: SimpleNamespace(clients={})
-                    with self.assertRaisesRegex(UserFacingException, code):
-                        OneKeyPlugin.enumerate(plugin)
+                    found = OneKeyPlugin.enumerate(plugin)
+                    self.assertEqual(['usb1'], [item.path for item in found])
                     self.assertEqual(generation, helper.generation)
                     self.assertIn('usb1', helper._links)
                     call(helper, 'state', dict(connectId='usb1'))
@@ -712,6 +720,7 @@ class TestProtocolRepairs(unittest.TestCase):
         plugin.device_manager = lambda: manager
         return plugin, manager
 
+    @unittest.skipUnless(HAS_ELECTRUM, 'requires electrum')
     def test_firmware_cancel_keeps_the_open_client_and_the_other_device(self):
         first, second = Scripted(), Scripted()
         original = first.handle
@@ -742,6 +751,7 @@ class TestProtocolRepairs(unittest.TestCase):
             self.assertTrue(other.attached())
             call(helper, 'state', dict(connectId='usb2'))
 
+    @unittest.skipUnless(HAS_ELECTRUM, 'requires electrum')
     def test_host_cancel_during_passphrase_closes_that_client_only(self):
         first, second = Scripted(), Scripted()
         events = []
@@ -788,6 +798,150 @@ class TestProtocolRepairs(unittest.TestCase):
             self.assertEqual(generation, helper.generation)
             self.assertTrue(other.attached())
             call(helper, 'state', dict(connectId='usb2'))
+
+    def test_truncated_der_ending_at_second_integer_tag_keeps_other_device(self):
+        first, second = Scripted(), Scripted()
+        original = first.handle
+        # Valid first INTEGER (0x02 0x01 0x01) followed by a trailing 0x02 tag with no length byte.
+        truncated_der = bytes([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01])
+        bad_der = bytes([0x30, 0x06, 0x02, 0x03, 0x01, 0x02, 0x03, 0x02])
+        self.assertEqual(8, len(truncated_der))
+
+        def handle(kind, payload):
+            if kind == codec.SIGN_TX:
+                return codec.TX_REQUEST, codec.encode_tx_request(
+                    codec.TX_FINISHED, signature=bad_der, signature_index=0)
+            return original(kind, payload)
+
+        first.handle = handle
+        with mock.patch('onekey.ipc.open_path', side_effect=lambda path: pipe_link(first if path == 'usb1' else second)):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            for path in ('usb1', 'usb2'):
+                call(helper, 'state', dict(connectId=path))
+            generation = helper.generation
+            opened = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+            previous = dict(hash=TXID, version=1, lock_time=0,
+                            inputs=[dict(prev_hash='22' * 32, prev_index=0, script_sig='', sequence=0xFFFFFFFF)],
+                            bin_outputs=[dict(amount='1000', script_pubkey='0014' + '33' * 20)])
+            with self.assertRaises(HelperError) as raised:
+                call(helper, 'sign', dict(
+                    connectId='usb1', binding=opened, coin='Bitcoin', version=2, locktime=0, refTxs=[previous],
+                    inputs=[dict(prev_hash=TXID, prev_index=0, amount='1000', sequence=0xFFFFFFFF,
+                                 address_n=ADDRESS_PATH, script_type='SPENDWITNESS')],
+                    outputs=[dict(amount='900', address='bc1qexample', script_type='PAYTOADDRESS')]))
+            self.assertEqual('SDK_FAILED', raised.exception.code)
+            self.assertEqual(generation, helper.generation)
+            self.assertIn('usb2', helper._links)
+            call(helper, 'state', dict(connectId='usb2'))
+
+    def test_mid_sign_decode_failure_sends_cancel_and_drops_link(self):
+        first, second = Scripted(), Scripted()
+        original = first.handle
+        sent = []
+
+        def handle(kind, payload):
+            if kind == codec.SIGN_TX:
+                return codec.TX_REQUEST, b'\x12\x05abc'
+            return original(kind, payload)
+
+        first.handle = handle
+
+        def open_link(path):
+            link = pipe_link(first if path == 'usb1' else second)
+            if path == 'usb1':
+                write = link._write
+
+                def wrapped(data):
+                    sent.append(split_message(decode(data).payload)[0])
+                    write(data)
+
+                link._write = wrapped
+            return link
+
+        with mock.patch('onekey.ipc.open_path', side_effect=open_link):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            for path in ('usb1', 'usb2'):
+                call(helper, 'state', dict(connectId=path))
+            generation = helper.generation
+            opened = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+            previous = dict(hash=TXID, version=1, lock_time=0,
+                            inputs=[dict(prev_hash='22' * 32, prev_index=0, script_sig='', sequence=0xFFFFFFFF)],
+                            bin_outputs=[dict(amount='1000', script_pubkey='0014' + '33' * 20)])
+            with self.assertRaises(HelperError) as raised:
+                call(helper, 'sign', dict(
+                    connectId='usb1', binding=opened, coin='Bitcoin', version=2, locktime=0, refTxs=[previous],
+                    inputs=[dict(prev_hash=TXID, prev_index=0, amount='1000', sequence=0xFFFFFFFF,
+                                 address_n=ADDRESS_PATH, script_type='SPENDWITNESS')],
+                    outputs=[dict(amount='900', address='bc1qexample', script_type='PAYTOADDRESS')]))
+            self.assertEqual('PROTOCOL', raised.exception.code)
+            self.assertIn(codec.CANCEL, sent)
+            self.assertNotIn('usb1', helper._links)
+            self.assertEqual(generation, helper.generation)
+            self.assertIn('usb2', helper._links)
+
+    def test_decode_fields_rejects_truncated_fixed32_and_fixed64(self):
+        with self.assertRaisesRegex(ValueError, 'truncated fixed64'):
+            codec.decode_fields(bytes([(1 << 3) | 1, 1, 2, 3]))
+        with self.assertRaisesRegex(ValueError, 'truncated fixed32'):
+            codec.decode_fields(bytes([(1 << 3) | 5, 1, 2]))
+
+    def test_usb_context_open_failure_does_not_poison_singleton(self):
+        good = mock.Mock()
+        bad = mock.Mock()
+        bad.open.side_effect = OSError('open failed')
+        driver = mock.Mock()
+        driver.USBContext.side_effect = [bad, good]
+        previous = usb._usb_context
+        usb._usb_context = None
+        try:
+            with mock.patch.object(usb, '_usb1', return_value=driver):
+                with self.assertRaises(OSError):
+                    usb._context()
+                self.assertIsNone(usb._usb_context)
+                self.assertIs(good, usb._context())
+                good.open.assert_called_once()
+        finally:
+            usb._usb_context = previous
+
+    def test_eventless_protocol_info_is_negotiated_once_per_claimed_link(self):
+        device = Scripted()
+        proto_calls = 0
+        original = device.handle
+
+        def handle(kind, payload):
+            nonlocal proto_calls
+            if kind == codec.PROTOCOL_INFO_REQUEST:
+                proto_calls += 1
+            return original(kind, payload)
+
+        device.handle = handle
+        with mock.patch('onekey.ipc.open_path', side_effect=lambda _path: pipe_link(device)):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            opened = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+            public_key(helper, opened)
+            public_key(helper, opened)
+        self.assertEqual(1, proto_calls)
+
+    def test_search_skips_unclaimed_usb_unavailable_and_returns_healthy_device(self):
+        device = Scripted()
+
+        def open_link(path):
+            if path == 'usb2':
+                raise LinkError('USB_UNAVAILABLE')
+            return pipe_link(device)
+
+        with mock.patch('onekey.ipc.list_paths', return_value=['usb1', 'usb2']), \
+                mock.patch('onekey.ipc.open_path', side_effect=open_link):
+            helper = Helper()
+            self.addCleanup(helper.shutdown)
+            found = call(helper, 'search', {})
+        self.assertEqual(['usb1'], [item['connectId'] for item in found])
 
 
 class TestReceiveFrames(unittest.TestCase):

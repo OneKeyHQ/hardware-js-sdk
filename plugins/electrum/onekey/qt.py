@@ -169,7 +169,7 @@ class WCOneKeyUnlock(WCHWUnlock):
 class WCOneKeyXPub(WCHWXPub):
     def get_xpub_from_client(self, client, derivation, xtype):
         if self.wizard_data["wallet_type"] not in ("standard", "multisig"):
-            raise UserFacingException(_("Only single-signature OneKey wallets are supported."))
+            raise UserFacingException(_("Only standard and multisig OneKey wallets are supported."))
         if self.wizard_data["wallet_type"] == "multisig" and xtype not in ("p2wsh", "p2wsh-p2sh"):
             raise UserFacingException(_("OneKey supports only BIP48 segwit multisig wallets."))
         mode = self.wizard_data.get("onekey_wallet_mode") or "standard"

@@ -480,8 +480,11 @@ class TestDeviceSession(unittest.TestCase):
                 self.assertNotIn(secret, str(raised.exception))
 
     def test_sign_message_uses_core_recovery_byte(self):
-        from electrum.bip32 import BIP32Node
-        from electrum.bitcoin import ecdsa_sign_usermessage, pubkey_to_address, verify_usermessage_with_address
+        try:
+            from electrum.bip32 import BIP32Node
+            from electrum.bitcoin import ecdsa_sign_usermessage, pubkey_to_address, verify_usermessage_with_address
+        except ModuleNotFoundError:
+            self.skipTest("requires electrum")
         node = BIP32Node.from_rootseed(b"\x11" * 32, xtype="p2wpkh").subkey_at_private_derivation("m/84'/0'/0'/0/0")
         message = "OneKey"
         signature = ecdsa_sign_usermessage(node.eckey, message, is_compressed=True)

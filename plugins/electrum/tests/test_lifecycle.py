@@ -266,3 +266,37 @@ class TestLifecycleRepairs(unittest.TestCase):
                 client.bind_keystore(store)
         self.assertTrue(client.closed)
         self.assertIsNone(client.account)
+
+    def test_wizard_cancel_releases_usb_claim_instead_of_treating_as_firmware_cancel(self):
+        plugin, manager = self.make_plugin()
+        device = Scripted()
+        closed = []
+        link = pipe_link(device, lambda: closed.append('usb1'))
+        with mock.patch('onekey.ipc.open_path', return_value=link):
+            helper = Helper()
+            plugin.helper = helper
+            self.addCleanup(helper.shutdown)
+            call(helper, 'hello', {})
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                client = pool.submit(self.client, plugin, manager).result(timeout=2)
+                with self.assertRaises(client_module.UserCancelled):
+                    with client.flow():
+                        raise client_module.UserCancelled()
+            self.assertTrue(client.closed)
+            self.assertEqual(['usb1'], closed)
+            self.assertNotIn('usb1', helper._links)
+
+    def test_matches_keystore_rejects_different_device_id_with_same_serial_and_xpub(self):
+        plugin, manager = self.make_plugin()
+        client = self.client(plugin, manager)
+        client.binding = dict(BINDING)
+        client.account = ([1, 2, 3], 'p2wpkh', 'expected-xpub')
+        reinit_binding = dict(BINDING, deviceId='reinitialized-device-id')
+        store = SimpleNamespace(xpub='expected-xpub', onekey_binding=reinit_binding,
+                                get_derivation_prefix=lambda: 'account')
+        with mock.patch.object(client_module, 'account_path', return_value=[1, 2, 3]), \
+                mock.patch.object(client_module, 'normalized_xpub', side_effect=lambda value, _: value):
+            self.assertFalse(client.matches_keystore(store))
+            same_store = SimpleNamespace(xpub='expected-xpub', onekey_binding=dict(BINDING),
+                                         get_derivation_prefix=lambda: 'account')
+            self.assertTrue(client.matches_keystore(same_store))

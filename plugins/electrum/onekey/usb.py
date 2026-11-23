@@ -5,6 +5,9 @@ Enumeration follows firmware-pro2: vendor 0x1209, the 0x4Fxx ids first, then 0x5
 and the vendor-class interface 0xFF.
 """
 
+import atexit
+import threading
+
 from .frame import RX_BUFFER_SIZE
 from .link import Link, LinkError
 
@@ -16,6 +19,22 @@ USB_PIDS = USB_PIDS_PREFERRED + USB_PIDS_FALLBACK
 USB_CLASS_VENDOR = 0xFF
 
 _usb_context = None
+_usb_context_lock = threading.Lock()
+
+
+def _close_context():
+    global _usb_context
+    with _usb_context_lock:
+        ctx = _usb_context
+        _usb_context = None
+    if ctx is not None:
+        try:
+            ctx.close()
+        except Exception:
+            pass
+
+
+atexit.register(_close_context)
 
 
 def _usb1():
@@ -37,11 +56,13 @@ def check_available():
 
 def _context():
     global _usb_context
-    if _usb_context is None:
-        usb1 = _usb1()
-        _usb_context = usb1.USBContext()
-        _usb_context.open()
-    return _usb_context
+    with _usb_context_lock:
+        if _usb_context is None:
+            usb1 = _usb1()
+            ctx = usb1.USBContext()
+            ctx.open()
+            _usb_context = ctx
+        return _usb_context
 
 
 def _endpoints(device, usb1):

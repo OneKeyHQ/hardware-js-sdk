@@ -1,10 +1,4 @@
-"""Serialized in-process device operations and retained legacy runtime utilities."""
-import hashlib
-import json
-import os
-from pathlib import Path
-import platform
-import sys
+"""Serialized in-process device operations."""
 import threading
 import time
 import uuid
@@ -16,137 +10,15 @@ from .usb import list_paths, open_path
 
 
 VERSION = 1
-MAX_LINE = 1024 * 1024
-SDK_SOURCE = "38f0b8c5d8fb645c1652880eb099866de57280aa"
 SDK_VERSION = "1.2.10"
 OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "sign-message",
               "features", "cancel", "ui", "dispose"}
-# Same targets as helper/pin.cjs BUNDLE_PLATFORMS. Linux nodes are the glibc builds.
-DESKTOP_PLATFORMS = ("darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64", "win32-arm64", "win32-x64")
-
-
-def _invalid_constant(_):
-    raise ValueError()
 
 
 class HelperError(Exception):
     def __init__(self, code="HELPER_FAILED"):
         self.code = code
         super().__init__("OneKey helper failed (" + code + "). Reconnect using the wallet wizard.")
-
-
-def desktop_platform():
-    arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x64", "amd64": "x64"}.get(platform.machine().lower())
-    name = f"{sys.platform}-{arch}" if arch else ""
-    return name if name in DESKTOP_PLATFORMS else None
-
-
-def runtime_candidates():
-    # Electrum serves a zip plugin from memory. __file__ is "<plugin.zip>/onekey/ipc.py"
-    # and is not a real path. The runtime is the sibling directory of that zip.
-    raw = __file__.replace("\\", "/")
-    if ".zip/" in raw:
-        archive = raw.split(".zip/", 1)[0] + ".zip"
-        yield Path(archive).parent / "onekey-runtime" / "runtime.json"
-        return
-    plugin_root = Path(__file__).resolve().parents[1]
-    yield plugin_root / "dist" / "onekey-runtime" / "runtime.json"
-
-
-def _inside(root, relative):
-    if type(relative) is not str or relative.startswith(("/", "\\")) or ".." in Path(relative).parts:
-        raise ValueError()
-    candidate = (root / relative).resolve()
-    if candidate != root and root not in candidate.parents:
-        raise ValueError()
-    if not candidate.is_file():
-        raise ValueError()
-    return candidate
-
-
-def _authorized_runtime_pin():
-    """Sha256 of runtime.json pinned inside the zip Electrum already authorized.
-
-    Dev and tests are not loaded from a zip, so they skip this. A zip with no
-    pin, or a sibling runtime whose receipt does not match that pin, is refused.
-    The pin is read from the in-memory archive, not from the zip path on disk.
-    """
-    raw = __file__
-    marker = ".zip/"
-    if marker not in raw.replace("\\", "/"):
-        return None
-    get_data = getattr(__loader__, "get_data", None)
-    if not callable(get_data):
-        raise HelperError("RUNTIME_INVALID")
-    # Electrum joins the archive path as-is, then adds "/". Windows archive
-    # paths keep backslashes, and get_data matches that original string.
-    if marker not in raw:
-        raise HelperError("RUNTIME_INVALID")
-    try:
-        payload = get_data(raw.split(marker, 1)[0] + ".zip/onekey/runtime_pin.txt")
-    except (OSError, KeyError, ValueError, TypeError):
-        raise HelperError("RUNTIME_INVALID") from None
-    if type(payload) is not bytes:
-        raise HelperError("RUNTIME_INVALID")
-    try:
-        text = payload.decode("ascii").strip()
-    except UnicodeError:
-        raise HelperError("RUNTIME_INVALID") from None
-    if len(text) != 64 or any(character not in "0123456789abcdef" for character in text):
-        raise HelperError("RUNTIME_INVALID")
-    return text
-
-
-def runtime_command():
-    pinned = _authorized_runtime_pin()
-    selected = os.environ.get("ONEKEY_ELECTRUM_RUNTIME", "")
-    if selected:
-        manifest = Path(selected)
-        if not manifest.is_absolute():
-            raise HelperError("RUNTIME_MISSING")
-    else:
-        manifest = next((path for path in runtime_candidates() if path.is_file()), None)
-        if manifest is None:
-            raise HelperError("RUNTIME_MISSING")
-    try:
-        manifest = manifest.resolve()
-        receipt = manifest.read_bytes()
-        receipt_hash = hashlib.sha256(receipt).hexdigest()
-        if pinned is not None and receipt_hash != pinned:
-            raise ValueError()
-        if manifest.with_suffix(".sha256").read_text().strip() != receipt_hash:
-            raise ValueError()
-        data = json.loads(receipt)
-        if data.get("sdkSource") != SDK_SOURCE or data.get("sdkVersion") != SDK_VERSION:
-            raise ValueError()
-        root = manifest.parent
-        for name in ("entry.cjs", "runtime.cjs", "pin.cjs"):
-            if hashlib.sha256((root / name).read_bytes()).hexdigest() != data["assets"][name]:
-                raise ValueError()
-        if data.get("mode") == "bundle":
-            if data.get("schema") != 2 or tuple(sorted(data["platforms"])) != DESKTOP_PLATFORMS:
-                raise ValueError()
-            target = desktop_platform()
-            spec = data["platforms"][target] if target else None
-            if type(spec) is not dict:
-                raise ValueError()
-            node = _inside(root, spec["node"])
-            if hashlib.sha256(node.read_bytes()).hexdigest() != spec["nodeSha256"]:
-                raise ValueError()
-            if sys.platform != "win32" and node.stat().st_mode & 0o111 != 0o111:
-                node.chmod(node.stat().st_mode | 0o755)
-        else:
-            if data.get("schema") != VERSION:
-                raise ValueError()
-            node = Path(data["node"])
-            if not node.is_absolute() or not node.is_file():
-                raise ValueError()
-        return [str(node), str(root / "entry.cjs"), "--manifest", str(manifest),
-                "--manifest-sha256", receipt_hash]
-    except HelperError:
-        raise
-    except (OSError, ValueError, KeyError, TypeError):
-        raise HelperError("RUNTIME_INVALID") from None
 
 
 class Helper:
@@ -263,7 +135,7 @@ class Helper:
             raise
         except SessionError as error:
             self._wallets.pop(connect_id, None)
-            if error.code == "PROTOCOL":
+            if error.code == "PROTOCOL" or getattr(link, "_closed", False):
                 self._drop(connect_id)
             raise
         except BaseException:
@@ -274,6 +146,7 @@ class Helper:
     def _search(self, deadline, cancelled, on_ui):
         paths = list(self.ports) if self.ports is not None else list_paths()
         found = []
+        first_usb_error = None
         for path in paths:
             if cancelled is not None and cancelled.is_set():
                 raise LinkError("CANCELLED")
@@ -303,13 +176,18 @@ class Helper:
                 if time.monotonic() >= deadline:
                     raise LinkError("TIMEOUT") from None
                 # A held device's failed probe must not hide other devices.
-                # Unclaimed legacy USB candidates may time out or reject V2.
+                # Unclaimed candidates that are busy, unsupported, or reject V2 are skipped
+                # when another device succeeds; if none succeed, surface the USB error.
+                if not held and error.code in ("USB_UNAVAILABLE", "SDK_FAILED"):
+                    if first_usb_error is None:
+                        first_usb_error = error
+                    continue
                 if not held and error.code not in ("TIMEOUT", "PROTOCOL"):
                     raise
             except SessionError as error:
                 if held:
                     self.release(path)
-                if error.code == "CANCELLED" or (cancelled is not None and cancelled.is_set()):
+                if error.code in ("CANCELLED", "FIRMWARE_CANCELLED") or (cancelled is not None and cancelled.is_set()):
                     raise LinkError("CANCELLED") from None
                 if time.monotonic() >= deadline:
                     raise LinkError("TIMEOUT") from None
@@ -329,6 +207,8 @@ class Helper:
             raise LinkError("CANCELLED")
         if time.monotonic() >= deadline:
             raise LinkError("TIMEOUT")
+        if not found and first_usb_error is not None:
+            raise first_usb_error
         return found
 
     def _acquire(self, connect_id):
@@ -364,4 +244,3 @@ class Helper:
     def _release_links(self):
         for connect_id in list(self._links):
             self._drop(connect_id)
-

@@ -99,6 +99,7 @@ class OneKeyClient(HardwareClientBase):
         self._fresh_selection = False
         self._unlock_selection = False
         self._requested_mode = None
+        self._firmware_cancelled = False
         try:
             state = self._call("state", {"connectId": path})
             self._check_state(state)
@@ -133,7 +134,11 @@ class OneKeyClient(HardwareClientBase):
         except HelperError as error:
             # flow() closes the client when this call belongs to the open wallet.
             # A storage-unlock cancel passes close_on_error=False and must keep it.
+            if error.code == "FIRMWARE_CANCELLED":
+                self._firmware_cancelled = True
+                raise UserCancelled() from None
             if error.code == "CANCELLED":
+                self._firmware_cancelled = False
                 raise UserCancelled() from None
             raise UserFacingException(str(error)) from None
 
@@ -152,6 +157,7 @@ class OneKeyClient(HardwareClientBase):
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
         previous = self.cancelled
         self.cancelled = threading.Event()
+        self._firmware_cancelled = False
         try:
             self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
             yield
@@ -160,25 +166,14 @@ class OneKeyClient(HardwareClientBase):
                 self.close()
             raise
         finally:
+            self._firmware_cancelled = False
             self.cancelled = previous
             self.handler.finished()
 
     def _kept_after_firmware_cancel(self, error):
-        # The device cancelled a prompt and the USB claim is still healthy. A host
-        # cancel closes that link before this runs, so the client is still released.
-        if not isinstance(error, UserCancelled):
-            return False
-        helper = self.helper
-        if getattr(helper, "generation", None) != self.generation:
-            return False
-        for name in ("_links", "ports"):
-            mapping = getattr(helper, name, None)
-            if not isinstance(mapping, dict):
-                continue
-            link = mapping.get(self.connect_id)
-            if link is not None and not getattr(link, "_closed", True):
-                return True
-        return False
+        # Only a device-side SESSION_CANCELLED keeps the claimed USB link open.
+        # Host/wizard cancellations must release the client and its USB claim.
+        return isinstance(error, UserCancelled) and self._firmware_cancelled and self.attached()
 
     def request_wallet_mode(self, mode):
         # The next open uses this. Unset means the standard wallet.
@@ -270,8 +265,8 @@ class OneKeyClient(HardwareClientBase):
         try:
             if self.closed or self.account is None or type(self.binding) is not dict:
                 return False
-            saved = keystore.onekey_binding
-            if type(saved) is not dict or saved.get("serialNo") != self.serial:
+            saved = check_binding(keystore.onekey_binding)
+            if saved != self.binding or saved["serialNo"] != self.serial:
                 return False
             xtype = BIP32Node.from_xkey(keystore.xpub).xtype
             path = account_path(keystore.get_derivation_prefix(), xtype)

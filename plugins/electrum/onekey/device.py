@@ -224,7 +224,7 @@ def _der(signature):
         _fail("SDK_FAILED")
     offset = 2
     for _ in range(2):
-        if offset >= len(signature) or signature[offset] != 2:
+        if offset + 1 >= len(signature) or signature[offset] != 2:
             _fail("SDK_FAILED")
         size = signature[offset + 1]
         offset += 2
@@ -346,21 +346,30 @@ class Session:
         _check_previous_frames(ref_txs)
         self._ready(binding)
         self.on_ui("button")
-        request = _payload(codec.decode_tx_request, self._call(codec.SIGN_TX, codec.encode_sign_tx(
-            len(inputs), len(outputs), coin, version, lock_time), codec.TX_REQUEST))
         signatures = {}
-        # Firmware walks the current transaction, then each previous transaction,
-        # then the inputs again while it returns signatures. Bound the walk by
-        # that shape so a normal payment is not cut off at a fixed count.
-        for _ in range(_sign_budget(inputs, outputs, ref_txs)):
-            if request["signature"] is not None and request["signature_index"] is not None:
-                signatures[request["signature_index"]] = request["signature"]
-            if request["request_type"] == codec.TX_FINISHED:
-                break
-            ack = self._ack(request, inputs, outputs, ref_txs, version, lock_time)
-            request = _payload(codec.decode_tx_request, self._call(codec.TX_ACK, ack, codec.TX_REQUEST))
-        else:
-            _fail("SDK_FAILED")
+        finished = False
+        try:
+            request = _payload(codec.decode_tx_request, self._call(codec.SIGN_TX, codec.encode_sign_tx(
+                len(inputs), len(outputs), coin, version, lock_time), codec.TX_REQUEST))
+            # Firmware walks the current transaction, then each previous transaction,
+            # then the inputs again while it returns signatures. Bound the walk by
+            # that shape so a normal payment is not cut off at a fixed count.
+            for _ in range(_sign_budget(inputs, outputs, ref_txs)):
+                if request["signature"] is not None and request["signature_index"] is not None:
+                    signatures[request["signature_index"]] = request["signature"]
+                if request["request_type"] == codec.TX_FINISHED:
+                    finished = True
+                    break
+                ack = self._ack(request, inputs, outputs, ref_txs, version, lock_time)
+                request = _payload(codec.decode_tx_request, self._call(codec.TX_ACK, ack, codec.TX_REQUEST))
+            else:
+                _fail("SDK_FAILED")
+        except BaseException:
+            if not finished and getattr(self.link, "_pending", False):
+                abort = getattr(self.link, "abort_pending", None)
+                if callable(abort):
+                    abort()
+            raise
         if len(signatures) != len(inputs):
             _fail("SDK_FAILED")
         result = []
@@ -519,10 +528,13 @@ class Session:
             _fail("DEVICE_MISMATCH")
 
     def _eventless_session(self):
-        if self._eventless:
+        if self._eventless or getattr(self.link, "eventless", False):
+            self._eventless = True
             return
         self._call(codec.PROTOCOL_INFO_REQUEST, codec.encode_protocol_info_request(True), codec.PROTOCOL_INFO)
         self._eventless = True
+        if hasattr(self.link, "eventless"):
+            self.link.eventless = True
 
     def _pin(self, pin_type):
         self.on_ui("attach-pin" if pin_type == codec.PIN_ATTACH else "pin")
@@ -545,7 +557,7 @@ class Session:
             if subcode == codec.SESSION_INVALID:
                 _fail("WALLET_SESSION_INVALID")
             if subcode == codec.SESSION_CANCELLED:
-                _fail("CANCELLED")
+                _fail("FIRMWARE_CANCELLED")
             _fail("SDK_FAILED")
         if kind != expect:
             _fail("PROTOCOL")

@@ -88,9 +88,13 @@ def decode_fields(payload):
                 raise ValueError("truncated bytes")
             index += length
         elif wire == 1:
+            if index + 8 > len(payload):
+                raise ValueError("truncated fixed64")
             value = int.from_bytes(payload[index:index + 8], "little")
             index += 8
         elif wire == 5:
+            if index + 4 > len(payload):
+                raise ValueError("truncated fixed32")
             value = int.from_bytes(payload[index:index + 4], "little")
             index += 4
         else:

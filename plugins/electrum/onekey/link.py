@@ -24,6 +24,7 @@ class Link:
         self._closed = False
         self._pending = False
         self._last_response_seq = None
+        self.eventless = False
 
     def exchange(self, msg_type, payload, *, deadline, cancelled):
         if self._closed:
@@ -88,11 +89,23 @@ class Link:
             except ValueError:
                 raise LinkError("PROTOCOL") from None
 
+    def abort_pending(self):
+        if not self._closed and self._pending:
+            try:
+                self._write(encode_message(CANCEL, b"", seq=self._seq.next()))
+            except Exception:
+                pass
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def close(self):
         if not self._closed:
             self._closed = True
             self._buffer.clear()
             self._pending = False
+            self.eventless = False
             self._close()
 
     @staticmethod
