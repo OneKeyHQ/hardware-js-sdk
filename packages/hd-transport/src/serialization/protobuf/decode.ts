@@ -1,26 +1,29 @@
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
 
-import { getProtobuf, getProtobufWkt } from './runtime';
+// Must execute before @bufbuild/protobuf imports so Jest/CJS cold-start configures text encoding first.
+// eslint-disable-next-line import/order
 import { ensureTextEncoding } from './text-encoding';
+// eslint-disable-next-line import/order
+import { getMessageDesc } from './descriptor';
 
-import type { DescMessage, Message, ScalarType } from '@bufbuild/protobuf';
+// eslint-disable-next-line import/order
+import { ScalarType, fromBinary, isFieldSet } from '@bufbuild/protobuf';
+// eslint-disable-next-line camelcase, import/no-unresolved, import/order
+import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
+
+import type { DescMessage, Message } from '@bufbuild/protobuf';
 import type { ProtobufMessageType } from './descriptor';
 
-const is64BitScalar = (scalar: ScalarType): boolean => {
-  const { ScalarType: S } = getProtobuf();
-  return (
-    scalar === S.INT64 ||
-    scalar === S.UINT64 ||
-    scalar === S.SINT64 ||
-    scalar === S.FIXED64 ||
-    scalar === S.SFIXED64
-  );
-};
+const is64BitScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT64 ||
+  scalar === ScalarType.UINT64 ||
+  scalar === ScalarType.SINT64 ||
+  scalar === ScalarType.FIXED64 ||
+  scalar === ScalarType.SFIXED64;
 
 const decodeScalar = (scalar: ScalarType, value: unknown): unknown => {
-  const { ScalarType: S } = getProtobuf();
-  if (scalar === S.BYTES) {
+  if (scalar === ScalarType.BYTES) {
     if (value instanceof Uint8Array) {
       return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('hex');
     }
@@ -40,8 +43,6 @@ const decodeScalar = (scalar: ScalarType, value: unknown): unknown => {
 };
 
 function assertRequiredFields(desc: DescMessage, decoded: Message): void {
-  const { isFieldSet } = getProtobuf();
-  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const record = decoded as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     if (field.fieldKind === 'list') {
@@ -75,8 +76,6 @@ function assertRequiredFields(desc: DescMessage, decoded: Message): void {
 }
 
 function messageToJSON(desc: DescMessage, decoded: Message): Record<string, unknown> {
-  const { isFieldSet } = getProtobuf();
-  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const record = decoded as unknown as Record<string, unknown>;
   const res: Record<string, unknown> = {};
 
@@ -123,24 +122,24 @@ export const decode = (
   data: ByteBuffer
 ): Record<string, unknown> => {
   ensureTextEncoding();
-  const { fromBinary } = getProtobuf();
+  const desc = getMessageDesc(messageType);
   const buff = data.toBuffer();
   const a = new Uint8Array(buff);
 
   let decoded: Message;
   try {
-    decoded = fromBinary(messageType.desc, a);
-    assertRequiredFields(messageType.desc, decoded);
+    decoded = fromBinary(desc, a);
+    assertRequiredFields(desc, decoded);
   } catch (error) {
     // Fix a battery_level problem with the device
     if (a.length > 1 && a[a.length - 1] === 0xff) {
       a[a.length - 1] = 0x04;
-      decoded = fromBinary(messageType.desc, a);
-      assertRequiredFields(messageType.desc, decoded);
+      decoded = fromBinary(desc, a);
+      assertRequiredFields(desc, decoded);
     } else {
       throw error;
     }
   }
 
-  return messageToJSON(messageType.desc, decoded);
+  return messageToJSON(desc, decoded);
 };

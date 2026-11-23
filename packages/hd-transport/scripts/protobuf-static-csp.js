@@ -11,6 +11,19 @@ const legacy = require('../../core/src/data/messages/messages_legacy_v1.json');
 const v2 = require('../messages-protocol-v2.json');
 const protocolInfo = require('../src/serialization/protobuf/legacy-protocol-info.json');
 
+const distJsSource = readFileSync(path.resolve(__dirname, '../dist/index.js'), 'utf8');
+assert.strictEqual(
+  /require\(['"]@bufbuild\/protobuf/.test(distJsSource),
+  false,
+  'dist/index.js must inline @bufbuild/protobuf without external subpath requires'
+);
+const distDtsSource = readFileSync(path.resolve(__dirname, '../dist/index.d.ts'), 'utf8');
+assert.strictEqual(
+  distDtsSource.includes('@bufbuild/protobuf'),
+  false,
+  'dist/index.d.ts must not expose @bufbuild/protobuf types'
+);
+
 const schemas = [v1, legacy, v2, protocolInfo];
 
 let count = 0;

@@ -137,3 +137,7 @@ export const ensureTextEncoding = (): void => {
     },
   });
 };
+
+// Configure text encoding eagerly when this module is evaluated so any subsequent
+// @bufbuild/protobuf descriptor initialization succeeds on runtimes lacking TextEncoder/TextDecoder.
+ensureTextEncoding();

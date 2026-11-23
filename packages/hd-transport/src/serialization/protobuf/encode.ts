@@ -1,37 +1,35 @@
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
 
-import { getProtobuf, getProtobufWkt } from './runtime';
+// Must execute before @bufbuild/protobuf imports so Jest/CJS cold-start configures text encoding first.
+// eslint-disable-next-line import/order
 import { ensureTextEncoding } from './text-encoding';
+// eslint-disable-next-line import/order
+import { getMessageDesc } from './descriptor';
 
-import type { DescEnum, DescField, DescMessage, Message, ScalarType } from '@bufbuild/protobuf';
+// eslint-disable-next-line import/order
+import { ScalarType, create, toBinary } from '@bufbuild/protobuf';
+// eslint-disable-next-line camelcase, import/no-unresolved, import/order
+import { FieldDescriptorProto_Label as FieldLabel } from '@bufbuild/protobuf/wkt';
+
+import type { DescEnum, DescField, DescMessage, Message } from '@bufbuild/protobuf';
 import type { ProtobufMessageType } from './descriptor';
 
-const is64BitScalar = (scalar: ScalarType): boolean => {
-  const { ScalarType: S } = getProtobuf();
-  return (
-    scalar === S.INT64 ||
-    scalar === S.UINT64 ||
-    scalar === S.SINT64 ||
-    scalar === S.FIXED64 ||
-    scalar === S.SFIXED64
-  );
-};
+const is64BitScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT64 ||
+  scalar === ScalarType.UINT64 ||
+  scalar === ScalarType.SINT64 ||
+  scalar === ScalarType.FIXED64 ||
+  scalar === ScalarType.SFIXED64;
 
-const isUnsigned64Scalar = (scalar: ScalarType): boolean => {
-  const { ScalarType: S } = getProtobuf();
-  return scalar === S.UINT64 || scalar === S.FIXED64;
-};
+const isUnsigned64Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT64 || scalar === ScalarType.FIXED64;
 
-const isUnsigned32Scalar = (scalar: ScalarType): boolean => {
-  const { ScalarType: S } = getProtobuf();
-  return scalar === S.UINT32 || scalar === S.FIXED32;
-};
+const isUnsigned32Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT32 || scalar === ScalarType.FIXED32;
 
-const isSigned32Scalar = (scalar: ScalarType): boolean => {
-  const { ScalarType: S } = getProtobuf();
-  return scalar === S.INT32 || scalar === S.SINT32 || scalar === S.SFIXED32;
-};
+const isSigned32Scalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT32 || scalar === ScalarType.SINT32 || scalar === ScalarType.SFIXED32;
 
 const toBigInt64 = (scalar: ScalarType, value: unknown): bigint => {
   let raw: bigint;
@@ -60,17 +58,16 @@ const toBigInt64 = (scalar: ScalarType, value: unknown): bigint => {
 };
 
 const encodeScalar = (scalar: ScalarType, value: unknown): unknown => {
-  const { ScalarType: S } = getProtobuf();
   if (
     typeof value === 'number' &&
-    scalar !== S.FLOAT &&
-    scalar !== S.DOUBLE &&
+    scalar !== ScalarType.FLOAT &&
+    scalar !== ScalarType.DOUBLE &&
     !Number.isSafeInteger(value)
   ) {
     throw new RangeError('field value is not within safe integer range');
   }
 
-  if (scalar === S.BYTES) {
+  if (scalar === ScalarType.BYTES) {
     if (typeof value === 'string') {
       return value.length === 0 ? new Uint8Array(0) : new Uint8Array(Buffer.from(value, 'hex'));
     }
@@ -87,11 +84,11 @@ const encodeScalar = (scalar: ScalarType, value: unknown): unknown => {
     return toBigInt64(scalar, value);
   }
 
-  if (scalar === S.BOOL) {
+  if (scalar === ScalarType.BOOL) {
     return Boolean(value);
   }
 
-  if (scalar === S.STRING) {
+  if (scalar === ScalarType.STRING) {
     return typeof value === 'string' ? value : String(value);
   }
 
@@ -127,10 +124,9 @@ const encodeEnum = (enumDesc: DescEnum, value: unknown): number | undefined => {
 };
 
 const zeroValueForScalar = (scalar: ScalarType): unknown => {
-  const { ScalarType: S } = getProtobuf();
-  if (scalar === S.BYTES) return new Uint8Array(0);
-  if (scalar === S.STRING) return '';
-  if (scalar === S.BOOL) return false;
+  if (scalar === ScalarType.BYTES) return new Uint8Array(0);
+  if (scalar === ScalarType.STRING) return '';
+  if (scalar === ScalarType.BOOL) return false;
   if (is64BitScalar(scalar)) return BigInt(0);
   return 0;
 };
@@ -150,8 +146,6 @@ const defaultForRequiredScalarOrEnum = (field: DescField): unknown => {
 };
 
 function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Message {
-  const { ScalarType: S, create } = getProtobuf();
-  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const msg = create(desc) as unknown as Record<string, unknown>;
 
   for (const field of desc.fields) {
@@ -187,7 +181,7 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
       // non-hex string (e.g. Buffer.from('0x...', 'hex')) are omitted on optional bytes fields,
       // whereas an explicit empty string '' is still encoded as 0-length bytes.
       const omitEmptyOptionalBytes =
-        field.scalar === S.BYTES &&
+        field.scalar === ScalarType.BYTES &&
         field.proto.label !== FieldLabel.REQUIRED &&
         encodedScalar instanceof Uint8Array &&
         encodedScalar.byteLength === 0 &&
@@ -219,9 +213,9 @@ export const encode = (
   data: Record<string, unknown>
 ): ByteBuffer => {
   ensureTextEncoding();
-  const { toBinary } = getProtobuf();
-  const message = buildMessage(messageType.desc, data ?? {});
-  const buffer = toBinary(messageType.desc, message);
+  const desc = getMessageDesc(messageType);
+  const message = buildMessage(desc, data ?? {});
+  const buffer = toBinary(desc, message);
   const bytebuffer = new ByteBuffer(buffer.byteLength);
   bytebuffer.append(buffer);
   bytebuffer.reset();

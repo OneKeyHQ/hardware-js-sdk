@@ -1,3 +1,4 @@
+import './serialization/protobuf/text-encoding';
 import {
   createMessageFromName,
   createMessageFromType,

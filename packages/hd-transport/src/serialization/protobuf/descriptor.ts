@@ -1,9 +1,35 @@
 import { Buffer } from 'buffer';
 
-import { getProtobuf, getProtobufWkt } from './runtime';
+// Must execute before @bufbuild/protobuf imports so Jest/CJS cold-start configures text encoding first.
+// eslint-disable-next-line import/order
 import { ensureTextEncoding } from './text-encoding';
 
-import type { DescEnum, DescMessage, FileRegistry, Message } from '@bufbuild/protobuf';
+// eslint-disable-next-line import/order
+import {
+  ScalarType,
+  create,
+  createFileRegistry,
+  fromBinary,
+  isFieldSet,
+  toBinary,
+} from '@bufbuild/protobuf';
+// eslint-disable-next-line import/order
+import {
+  DescriptorProtoSchema,
+  EnumDescriptorProtoSchema,
+  EnumValueDescriptorProtoSchema,
+  FieldDescriptorProtoSchema,
+  // eslint-disable-next-line camelcase
+  FieldDescriptorProto_Label as FieldLabel,
+  FieldOptionsSchema,
+  // eslint-disable-next-line camelcase
+  FieldDescriptorProto_Type as FieldTypeEnum,
+  FileDescriptorProtoSchema,
+  FileDescriptorSetSchema,
+  // eslint-disable-next-line import/no-unresolved
+} from '@bufbuild/protobuf/wkt';
+
+import type { DescEnum, DescMessage, Message } from '@bufbuild/protobuf';
 import type {
   DescriptorProto,
   EnumDescriptorProto,
@@ -54,7 +80,7 @@ export interface ProtobufFieldInfo {
 export interface ProtobufMessageType {
   readonly name: string;
   readonly fullName: string;
-  readonly desc: DescMessage;
+  readonly desc: unknown;
   readonly options?: Record<string, unknown>;
   readonly fields: Record<string, ProtobufFieldInfo>;
   readonly fieldsArray: ProtobufFieldInfo[];
@@ -66,44 +92,39 @@ export interface ProtobufMessageType {
 export interface ProtobufEnumType {
   readonly name: string;
   readonly fullName: string;
-  readonly desc: DescEnum;
+  readonly desc: unknown;
   readonly values: Record<string, number>;
   readonly valuesById: Record<number, string>;
 }
 
 export interface ProtobufRoot {
-  readonly registry: FileRegistry;
+  readonly registry: unknown;
   lookup(name: string): ProtobufMessageType | ProtobufEnumType | null;
   lookupType(name: string): ProtobufMessageType;
   lookupEnum(name: string): ProtobufEnumType;
   listTypes(): ProtobufMessageType[];
 }
 
-let cachedScalarTypeMap: Record<string, FieldType> | undefined;
+export const getMessageDesc = (messageType: ProtobufMessageType): DescMessage =>
+  messageType.desc as DescMessage;
 
-function getScalarTypeMap(): Record<string, FieldType> {
-  if (!cachedScalarTypeMap) {
-    const { FieldDescriptorProto_Type: FieldTypeEnum } = getProtobufWkt();
-    cachedScalarTypeMap = {
-      double: FieldTypeEnum.DOUBLE,
-      float: FieldTypeEnum.FLOAT,
-      int64: FieldTypeEnum.INT64,
-      uint64: FieldTypeEnum.UINT64,
-      int32: FieldTypeEnum.INT32,
-      fixed64: FieldTypeEnum.FIXED64,
-      fixed32: FieldTypeEnum.FIXED32,
-      bool: FieldTypeEnum.BOOL,
-      string: FieldTypeEnum.STRING,
-      bytes: FieldTypeEnum.BYTES,
-      uint32: FieldTypeEnum.UINT32,
-      sfixed32: FieldTypeEnum.SFIXED32,
-      sfixed64: FieldTypeEnum.SFIXED64,
-      sint32: FieldTypeEnum.SINT32,
-      sint64: FieldTypeEnum.SINT64,
-    };
-  }
-  return cachedScalarTypeMap;
-}
+const SCALAR_TYPE_MAP: Record<string, FieldType> = {
+  double: FieldTypeEnum.DOUBLE,
+  float: FieldTypeEnum.FLOAT,
+  int64: FieldTypeEnum.INT64,
+  uint64: FieldTypeEnum.UINT64,
+  int32: FieldTypeEnum.INT32,
+  fixed64: FieldTypeEnum.FIXED64,
+  fixed32: FieldTypeEnum.FIXED32,
+  bool: FieldTypeEnum.BOOL,
+  string: FieldTypeEnum.STRING,
+  bytes: FieldTypeEnum.BYTES,
+  uint32: FieldTypeEnum.UINT32,
+  sfixed32: FieldTypeEnum.SFIXED32,
+  sfixed64: FieldTypeEnum.SFIXED64,
+  sint32: FieldTypeEnum.SINT32,
+  sint64: FieldTypeEnum.SINT64,
+};
 
 function isTypeNode(node: ProtobufNodeJson): node is ProtobufTypeJson {
   return 'fields' in node && typeof node.fields === 'object' && node.fields !== null;
@@ -185,8 +206,6 @@ function resolveTypeName(
 }
 
 function buildEnumProto(name: string, node: ProtobufEnumJson): EnumDescriptorProto {
-  const { create } = getProtobuf();
-  const { EnumDescriptorProtoSchema, EnumValueDescriptorProtoSchema } = getProtobufWkt();
   return create(EnumDescriptorProtoSchema, {
     name,
     value: Object.entries(node.values).map(([valueName, number]) =>
@@ -201,13 +220,6 @@ function buildFieldProto(
   scope: string[],
   index: SymbolIndex
 ): FieldDescriptorProto {
-  const { create } = getProtobuf();
-  const {
-    FieldDescriptorProtoSchema,
-    FieldDescriptorProto_Label: FieldLabel,
-    FieldDescriptorProto_Type: FieldTypeEnum,
-    FieldOptionsSchema,
-  } = getProtobufWkt();
   let label = FieldLabel.OPTIONAL;
   if (field.rule === 'required') {
     label = FieldLabel.REQUIRED;
@@ -215,7 +227,7 @@ function buildFieldProto(
     label = FieldLabel.REPEATED;
   }
 
-  const scalarType = getScalarTypeMap()[field.type];
+  const scalarType = SCALAR_TYPE_MAP[field.type];
   let type: FieldType;
   let typeName: string | undefined;
 
@@ -260,8 +272,6 @@ function buildMessageProto(
   parentScope: string[],
   index: SymbolIndex
 ): DescriptorProto {
-  const { create } = getProtobuf();
-  const { DescriptorProtoSchema } = getProtobufWkt();
   const scope = [...parentScope, name];
   const nestedType: DescriptorProto[] = [];
   const enumType: EnumDescriptorProto[] = [];
@@ -295,8 +305,6 @@ function collectPackageFiles(
   files: FileDescriptorProto[]
 ): void {
   if (!nested) return;
-  const { create } = getProtobuf();
-  const { FileDescriptorProtoSchema } = getProtobufWkt();
   const messageType: DescriptorProto[] = [];
   const enumType: EnumDescriptorProto[] = [];
   const childNamespaces: Array<[string, ProtobufNamespaceJson]> = [];
@@ -333,8 +341,6 @@ function collectPackageFiles(
 }
 
 function assertRawRequiredFields(desc: DescMessage, msg: Message): void {
-  const { isFieldSet } = getProtobuf();
-  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const record = msg as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     if (field.fieldKind === 'list') {
@@ -365,7 +371,6 @@ function assertRawRequiredFields(desc: DescMessage, msg: Message): void {
 }
 
 function getFieldDefaultValue(desc: DescMessage, fieldName: string): unknown {
-  const { ScalarType } = getProtobuf();
   const field = desc.fields.find(f => f.name === fieldName);
   if (!field) return undefined;
   if (field.fieldKind === 'list') return [];
@@ -386,7 +391,6 @@ function getFieldDefaultValue(desc: DescMessage, fieldName: string): unknown {
 }
 
 function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unknown> {
-  const { isFieldSet } = getProtobuf();
   const record = msg as unknown as Record<string, unknown>;
   const proto: Record<string, unknown> = {};
   for (const field of desc.fields) {
@@ -441,7 +445,6 @@ function coerceRawBytes(val: unknown): Uint8Array {
 }
 
 function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unknown {
-  const { ScalarType } = getProtobuf();
   const field = desc.fields.find(f => f.name === fieldName);
   if (!field) return undefined;
   if (field.fieldKind === 'scalar') {
@@ -461,8 +464,6 @@ function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unkno
 }
 
 function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): Message {
-  const { ScalarType, create } = getProtobuf();
-  const { FieldDescriptorProto_Label: FieldLabel } = getProtobufWkt();
   const msg = create(desc) as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     const val = input[field.name];
@@ -512,9 +513,6 @@ function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): M
 }
 
 export function createProtobufRoot(data: ProtobufNamespaceJson | string): ProtobufRoot {
-  const { create, createFileRegistry, fromBinary, toBinary } = getProtobuf();
-  const { DescriptorProtoSchema, FileDescriptorProtoSchema, FileDescriptorSetSchema } =
-    getProtobufWkt();
   const schema: ProtobufNamespaceJson =
     typeof data === 'string' ? (JSON.parse(data) as ProtobufNamespaceJson) : data;
   const topLevel: Record<string, ProtobufNodeJson> | undefined =
