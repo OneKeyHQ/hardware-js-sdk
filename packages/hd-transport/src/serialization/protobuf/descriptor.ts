@@ -26,10 +26,11 @@ import {
   FieldDescriptorProto_Type as FieldTypeEnum,
   FileDescriptorProtoSchema,
   FileDescriptorSetSchema,
+  OneofDescriptorProtoSchema,
   // eslint-disable-next-line import/no-unresolved
 } from '@bufbuild/protobuf/wkt';
 
-import type { DescEnum, DescMessage, Message } from '@bufbuild/protobuf';
+import type { DescEnum, DescField, DescMessage, Message } from '@bufbuild/protobuf';
 import type {
   DescriptorProto,
   EnumDescriptorProto,
@@ -37,6 +38,7 @@ import type {
   // eslint-disable-next-line camelcase
   FieldDescriptorProto_Type as FieldType,
   FileDescriptorProto,
+  OneofDescriptorProto,
   // eslint-disable-next-line import/no-unresolved
 } from '@bufbuild/protobuf/wkt';
 
@@ -47,8 +49,13 @@ export interface ProtobufFieldJson {
   options?: Record<string, unknown>;
 }
 
+export interface ProtobufOneofJson {
+  oneof: string[];
+}
+
 export interface ProtobufTypeJson {
   fields: Record<string, ProtobufFieldJson>;
+  oneofs?: Record<string, ProtobufOneofJson>;
   options?: Record<string, unknown>;
   nested?: Record<string, ProtobufNodeJson>;
 }
@@ -108,6 +115,48 @@ export interface ProtobufRoot {
 export const getMessageDesc = (messageType: ProtobufMessageType): DescMessage =>
   messageType.desc as DescMessage;
 
+export const getFieldValue = (record: Record<string, unknown>, field: DescField): unknown => {
+  if (field.oneof) {
+    const oneofVal = record[field.oneof.localName] as
+      | { case?: string; value?: unknown }
+      | undefined;
+    return oneofVal?.case === field.localName ? oneofVal.value : undefined;
+  }
+  return record[field.localName];
+};
+
+export const setFieldValue = (
+  record: Record<string, unknown>,
+  field: DescField,
+  value: unknown
+): void => {
+  if (field.oneof) {
+    record[field.oneof.localName] = { case: field.localName, value };
+  } else {
+    record[field.localName] = value;
+  }
+};
+
+export const isLongBitPair = (
+  value: unknown
+): value is { low: number; high: number; unsigned?: boolean } =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { low?: unknown }).low === 'number' &&
+  typeof (value as { high?: unknown }).high === 'number' &&
+  Number.isInteger((value as { low: number }).low) &&
+  Number.isInteger((value as { high: number }).high);
+
+export const longBitPairToBigInt = (
+  value: { low: number; high: number; unsigned?: boolean },
+  unsigned: boolean
+): bigint => {
+  const lowU32 = BigInt.asUintN(32, BigInt(value.low));
+  const highU32 = BigInt.asUintN(32, BigInt(value.high));
+  const combined = highU32 * BigInt(0x100000000) + lowU32;
+  return unsigned ? BigInt.asUintN(64, combined) : BigInt.asIntN(64, combined);
+};
+
 const SCALAR_TYPE_MAP: Record<string, FieldType> = {
   double: FieldTypeEnum.DOUBLE,
   float: FieldTypeEnum.FLOAT,
@@ -140,7 +189,6 @@ interface SymbolIndex {
   kinds: Map<string, SymbolKind>;
   messageOptions: Map<string, Record<string, unknown>>;
   messageFields: Map<string, Record<string, ProtobufFieldInfo>>;
-  placeholders: Set<string>;
 }
 
 function buildFullName(scope: string[], name: string): string {
@@ -200,9 +248,8 @@ function resolveTypeName(
     const kind = index.kinds.get(candidate);
     if (kind) return { fullName: candidate, kind };
   }
-  // Partial test schemas may reference external message types without defining them.
-  index.placeholders.add(normalized);
-  return { fullName: normalized, kind: 'message' };
+  const scopeLabel = scope.length > 0 ? `.${scope.join('.')}` : 'Root';
+  throw new Error(`no such Type or Enum '${rawType}' in ${scopeLabel}`);
 }
 
 function buildEnumProto(name: string, node: ProtobufEnumJson): EnumDescriptorProto {
@@ -218,7 +265,8 @@ function buildFieldProto(
   fieldName: string,
   field: ProtobufFieldJson,
   scope: string[],
-  index: SymbolIndex
+  index: SymbolIndex,
+  oneofIndex?: number
 ): FieldDescriptorProto {
   let label = FieldLabel.OPTIONAL;
   if (field.rule === 'required') {
@@ -263,6 +311,7 @@ function buildFieldProto(
     typeName,
     defaultValue,
     options,
+    ...(oneofIndex !== undefined ? { oneofIndex } : {}),
   });
 }
 
@@ -286,8 +335,22 @@ function buildMessageProto(
     }
   }
 
+  const oneofDecl: OneofDescriptorProto[] = [];
+  const fieldToOneofIndex = new Map<string, number>();
+  if (node.oneofs) {
+    for (const [oneofName, oneofDef] of Object.entries(node.oneofs)) {
+      const idx = oneofDecl.length;
+      oneofDecl.push(create(OneofDescriptorProtoSchema, { name: oneofName }));
+      if (Array.isArray(oneofDef?.oneof)) {
+        for (const memberName of oneofDef.oneof) {
+          fieldToOneofIndex.set(memberName, idx);
+        }
+      }
+    }
+  }
+
   const fields = Object.entries(node.fields).map(([fieldName, field]) =>
-    buildFieldProto(fieldName, field, scope, index)
+    buildFieldProto(fieldName, field, scope, index, fieldToOneofIndex.get(fieldName))
   );
 
   return create(DescriptorProtoSchema, {
@@ -295,6 +358,7 @@ function buildMessageProto(
     field: fields,
     nestedType,
     enumType,
+    oneofDecl,
   });
 }
 
@@ -361,7 +425,7 @@ function assertRawRequiredFields(desc: DescMessage, msg: Message): void {
         }
       }
       if (field.fieldKind === 'message' && isFieldSet(msg, field)) {
-        const sub = record[field.localName];
+        const sub = getFieldValue(record, field);
         if (sub != null) {
           assertRawRequiredFields(field.message, sub as Message);
         }
@@ -407,11 +471,20 @@ function rawMessageToPlain(desc: DescMessage, msg: Message): Record<string, unkn
             : [...list];
       }
     } else if (isFieldSet(msg, field)) {
-      const val = record[field.localName];
+      const val = getFieldValue(record, field);
       if (field.fieldKind === 'message' && val != null) {
         out[field.name] = rawMessageToPlain(field.message, val as Message);
       } else {
         out[field.name] = val;
+      }
+    }
+  }
+  for (const oneof of desc.oneofs) {
+    const oneofVal = record[oneof.localName] as { case?: string } | undefined;
+    if (oneofVal?.case) {
+      const activeField = oneof.fields.find(f => f.localName === oneofVal.case);
+      if (activeField) {
+        out[oneof.name] = activeField.name;
       }
     }
   }
@@ -463,16 +536,29 @@ function defaultRawValueForRequired(desc: DescMessage, fieldName: string): unkno
   return getFieldDefaultValue(desc, fieldName);
 }
 
+const is64BitRawScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.INT64 ||
+  scalar === ScalarType.UINT64 ||
+  scalar === ScalarType.SINT64 ||
+  scalar === ScalarType.FIXED64 ||
+  scalar === ScalarType.SFIXED64;
+
+const isUnsigned64RawScalar = (scalar: ScalarType): boolean =>
+  scalar === ScalarType.UINT64 || scalar === ScalarType.FIXED64;
+
 function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): Message {
   const msg = create(desc) as unknown as Record<string, unknown>;
   for (const field of desc.fields) {
     const val = input[field.name];
     if (val === undefined || val === null) {
       if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
-        msg[field.localName] =
+        setFieldValue(
+          msg,
+          field,
           field.fieldKind === 'message'
             ? plainToRawMessage(field.message, {})
-            : defaultRawValueForRequired(desc, field.name);
+            : defaultRawValueForRequired(desc, field.name)
+        );
       }
     } else if (field.fieldKind === 'list') {
       if (Array.isArray(val)) {
@@ -482,6 +568,11 @@ function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): M
           );
         } else if (field.listKind === 'scalar' && field.scalar === ScalarType.BYTES) {
           msg[field.localName] = val.map(v => coerceRawBytes(v));
+        } else if (field.listKind === 'scalar' && is64BitRawScalar(field.scalar)) {
+          const unsigned = isUnsigned64RawScalar(field.scalar);
+          msg[field.localName] = val.map(v =>
+            isLongBitPair(v) ? longBitPairToBigInt(v, unsigned) : v
+          );
         } else if (field.listKind === 'enum') {
           msg[field.localName] = val
             .map(v => coerceRawEnumValue(field.enum, v))
@@ -492,21 +583,27 @@ function plainToRawMessage(desc: DescMessage, input: Record<string, unknown>): M
       }
     } else if (field.fieldKind === 'message') {
       if (typeof val === 'object') {
-        msg[field.localName] = plainToRawMessage(field.message, val as Record<string, unknown>);
+        setFieldValue(msg, field, plainToRawMessage(field.message, val as Record<string, unknown>));
       } else if (field.proto.label === FieldLabel.REQUIRED) {
-        msg[field.localName] = plainToRawMessage(field.message, {});
+        setFieldValue(msg, field, plainToRawMessage(field.message, {}));
       }
     } else if (field.fieldKind === 'enum') {
       const enumNumber = coerceRawEnumValue(field.enum, val);
       if (enumNumber !== undefined) {
-        msg[field.localName] = enumNumber;
+        setFieldValue(msg, field, enumNumber);
       } else if (field.proto.label === FieldLabel.REQUIRED) {
-        msg[field.localName] = defaultRawValueForRequired(desc, field.name);
+        setFieldValue(msg, field, defaultRawValueForRequired(desc, field.name));
       }
     } else if (field.fieldKind === 'scalar' && field.scalar === ScalarType.BYTES) {
-      msg[field.localName] = coerceRawBytes(val);
+      setFieldValue(msg, field, coerceRawBytes(val));
+    } else if (
+      field.fieldKind === 'scalar' &&
+      is64BitRawScalar(field.scalar) &&
+      isLongBitPair(val)
+    ) {
+      setFieldValue(msg, field, longBitPairToBigInt(val, isUnsigned64RawScalar(field.scalar)));
     } else {
-      msg[field.localName] = val;
+      setFieldValue(msg, field, val);
     }
   }
   return msg as unknown as Message;
@@ -524,28 +621,11 @@ export function createProtobufRoot(data: ProtobufNamespaceJson | string): Protob
     kinds: new Map(),
     messageOptions: new Map(),
     messageFields: new Map(),
-    placeholders: new Set(),
   };
   indexNamespace(topLevel, [], index);
 
   const files: FileDescriptorProto[] = [];
   collectPackageFiles(topLevel, [], index, files);
-
-  if (index.placeholders.size > 0) {
-    const placeholderMessages = Array.from(index.placeholders).map(name =>
-      create(DescriptorProtoSchema, { name: name.includes('.') ? name.split('.').pop()! : name })
-    );
-    files.unshift(
-      create(FileDescriptorProtoSchema, {
-        name: '__placeholders__.proto',
-        syntax: 'proto2',
-        messageType: placeholderMessages,
-      })
-    );
-    for (let i = 1; i < files.length; i += 1) {
-      files[i].dependency.push('__placeholders__.proto');
-    }
-  }
 
   const fileDescriptorSet = create(FileDescriptorSetSchema, { file: files });
   const registry = createFileRegistry(fileDescriptorSet);

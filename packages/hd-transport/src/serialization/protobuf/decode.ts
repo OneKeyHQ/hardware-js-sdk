@@ -5,7 +5,7 @@ import ByteBuffer from 'bytebuffer';
 // eslint-disable-next-line import/order
 import { ensureTextEncoding } from './text-encoding';
 // eslint-disable-next-line import/order
-import { getMessageDesc } from './descriptor';
+import { getFieldValue, getMessageDesc } from './descriptor';
 
 // eslint-disable-next-line import/order
 import { ScalarType, fromBinary, isFieldSet } from '@bufbuild/protobuf';
@@ -66,7 +66,7 @@ function assertRequiredFields(desc: DescMessage, decoded: Message): void {
         }
       }
       if (field.fieldKind === 'message' && isFieldSet(decoded, field)) {
-        const sub = record[field.localName];
+        const sub = getFieldValue(record, field);
         if (sub != null) {
           assertRequiredFields(field.message, sub as Message);
         }
@@ -99,7 +99,7 @@ function messageToJSON(desc: DescMessage, decoded: Message): Record<string, unkn
         res[field.name] = null;
       }
     } else {
-      const value = record[field.localName];
+      const value = getFieldValue(record, field);
       if (value == null) {
         if (isOptional) {
           res[field.name] = null;

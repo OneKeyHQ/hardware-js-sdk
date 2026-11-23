@@ -5,7 +5,7 @@ import DataManager from '../src/data-manager/DataManager';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
 import { DevicePool } from '../src/device/DevicePool';
-import { IFRAME, UI_EVENT, UI_RESPONSE } from '../src/events';
+import { CORE_EVENT, IFRAME, UI_EVENT, UI_RESPONSE } from '../src/events';
 
 import type { CoreContext } from '../src/core';
 import type { UiPromiseResponse } from '../src/events/ui-promise';
@@ -532,6 +532,66 @@ describe('Core.dispose', () => {
 
     try {
       expect(TransportManager.transport).toBe(newTransport);
+    } finally {
+      await core.dispose();
+      TransportManager.transport = previous;
+      DataManager.settings = settings;
+    }
+  });
+
+  test('resetForTransportSwitch retires active requestQueue tasks and drops stale postMessage events', async () => {
+    const previous = TransportManager.transport;
+    const { settings } = DataManager;
+    const oldTransport = {
+      name: 'OldTransport',
+      init: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      enumerate: jest.fn().mockResolvedValue([]),
+    };
+    const newTransport = {
+      name: 'NewTransport',
+      init: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      enumerate: jest.fn().mockResolvedValue([]),
+    };
+    function NewTransport() {
+      return newTransport;
+    }
+    TransportManager.transport = oldTransport as never;
+    DataManager.settings = { ...settings, env: 'webusb' };
+    const core = initCore();
+    initConnector();
+
+    const emittedEvents: unknown[] = [];
+    core.on(CORE_EVENT, event => emittedEvents.push(event));
+
+    try {
+      const preSwitchContext = (
+        core as unknown as { getCoreContext: () => CoreContext }
+      ).getCoreContext();
+      const task = preSwitchContext.requestQueue.createTask({
+        responseID: 777,
+        name: 'getFeatures',
+        connectId: 'dev-1',
+      } as never);
+      task.callPromise = createDeferred<unknown>();
+
+      await switchTransport({ env: 'emulator', Transport: NewTransport });
+
+      await expect(task.callPromise.promise).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.CallQueueActionCancelled,
+      });
+      expect(preSwitchContext.requestQueue.getTask(777)).toBeUndefined();
+      expect(preSwitchContext.isActive()).toBe(false);
+
+      // Late UI messages emitted via the retired context must be dropped.
+      emittedEvents.length = 0;
+      preSwitchContext.postUiMessage({
+        event: IFRAME.CALLBACK,
+        type: 'stale-prompt',
+        payload: {},
+      });
+      expect(emittedEvents).toHaveLength(0);
     } finally {
       await core.dispose();
       TransportManager.transport = previous;

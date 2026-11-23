@@ -5,7 +5,7 @@ import ByteBuffer from 'bytebuffer';
 // eslint-disable-next-line import/order
 import { ensureTextEncoding } from './text-encoding';
 // eslint-disable-next-line import/order
-import { getMessageDesc } from './descriptor';
+import { getMessageDesc, isLongBitPair, longBitPairToBigInt, setFieldValue } from './descriptor';
 
 // eslint-disable-next-line import/order
 import { ScalarType, create, toBinary } from '@bufbuild/protobuf';
@@ -45,6 +45,8 @@ const toBigInt64 = (scalar: ScalarType, value: unknown): bigint => {
       throw new Error('empty string');
     }
     raw = BigInt(value);
+  } else if (isLongBitPair(value)) {
+    return longBitPairToBigInt(value, isUnsigned64Scalar(scalar));
   } else if (
     typeof value === 'object' &&
     value !== null &&
@@ -152,10 +154,13 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
     const value = payload[field.name];
     if (value === undefined || value === null) {
       if (field.fieldKind !== 'list' && field.proto.label === FieldLabel.REQUIRED) {
-        msg[field.localName] =
+        setFieldValue(
+          msg,
+          field,
           field.fieldKind === 'message'
             ? buildMessage(field.message, {})
-            : defaultForRequiredScalarOrEnum(field);
+            : defaultForRequiredScalarOrEnum(field)
+        );
       }
     } else if (field.fieldKind === 'list') {
       if (Array.isArray(value)) {
@@ -187,20 +192,20 @@ function buildMessage(desc: DescMessage, payload: Record<string, unknown>): Mess
         encodedScalar.byteLength === 0 &&
         value !== '';
       if (!omitEmptyOptionalBytes) {
-        msg[field.localName] = encodedScalar;
+        setFieldValue(msg, field, encodedScalar);
       }
     } else if (field.fieldKind === 'enum') {
       const enumNumber = encodeEnum(field.enum, value);
       if (enumNumber !== undefined) {
-        msg[field.localName] = enumNumber;
+        setFieldValue(msg, field, enumNumber);
       } else if (field.proto.label === FieldLabel.REQUIRED) {
-        msg[field.localName] = defaultForRequiredScalarOrEnum(field);
+        setFieldValue(msg, field, defaultForRequiredScalarOrEnum(field));
       }
     } else if (field.fieldKind === 'message') {
       if (typeof value === 'object') {
-        msg[field.localName] = buildMessage(field.message, value as Record<string, unknown>);
+        setFieldValue(msg, field, buildMessage(field.message, value as Record<string, unknown>));
       } else if (field.proto.label === FieldLabel.REQUIRED) {
-        msg[field.localName] = buildMessage(field.message, {});
+        setFieldValue(msg, field, buildMessage(field.message, {}));
       }
     }
   }

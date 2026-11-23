@@ -343,4 +343,79 @@ describe('@bufbuild/protobuf boundary semantics', () => {
     const rawPing = Ping.encode({ message: 'hi' }).finish();
     expect(Ping.decode(rawPing).message).toBe('hi');
   });
+
+  test('rejects unresolved field types instead of creating empty placeholders', () => {
+    expect(() =>
+      parseConfigure({
+        nested: {
+          Parent: {
+            fields: {
+              child: { type: 'MissingChild', id: 1 },
+            },
+          },
+        },
+      })
+    ).toThrow("no such Type or Enum 'MissingChild'");
+  });
+
+  test('preserves oneof declarations and exposes the selected field name on decode', () => {
+    const oneofRoot = parseConfigure({
+      nested: {
+        Choice: {
+          oneofs: {
+            selection: { oneof: ['a', 'b'] },
+          },
+          fields: {
+            a: { type: 'string', id: 1 },
+            b: { type: 'uint32', id: 2 },
+          },
+        },
+      },
+    });
+    const Choice = oneofRoot.lookupType('Choice');
+
+    const rawA = Choice.encode({ a: 'hello' }).finish();
+    const decodedRawA = Choice.decode(rawA);
+    expect(decodedRawA.a).toBe('hello');
+    expect(decodedRawA.selection).toBe('a');
+
+    const rawEmpty = Choice.encode({}).finish();
+    const decodedEmpty = Choice.decode(rawEmpty);
+    expect(decodedEmpty.selection).toBeUndefined();
+
+    const encodedB = encode(Choice, { b: 42 });
+    const decodedB = decode(Choice, encodedB);
+    expect(decodedB.b).toBe(42);
+    expect(decodedB.a).toBeNull();
+  });
+
+  test('preserves plain 64-bit Long bit-pair objects across JSON/structured-clone boundaries', () => {
+    const numRoot = parseConfigure({
+      nested: {
+        Num: {
+          fields: {
+            u64: { type: 'uint64', id: 1 },
+            i64: { type: 'int64', id: 2 },
+          },
+        },
+      },
+    });
+    const Num = numRoot.lookupType('Num');
+
+    const payload = {
+      u64: { low: 7, high: 1, unsigned: true },
+      i64: { low: -1, high: -1, unsigned: false },
+    };
+    const encoded = encode(Num, payload);
+    const decoded = decode(Num, encoded);
+    expect(decoded).toStrictEqual({
+      u64: 4294967303,
+      i64: -1,
+    });
+
+    const rawEncoded = Num.encode(payload).finish();
+    const rawDecoded = Num.decode(rawEncoded);
+    expect(rawDecoded.u64).toBe(BigInt(4294967303));
+    expect(rawDecoded.i64).toBe(BigInt(-1));
+  });
 });

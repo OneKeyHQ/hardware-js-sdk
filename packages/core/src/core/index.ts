@@ -185,7 +185,7 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     method.connector = _connector;
     const shouldPostMessage = createUiProgressMessageFilter();
     method.postMessage = event => {
-      if (shouldPostMessage(event)) {
+      if (context.isActive() && shouldPostMessage(event)) {
         postMessage(event);
       }
     };
@@ -217,6 +217,11 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
         (DataManager.isBrowserWebUsb(env) || DataManager.isDesktopWebUsb(env))
           ? await context.methodSynchronize(() => method.run(), 'webusb-discovery')
           : await method.run();
+      if (!context.isActive()) {
+        const cancelled = ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled);
+        completeMethodRequestContext(method, cancelled);
+        return createResponseMessage(method.responseID, false, { error: cancelled });
+      }
       completeMethodRequestContext(method);
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
@@ -741,6 +746,10 @@ const onCallDevice = async (
             method.device?.commands?.checkDisposed();
           },
         });
+        if (!context.isActive() || !requestQueue.getTask(method.responseID)) {
+          Log.debug('Call API - Ignore late inner method result after cancellation or switch');
+          return;
+        }
         messageResponse = createResponseMessage(method.responseID, true, response);
         // Preserve the acknowledged result while the next call waits for cleanup and cooldown.
         if (method.connectId) {
@@ -1908,6 +1917,9 @@ export default class Core extends EventEmitter {
       methodSynchronize: this.methodSynchronize,
       getPrePendingCallPromise: (connectId: string) => this.prePendingCallPromises.get(connectId),
       setPrePendingCallPromise: (connectId: string, promise?: Promise<void>) => {
+        if (!isContextActive()) {
+          return;
+        }
         if (!promise) {
           this.prePendingCallPromises.delete(connectId);
           return;
@@ -2095,6 +2107,12 @@ export default class Core extends EventEmitter {
   resetForTransportSwitch() {
     this.transportGeneration += 1;
     this.requestQueue.abortAllRequests();
+    this.requestQueue.getRequestTasksId().forEach(requestId => {
+      this.requestQueue.rejectRequest(
+        requestId,
+        ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
+      );
+    });
     cleanup(this.uiPromises);
     // Replace the array so a late finally() from a pre-switch call only cleans its own
     // detached list and cannot cancel UI waiters registered after the switch.
