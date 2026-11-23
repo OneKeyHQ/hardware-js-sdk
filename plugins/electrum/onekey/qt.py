@@ -45,46 +45,40 @@ class Plugin(OneKeyPlugin, QtPluginBase):
 
 
 class OneKeyQtHandler(QtHandlerBase):
-    alternate_wallet_signal = pyqtSignal(bool)
+    passphrase_retry_signal = pyqtSignal()
 
     def __init__(self, window):
         super().__init__(window, "OneKey")
         self._wallet_choice_done = threading.Event()
         self._wallet_choice = None
-        self.alternate_wallet_signal.connect(self._choose_alternate_wallet)
+        self.passphrase_retry_signal.connect(self._choose_passphrase_retry)
 
-    def choose_alternate_wallet(self, attach):
+    def choose_passphrase_retry(self):
         if threading.current_thread() is threading.main_thread():
             raise UserFacingException(_("OneKey wallet selection must run on the hardware thread."))
         self._wallet_choice = None
         self._wallet_choice_done.clear()
-        self.alternate_wallet_signal.emit(bool(attach))
+        self.passphrase_retry_signal.emit()
         self._wallet_choice_done.wait()
         return self._wallet_choice
 
-    @pyqtSlot(bool)
-    def _choose_alternate_wallet(self, attach):
+    @pyqtSlot()
+    def _choose_passphrase_retry(self):
         try:
             box = QMessageBox(self.top_level_window())
             box.setIcon(QMessageBox.Icon.Question)
             box.setWindowTitle("OneKey")
-            text = _("This OneKey wallet did not encrypt this file. "
-                     "A hidden wallet asks for the passphrase on the device.")
-            if attach:
-                text += " " + _("Attach PIN opens the wallet bound to that PIN.")
-            box.setText(text)
-            hidden = box.addButton(_("Hidden wallet"), QMessageBox.ButtonRole.AcceptRole)
-            attach_button = None
-            if attach:
-                attach_button = box.addButton(_("Attach PIN wallet"), QMessageBox.ButtonRole.ActionRole)
+            box.setText(_(
+                "The current OneKey wallet did not encrypt this file. "
+                "Enter a passphrase on your OneKey to try a hidden wallet, "
+                "or lock the device and unlock with the matching PIN."
+            ))
+            hidden = box.addButton(_("Enter passphrase on device"), QMessageBox.ButtonRole.AcceptRole)
             box.addButton(QMessageBox.StandardButton.Cancel)
             box.setDefaultButton(hidden)
             box.exec()
-            clicked = box.clickedButton()
-            if clicked is hidden:
+            if box.clickedButton() is hidden:
                 self._wallet_choice = "select-hidden"
-            elif attach_button is not None and clicked is attach_button:
-                self._wallet_choice = "select-attach-pin"
         finally:
             self._wallet_choice_done.set()
 
@@ -135,12 +129,12 @@ class WCOneKeyUnlock(WCHWUnlock):
         threading.Thread(target=unlock_task, daemon=True).start()
 
     def _unlock_password(self, client):
-        # The wallet type is inside the encrypted file, so the first try is the standard wallet.
+        # Try the active device session first (PIN_ANY accepts both Main PIN and Attach PIN).
         password = self._encryption_password(client, "standard")
         if self._password_decrypts(password):
             return password
-        mode = client.handler.choose_alternate_wallet(client.attach_pin_enabled())
-        if mode not in ("select-hidden", "select-attach-pin"):
+        mode = client.handler.choose_passphrase_retry()
+        if mode != "select-hidden":
             self.error = _("This OneKey wallet did not encrypt this file.")
             return None
         password = self._encryption_password(client, mode)

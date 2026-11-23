@@ -239,14 +239,13 @@ def _der(signature):
 
 
 class Session:
-    def __init__(self, link, *, deadline, cancelled, on_ui, cache, connect_id, features=None):
+    def __init__(self, link, *, deadline, cancelled, on_ui, cache, connect_id):
         self.link = link
         self.deadline = deadline
         self.cancelled = cancelled
         self.on_ui = on_ui or (lambda _event: None)
         self.cache = cache
         self.connect_id = connect_id
-        self.features = features
         self._eventless = False
 
     def handshake(self):
@@ -272,40 +271,37 @@ class Session:
         return {"deviceId": status["device_id"], "serialNo": info["serial_no"], "model": info["model"]}
 
     def open(self, mode):
-        if mode not in ("standard", "select-hidden", "select-attach-pin"):
+        if mode not in ("standard", "select-hidden"):
             _fail("INVALID_REQUEST")
         status, info = self.identity()
         self._eventless_session()
         if mode == "standard":
-            status, info = self._main_pin(status, info)
-            if status.get("passphrase_enabled"):
-                self._passphrase("", on_device=False)
-            _address, session_id = self._session()
-            wallet_type, passphrase_state = "standard", None
-        elif mode == "select-hidden":
+            # PIN_ANY accepts both Main PIN and Attach PIN natively on the device.
+            # If the user unlocked via Attach PIN, follow that active session directly.
+            if status.get("unlocked") is not True:
+                self._pin(codec.PIN_ANY)
+                status, info = self.identity()
+            if status.get("unlocked_by_attach_to_pin") is True:
+                passphrase_state, session_id = self._session()
+                wallet_type = "hidden"
+            else:
+                if status.get("passphrase_enabled"):
+                    self._passphrase("", on_device=False)
+                _address, session_id = self._session()
+                wallet_type, passphrase_state = "standard", None
+        else:
             status, info = self._main_pin(status, info)
             self.on_ui("passphrase-select")
             self._passphrase(None, on_device=True)
             passphrase_state, session_id = self._session()
             wallet_type = "hidden"
-        else:
-            # An explicit selection must allow choosing another Attach PIN slot.
-            if status.get("unlocked_by_attach_to_pin") is True:
-                self._call(codec.LOCK_DEVICE, b"", codec.SUCCESS)
-                status, info = self.identity()
-                if status.get("unlocked") is not False:
-                    _fail("WALLET_MISMATCH")
-            status, info = self._attach_pin(status, info)
-            passphrase_state, session_id = self._session()
-            wallet_type = "attach-pin"
         status, info = self.identity()
         if not status["device_id"] or status.get("unlocked") is not True:
             _fail("DEVICE_MISMATCH")
-        if self.features is not None:
-            self.features[self.connect_id] = status.get("attach_to_pin_enabled") is True
         result = {"deviceId": status["device_id"], "serialNo": info["serial_no"],
                   "walletType": wallet_type, "passphraseState": passphrase_state}
-        self._remember(wallet_type, passphrase_state, status["device_id"], session_id)
+        self._remember(wallet_type, passphrase_state, status["device_id"], session_id,
+                       status.get("unlocked_by_attach_to_pin") is True)
         return result
 
     def xpub(self, binding, coin, path, script_type):
@@ -411,26 +407,31 @@ class Session:
         # same device_id. The tuple alone cannot prove which seed is loaded.
         if self._resume(binding, status):
             return status, info
+        if status.get("unlocked") is not True:
+            # PIN_ANY accepts both Main PIN and Attach PIN; the user unlocks
+            # whichever wallet they intend and we verify session consistency below.
+            self._pin(codec.PIN_ANY)
+            status, info = self.identity()
+            if self._resume(binding, status):
+                return status, info
         kind = binding["walletType"]
+        attach = status.get("unlocked_by_attach_to_pin") is True
         if kind == "standard":
-            status, info = self._main_pin(status, info)
+            if attach:
+                _fail("WALLET_MISMATCH")
             if status.get("passphrase_enabled"):
                 self._passphrase("", on_device=False)
             _address, session_id = self._session()
-        elif kind == "hidden":
-            if status.get("unlocked") is True:
-                # Empty Get inspects the current wallet; an address-only hint can
-                # select/create a different wallet and cannot prove ownership.
-                restored, session_id = self._session()
-                if restored == binding["passphraseState"]:
-                    self._confirm(binding)
-                    self._remember(kind, restored, binding["deviceId"], session_id)
-                    return status, info
-            if status.get("unlocked") is not True or status.get("unlocked_by_attach_to_pin") is True:
-                self._pin(codec.PIN_MAIN)
-                status, info = self.identity()
-            if self._resume(binding, status):
+        else:
+            # Empty Get inspects the current wallet; an address-only hint can
+            # select/create a different wallet and cannot prove ownership.
+            restored, session_id = self._session()
+            if restored == binding["passphraseState"]:
+                self._confirm(binding)
+                self._remember(kind, restored, binding["deviceId"], session_id, attach)
                 return status, info
+            if attach or not status.get("passphrase_enabled"):
+                _fail("WALLET_MISMATCH")
             # Address-only Get is a hint. A miss calls SESSION_NEW and returns the
             # new wallet. Resume uses the in-memory session id; after lock the
             # passphrase has to be entered on the device again.
@@ -439,43 +440,26 @@ class Session:
             restored, session_id = self._session()
             if restored != binding["passphraseState"]:
                 _fail("WALLET_MISMATCH")
-        else:
-            if status.get("unlocked_by_attach_to_pin") is True:
-                restored, session_id = self._session()
-                if restored == binding["passphraseState"]:
-                    self._confirm(binding)
-                    self._remember(kind, restored, binding["deviceId"], session_id)
-                    return status, info
-                # A different Attach PIN slot needs a fresh PIN selection.
-                self._call(codec.LOCK_DEVICE, b"", codec.SUCCESS)
-                status, info = self.identity()
-                if status.get("unlocked") is not False:
-                    _fail("WALLET_MISMATCH")
-            status, info = self._attach_pin(status, info)
-            restored, session_id = self._session()
-            if restored != binding["passphraseState"]:
-                _fail("WALLET_MISMATCH")
         # PIN entry may change initialization identity. Check it before any
         # public key, address or signing command, as well as after the operation.
         self._confirm(binding)
-        self._remember(kind, binding["passphraseState"], binding["deviceId"], session_id)
+        self._remember(kind, binding["passphraseState"], binding["deviceId"], session_id, attach)
         return status, info
 
     def _resume(self, binding, status):
         cached = self.cache.get(self.connect_id)
-        if type(cached) is not tuple or len(cached) != 4:
+        if type(cached) is not tuple or len(cached) != 5:
             return False
-        wallet_type, passphrase_state, device_id, session_id = cached
+        wallet_type, passphrase_state, device_id, session_id, cached_attach = cached
         wanted = (binding["walletType"], binding["passphraseState"], binding["deviceId"])
         if (wallet_type, passphrase_state, device_id) != wanted or not _session_id(session_id):
             return False
         if status.get("unlocked") is not True or status.get("device_id") != binding["deviceId"]:
             return False
         attach = status.get("unlocked_by_attach_to_pin") is True
-        if binding["walletType"] == "attach-pin":
-            if not attach:
-                return False
-        elif attach:
+        if attach != cached_attach:
+            return False
+        if binding["walletType"] == "standard" and attach:
             return False
         address = None if binding["walletType"] == "standard" else binding["passphraseState"]
         try:
@@ -488,7 +472,7 @@ class Session:
         if binding["walletType"] != "standard" and opened != binding["passphraseState"]:
             self.cache.pop(self.connect_id, None)
             return False
-        self._remember(wallet_type, passphrase_state, device_id, new_id or session_id)
+        self._remember(wallet_type, passphrase_state, device_id, new_id or session_id, attach)
         return True
 
     def _session(self, address=None, session_id=None):
@@ -498,10 +482,10 @@ class Session:
             _fail("WALLET_MISMATCH")
         return opened, new_id
 
-    def _remember(self, wallet_type, passphrase_state, device_id, session_id):
+    def _remember(self, wallet_type, passphrase_state, device_id, session_id, attach=False):
         if not _session_id(session_id):
             session_id = None
-        self.cache[self.connect_id] = (wallet_type, passphrase_state, device_id, session_id)
+        self.cache[self.connect_id] = (wallet_type, passphrase_state, device_id, session_id, bool(attach))
 
     def _main_pin(self, status, info):
         # Main PIN while attach-unlocked is the wrong unlock. Firmware relocks and
@@ -510,15 +494,6 @@ class Session:
             return status, info
         self._pin(codec.PIN_MAIN)
         return self.identity()
-
-    def _attach_pin(self, status, info):
-        if status.get("unlocked_by_attach_to_pin") is True:
-            return status, info
-        self._pin(codec.PIN_ATTACH)
-        status, info = self.identity()
-        if status.get("unlocked_by_attach_to_pin") is not True:
-            _fail("WALLET_MISMATCH")
-        return status, info
 
     def _confirm(self, binding):
         status, info = self.identity()
@@ -537,7 +512,7 @@ class Session:
             self.link.eventless = True
 
     def _pin(self, pin_type):
-        self.on_ui("attach-pin" if pin_type == codec.PIN_ATTACH else "pin")
+        self.on_ui("pin")
         self._call(codec.DEVICE_SESSION_ASK_PIN, codec.encode_ask_pin(pin_type), codec.SUCCESS)
 
     def _passphrase(self, passphrase, *, on_device):

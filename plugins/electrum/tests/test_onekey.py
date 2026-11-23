@@ -444,14 +444,10 @@ class TestOneKeyClient(unittest.TestCase):
         handler.choose_wallet.assert_not_called()
         helper.shutdown.assert_not_called()
 
-    def test_attach_pin_enabled_follows_the_feature_and_fails_closed(self):
-        client, helper, _handler = self.make_client()
-        helper.call.return_value = {"attachToPinEnabled": True}
-        self.assertTrue(client.attach_pin_enabled())
-        self.assertEqual("features", helper.call.call_args.args[0])
-        helper.call.side_effect = HelperError("STALE")
-        self.assertFalse(client.attach_pin_enabled())
-        self.assertFalse(client.closed)
+    def test_request_wallet_mode_rejects_separate_attach_pin_mode(self):
+        client, _helper, _handler = self.make_client()
+        with self.assertRaises(UserFacingException):
+            client.request_wallet_mode("select-attach-pin")
 
     def test_account_xpub_omitting_fingerprint_clears_the_cache(self):
         client, helper, _handler = self.make_client()
@@ -1184,7 +1180,7 @@ class TestOneKeyMultisig(unittest.TestCase):
         client.request_wallet_mode.assert_called_once_with("select-hidden")
         step.wizard_data = {"wallet_type": "imported"}
         client.reset_mock()
-        with self.assertRaisesRegex(UserFacingException, "Only single-signature"):
+        with self.assertRaisesRegex(UserFacingException, "Only standard and multisig"):
             WCOneKeyXPub.get_xpub_from_client(step, client, "m/84'/0'/0'", "p2wpkh")
         client.begin_new_wallet_selection.assert_not_called()
         client.request_wallet_mode.assert_not_called()

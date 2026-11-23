@@ -90,7 +90,10 @@ class Scripted:
             self.pins.append(codec.decode_ask_pin(payload))
             self.locked = False
             self.device_id = "synthetic-device"
-            self.unlocked_by_attach = self.pins[-1] == codec.PIN_ATTACH
+            self.unlocked_by_attach = (
+                self.pins[-1] == codec.PIN_ATTACH
+                or (self.pins[-1] == codec.PIN_ANY and getattr(self, "pin_any_as_attach", False))
+            )
             # Main PIN unlocks the device and clears SE sessions. Attach PIN loads
             # the bound passphrase, which an empty Get then reads.
             if self.unlocked_by_attach:
@@ -305,7 +308,7 @@ class TestDeviceSession(unittest.TestCase):
             opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
             self.assertEqual("standard", opened["walletType"])
             self.assertIsNone(opened["passphraseState"])
-            self.assertEqual([codec.PIN_MAIN], device.pins)
+            self.assertEqual([codec.PIN_ANY], device.pins)
             self.assertIn((False, ""), device.on_device)
             hidden = Scripted()
             helper, hidden = helper_for(hidden)
@@ -321,12 +324,12 @@ class TestDeviceSession(unittest.TestCase):
                                            "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
             self.assertEqual("xpub-test", result["xpub"])
             self.assertEqual([(True, None)], locked.on_device)
-            self.assertEqual([(None, None)], locked.session_queries)
+            self.assertEqual([(None, None), (None, None)], locked.session_queries)
             self.assertEqual(locked.hidden, locked.session_address)
             address = call(helper, "address", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                                                "path": ADDRESS_PATH, "scriptType": "SPENDWITNESS"})
             self.assertEqual("bc1qexample", address["address"])
-            self.assertEqual([codec.PIN_MAIN], locked.pins)
+            self.assertEqual([codec.PIN_ANY], locked.pins)
             self.assertEqual([(True, None)], locked.on_device)
             self.assertEqual((locked.session_id, locked.hidden), locked.session_queries[-1])
             signed = self.sign(helper, binding)
@@ -340,45 +343,36 @@ class TestDeviceSession(unittest.TestCase):
             self.assertEqual(SIGNATURE.hex(), signed["signatures"][0]["signature"])
             popen.assert_not_called()
 
-    def test_open_records_attach_pin_availability_without_changing_the_binding(self):
+    def test_pin_any_unlock_follows_attach_pin_session_without_separate_mode(self):
+        # User unlocks with Attach PIN during standard open (PIN_ANY): bound directly as hidden session.
         device = Scripted()
-        device.attach_to_pin_enabled = True
-        helper, _device = helper_for(device)
-        self.assertEqual({"attachToPinEnabled": False}, call(helper, "features", {"connectId": "usb1"}))
-        opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
-        self.assertEqual({"deviceId", "serialNo", "walletType", "passphraseState"}, set(opened))
-        self.assertEqual({"attachToPinEnabled": True}, call(helper, "features", {"connectId": "usb1"}))
-        plain = Scripted()
-        helper, _plain = helper_for(plain)
-        call(helper, "open", {"connectId": "usb1", "mode": "standard"})
-        self.assertEqual({"attachToPinEnabled": False}, call(helper, "features", {"connectId": "usb1"}))
-        self.assertEqual({"attachToPinEnabled": False}, call(helper, "features", {"connectId": "other"}))
-
-    def test_attach_pin_selects_and_restores_without_passphrase(self):
-        device = Scripted()
+        device.pin_any_as_attach = True
         helper, device = helper_for(device)
-        opened = call(helper, "open", {"connectId": "usb1", "mode": "select-attach-pin"})
-        self.assertEqual("attach-pin", opened["walletType"])
+        opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        self.assertEqual("hidden", opened["walletType"])
         self.assertEqual(device.hidden, opened["passphraseState"])
-        self.assertEqual([codec.PIN_ATTACH], device.pins)
+        self.assertEqual([codec.PIN_ANY], device.pins)
         self.assertEqual([], device.on_device)
         device.pins.clear()
         binding = dict(deviceId=opened["deviceId"], serialNo=opened["serialNo"],
-                       walletType="attach-pin", passphraseState=opened["passphraseState"])
+                       walletType="hidden", passphraseState=opened["passphraseState"])
         result = call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                                        "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
         self.assertEqual("xpub-test", result["xpub"])
         self.assertEqual([], device.pins)
         self.assertEqual([], device.on_device)
 
+        # After lock, PIN_ANY lets the user enter Attach PIN and match the session directly.
         locked = Scripted()
+        locked.pin_any_as_attach = True
         helper, locked = helper_for(locked)
         call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                               "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
-        self.assertEqual([codec.PIN_ATTACH], locked.pins)
+        self.assertEqual([codec.PIN_ANY], locked.pins)
         self.assertEqual([], locked.on_device)
         self.assertEqual([(None, None)], locked.session_queries)
 
+        # Already unlocked via Attach PIN: matches immediately without PIN or passphrase prompts.
         current = Scripted()
         current.locked = False
         current.device_id = "synthetic-device"
@@ -398,11 +392,11 @@ class TestDeviceSession(unittest.TestCase):
         device.hidden_xpub = "xpub-attach"
         device.unlocked_by_attach = True
         device.install_session(device.hidden)
-        result = call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
-                                       "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
-        self.assertEqual("xpub-test", result["xpub"])
-        self.assertEqual(codec.PIN_MAIN, device.pins[-1])
-        self.assertEqual("standard-wallet", device.session_address)
+        with self.assertRaises(HelperError) as raised:
+            call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
+                                  "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
+        self.assertEqual("WALLET_MISMATCH", raised.exception.code)
+        self.assertEqual(0, device.locks)
 
     def test_hidden_restore_rejects_a_different_passphrase_without_a_hint_session(self):
         device = Scripted()
@@ -415,7 +409,7 @@ class TestDeviceSession(unittest.TestCase):
                                   "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
         self.assertEqual("WALLET_MISMATCH", raised.exception.code)
         self.assertEqual([(True, None)], device.on_device)
-        self.assertEqual([(None, None)], device.session_queries)
+        self.assertEqual([(None, None), (None, None)], device.session_queries)
         self.assertEqual("other-wallet", device.session_address)
         self.assertIsNotNone(helper.generation)
 

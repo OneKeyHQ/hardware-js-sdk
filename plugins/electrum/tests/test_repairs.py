@@ -143,38 +143,27 @@ class TestProtocolRepairs(unittest.TestCase):
                 self.assertEqual([], device.on_device)
                 self.assertEqual([], device.pins)
 
-    def test_explicit_attach_selection_can_choose_another_slot(self):
+    def test_already_attach_unlocked_device_opens_that_session_directly_without_locking(self):
         device = Scripted()
         device.locked = False
         device.device_id = 'synthetic-device'
         device.unlocked_by_attach = True
-        device.install_session('old-attach-wallet')
-        device.hidden = 'target-attach-wallet'
-        original = device.handle
-        locks = []
-
-        def handle(kind, payload):
-            if kind == 24:
-                locks.append(kind)
-                device.locked = True
-                device.unlocked_by_attach = False
-                device.session_id = device.session_address = None
-                return codec.SUCCESS, b''
-            return original(kind, payload)
-
-        device.handle = handle
+        device.install_session('target-attach-wallet')
         helper, device = helper_for(device)
-        result = call(helper, 'open', dict(connectId='usb1', mode='select-attach-pin'))
+        result = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+        self.assertEqual('hidden', result['walletType'])
         self.assertEqual('target-attach-wallet', result['passphraseState'])
-        self.assertEqual([24], locks)
-        self.assertEqual([codec.PIN_ATTACH], device.pins)
+        self.assertEqual(0, device.locks)
+        self.assertEqual([], device.pins)
 
-    def test_saved_attach_wallet_switches_from_another_attach_slot(self):
+    def test_saved_hidden_wallet_rejects_different_attach_slot_without_locking(self):
         for cached in (False, True):
             with self.subTest(cached=cached):
-                helper, device = helper_for()
+                device = Scripted()
+                device.pin_any_as_attach = True
+                helper, device = helper_for(device)
                 self.addCleanup(helper.shutdown)
-                expected = binding('attach-pin')
+                expected = binding('hidden')
                 if cached:
                     public_key(helper, expected)
                 device.pins.clear()
@@ -184,37 +173,13 @@ class TestProtocolRepairs(unittest.TestCase):
                 device.unlocked_by_attach = True
                 device.install_session('other-attach-wallet')
 
-                self.assertEqual('xpub-test', public_key(helper, expected)['xpub'])
-                self.assertEqual(1, device.locks)
-                self.assertEqual([codec.PIN_ATTACH], device.pins)
-                self.assertEqual(expected['passphraseState'], device.session_address)
+                with self.assertRaises(HelperError) as raised:
+                    public_key(helper, expected)
+                self.assertEqual('WALLET_MISMATCH', raised.exception.code)
+                self.assertEqual(0, device.locks)
+                self.assertEqual([], device.pins)
                 self.assertEqual([], device.on_device)
-                self.assertTrue(device.material)
-
-    def test_saved_attach_wallet_retry_prompts_after_wrong_slot(self):
-        device = Scripted()
-        device.locked = False
-        device.device_id = 'synthetic-device'
-        device.unlocked_by_attach = True
-        device.install_session('other-attach-wallet')
-        expected = binding('attach-pin')
-        device.hidden = 'wrong-attach-wallet'
-        helper, device = helper_for(device)
-        self.addCleanup(helper.shutdown)
-
-        with self.assertRaises(HelperError) as raised:
-            public_key(helper, expected)
-        self.assertEqual('WALLET_MISMATCH', raised.exception.code)
-        self.assertEqual(1, device.locks)
-        self.assertEqual([codec.PIN_ATTACH], device.pins)
-        self.assertFalse(device.material)
-
-        device.hidden = expected['passphraseState']
-        self.assertEqual('xpub-test', public_key(helper, expected)['xpub'])
-        self.assertEqual(2, device.locks)
-        self.assertEqual([codec.PIN_ATTACH, codec.PIN_ATTACH], device.pins)
-        self.assertEqual(expected['passphraseState'], device.session_address)
-        self.assertEqual([], device.on_device)
+                self.assertFalse(device.material)
 
     def test_pin_switch_refreshes_identity_before_reading_material(self):
         device = Scripted()
@@ -240,14 +205,18 @@ class TestProtocolRepairs(unittest.TestCase):
         with self.assertRaises(HelperError):
             public_key(helper, binding('standard'))
 
-    def test_cached_attach_binding_after_main_pin_requires_attach_pin_again(self):
-        helper, device = helper_for()
-        selected = call(helper, 'open', dict(connectId='usb1', mode='select-attach-pin'))
+    def test_cached_attach_session_after_main_pin_switch_rejects_wrong_session(self):
+        device = Scripted()
+        device.pin_any_as_attach = True
+        device.passphrase_enabled = False
+        helper, device = helper_for(device)
+        selected = call(helper, 'open', dict(connectId='usb1', mode='standard'))
         device.unlocked_by_attach = False
         device.install_session('standard-wallet')
-        public_key(helper, selected)
-        self.assertEqual([codec.PIN_ATTACH, codec.PIN_ATTACH], device.pins)
-        self.assertEqual(device.hidden, device.session_address)
+        with self.assertRaises(HelperError) as raised:
+            public_key(helper, selected)
+        self.assertEqual('WALLET_MISMATCH', raised.exception.code)
+        self.assertEqual(0, device.locks)
 
     def test_failed_legacy_probe_does_not_hide_a_pro2(self):
         for failure in ('TIMEOUT', 'PROTOCOL', 'unexpected-ping', 'unsupported'):
@@ -297,7 +266,7 @@ class TestProtocolRepairs(unittest.TestCase):
             self.assertEqual([20], [kind for kind in sent if kind == 20])
             self.assertEqual(['usb1'], closed)
             call(helper, 'state', dict(connectId='usb1'))
-            self.assertEqual(1, device.pins.count(codec.PIN_MAIN))
+            self.assertEqual(1, device.pins.count(codec.PIN_ANY))
 
     def test_reconnect_continues_the_device_send_sequence(self):
         device = Scripted()
