@@ -4,9 +4,9 @@ import * as decodeProtobuf from '../../serialization/protobuf/decode';
 import { decodeEnvelope } from './decode';
 import { createMessageFromType } from '../../serialization/protobuf/messages';
 
-import type { Root } from 'protobufjs/light';
+import type { ProtobufRoot } from '../../serialization/protobuf/descriptor';
 
-export function decodeMessage(messages: Root, data: string) {
+export function decodeMessage(messages: ProtobufRoot, data: string) {
   const bytebuffer = ByteBuffer.wrap(data, 'hex');
 
   const { typeId, buffer } = decodeEnvelope(bytebuffer);

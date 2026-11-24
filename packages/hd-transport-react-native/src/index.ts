@@ -72,7 +72,7 @@ type FirmwareInstallBleAcquireInput = BleAcquireInput & {
 const transport: typeof transportModule =
   (transportModule as typeof transportModule & { default?: typeof transportModule }).default ??
   transportModule;
-const { check, ProtocolV1, parseConfigure } = transport;
+const { check, ProtocolV1, parseTransportConfigure } = transport;
 
 const Log = bleLogger;
 
@@ -670,9 +670,9 @@ function remapError(error: IOBleErrorRemap) {
 export default class ReactNativeBleTransport {
   blePlxManager: BlePlxManager | undefined;
 
-  _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
-  _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  _messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   private protocolV2SchemaConfiguration: string | undefined;
 
@@ -799,7 +799,7 @@ export default class ReactNativeBleTransport {
   }
 
   configure(signedData: any) {
-    const messages = parseConfigure(signedData);
+    const messages = parseTransportConfigure(signedData);
     this.configured = true;
     this._messages = messages;
   }
@@ -811,7 +811,7 @@ export default class ReactNativeBleTransport {
     }
 
     const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
-    this._messagesV2 = parseConfigure(signedData);
+    this._messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaConfiguration = configuration;
     if (isReconfiguration) {
       this.protocolV2Links

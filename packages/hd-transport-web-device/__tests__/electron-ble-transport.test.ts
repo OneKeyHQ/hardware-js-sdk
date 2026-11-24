@@ -1372,4 +1372,81 @@ describe('ElectronBleTransport protocol detection', () => {
       await bleTransport.release(device.id);
     }
   });
+
+  test('stop() unsubscribes host disconnect listener and releases owned links idempotently', async () => {
+    const device = { id: 'stop-cleanup-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    const emitter = new EventEmitter();
+    const hostDisconnectCleanup = jest.fn();
+    const notifyCleanup = jest.fn();
+    const mtuCleanup = jest.fn();
+    let disconnectHandler:
+      | ((d: { id: string; name: string; reason?: EBleDisconnectReason }) => void)
+      | undefined;
+
+    nobleBle.onDeviceDisconnected.mockImplementation(handler => {
+      disconnectHandler = handler;
+      return () => {
+        hostDisconnectCleanup();
+        disconnectHandler = undefined;
+      };
+    });
+    echoProtocolV2(nobleBle, device.id);
+    const echoOnNotification = nobleBle.onNotification.getMockImplementation();
+    nobleBle.onNotification.mockImplementation(handler => {
+      echoOnNotification?.(handler);
+      return notifyCleanup;
+    });
+    nobleBle.onMtuChanged.mockImplementation(() => mtuCleanup);
+
+    const transportDisconnect = jest.fn();
+    emitter.on('transport-device-disconnect', transportDisconnect);
+    const bleTransport = configureTransport(nobleBle, emitter);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    expect(bleTransport.getProtocolType(device.id)).toBe('V2');
+
+    await bleTransport.stop();
+
+    expect(hostDisconnectCleanup).toHaveBeenCalledTimes(1);
+    expect(notifyCleanup).toHaveBeenCalledTimes(1);
+    expect(mtuCleanup).toHaveBeenCalledTimes(1);
+    expect(nobleBle.unsubscribe).toHaveBeenCalledWith(device.id);
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
+
+    // Calling stop() again is a safe no-op.
+    await bleTransport.stop();
+    expect(hostDisconnectCleanup).toHaveBeenCalledTimes(1);
+    expect(nobleBle.disconnect).toHaveBeenCalledTimes(1);
+
+    // Late host disconnect events are no longer delivered to the stopped transport.
+    disconnectHandler?.({ ...device, reason: EBleDisconnectReason.DeviceDisconnected });
+    expect(transportDisconnect).not.toHaveBeenCalled();
+  });
+
+  test('stop() during getDevice() does not let retired acquire disconnect a replacement link', async () => {
+    const device = { id: 'lookup-stop-pro2-id', name: 'OneKey Pro 2' };
+    const nobleBle = createNobleBle(device);
+    let resolveGetDevice: ((value: typeof device) => void) | undefined;
+    nobleBle.getDevice.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveGetDevice = resolve;
+        })
+    );
+    const bleTransport = configureTransport(nobleBle);
+
+    const acquiring = bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V2' });
+    const stopping = bleTransport.stop();
+    await stopping;
+    // Clear disconnect count recorded during stopResources() so we verify the late
+    // retired acquire does not issue another disconnect against a replacement link.
+    nobleBle.disconnect.mockClear();
+
+    resolveGetDevice?.(device);
+    await expect(acquiring).rejects.toThrow(/Electron BLE transport is stopped/);
+    expect(nobleBle.connect).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+  });
 });

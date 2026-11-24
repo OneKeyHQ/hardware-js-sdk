@@ -34,7 +34,7 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 
-const { parseConfigure, ProtocolV1, check } = transport;
+const { parseTransportConfigure, ProtocolV1, check } = transport;
 
 declare global {
   interface Window {
@@ -98,9 +98,9 @@ const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
  * after a Protocol V1 GetFeatures timeout by probing Protocol V2 Ping.
  */
 export default class ElectronBleTransport {
-  private _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  private _messages: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
-  private _messagesV2: ReturnType<typeof transport.parseConfigure> | undefined;
+  private _messagesV2: ReturnType<typeof transport.parseTransportConfigure> | undefined;
 
   private protocolV2SchemaConfiguration: string | undefined;
 
@@ -130,6 +130,10 @@ export default class ElectronBleTransport {
    * the link; `releaseNative()` needs it to cancel that pending connect.
    */
   private acquiringDevices: Set<string> = new Set();
+
+  private stopped = false;
+
+  private stopPromise?: Promise<void>;
 
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
@@ -162,7 +166,7 @@ export default class ElectronBleTransport {
       this.v2Assemblers.get(uuid)?.reset();
       this.rejectProtocolV2Frames(uuid, new Error(reason));
       this.Log?.debug('[Electron BLE] Protocol V2 link invalidated:', uuid, reason);
-      if (reason.startsWith('Protocol V2 link-fatal error:')) {
+      if (!this.stopped && reason.startsWith('Protocol V2 link-fatal error:')) {
         await this.releaseNative(uuid, { forceNative: true });
       }
     },
@@ -269,6 +273,8 @@ export default class ElectronBleTransport {
   }
 
   init(logger: any, emitter?: EventEmitter) {
+    this.stopped = false;
+    this.stopPromise = undefined;
     this.Log = logger;
     this.emitter = emitter;
 
@@ -282,6 +288,43 @@ export default class ElectronBleTransport {
     this.subscribeHostDisconnects();
 
     this.Log?.debug('[Electron BLE] Transport initialized');
+  }
+
+  private assertRunning() {
+    if (this.stopped) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Electron BLE transport is stopped');
+    }
+  }
+
+  stop(): Promise<void> {
+    this.stopped = true;
+    this.hostDisconnectCleanup?.();
+    this.hostDisconnectCleanup = undefined;
+
+    if (!this.stopPromise) {
+      this.stopPromise = this.stopResources();
+    }
+    return this.stopPromise;
+  }
+
+  private async stopResources(): Promise<void> {
+    const trackedDeviceIds = new Set<string>([
+      ...this.connectedDevices,
+      ...this.retainedDevices,
+      ...this.acquiringDevices,
+      ...this.notificationCleanups.keys(),
+      ...this.mtuCleanups.keys(),
+      ...this.deviceProtocol.keys(),
+      ...this.v1Buffers.keys(),
+      ...this.v2Assemblers.keys(),
+    ]);
+
+    await Promise.all(Array.from(trackedDeviceIds, deviceId => this.releaseNative(deviceId)));
+    this.acquiringDevices.clear();
+    this.protocolV2CallCounts.clear();
+    await this.protocolV2Links
+      .dispose('Electron BLE transport stopped')
+      .catch(error => this.Log?.debug('[Electron BLE] link dispose failed:', error));
   }
 
   /**
@@ -322,7 +365,7 @@ export default class ElectronBleTransport {
   }
 
   configure(signedData: any) {
-    this._messages = parseConfigure(signedData);
+    this._messages = parseTransportConfigure(signedData);
     this.configured = true;
   }
 
@@ -333,7 +376,7 @@ export default class ElectronBleTransport {
     }
 
     const isReconfiguration = this.protocolV2SchemaConfiguration !== undefined;
-    this._messagesV2 = parseConfigure(signedData);
+    this._messagesV2 = parseTransportConfigure(signedData);
     this.protocolV2SchemaConfiguration = configuration;
     if (isReconfiguration) {
       this.protocolV2Links
@@ -390,13 +433,16 @@ export default class ElectronBleTransport {
       this.runPromiseDeviceId = null;
     }
 
+    this.assertRunning();
     this.acquiringDevices.add(uuid);
+    let connectAttempted = false;
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
       }
 
       const device = await invokeNobleBle(window.desktopApi.nobleBle.getDevice(uuid));
+      this.assertRunning();
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
       }
@@ -420,11 +466,13 @@ export default class ElectronBleTransport {
       }
 
       try {
+        connectAttempted = true;
         await invokeNobleBle(window.desktopApi.nobleBle.connect(uuid));
         this.connectedDevices.add(uuid);
       } catch (error) {
         this.handleBluetoothError(error);
       }
+      this.assertRunning();
 
       const mtuCleanup = this.createMtuSubscription(uuid);
       if (mtuCleanup) {
@@ -440,11 +488,13 @@ export default class ElectronBleTransport {
         this.handleBluetoothError(error);
       }
       await this.refreshBlePacketCapacity(uuid);
+      this.assertRunning();
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
+      this.assertRunning();
       if (protocolType === 'V2') {
         this.Log?.debug('[Electron BLE] Protocol V2 write configured', {
           writeMode: 'withoutResponse',
@@ -461,7 +511,7 @@ export default class ElectronBleTransport {
       this.Log?.error('[Electron BLE] acquire failed:', error);
       try {
         const nobleBle = window.desktopApi?.nobleBle;
-        if (nobleBle) {
+        if (nobleBle && !this.stopped && (connectAttempted || this.connectedDevices.has(uuid))) {
           if (this.connectedDevices.has(uuid)) {
             await invokeNobleBle(nobleBle.unsubscribe(uuid)).catch(cleanupError => {
               this.Log?.debug('[Electron BLE] acquire unsubscribe failed:', cleanupError);
@@ -616,14 +666,17 @@ export default class ElectronBleTransport {
       protocolHint === 'V2' || this.deviceProtocol.get(uuid) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
     for (let i = 0; i < probeOrder.length; i += 1) {
+      this.assertRunning();
       const protocol = probeOrder[i];
       if (i > 0) {
         // Keep the physical BLE link while switching probes. Reconnecting here can
         // summon a second OS pairing prompt for a device that is still onboarding.
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
+        this.assertRunning();
       }
       const detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+      this.assertRunning();
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
@@ -722,6 +775,7 @@ export default class ElectronBleTransport {
   }
 
   private async writeOnce(uuid: string, hexData: string): Promise<void> {
+    this.assertRunning();
     const nobleBle = window.desktopApi?.nobleBle;
     if (!nobleBle) {
       throw new Error('Noble BLE API not available');
@@ -729,6 +783,7 @@ export default class ElectronBleTransport {
 
     try {
       await invokeNobleBle(nobleBle.write(uuid, hexData, { pacingDelayMs: 0 }));
+      this.assertRunning();
     } catch (error) {
       this.handleBluetoothError(error);
     }

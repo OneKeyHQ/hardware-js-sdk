@@ -275,6 +275,33 @@ const rewriteSeq = (frame, seq) => {
 };
 
 describe('Protocol V2 framing and session', () => {
+  test('decodes both ProtocolInfo wire layouts without a global Buffer', () => {
+    const productionSchemas = {
+      protocolV1: protocolV1Messages,
+      protocolV2: productionProtocolV2Messages,
+    };
+    const current = ProtocolV2.encodeFrame(productionSchemas, 'ProtocolInfo', {
+      version: 2,
+      build_fingerprint: 'synthetic',
+      supported_messages: [60200],
+    });
+    const legacy = protocolV2.encodeProtobufFrame(60201, Uint8Array.of(8, 1));
+    const buffer = globalThis.Buffer;
+    try {
+      Object.defineProperty(globalThis, 'Buffer', { value: undefined });
+      expect(ProtocolV2.decodeFrame(productionSchemas, current).message).toMatchObject({
+        version: 2,
+        build_fingerprint: 'synthetic',
+      });
+      expect(ProtocolV2.decodeFrame(productionSchemas, legacy).message).toMatchObject({
+        version: 1,
+        protobuf_definition: null,
+      });
+    } finally {
+      Object.defineProperty(globalThis, 'Buffer', { value: buffer });
+    }
+  });
+
   test('encodes and decodes Protocol V2 protobuf frames', () => {
     const frame = ProtocolV2.encodeFrame(schemas, 'ProtocolInfo', {
       version: 1,

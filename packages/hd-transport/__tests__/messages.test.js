@@ -32,6 +32,9 @@ const json = {
         },
       },
     },
+    TxInput: {
+      fields: {},
+    },
     TxAckInput: {
       options: {
         '(wire_type)': 22,

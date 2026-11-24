@@ -1,5 +1,4 @@
 import semver from 'semver';
-import { get } from 'lodash';
 import BigNumber from 'bignumber.js';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
@@ -349,7 +348,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }
 
   hasBiggerData(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
-    const data = get(item.message, 'data', undefined) as string | undefined;
+    const data = (item.message as Record<string, unknown> | undefined)?.data as string | undefined;
     if (!data) return false;
 
     let biggerLimit = 1024; // 1k

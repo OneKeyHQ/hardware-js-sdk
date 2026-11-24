@@ -1,7 +1,9 @@
-import { parseConfigure } from './protobuf';
-
-export { parseConfigure };
-export { createMessageFromName, createMessageFromType } from './protobuf/messages';
+export {
+  createMessageFromName,
+  createMessageFromType,
+  parseConfigure,
+  parseTransportConfigure,
+} from './protobuf/messages';
 export { encode as encodeProtobuf } from './protobuf/encode';
 export { decode as decodeProtobuf } from './protobuf/decode';
 export { PROTOCOL_V2_SYS_MESSAGE_THRESHOLD, ProtocolV1, ProtocolV2 } from '../protocols';

@@ -1,5 +1,3 @@
-import { isEmpty } from 'lodash';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -9,6 +7,11 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import type { TronTransaction } from '../../types/api/tronSignTransaction';
 import type { TronSignTx } from '@onekeyfe/hd-transport';
 import type { DeviceFirmwareRange } from '../../types';
+
+const isEmpty = (value: unknown): boolean =>
+  value == null ||
+  ((typeof value === 'string' || Array.isArray(value)) && value.length === 0) ||
+  (typeof value === 'object' && Object.keys(value).length === 0);
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
   getSupportedProtocols() {

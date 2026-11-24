@@ -1,6 +1,5 @@
 import semver from 'semver';
 import BigNumber from 'bignumber.js';
-import { isEmpty } from 'lodash';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -17,6 +16,11 @@ import type {
   TonTxAck,
 } from '@onekeyfe/hd-transport';
 import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
+
+const isEmpty = (value: unknown): boolean =>
+  value == null ||
+  ((typeof value === 'string' || Array.isArray(value)) && value.length === 0) ||
+  (typeof value === 'object' && Object.keys(value).length === 0);
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   getSupportedProtocols() {

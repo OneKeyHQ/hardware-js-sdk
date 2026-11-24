@@ -1,0 +1,16 @@
+{
+  "nested": {
+    "LegacyProtocolInfo": {
+      "fields": {
+        "version": { "rule": "required", "type": "uint32", "id": 1 },
+        "supported_messages": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 2,
+          "options": { "packed": false }
+        },
+        "protobuf_definition": { "type": "string", "id": 3 }
+      }
+    }
+  }
+}

@@ -150,10 +150,9 @@ export default class TransportManager {
       /** Actually initializes the HttpTransport */
       this.transport = new TransportConstructor() as unknown as Transport;
     }
-    if (plugin) {
-      this.plugin = plugin;
-      Log.debug('set transport plugin: ', this.plugin);
-    }
+    this.webUsbInit = false;
+    this.reactNativeInit = false;
+    this.plugin = plugin ?? null;
     Log.debug(
       'set transport: ',
       this.transport.name,

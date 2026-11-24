@@ -16,6 +16,37 @@ const schema = {
   },
 };
 
+test('reads a multi-packet V1 response without a global Buffer', async () => {
+  const webusb = new WebUsbTransport();
+  const messages = transport.parseConfigure(schema);
+  const response = { message: 'v1 response '.repeat(9) };
+  const expected = transport.ProtocolV1.encodeEnvelope(messages, 'Success', response).toString(
+    'hex'
+  );
+  const packets = transport.ProtocolV1.encodeTransportPackets(messages, 'Success', response);
+  expect(packets.length).toBeGreaterThan(1);
+  const reader = webusb as unknown as {
+    transferInWithRetry: () => Promise<Uint8Array>;
+  };
+  const transferIn = jest.spyOn(reader, 'transferInWithRetry');
+  packets.forEach(packet => {
+    transferIn.mockResolvedValueOnce(new Uint8Array(packet.toBuffer()));
+  });
+  const buffer = globalThis.Buffer;
+  try {
+    Object.defineProperty(globalThis, 'Buffer', { value: undefined });
+    const received = await webusb.receiveData('synthetic-usb');
+    expect(received).toBe(expected);
+    expect(transport.ProtocolV1.decodeMessage(messages, received)).toMatchObject({
+      type: 'Success',
+      message: response,
+    });
+  } finally {
+    Object.defineProperty(globalThis, 'Buffer', { value: buffer });
+    transferIn.mockRestore();
+  }
+});
+
 function buildAcquirableTransport(path = 'pro-webusb') {
   const webusb = new WebUsbTransport() as any;
   webusb.Log = { debug: jest.fn() };

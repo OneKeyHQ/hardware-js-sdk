@@ -1,0 +1,11 @@
+{
+  "MessageType_ZcashGetAddress": 12400,
+  "MessageType_ZcashAddress": 12401,
+  "MessageType_ZcashSignPczt": 12402,
+  "MessageType_ZcashSignedPczt": 12403,
+  "MessageType_ZcashPcztChunkRequest": 12404,
+  "MessageType_ZcashPcztChunkAck": 12405,
+  "MessageType_ZcashSignedPcztChunkRequest": 12406,
+  "MessageType_ZcashGetFullViewingKey": 12407,
+  "MessageType_ZcashFullViewingKey": 12408
+}

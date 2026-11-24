@@ -4819,6 +4819,13 @@ export enum DeviceSettingsPage {
   DevicePinChange = 1,
   DevicePassphrase = 2,
   DeviceAirgap = 3,
+  DeviceNameDisplay = 4,
+  DeviceUsbLock = 5,
+  DeviceRandomKeypad = 6,
+  DeviceFido = 7,
+  DeviceAutolock = 8,
+  DeviceAutoshutdown = 9,
+  DeviceBluetooth = 10,
 }
 
 // DeviceSettingsPageShow
@@ -5436,6 +5443,7 @@ export type ViewVerifyPage = {
   title_id?: number;
   chain_id?: number;
   content?: ViewContentPreview;
+  multisig_policy?: string;
 };
 
 export enum ProtocolV2FailureType {

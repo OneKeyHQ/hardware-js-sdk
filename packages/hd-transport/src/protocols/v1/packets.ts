@@ -5,9 +5,13 @@ import { encodeEnvelope } from './encode';
 import { createMessageFromName } from '../../serialization/protobuf/messages';
 import { PROTOCOL_V1_CHUNK_PAYLOAD_SIZE, PROTOCOL_V1_REPORT_ID } from '../../constants';
 
-import type { Root } from 'protobufjs/light';
+import type { ProtobufRoot } from '../../serialization/protobuf/descriptor';
 
-export function encodeEnvelopeMessage(messages: Root, name: string, data: Record<string, unknown>) {
+export function encodeEnvelopeMessage(
+  messages: ProtobufRoot,
+  name: string,
+  data: Record<string, unknown>
+) {
   const { Message, messageTypeId } = createMessageFromName(messages, name);
 
   const buffer = encodeProtobuf(Message, data);
@@ -19,7 +23,7 @@ export function encodeEnvelopeMessage(messages: Root, name: string, data: Record
 }
 
 export const encodeMessageChunks = (
-  messages: Root,
+  messages: ProtobufRoot,
   name: string,
   data: Record<string, unknown>
 ) => {
@@ -33,7 +37,7 @@ export const encodeMessageChunks = (
 };
 
 export const encodeTransportPackets = (
-  messages: Root,
+  messages: ProtobufRoot,
   name: string,
   data: Record<string, unknown>
 ) => {
