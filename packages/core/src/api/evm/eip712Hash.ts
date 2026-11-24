@@ -58,7 +58,7 @@ const toBigNumber = (value: unknown, fieldName: string): BigNumber => {
     const trimmed = value.trim();
     const isNegative = trimmed.startsWith('-');
     const unsigned = isNegative ? trimmed.slice(1) : trimmed;
-    const isHex = /^0x[0-9a-fA-F]+$/.test(unsigned);
+    const isHex = /^0[xX][0-9a-fA-F]+$/.test(unsigned);
     if (!isHex && !/^[0-9]+$/.test(unsigned)) {
       return invalidTypedData(`${fieldName} must be an integer`);
     }

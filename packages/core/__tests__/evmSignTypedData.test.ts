@@ -1021,4 +1021,44 @@ describe('EVMSignTypedData — OneKey Pro typed-hash fallback', () => {
     await expect(method.run()).rejects.toThrow();
     expect(typedCall).not.toHaveBeenCalled();
   });
+
+  it('pre-routes oversized Uint8Array bytes on Pro without crashing in size check', async () => {
+    const data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = {
+      types: {
+        EIP712Domain: [{ name: 'name', type: 'string' }],
+        Blob: [{ name: 'payload', type: 'bytes' }],
+      },
+      primaryType: 'Blob',
+      domain: { name: 'Extended' },
+      message: { payload: new Uint8Array(2048).fill(0xab) },
+    };
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'EthereumTypedDataSignature',
+      message: signatureMessage,
+    });
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall);
+
+    const result = await method.run();
+
+    expect(result).toEqual(signatureMessage);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedHashOneKey');
+  });
+
+  it('does not throw when Pro firmware version string is non-semver', async () => {
+    const data = buildLongStringData(64);
+    const typedCall = jest.fn().mockResolvedValueOnce({
+      type: 'EthereumTypedDataSignature',
+      message: signatureMessage,
+    });
+    const method = createRunnableMethod(data, EDeviceType.Pro, typedCall, {
+      firmwareVersion: 'custom-dev-build',
+    });
+
+    const result = await method.run();
+
+    expect(result).toEqual(signatureMessage);
+    expect(typedCall).toHaveBeenCalledTimes(1);
+    expect(typedCall.mock.calls[0][0]).toBe('EthereumSignTypedDataOneKey');
+  });
 });

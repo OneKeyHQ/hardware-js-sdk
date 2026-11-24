@@ -1081,6 +1081,10 @@ async function attemptWindowsWriteUntilPaired(
     }
   }
 
+  if (pairingCanceledDevices.has(deviceId)) {
+    throw createPairingCanceledError();
+  }
+
   // No notification arrived. Keep the GATT link: a Protocol V1 probe miss on a
   // healthy V2 device takes this path, and the following V2 probe still needs
   // the same characteristics. Confirmed pairing failures abort above.
@@ -2617,6 +2621,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         ...connectingDevices.keys(),
         ...pairedDevices,
         ...pendingDirectNativeConnections.keys(),
+        ...deviceConnectionPromises.keys(),
       ]);
       logger?.info('[NobleBLE] Cancel pairing invoked', {
         platform: process.platform,

@@ -104,4 +104,24 @@ describe('getEIP712Hashes — fixed-width bytesN', () => {
     expect(hashes.domainHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(hashes.messageHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
+
+  it('accepts uppercase 0X hex prefixes for integer fields', () => {
+    const payload = {
+      types: {
+        EIP712Domain: [{ name: 'chainId', type: 'uint256' }],
+        Value: [{ name: 'amount', type: 'uint256' }],
+      },
+      primaryType: 'Value',
+      domain: { chainId: '0X1' },
+      message: { amount: '0X10' },
+    } as unknown as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+
+    const upper = getEIP712Hashes(payload);
+    const lower = getEIP712Hashes({
+      ...payload,
+      domain: { chainId: '0x1' },
+      message: { amount: '0x10' },
+    } as unknown as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>);
+    expect(upper).toEqual(lower);
+  });
 });

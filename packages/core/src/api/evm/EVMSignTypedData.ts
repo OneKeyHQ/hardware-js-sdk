@@ -577,7 +577,22 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return this.device.getCurrentDeviceType() === EDeviceType.Pro;
   }
 
-  private hasProOversizedValue(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+  private hasProOversizedValue(item?: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+    if (!item?.types || !item.primaryType) return false;
+
+    const getDynamicByteLength = (typeName: 'string' | 'bytes', value: unknown): number => {
+      if (typeName === 'string') {
+        return typeof value === 'string' ? Buffer.byteLength(value, 'utf8') : 0;
+      }
+      if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
+        return value.byteLength;
+      }
+      if (typeof value === 'string') {
+        return encodeData(typeName, value).length / 2;
+      }
+      return 0;
+    };
+
     const walkValue = (typeName: string, value: unknown): boolean => {
       if (value == null) return false;
 
@@ -589,7 +604,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
       if (typeName === 'string' || typeName === 'bytes') {
         // Match the bytes sent in EthereumTypedDataValueAckOneKey, not JSON size.
-        return encodeData(typeName, value).length / 2 > PRO_MAX_DYNAMIC_VALUE_BYTES;
+        return getDynamicByteLength(typeName, value) > PRO_MAX_DYNAMIC_VALUE_BYTES;
       }
 
       if (typeof value === 'object' && item.types[typeName]) {
@@ -704,9 +719,14 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       return Promise.resolve(response.message);
     }
 
+    const currentFirmwareVersion = this.device.getCurrentFirmwareVersionString();
     const proHasOversizedValue =
       this.isOneKeyPro() &&
-      semver.gte(this.device.getCurrentFirmwareVersionString() ?? '0.0.0', '4.2.0') &&
+      Boolean(
+        currentFirmwareVersion &&
+          semver.valid(currentFirmwareVersion) &&
+          semver.gte(currentFirmwareVersion, '4.2.0')
+      ) &&
       this.hasProOversizedValue(this.params.data);
 
     // Touch Pro Sign NestedArrays

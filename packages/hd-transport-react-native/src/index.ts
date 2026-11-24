@@ -1712,12 +1712,17 @@ export default class ReactNativeBleTransport {
         }
       }
 
-      if (this.stopped || bondSignal.aborted) {
-        // Native connect can succeed after cancellation, before this link enters
-        // transportCache. Drain manager-owned teardown before rejecting acquire.
-        await this.disconnectUnlocked(uuid);
-        this.throwIfBondingStopped(bondSignal);
-      }
+      const drainIfAcquireCancelled = async () => {
+        if (this.stopped || bondSignal.aborted) {
+          // Native connect can succeed before or during post-connect setup after
+          // cancellation, before this link enters transportCache. Drain
+          // manager-owned teardown before rejecting acquire.
+          await this.disconnectUnlocked(uuid);
+          this.throwIfBondingStopped(bondSignal);
+        }
+      };
+
+      await drainIfAcquireCancelled();
       if (Platform.OS === 'android' && !(await device.isConnected().catch(() => false))) {
         const disconnectedDevice = device;
         await this.runNativeTeardown(uuid, blePlxManager, async () => {
@@ -1732,7 +1737,7 @@ export default class ReactNativeBleTransport {
         });
         throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'device is not connected');
       }
-      this.throwIfBondingStopped(bondSignal);
+      await drainIfAcquireCancelled();
       let characteristics: ResolvedBleCharacteristics | undefined;
       if (isAndroid) {
         if (refreshAndroidGattCache) {
@@ -1740,7 +1745,7 @@ export default class ReactNativeBleTransport {
           // exchange so the request is not queued behind it.
           characteristics = await this.resolveCharacteristicsWithTimeout(uuid, device);
           if (androidRefreshConnectRan) this.androidGattCacheRefreshes.delete(uuid);
-          this.throwIfBondingStopped(bondSignal);
+          await drainIfAcquireCancelled();
         }
         device = await this.negotiateAndroidMtu(uuid, blePlxManager, device);
       } else if (!skipPostConnectMtu) {
@@ -1752,7 +1757,7 @@ export default class ReactNativeBleTransport {
         );
         device = mtuResult.device;
         if (mtuResult.timedOut) {
-          this.throwIfBondingStopped(bondSignal);
+          await drainIfAcquireCancelled();
           Log?.debug(
             '[ReactNativeBleTransport] post-connect MTU timed out, reconnecting without requesting MTU'
           );
@@ -1764,7 +1769,7 @@ export default class ReactNativeBleTransport {
             );
             mtuTeardownSettled = true;
           });
-          this.throwIfBondingStopped(bondSignal);
+          await drainIfAcquireCancelled();
           if (!mtuTeardownSettled || this.blePlxManager !== blePlxManager) {
             // The teardown budget expired and the manager that owned timedOutDevice was reset.
             throw ERRORS.TypedError(HardwareErrorCode.BleTimeoutError, 'BLE MTU cleanup timed out');
@@ -1788,11 +1793,11 @@ export default class ReactNativeBleTransport {
           }
         }
       }
-      this.throwIfBondingStopped(bondSignal);
+      await drainIfAcquireCancelled();
       const acquiredDevice = device;
       const { writeCharacteristic, notifyCharacteristic } =
         characteristics ?? (await this.resolveCharacteristicsWithTimeout(uuid, acquiredDevice));
-      this.throwIfBondingStopped(bondSignal);
+      await drainIfAcquireCancelled();
 
       const protocolHint = expectedProtocol
         ? undefined
