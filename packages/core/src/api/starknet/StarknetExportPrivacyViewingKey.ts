@@ -1,9 +1,10 @@
 import { StarknetPrivacyViewingKeyDerivation, StarknetPublicKeyType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
-import { validatePath } from '../helpers/pathUtils';
+import { validateStrictPath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { createMethodInteraction } from '../../protocols/protocol-v2/uiInteraction';
 import { formatHexResult, toEnumValue, toFeltHex } from './normalize';
 
 import type { StarknetExportPrivacyViewingKey as HardwareStarknetExportPrivacyViewingKey } from '@onekeyfe/hd-transport';
@@ -22,6 +23,11 @@ export default class StarknetExportPrivacyViewingKey extends BaseMethod<Hardware
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.strictCheckDeviceSupport = true;
+    // The name matches no Protocol V2 confirmation rule, so the export prompt is declared here.
+    this.protocolV2UiInteraction = createMethodInteraction(
+      'public-key-confirmation',
+      this.name || 'starknetExportPrivacyViewingKey'
+    );
 
     validateParams(this.payload, [
       { name: 'path', required: true },
@@ -32,7 +38,7 @@ export default class StarknetExportPrivacyViewingKey extends BaseMethod<Hardware
 
     const payload = this.payload as StarknetExportPrivacyViewingKeyParams;
     this.params = {
-      address_n: validatePath(payload.path, 3),
+      address_n: validateStrictPath(payload.path, 3),
       public_key_type: toEnumValue(
         payload.publicKeyType,
         StarknetPublicKeyType,

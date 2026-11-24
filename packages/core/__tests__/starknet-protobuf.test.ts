@@ -96,4 +96,21 @@ describe('Starknet protobuf messages (protocol V2)', () => {
     const calldata = [`${'00'.repeat(31)}01`, 'ff'.repeat(32)];
     expect(roundTrip('StarknetCalldataAck', { calldata })).toEqual({ calldata });
   });
+
+  test('numeric public_key_type enums survive wire encoding', () => {
+    const secpParams = buildSignParams({
+      publicKeyType: 0,
+      invokeV3: { senderAddress: '0x1', calldata: ['0x1'] },
+    });
+    const starkParams = buildSignParams({
+      publicKeyType: 1,
+      invokeV3: { senderAddress: '0x1', calldata: ['0x1'] },
+    });
+    expect(
+      roundTrip('StarknetSignTx', secpParams as unknown as Record<string, unknown>).public_key_type
+    ).toBe('SECP256K1');
+    expect(
+      roundTrip('StarknetSignTx', starkParams as unknown as Record<string, unknown>).public_key_type
+    ).toBe('STARK');
+  });
 });

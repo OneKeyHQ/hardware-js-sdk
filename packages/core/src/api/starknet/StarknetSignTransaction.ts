@@ -6,7 +6,7 @@ import {
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { BaseMethod } from '../BaseMethod';
-import { validatePath } from '../helpers/pathUtils';
+import { validateStrictPath } from '../helpers/pathUtils';
 import { invalidParameter, validateParams } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
 import {
@@ -72,7 +72,7 @@ export default class StarknetSignTransaction extends BaseMethod<HardwareStarknet
     }
 
     const params: HardwareStarknetSignTx = {
-      address_n: validatePath(payload.path, 3),
+      address_n: validateStrictPath(payload.path, 3),
       public_key_type: toEnumValue(
         payload.publicKeyType,
         StarknetPublicKeyType,

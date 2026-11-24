@@ -25,6 +25,7 @@ const LogPayloadBlockMethod: Set<string> = new Set([
   'moneroGetWatchKey',
   'moneroKeyImageSync',
   'moneroSignTransaction',
+  'starknetGetAddress',
   'starknetSignTransaction',
   'starknetExportPrivacyViewingKey',
 ]);

@@ -360,7 +360,7 @@ describe('StarknetSignTransaction', () => {
 });
 
 describe('StarknetExportPrivacyViewingKey', () => {
-  test('defaults to the account-leaf v1 derivation and returns 0x hex', async () => {
+  test('declares a device confirmation UI interaction and returns 0x hex', async () => {
     const method = new StarknetExportPrivacyViewingKey({
       id: 1,
       payload: {
@@ -372,6 +372,11 @@ describe('StarknetExportPrivacyViewingKey', () => {
       },
     });
     method.init();
+    expect(method.protocolV2UiInteraction).toMatchObject({
+      reason: 'public-key-confirmation',
+      operation: 'starknetExportPrivacyViewingKey',
+      request: 'button',
+    });
     const typedCall = jest.fn().mockResolvedValueOnce({
       type: 'StarknetPrivacyViewingKey',
       message: { viewing_key: '0e'.repeat(32) },
@@ -391,8 +396,57 @@ describe('StarknetExportPrivacyViewingKey', () => {
   });
 });
 
+describe('Starknet strict path validation', () => {
+  const buildMethod = (name: string, path: string | number[]) => {
+    switch (name) {
+      case 'starknetGetPublicKey':
+        return new StarknetGetPublicKey({ id: 1, payload: { method: name, path } });
+      case 'starknetGetAddress':
+        return new StarknetGetAddress({
+          id: 1,
+          payload: {
+            method: name,
+            path,
+            classHash: OZ_CLASS_HASH,
+            contractAddressSalt: PUBLIC_KEY,
+            constructorCalldata: [PUBLIC_KEY],
+          },
+        });
+      case 'starknetSignTransaction':
+        return createSignMethod({
+          path,
+          invokeV3: { senderAddress: '0x1', calldata: ['0x1'] },
+        });
+      default:
+        return new StarknetExportPrivacyViewingKey({
+          id: 1,
+          payload: {
+            method: 'starknetExportPrivacyViewingKey',
+            path,
+            chainId: SN_MAIN,
+            accountAddress: '0x123',
+            poolAddress: '0x456',
+          },
+        });
+    }
+  };
+
+  test.each([
+    'starknetGetPublicKey',
+    'starknetGetAddress',
+    'starknetSignTransaction',
+    'starknetExportPrivacyViewingKey',
+  ])('%s rejects fractional and oversized paths while accepting valid number[]', name => {
+    expect(() => buildMethod(name, "m/44'/9004'/0.5'/0/0").init()).toThrow('Not a valid path');
+    expect(() => buildMethod(name, [0x8000002c, 0x8000232c, 4294967296]).init()).toThrow(
+      'Not a valid path'
+    );
+    expect(() => buildMethod(name, ADDRESS_N).init()).not.toThrow();
+  });
+});
+
 describe('Starknet log blocking', () => {
-  test.each(['starknetSignTransaction', 'starknetExportPrivacyViewingKey'])(
+  test.each(['starknetGetAddress', 'starknetSignTransaction', 'starknetExportPrivacyViewingKey'])(
     'keeps %s payloads out of SDK logs',
     method => {
       expect(getLogBlockLabel({ payload: { method } })).toBe(method);

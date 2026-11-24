@@ -1,7 +1,7 @@
 import { StarknetPublicKeyType } from '@onekeyfe/hd-transport';
 
 import { BaseMethod } from '../BaseMethod';
-import { serializedPath, validatePath } from '../helpers/pathUtils';
+import { serializedPath, validateStrictPath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { formatHexResult, toEnumValue, toFeltHex, toFeltHexArray } from './normalize';
@@ -37,7 +37,7 @@ export default class StarknetGetAddress extends BaseMethod<HardwareStarknetGetAd
       ]);
 
       return {
-        address_n: validatePath(batch.path, 3),
+        address_n: validateStrictPath(batch.path, 3),
         show_display: batch.showOnOneKey ?? true,
         public_key_type: toEnumValue(
           batch.publicKeyType,

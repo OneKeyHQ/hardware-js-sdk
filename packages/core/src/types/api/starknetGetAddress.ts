@@ -1,5 +1,5 @@
 import type { StarknetPublicKeyType } from '@onekeyfe/hd-transport';
-import type { CommonParams, Response } from '../params';
+import type { CommonParams, Params, Response } from '../params';
 
 export type StarknetAddress = {
   path: string;
@@ -22,11 +22,11 @@ export type StarknetGetAddressParams = {
 export declare function starknetGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & StarknetGetAddressParams
+  params: Params<StarknetGetAddressParams>
 ): Response<StarknetAddress>;
 
 export declare function starknetGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: StarknetGetAddressParams[] }
+  params: CommonParams & { bundle: StarknetGetAddressParams[] }
 ): Response<Array<StarknetAddress>>;
