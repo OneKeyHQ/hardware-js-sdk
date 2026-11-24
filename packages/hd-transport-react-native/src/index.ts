@@ -2897,17 +2897,15 @@ export default class ReactNativeBleTransport {
   }
 
   /**
-   * A sleeping Classic drops GetFeatures/Ping and only leaves its screensaver on Initialize, which
-   * resets the wallet session, so it is sent once after a fully silent detection. The firmware does
-   * not reliably answer it, so its timeout must not drop the link. It only runs when V1 is probed
-   * first, so a late reply lands on the V1 probe rather than on a V2 one.
+   * A sleeping Classic keeps serving BLE connect/GATT/MTU from its BLE co-processor while the main
+   * MCU drops GetFeatures/Ping and only leaves its screensaver on Initialize (on both Android and
+   * iOS). Because Initialize resets the wallet session, it is sent once after a fully silent
+   * detection. The firmware does not reliably answer it, so its timeout must not drop the link.
+   * It only runs when V1 is probed first, so a late reply lands on the V1 probe rather than on a
+   * V2 one.
    */
   private async wakeSilentProtocolV1Device(uuid: string, probeOrder: ProtocolType[]) {
-    if (
-      Platform.OS !== 'android' ||
-      probeOrder[0] !== 'V1' ||
-      this.silentDetections.get(uuid) !== 'silent'
-    ) {
+    if (probeOrder[0] !== 'V1' || this.silentDetections.get(uuid) !== 'silent') {
       return;
     }
     this.silentDetections.set(uuid, 'woken');

@@ -1715,15 +1715,39 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(callProtocolV1).not.toHaveBeenCalled();
   });
 
-  test('does not send the Initialize wake on iOS', async () => {
+  test('spends one Initialize wake on iOS after a fully silent detection', async () => {
+    setPlatformOS('ios');
     const { transport, uuid } = createHarness();
     const probes = transport as any;
     jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
     jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
     const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
 
+    // First detection does not reset an active wallet session.
     await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
+
+    // After a fully silent detection, iOS also wakes a sleeping Classic with one Initialize.
     await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+
+    // Still silent: do not repeat the wake on subsequent polls.
+    callProtocolV1.mockClear();
+    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
+  });
+
+  test('does not send the Initialize wake on iOS before a V2-first probe', async () => {
+    setPlatformOS('ios');
+    const { transport, uuid } = createHarness();
+    const probes = transport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
+    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
     expect(callProtocolV1).not.toHaveBeenCalled();
   });
 
