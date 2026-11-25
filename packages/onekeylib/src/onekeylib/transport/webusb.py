@@ -138,7 +138,7 @@ class WebUsbTransport(Transport):
     def write_chunk(self, chunk: bytes, /) -> None:
         assert self.handle is not None
         _check_chunk_size(chunk)
-        LOG.log(DUMP_PACKETS, f"writing packet: {chunk.hex()}")
+        LOG.log(DUMP_PACKETS, "writing packet (%d bytes)", len(chunk))
         while True:
             try:
                 bytes_written = self.handle.interruptWrite(
@@ -165,7 +165,7 @@ class WebUsbTransport(Transport):
                 chunk = self.handle.interruptRead(
                     endpoint, WEBUSB_CHUNK_SIZE, USB_COMM_TIMEOUT_MS
                 )
-                LOG.log(DUMP_PACKETS, f"read packet: {chunk.hex()}")
+                LOG.log(DUMP_PACKETS, "read packet (%d bytes)", len(chunk))
                 return _check_chunk_size(chunk)
             except usb1.USBErrorTimeout as exc:
                 if exc.received:

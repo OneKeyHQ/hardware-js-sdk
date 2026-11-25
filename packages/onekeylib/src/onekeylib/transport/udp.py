@@ -97,6 +97,11 @@ class UdpTransport(Transport):
         return "{}:{}:{}".format(self.PATH_PREFIX, *self.device)
 
     def _open(self) -> None:
+        host, _port = self.device
+        if host not in ("127.0.0.1", "::1", "localhost"):
+            raise TransportException(
+                f"UDP emulator transport is restricted to loopback addresses, got: {host}"
+            )
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.connect(self.device)
         self.socket.settimeout(SOCKET_TIMEOUT)
@@ -110,7 +115,7 @@ class UdpTransport(Transport):
         assert self.socket is not None
         if len(chunk) != 64:
             raise TransportException("Unexpected data length")
-        LOG.log(DUMP_PACKETS, f"sending packet: {chunk.hex()}")
+        LOG.log(DUMP_PACKETS, "sending UDP packet (%d bytes)", len(chunk))
         self.socket.sendall(chunk)
 
     def read_chunk(self, *, timeout: float | None = None) -> bytes:
@@ -123,7 +128,7 @@ class UdpTransport(Transport):
             except socket.timeout:
                 if timeout is not None and time.time() - start > timeout:
                     raise Timeout(f"Timeout reading UDP packet ({timeout}s)")
-        LOG.log(DUMP_PACKETS, f"received packet: {chunk.hex()}")
+        LOG.log(DUMP_PACKETS, "received UDP packet (%d bytes)", len(chunk))
         if len(chunk) != 64:
             raise TransportException(f"Unexpected chunk size: {len(chunk)}")
         return chunk

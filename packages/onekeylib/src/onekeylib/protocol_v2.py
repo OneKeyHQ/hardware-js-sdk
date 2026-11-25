@@ -11,7 +11,10 @@
 from __future__ import annotations
 
 import logging
+import threading
 import typing as t
+import unicodedata
+import uuid
 from contextlib import suppress
 
 from . import client, exceptions, mapping as mapping_mod, messages, models
@@ -34,21 +37,31 @@ REQUIRED_V2_MESSAGES = frozenset({
     messages.DeviceSessionAskPassphrase.MESSAGE_WIRE_TYPE,
 })
 
+# Messages sent mid-workflow (e.g. during SignTx) that must not be interrupted
+# by management status/session queries.
+_MID_WORKFLOW_MESSAGES = (messages.TxAck, messages.ButtonAck)
 
-class SessionV2(client.Session["OneKeyClientV2", t.Optional[bytes]]):
-    """Protocol V2 wallet session compatible with `onekeylib.btc` workflows."""
+
+class SessionV2(client.Session["OneKeyClientV2", t.Optional[str]]):
+    """Protocol V2 wallet session compatible with `onekeylib.btc` workflows.
+
+    Exposes an opaque local correlation ID (`session.id`); raw firmware
+    session identifiers stay internal to the client.
+    """
 
     def __init__(
         self,
         client: "OneKeyClientV2",
-        session_id: bytes | None,
         *,
+        firmware_session_id: bytes | None,
         btc_test_address: str | None = None,
         attach_pin: bool = False,
         root_fingerprint: bytes | None = None,
     ) -> None:
-        super().__init__(client, session_id, root_fingerprint=root_fingerprint)
-        self.btc_test_address = btc_test_address
+        opaque_id = uuid.uuid4().hex if firmware_session_id is not None else None
+        super().__init__(client, opaque_id, root_fingerprint=root_fingerprint)
+        self._firmware_session_id = firmware_session_id
+        self._btc_test_address = btc_test_address
         self.attach_pin = attach_pin
 
     def close(self) -> None:
@@ -74,20 +87,35 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
             model=model,
             mapping=mapping,
         )
+        self._lock = threading.RLock()
         self._handshaked = False
         self._eventless = False
         self._device_status: messages.DeviceStatus | None = None
         self._device_info: messages.DeviceInfo | None = None
         self._active_session: SessionV2 | None = None
+        self._sessions: dict[str, SessionV2] = {}
 
-    def _raw_write(self, msg: MessageType) -> None:
+    def _reset_link_state(self) -> None:
+        self._handshaked = False
+        self._eventless = False
+        self._active_session = None
+
+    def _raw_write(self, msg: MessageType) -> int:
         active_mapping = self._mapping or mapping_mod.DEFAULT_MAPPING
         wire_type, payload = active_mapping.encode(msg)
-        self.transport.write_message(wire_type, payload)
+        return self.transport.write_message(wire_type, payload)
 
-    def _raw_read(self, timeout: float | None = None) -> MessageType:
+    def _raw_read(
+        self,
+        timeout: float | None = None,
+        *,
+        expected_ack_seq: int | None = None,
+    ) -> MessageType:
         active_mapping = self._mapping or mapping_mod.DEFAULT_MAPPING
-        wire_type, payload = self.transport.read_message(timeout=timeout)
+        wire_type, payload = self.transport.read_message(
+            timeout=timeout,
+            expected_ack_seq=expected_ack_seq,
+        )
         return active_mapping.decode(wire_type, payload)
 
     def _v2_call(
@@ -97,33 +125,36 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         expect: type[MT],
         timeout: float | None = 120.0,
     ) -> MT:
-        self._raw_write(msg)
-        while True:
-            resp = self._raw_read(timeout=timeout)
-            if isinstance(resp, messages.V2Failure):
-                if resp.code == 5 and resp.subcode == 1:
-                    raise exceptions.Cancelled(resp.message or "Cancelled on device")
-                raise exceptions.OneKeyFailure(
-                    messages.Failure(
-                        code=messages.FailureType.ActionCancelled
-                        if resp.code == 5 and resp.subcode == 1
-                        else messages.FailureType.ProcessError,
-                        message=resp.message or f"OneKey V2 failure ({resp.code}:{resp.subcode})",
+        with self._lock:
+            seq = self._raw_write(msg)
+            while True:
+                resp = self._raw_read(timeout=timeout, expected_ack_seq=seq)
+                if isinstance(resp, messages.V2Failure):
+                    if resp.code == 5 and (resp.subcode == 1 or resp.subcode is None):
+                        raise exceptions.Cancelled(resp.message or "Cancelled on device")
+                    raise exceptions.OneKeyFailure(
+                        messages.Failure(
+                            code=messages.FailureType.ProcessError,
+                            message=resp.message or f"OneKey V2 failure ({resp.code}:{resp.subcode})",
+                        )
                     )
-                )
-            if isinstance(resp, messages.Failure):
-                if resp.code == messages.FailureType.ActionCancelled:
-                    raise exceptions.Cancelled(resp.message or "Cancelled on device")
-                raise exceptions.OneKeyFailure(resp)
-            if isinstance(resp, messages.ButtonRequest):
-                self.app._callback_button(resp)
-                self._raw_write(messages.ButtonAck())
-                continue
-            if not isinstance(resp, expect):
-                raise exceptions.UnexpectedMessageError(expect, resp)
-            return resp
+                if isinstance(resp, messages.Failure):
+                    if resp.code == messages.FailureType.ActionCancelled:
+                        raise exceptions.Cancelled(resp.message or "Cancelled on device")
+                    raise exceptions.OneKeyFailure(resp)
+                if isinstance(resp, messages.ButtonRequest):
+                    self.app._callback_button(resp)
+                    seq = self._raw_write(messages.ButtonAck())
+                    continue
+                if expect is messages.Success and isinstance(resp, messages.V2Success):
+                    return messages.Success(message=resp.message)  # type: ignore[return-value]
+                if not isinstance(resp, expect):
+                    raise exceptions.UnexpectedMessageError(expect, resp)
+                return resp
 
     def _ensure_handshake(self) -> None:
+        if not self.transport.is_open():
+            self._reset_link_state()
         if not self._handshaked:
             self._v2_call(messages.V2Ping(message="handshake"), expect=messages.V2Success, timeout=5.0)
             self._handshaked = True
@@ -139,52 +170,68 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
                 )
             self._eventless = True
 
+    def _get_features(self) -> messages.Features:
+        return self.refresh_features()
+
+    @enter_context
+    def ping(self, message: str, button_protection: bool = False) -> str:
+        del button_protection
+        with self._lock:
+            self._ensure_handshake()
+            resp = self._v2_call(
+                messages.V2Ping(message=message),
+                expect=messages.V2Success,
+                timeout=5.0,
+            )
+            return resp.message or ""
+
     @enter_context
     def refresh_features(self) -> messages.Features:
-        self._ensure_handshake()
-        info = self._v2_call(
-            messages.DeviceInfoGet(
-                targets=messages.DeviceInfoTargets(hw=True),
-                types=messages.DeviceInfoTypes(specific=True),
-            ),
-            expect=messages.DeviceInfo,
-            timeout=5.0,
-        )
-        if info.protocol_version != 1 or info.hw is None:
-            raise exceptions.OneKeyException("Incomplete OneKey V2 device info")
-        detected_model = models.by_device_type(info.hw.device_type)
-        if detected_model is None:
-            raise exceptions.OneKeyException(
-                f"Unsupported OneKey V2 device type: {info.hw.device_type}"
+        with self._lock:
+            self._ensure_handshake()
+            info = self._v2_call(
+                messages.DeviceInfoGet(
+                    targets=messages.DeviceInfoTargets(hw=True),
+                    types=messages.DeviceInfoTypes(specific=True),
+                ),
+                expect=messages.DeviceInfo,
+                timeout=5.0,
             )
-        status = self._v2_call(
-            messages.DeviceStatusGet(),
-            expect=messages.DeviceStatus,
-            timeout=5.0,
-        )
-        self._device_info = info
-        self._device_status = status
-        self._model = detected_model
+            if info.protocol_version != 1 or info.hw is None:
+                raise exceptions.OneKeyException("Incomplete OneKey V2 device info")
+            detected_model = models.by_device_type(info.hw.device_type)
+            if detected_model is None:
+                raise exceptions.OneKeyException(
+                    f"Unsupported OneKey V2 device type: {info.hw.device_type}"
+                )
+            status = self._v2_call(
+                messages.DeviceStatusGet(),
+                expect=messages.DeviceStatus,
+                timeout=5.0,
+            )
+            self._device_info = info
+            self._device_status = status
+            self._model = detected_model
 
-        capabilities = [messages.Capability.Bitcoin]
-        if status.passphrase_enabled:
-            capabilities.append(messages.Capability.PassphraseEntry)
+            capabilities = [messages.Capability.Bitcoin]
+            if status.passphrase_enabled:
+                capabilities.append(messages.Capability.PassphraseEntry)
 
-        self._features = messages.Features(
-            vendor="onekey.so",
-            major_version=info.protocol_version,
-            minor_version=0,
-            patch_version=0,
-            device_id=status.device_id or "",
-            initialized=bool(status.init_states),
-            unlocked=status.unlocked,
-            passphrase_protection=status.passphrase_enabled,
-            model=detected_model.name,
-            internal_model=detected_model.internal_name,
-            label=f"{detected_model.name} ({info.hw.serial_no or status.device_id or ''})",
-            capabilities=capabilities,
-        )
-        return self._features
+            self._features = messages.Features(
+                vendor="onekey.so",
+                major_version=info.protocol_version,
+                minor_version=0,
+                patch_version=0,
+                device_id=status.device_id or "",
+                initialized=bool(status.init_states),
+                unlocked=status.unlocked,
+                passphrase_protection=status.passphrase_enabled,
+                model=detected_model.name,
+                internal_model=detected_model.internal_name,
+                label=f"{detected_model.name} ({info.hw.serial_no or status.device_id or ''})",
+                capabilities=capabilities,
+            )
+            return self._features
 
     @property
     def serial_no(self) -> str | None:
@@ -194,26 +241,33 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
 
     @enter_context
     def ensure_unlocked(self, *, _use_session: SessionV2 | None = None) -> None:
-        self._ensure_handshake()
-        status = self._v2_call(
-            messages.DeviceStatusGet(),
-            expect=messages.DeviceStatus,
-            timeout=5.0,
-        )
-        if status.unlocked is not True:
-            self._v2_call(
-                messages.DeviceSessionAskPin(type=int(messages.OneKeyPinType.ANY)),
-                expect=messages.V2Success,
-                timeout=120.0,
-            )
+        del _use_session
+        with self._lock:
+            self._ensure_handshake()
             status = self._v2_call(
                 messages.DeviceStatusGet(),
                 expect=messages.DeviceStatus,
                 timeout=5.0,
             )
-        if status.unlocked is not True:
-            raise exceptions.DeviceLockedError("OneKey device is locked")
-        self._device_status = status
+            unlocked_now = False
+            if status.unlocked is not True:
+                self._v2_call(
+                    messages.DeviceSessionAskPin(type=int(messages.OneKeyPinType.ANY)),
+                    expect=messages.V2Success,
+                    timeout=120.0,
+                )
+                status = self._v2_call(
+                    messages.DeviceStatusGet(),
+                    expect=messages.DeviceStatus,
+                    timeout=5.0,
+                )
+                unlocked_now = True
+            if status.unlocked is not True:
+                raise exceptions.DeviceLockedError("OneKey device is locked")
+            self._device_status = status
+            if unlocked_now or self._features is None:
+                # Refresh cached features so passphrase_protection reflects unlocked state.
+                self.refresh_features()
 
     @enter_context
     def get_session(
@@ -221,59 +275,50 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         passphrase: str | client.PassphraseSetting = client.PassphraseSetting.AUTO,
         *,
         derive_cardano: bool = False,
-        session_id: bytes | None = None,
-        btc_test_address: str | None = None,
+        session_ref: str | None = None,
     ) -> SessionV2:
         del derive_cardano
-        self._ensure_handshake()
-        if self._features is None:
-            self.refresh_features()
+        with self._lock:
+            self._ensure_handshake()
+            if self._features is None:
+                self.refresh_features()
 
-        if passphrase is client.PassphraseSetting.NONE:
-            return SessionV2(self, None)
+            if passphrase is client.PassphraseSetting.NONE:
+                return SessionV2(self, firmware_session_id=None)
 
-        self.ensure_unlocked()
-        assert self._device_status is not None
-        status = self._device_status
+            self.ensure_unlocked()
+            assert self._device_status is not None
+            status = self._device_status
 
-        if session_id is not None:
-            resumed = self._v2_call(
-                messages.DeviceSessionGet(
-                    session_id=session_id,
-                    btc_test_address=btc_test_address,
-                ),
-                expect=messages.DeviceSession,
-                timeout=10.0,
-            )
-            if (
-                not resumed.session_id
-                or resumed.session_id != session_id
-                or (btc_test_address is not None and resumed.btc_test_address != btc_test_address)
-                or 1 not in resumed.seed_domains
-            ):
-                raise exceptions.InvalidSessionError(session_id)
-            sess = SessionV2(
-                self,
-                resumed.session_id,
-                btc_test_address=resumed.btc_test_address,
-                attach_pin=status.unlocked_by_attach_to_pin is True,
-            )
-            self._active_session = sess
-            return sess
+            if session_ref is not None:
+                existing = self._sessions.get(session_ref)
+                if existing is None or existing._firmware_session_id is None:
+                    raise exceptions.InvalidSessionError(None)
+                self._resume_firmware_session(existing, status)
+                self._active_session = existing
+                return existing
 
-        attach_pin = status.unlocked_by_attach_to_pin is True
-        if not attach_pin and status.passphrase_enabled:
+            attach_pin = status.unlocked_by_attach_to_pin is True
             if passphrase is client.PassphraseSetting.STANDARD_WALLET:
-                self._v2_call(
-                    messages.DeviceSessionAskPassphrase(
-                        passphrase="",
-                        on_device=False,
-                        seed_domains=[1],
-                    ),
-                    expect=messages.V2Success,
-                    timeout=30.0,
-                )
-            elif passphrase in (client.PassphraseSetting.ON_DEVICE, client.PassphraseSetting.AUTO):
+                if attach_pin:
+                    raise exceptions.OneKeyException(
+                        "Device is unlocked with Attach PIN; lock and unlock with Main PIN for the standard wallet."
+                    )
+                if status.passphrase_enabled:
+                    self._v2_call(
+                        messages.DeviceSessionAskPassphrase(
+                            passphrase="",
+                            on_device=False,
+                            seed_domains=[1],
+                        ),
+                        expect=messages.V2Success,
+                        timeout=30.0,
+                    )
+            elif passphrase is client.PassphraseSetting.ON_DEVICE:
+                if attach_pin or not status.passphrase_enabled:
+                    raise exceptions.OneKeyException(
+                        "On-device passphrase entry requires Main PIN unlock with passphrase protection enabled."
+                    )
                 self._v2_call(
                     messages.DeviceSessionAskPassphrase(
                         on_device=True,
@@ -283,35 +328,79 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
                     timeout=120.0,
                 )
             elif isinstance(passphrase, str):
-                self._v2_call(
-                    messages.DeviceSessionAskPassphrase(
-                        passphrase=passphrase,
-                        on_device=False,
-                        seed_domains=[1],
-                    ),
-                    expect=messages.V2Success,
-                    timeout=30.0,
-                )
+                normalized = unicodedata.normalize("NFKD", passphrase)
+                if attach_pin:
+                    raise exceptions.OneKeyException(
+                        "Cannot supply a passphrase while unlocked with Attach PIN."
+                    )
+                if normalized and not status.passphrase_enabled:
+                    raise exceptions.OneKeyException(
+                        "Passphrase protection is disabled on this device."
+                    )
+                if status.passphrase_enabled:
+                    self._v2_call(
+                        messages.DeviceSessionAskPassphrase(
+                            passphrase=normalized,
+                            on_device=False,
+                            seed_domains=[1],
+                        ),
+                        expect=messages.V2Success,
+                        timeout=30.0,
+                    )
+            elif passphrase is client.PassphraseSetting.AUTO:
+                if not attach_pin and status.passphrase_enabled:
+                    self._v2_call(
+                        messages.DeviceSessionAskPassphrase(
+                            on_device=True,
+                            seed_domains=[1],
+                        ),
+                        expect=messages.V2Success,
+                        timeout=120.0,
+                    )
 
-        opened = self._v2_call(
-            messages.DeviceSessionGet(),
+            opened = self._v2_call(
+                messages.DeviceSessionGet(),
+                expect=messages.DeviceSession,
+                timeout=10.0,
+            )
+            if not opened.session_id or not opened.btc_test_address or 1 not in opened.seed_domains:
+                raise exceptions.OneKeyException("Incomplete OneKey V2 wallet session")
+
+            sess = SessionV2(
+                self,
+                firmware_session_id=opened.session_id,
+                btc_test_address=opened.btc_test_address,
+                attach_pin=attach_pin,
+            )
+            assert sess.id is not None
+            self._sessions[sess.id] = sess
+            self._active_session = sess
+            return sess
+
+    def _resume_firmware_session(self, session: SessionV2, status: messages.DeviceStatus) -> None:
+        if status.unlocked is not True:
+            raise exceptions.DeviceLockedError("OneKey was locked")
+        if (status.unlocked_by_attach_to_pin is True) != session.attach_pin:
+            raise exceptions.InvalidSessionError(None)
+        resumed = self._v2_call(
+            messages.DeviceSessionGet(
+                session_id=session._firmware_session_id,
+                btc_test_address=session._btc_test_address,
+            ),
             expect=messages.DeviceSession,
             timeout=10.0,
         )
-        if not opened.session_id or not opened.btc_test_address or 1 not in opened.seed_domains:
-            raise exceptions.OneKeyException("Incomplete OneKey V2 wallet session")
-
-        sess = SessionV2(
-            self,
-            opened.session_id,
-            btc_test_address=opened.btc_test_address,
-            attach_pin=attach_pin,
-        )
-        self._active_session = sess
-        return sess
+        if (
+            not resumed.session_id
+            or resumed.session_id != session._firmware_session_id
+            or resumed.btc_test_address != session._btc_test_address
+            or 1 not in resumed.seed_domains
+        ):
+            session.is_invalid = True
+            raise exceptions.InvalidSessionError(None)
 
     def get_seedless_session(self) -> SessionV2:
-        return SessionV2(self, None)
+        return SessionV2(self, firmware_session_id=None)
 
     def _get_any_session(self) -> SessionV2:
         return self._active_session or self.get_seedless_session()
@@ -335,11 +424,13 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
 
     def _write(self, session: SessionV2, msg: MessageType) -> None:
         del session
-        self._raw_write(msg)
+        with self._lock:
+            self._raw_write(msg)
 
     def _read(self, session: SessionV2, timeout: float | None = None) -> MessageType:
         del session
-        return self._raw_read(timeout=timeout)
+        with self._lock:
+            return self._raw_read(timeout=timeout)
 
     def _call_raw(
         self,
@@ -347,8 +438,9 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         msg: MessageType,
         timeout: float | None = None,
     ) -> MessageType:
-        self._write(session, msg)
-        return self._read(session, timeout=timeout)
+        with self._lock:
+            seq = self._raw_write(msg)
+            return self._raw_read(timeout=timeout, expected_ack_seq=seq)
 
     def _call(
         self,
@@ -358,23 +450,26 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         expect: type[MT] = messages.protobuf.MessageType,  # type: ignore[assignment]
         timeout: float | None = None,
     ) -> MT:
-        if session.id is not None:
-            # Verify live session before Bitcoin/wallet calls
-            status = self._v2_call(
-                messages.DeviceStatusGet(),
-                expect=messages.DeviceStatus,
-                timeout=5.0,
-            )
-            if status.unlocked is not True:
-                raise exceptions.DeviceLockedError("OneKey was locked")
-            if (status.unlocked_by_attach_to_pin is True) != session.attach_pin:
-                raise exceptions.InvalidSessionError(session.id)
-        try:
-            return self._v2_call(msg, expect=expect, timeout=timeout or 120.0)
-        except exceptions.Cancelled:
-            # Device-side cancel leaves USB link intact; do not tear down transport.
-            raise
-        except BaseException:
-            with suppress(Exception):
-                self._raw_write(messages.Cancel())
-            raise
+        with self._lock:
+            if session._firmware_session_id is not None and not isinstance(msg, _MID_WORKFLOW_MESSAGES):
+                # Restore and verify the exact wallet session before top-level commands,
+                # without interrupting mid-signing TxAck/ButtonAck exchanges.
+                status = self._v2_call(
+                    messages.DeviceStatusGet(),
+                    expect=messages.DeviceStatus,
+                    timeout=5.0,
+                )
+                self._resume_firmware_session(session, status)
+                self._active_session = session
+            try:
+                return self._v2_call(msg, expect=expect, timeout=timeout or 120.0)
+            except exceptions.Cancelled:
+                # Device-side cancel leaves USB link intact; do not tear down transport.
+                raise
+            except BaseException:
+                with suppress(Exception):
+                    self._raw_write(messages.Cancel())
+                with suppress(Exception):
+                    self.transport.close()
+                self._reset_link_state()
+                raise

@@ -93,7 +93,7 @@ def from_json(json_dict: "Transaction") -> messages.TransactionType:
 
     def make_bin_output(vout: "Vout") -> messages.TxOutputBinType:
         return messages.TxOutputBinType(
-            amount=int(Decimal(vout["value"]) * (10**8)),
+            amount=int((Decimal(str(vout["value"])) * Decimal("100000000")).to_integral_exact()),
             script_pubkey=bytes.fromhex(vout["scriptPubKey"]["hex"]),
         )
 
@@ -316,6 +316,8 @@ def sign_tx(
             outputs_count=len(outputs),
         )
         for name, value in kwargs.items():
+            if name in ("coin_name", "inputs_count", "outputs_count"):
+                continue
             if hasattr(signtx, name):
                 setattr(signtx, name, value)
 

@@ -123,15 +123,15 @@ def hash_160_to_bc_address(h160: bytes, address_type: int) -> str:
 
 
 def compress_pubkey(public_key: bytes) -> bytes:
-    if public_key[0] == 4:
-        return bytes((public_key[64] & 1) + 2) + public_key[1:33]
+    if len(public_key) == 65 and public_key[0] == 4:
+        return bytes([(public_key[64] & 1) + 2]) + public_key[1:33]
     raise ValueError("Pubkey is already compressed")
 
 
 def public_key_to_bc_address(
     public_key: bytes, address_type: int, compress: bool = True
 ) -> str:
-    if public_key[0] == "\x04" and compress:
+    if len(public_key) == 65 and public_key[0] == 4 and compress:
         public_key = compress_pubkey(public_key)
 
     h160 = hash_160(public_key)

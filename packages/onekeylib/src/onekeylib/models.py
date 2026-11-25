@@ -17,7 +17,7 @@ from . import mapping, messages
 
 UsbId = Tuple[int, int]
 
-VENDORS = ("onekey.so", "onekey.com")
+VENDORS = ("onekey.so", "onekey.com", "trezor.io")
 
 
 @dataclass(eq=True, frozen=True)

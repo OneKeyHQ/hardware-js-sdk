@@ -53,10 +53,9 @@ class PrettyProtobufFormatter(logging.Formatter):
 
         proto_msg = getattr(record, "protobuf", None)
         if isinstance(proto_msg, protobuf.MessageType):
-            if type(proto_msg) in OMITTED_MESSAGES:
-                message += f" ({proto_msg.ByteSize()} bytes)"
-            else:
-                message += "\n" + protobuf.format_message(proto_msg)
+            # Log metadata only so PINs, passphrases, session IDs, and signing payloads
+            # are never written to diagnostic logs.
+            message += f" ({type(proto_msg).__name__})"
 
         return message
 

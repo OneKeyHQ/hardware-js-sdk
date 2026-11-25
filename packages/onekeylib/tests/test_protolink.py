@@ -20,6 +20,7 @@ class TestProtoLinkTransport(unittest.TestCase):
         transport.ep_out = 0x01
         transport._buffer = bytearray()
         transport._sequence = 0
+        transport._last_response_seq = None
         transport._opened = 1
         return transport
 
@@ -63,7 +64,10 @@ class TestProtoLinkTransport(unittest.TestCase):
         with mock.patch("onekeylib.transport.protolink.time.monotonic", side_effect=[0, 0, 2]):
             with self.assertRaises(Timeout):
                 transport.read_message(timeout=1.0)
+        self.assertIsNone(transport.handle)
 
-        transport.handle.bulkWrite.return_value = 1
+        transport2 = self.make_transport()
+        transport2.handle.bulkWrite.return_value = 1
         with self.assertRaises(TransportException):
-            transport.write_message(15, b"sign")
+            transport2.write_message(15, b"sign")
+        self.assertIsNone(transport2.handle)

@@ -110,12 +110,10 @@ class SessionV1(client.Session["OneKeyClientV1", t.Optional[bytes]]):
         self.seedless = seedless
 
     def __str__(self) -> str:
-        return f"SessionV1(id={self.id.hex() if self.id else '(none)'})"
+        return f"SessionV1(ref={self._log_short_id()})"
 
     def _log_short_id(self) -> str:
-        if self.id is None:
-            return super()._log_short_id()
-        return self.id.hex()[:8]
+        return f"local-{id(self) & 0xFFFFFFFF:08x}"
 
     @enter_context
     def initialize(self, *, derive_cardano: bool | None = None) -> messages.Features:
@@ -127,7 +125,7 @@ class SessionV1(client.Session["OneKeyClientV1", t.Optional[bytes]]):
           if the session has expired.
         """
         if self.is_invalid:
-            raise exceptions.InvalidSessionError(self.id)
+            raise exceptions.InvalidSessionError(None)
 
         # notify the client that this is now the active session
         self.client._last_active_session = self
@@ -144,15 +142,15 @@ class SessionV1(client.Session["OneKeyClientV1", t.Optional[bytes]]):
             warnings.warn("Your OneKey firmware does not support sessions.")
 
         if self.id is None or self.seedless:
-            LOG.info("New session id %s", session_id.hex() if session_id else "(none)")
+            LOG.info("Initialized new V1 session (%s)", self._log_short_id())
             self.id = session_id
         elif self.id != session_id:
             self.is_invalid = True
             self.client._close_session(self)
-            LOG.error("Failed to resume session id %s", self.id.hex())
-            raise exceptions.InvalidSessionError(session_id, from_message=resp)
+            LOG.error("Failed to resume V1 session (%s)", self._log_short_id())
+            raise exceptions.InvalidSessionError(None, from_message=resp)
         else:
-            LOG.info("Resumed session id %s", self.id.hex())
+            LOG.info("Resumed V1 session (%s)", self._log_short_id())
         return features
 
     @classmethod
@@ -286,32 +284,38 @@ class OneKeyClientV1(client.OneKeyClient[SessionV1]):
     def _write(self, session: SessionV1, msg: MessageType) -> None:
         self._activate(session)
         LOG.debug(
-            f"sending message: {msg.__class__.__name__}",
-            extra={"protobuf": msg, "session": session},
+            "sending message: %s",
+            msg.__class__.__name__,
+            extra={"session": session},
         )
         msg_type, msg_bytes = self.mapping.encode(msg)
         LOG.log(
             DUMP_BYTES,
-            f"encoded as type {msg_type} ({len(msg_bytes)} bytes): {msg_bytes.hex()}",
+            "encoded as type %d (%d bytes)",
+            msg_type,
+            len(msg_bytes),
             extra={"session": session},
         )
         write(self.transport, msg_type, msg_bytes)
 
     def _read(self, session: SessionV1, timeout: float | None = None) -> MessageType:
         if session.is_invalid:
-            raise exceptions.InvalidSessionError(session.id)
+            raise exceptions.InvalidSessionError(None)
         if self._last_active_session is not session:
             raise exceptions.OneKeyException("Reading from the wrong session")
         msg_type, msg_bytes = read(self.transport, timeout=timeout)
         LOG.log(
             DUMP_BYTES,
-            f"received type {msg_type} ({len(msg_bytes)} bytes): {msg_bytes.hex()}",
+            "received type %d (%d bytes)",
+            msg_type,
+            len(msg_bytes),
             extra={"session": session},
         )
         msg = self.mapping.decode(msg_type, msg_bytes)
         LOG.debug(
-            f"received message: {msg.__class__.__name__}",
-            extra={"protobuf": msg, "session": session},
+            "received message: %s",
+            msg.__class__.__name__,
+            extra={"session": session},
         )
         return msg
 
@@ -327,8 +331,8 @@ def probe(
     for _ in range(retries):
         try:
             # skip stale responses (to prevent the device from blocking during sending)
-            resp = read(transport, _ignore_bad_magic=True, timeout=0.1)
-            LOG.debug("stale response: %s", resp)
+            resp_type, resp_bytes = read(transport, _ignore_bad_magic=True, timeout=0.1)
+            LOG.debug("discarded stale response: type=%d (%d bytes)", resp_type, len(resp_bytes))
         except Timeout:
             break
     cancel_msg = messages.Cancel()

@@ -30,7 +30,8 @@ except Exception as e:
     USB_IMPORTED = False
 
 FRAME_MAGIC = 0x5A
-MAX_FRAME_LENGTH = 0xFFFF
+HEAD_SIZE = 8
+MAX_FRAME_LENGTH = 4200
 USB_READ_SIZE = 4096
 USB_WRITE_TIMEOUT_MS = 5000
 USB_POLL_TIMEOUT_MS = 200
@@ -49,8 +50,11 @@ def encode_frame(wire_type: int, payload: bytes, sequence: int) -> bytes:
     length = len(payload) + 10
     if length > MAX_FRAME_LENGTH:
         raise ValueError("OneKey proto_link frame too large")
+    seq = sequence & 0xFF
+    if seq == 0:
+        raise ValueError("OneKey proto_link sequence cannot be 0")
     header = struct.pack("<BH", FRAME_MAGIC, length)
-    frame = header + bytes([crc8(header), 0, 0, sequence & 0xFF])
+    frame = header + bytes([crc8(header), 0, 0, seq])
     frame += struct.pack("<H", wire_type) + payload
     return frame + bytes([crc8(frame)])
 
@@ -75,6 +79,7 @@ class ProtoLinkTransport(Transport):
         self.ep_out: int | None = None
         self._buffer = bytearray()
         self._sequence = 0
+        self._last_response_seq: int | None = None
         super().__init__()
 
     @classmethod
@@ -126,6 +131,9 @@ class ProtoLinkTransport(Transport):
         return self.handle is not None
 
     def _open(self) -> None:
+        usb_ids = {usb_id for m in V2_MODELS for usb_id in m.usb_ids}
+        if (self.device.getVendorID(), self.device.getProductID()) not in usb_ids:
+            raise TransportException("USB device is not a supported OneKey V2 device")
         endpoints = self._find_bulk_interface(self.device)
         if endpoints is None:
             raise TransportException("OneKey proto_link bulk interface not found")
@@ -148,7 +156,12 @@ class ProtoLinkTransport(Transport):
         self.ep_in = ep_in
         self.ep_out = ep_out
         self._buffer.clear()
-        self._drain()
+        self._last_response_seq = None
+        try:
+            self._drain()
+        except BaseException:
+            self._close()
+            raise
 
     def _drain(self) -> None:
         assert self.handle is not None and self.ep_in is not None
@@ -174,12 +187,18 @@ class ProtoLinkTransport(Transport):
             self.ep_in = None
             self.ep_out = None
             self._buffer.clear()
+            self._last_response_seq = None
 
     def write_chunk(self, chunk: bytes, /) -> None:
         if self.handle is None or self.ep_out is None:
             raise TransportException("OneKey USB transport is not open")
-        written = self.handle.bulkWrite(self.ep_out, chunk, timeout=USB_WRITE_TIMEOUT_MS)
+        try:
+            written = self.handle.bulkWrite(self.ep_out, chunk, timeout=USB_WRITE_TIMEOUT_MS)
+        except Exception as e:
+            self.close()
+            raise TransportException(f"OneKey USB write failed: {e}") from e
         if written != len(chunk):
+            self.close()
             raise TransportException("Incomplete OneKey USB write")
 
     def read_chunk(self, *, timeout: float | None = None) -> bytes:
@@ -190,46 +209,71 @@ class ProtoLinkTransport(Transport):
             return bytes(self.handle.bulkRead(self.ep_in, USB_READ_SIZE, timeout=timeout_ms))
         except usb1.USBErrorTimeout as e:
             raise Timeout("OneKey USB read timed out") from e
+        except Exception as e:
+            self.close()
+            raise TransportException(f"OneKey USB read failed: {e}") from e
 
-    def write_message(self, wire_type: int, payload: bytes) -> None:
+    def write_message(self, wire_type: int, payload: bytes) -> int:
         self._sequence = (self._sequence % 255) + 1
         frame = encode_frame(wire_type, payload, self._sequence)
         self.write_chunk(frame)
+        return self._sequence
 
     def read_message(
         self,
         *,
         timeout: float | None = 120.0,
         cancelled: t.Callable[[], bool] | None = None,
+        expected_ack_seq: int | None = None,
     ) -> tuple[int, bytes]:
         deadline = None if timeout is None else time.monotonic() + timeout
-        while True:
-            if cancelled is not None and cancelled():
-                raise TransportException("Cancelled by host")
-            if len(self._buffer) >= 4:
-                if self._buffer[0] != FRAME_MAGIC or crc8(self._buffer[:3]) != self._buffer[3]:
-                    raise TransportException("Invalid OneKey proto_link frame header")
-                length = int.from_bytes(self._buffer[1:3], "little")
-                if length < 8:
-                    raise TransportException("Invalid OneKey proto_link frame length")
-                if len(self._buffer) >= length:
-                    frame = bytes(self._buffer[:length])
-                    del self._buffer[:length]
-                    if crc8(frame[:-1]) != frame[-1]:
-                        raise TransportException("Invalid OneKey proto_link frame checksum")
-                    if frame[4] != 0 or (frame[5] >> 2) != 0:
-                        raise TransportException("Unexpected OneKey proto_link channel")
-                    if (frame[5] & 3) == 1:
-                        # Link-layer acknowledgement; keep reading for data frame.
-                        continue
-                    if (frame[5] & 3) != 0 or length < 10:
-                        raise TransportException("Invalid OneKey proto_link data frame")
-                    wire_type = int.from_bytes(frame[7:9], "little")
-                    return wire_type, frame[9:-1]
-            if deadline is not None and time.monotonic() >= deadline:
-                raise Timeout("OneKey USB request timed out")
-            try:
-                chunk = self.read_chunk(timeout=USB_POLL_TIMEOUT_MS / 1000.0)
-                self._buffer.extend(chunk)
-            except Timeout:
-                continue
+        try:
+            while True:
+                if cancelled is not None and cancelled():
+                    raise TransportException("Cancelled by host")
+                if len(self._buffer) >= 1 and self._buffer[0] != FRAME_MAGIC:
+                    raise TransportException("Invalid OneKey proto_link SOF")
+                if len(self._buffer) >= 3:
+                    length = int.from_bytes(self._buffer[1:3], "little")
+                    if length > MAX_FRAME_LENGTH:
+                        raise TransportException("OneKey proto_link frame too large")
+                    if length < HEAD_SIZE:
+                        raise TransportException("Invalid OneKey proto_link frame length")
+                if len(self._buffer) >= 4:
+                    if crc8(self._buffer[:3]) != self._buffer[3]:
+                        raise TransportException("Invalid OneKey proto_link frame header")
+                    length = int.from_bytes(self._buffer[1:3], "little")
+                    if len(self._buffer) >= length:
+                        frame = bytes(self._buffer[:length])
+                        del self._buffer[:length]
+                        if crc8(frame[:-1]) != frame[-1]:
+                            raise TransportException("Invalid OneKey proto_link frame checksum")
+                        if frame[4] != 0 or (frame[5] >> 2) != 0:
+                            raise TransportException("Unexpected OneKey proto_link channel")
+                        seq = frame[6]
+                        if seq == 0:
+                            raise TransportException("Invalid OneKey proto_link sequence")
+                        packet_type = frame[5] & 3
+                        if packet_type == 1:
+                            if length != HEAD_SIZE:
+                                raise TransportException("Invalid OneKey proto_link ACK length")
+                            if expected_ack_seq is not None and seq != expected_ack_seq:
+                                raise TransportException("Mismatched OneKey proto_link ACK sequence")
+                            continue
+                        if packet_type != 0 or length < 10:
+                            raise TransportException("Invalid OneKey proto_link data frame")
+                        if self._last_response_seq is not None and seq == self._last_response_seq:
+                            raise TransportException("Duplicate OneKey proto_link response sequence")
+                        self._last_response_seq = seq
+                        wire_type = int.from_bytes(frame[7:9], "little")
+                        return wire_type, frame[9:-1]
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise Timeout("OneKey USB request timed out")
+                try:
+                    chunk = self.read_chunk(timeout=USB_POLL_TIMEOUT_MS / 1000.0)
+                    self._buffer.extend(chunk)
+                except Timeout:
+                    continue
+        except (TransportException, Timeout):
+            self.close()
+            raise
