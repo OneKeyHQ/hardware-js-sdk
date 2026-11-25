@@ -765,7 +765,9 @@ class TestProtocolRepairs(unittest.TestCase):
             generation = helper.generation
             with self.assertRaises(UserCancelled):
                 client.get_xpub("m/84'/0'/0'", 'p2wpkh')
-            self.assertTrue(client.closed)
+            self.assertFalse(client.closed)
+            self.assertIsNone(client.binding)
+            self.assertIsNone(client.account)
             self.assertIn(codec.CANCEL, sent)
             self.assertNotIn('usb1', helper._links)
             self.assertEqual(generation, helper.generation)

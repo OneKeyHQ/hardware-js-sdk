@@ -96,6 +96,7 @@ class OneKeyClient(HardwareClientBase):
         self._unlock_selection = False
         self._requested_mode = None
         self._firmware_cancelled = False
+        self._fatal_error = False
         # One-shot proof that bind_keystore() just compared the live xpub. Only the
         # operation that requested the bind may take it (take_bind_token()).
         self._bind_token = None
@@ -149,6 +150,8 @@ class OneKeyClient(HardwareClientBase):
                 raise UserFacingException(_(
                     "Passphrase is disabled on this OneKey. Enable passphrase in device settings first."
                 )) from None
+            if error.code in ("DEVICE_MISMATCH", "STALE", "UNSUPPORTED"):
+                self._fatal_error = True
             raise UserFacingException(str(error)) from None
 
     def _ui(self, event):
@@ -166,18 +169,37 @@ class OneKeyClient(HardwareClientBase):
         previous = self.cancelled
         self.cancelled = threading.Event()
         self._firmware_cancelled = False
+        self._fatal_error = False
         try:
             self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
             yield
         except BaseException as error:
             self._clear_bind_tokens()
-            if close_on_error and not self._kept_after_firmware_cancel(error):
-                self.close()
+            if close_on_error:
+                if self._fatal_error or not self.attached():
+                    self.close()
+                elif not self._kept_after_firmware_cancel(error):
+                    # Keep the logical client paired in Electrum's DeviceMgr on
+                    # recoverable business errors or host/wizard cancellation so
+                    # retrying in the wizard never hits "Client for hardware
+                    # device was unpaired." Release the USB claim on host cancel
+                    # and clear session bindings so nothing leaks across retries.
+                    self._reset_session(release_usb=isinstance(error, UserCancelled))
             raise
         finally:
             self._firmware_cancelled = False
+            self._fatal_error = False
             self.cancelled = previous
             self.handler.finished()
+
+    def _reset_session(self, *, release_usb=False):
+        self.binding = None
+        self.account = None
+        self._clear_bind_tokens()
+        if release_usb and getattr(self.helper, "generation", None) == self.generation:
+            release = getattr(self.helper, "release", None)
+            if callable(release):
+                release(self.connect_id)
 
     def _kept_after_firmware_cancel(self, error):
         # Only a device-side SESSION_CANCELLED keeps the claimed USB link open.
@@ -433,7 +455,7 @@ class OneKeyClient(HardwareClientBase):
                 return self.account[2]
             self.bind_keystore(expected)
             if self.account[:2] != (path, xtype):
-                self.close()
+                self._reset_session(release_usb=False)
                 raise UserFacingException(_("OneKey pairing requested a different account."))
             return self.account[2]
         with self.flow():

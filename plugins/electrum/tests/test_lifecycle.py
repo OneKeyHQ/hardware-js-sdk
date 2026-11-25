@@ -264,10 +264,11 @@ class TestLifecycleRepairs(unittest.TestCase):
                 mock.patch.object(client, '_xpub', return_value='wrong-account'):
             with self.assertRaises(client_module.UserFacingException):
                 client.bind_keystore(store)
-        self.assertTrue(client.closed)
+        self.assertFalse(client.closed)
+        self.assertIsNone(client.binding)
         self.assertIsNone(client.account)
 
-    def test_wizard_cancel_releases_usb_claim_instead_of_treating_as_firmware_cancel(self):
+    def test_wizard_cancel_releases_usb_claim_and_keeps_client_paired(self):
         plugin, manager = self.make_plugin()
         device = Scripted()
         closed = []
@@ -282,7 +283,9 @@ class TestLifecycleRepairs(unittest.TestCase):
                 with self.assertRaises(client_module.UserCancelled):
                     with client.flow():
                         raise client_module.UserCancelled()
-            self.assertTrue(client.closed)
+            self.assertFalse(client.closed)
+            self.assertIsNone(client.binding)
+            self.assertIsNone(client.account)
             self.assertEqual(['usb1'], closed)
             self.assertNotIn('usb1', helper._links)
 

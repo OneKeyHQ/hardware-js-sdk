@@ -462,9 +462,10 @@ class OneKeyPlugin(HW_PluginBase):
                 self._require_applied_signatures(
                     keystore, target, multisig, already_complete, preserved, checked)
         except BaseException as error:
-            # A firmware cancel leaves this USB claim up. Other failures still release it.
-            if not isinstance(error, UserCancelled) or not client.attached():
+            if not client.attached():
                 client.close()
+            elif not isinstance(error, UserCancelled):
+                client._reset_session(release_usb=False)
             raise
 
     @staticmethod

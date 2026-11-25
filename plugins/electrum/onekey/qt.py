@@ -87,6 +87,46 @@ def _device_manager(component):
     return getattr(plugins, "device_manager", None)
 
 
+def _ensure_wizard_client(component, info):
+    """Return a paired client for info.device.id_, re-pairing if it was dropped."""
+    manager = _device_manager(component)
+    if manager is None:
+        return None
+    client = manager.client_by_id(info.device.id_, scan_now=False)
+    if client is not None and getattr(client, "attached", lambda: True)():
+        return client
+    try:
+        client = manager.client_by_id(info.device.id_, scan_now=True)
+        if client is not None and getattr(client, "attached", lambda: True)():
+            return client
+    except Exception:
+        pass
+    # DeviceMgr.scan_devices() does not call create_client() for an unpaired device.
+    # Re-create and register the client if the physical device is still attached.
+    plugins = getattr(component, "plugins", None) or getattr(getattr(component, "wizard", None), "plugins", None)
+    plugin = plugins.get_plugin(info.plugin_name) if plugins is not None else None
+    if plugin is None or not hasattr(plugin, "create_client"):
+        return None
+    try:
+        devices = plugin.enumerate()
+        matched = next((dev for dev in devices if dev.id_ == info.device.id_), None)
+        if matched is None:
+            return None
+        handler = plugin.create_handler(getattr(component, "wizard", None))
+        client = plugin.create_client(matched, handler)
+        clients = getattr(manager, "clients", None)
+        if isinstance(clients, dict):
+            lock = getattr(manager, "lock", None)
+            if lock is not None:
+                with lock:
+                    clients[client] = matched.id_
+            else:
+                clients[client] = matched.id_
+        return client
+    except Exception:
+        return None
+
+
 class WCOneKeyScript(WCScriptAndDerivation):
     def _passphrase_known_disabled(self):
         hw = self.wizard_data.get("hardware_device")
@@ -128,13 +168,7 @@ class WCOneKeyUnlock(WCHWUnlock):
         _name, info = self.wizard_data["hardware_device"]
         self.plugin = self.plugins.get_plugin(info.plugin_name)
         self.title = _("Unlocking {} ({})").format(info.model_name, info.label)
-        manager = _device_manager(self)
-        client = manager.client_by_id(info.device.id_, scan_now=False) if manager is not None else None
-        if client is None and manager is not None:
-            try:
-                client = manager.client_by_id(info.device.id_, scan_now=True)
-            except Exception:
-                client = None
+        client = _ensure_wizard_client(self, info)
         if client is None:
             self.error = _("Client for hardware device was unpaired.")
             self.busy = False
@@ -195,14 +229,8 @@ class WCOneKeyUnlock(WCHWUnlock):
 class WCOneKeyXPub(WCHWXPub):
     def on_ready(self):
         hw = self.wizard_data.get("hardware_device")
-        manager = _device_manager(self)
-        if manager is not None and hw and isinstance(hw, (tuple, list)) and len(hw) >= 2:
-            info = hw[1]
-            try:
-                if manager.client_by_id(info.device.id_, scan_now=False) is None:
-                    manager.client_by_id(info.device.id_, scan_now=True)
-            except Exception:
-                pass
+        if hw and isinstance(hw, (tuple, list)) and len(hw) >= 2:
+            _ensure_wizard_client(self, hw[1])
         super().on_ready()
 
     def get_xpub_from_client(self, client, derivation, xtype):
