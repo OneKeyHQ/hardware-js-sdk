@@ -70,18 +70,14 @@ class OneKeyQtHandler(QtHandlerBase):
             box.setWindowTitle("OneKey")
             box.setText(_(
                 "The current OneKey wallet did not encrypt this file. "
-                "Enter a passphrase on your OneKey to try a hidden wallet, "
-                "or lock the device and unlock with the matching PIN."
+                "Enter a passphrase on your OneKey to try a hidden wallet?"
             ))
-            retry_current = box.addButton(_("Retry with current wallet"), QMessageBox.ButtonRole.ActionRole)
             hidden = box.addButton(_("Enter passphrase on device"), QMessageBox.ButtonRole.AcceptRole)
             box.addButton(QMessageBox.StandardButton.Cancel)
             box.setDefaultButton(hidden)
             box.exec()
             if box.clickedButton() is hidden:
                 self._wallet_choice = "select-hidden"
-            elif box.clickedButton() is retry_current:
-                self._wallet_choice = "standard"
         finally:
             self._wallet_choice_done.set()
 
@@ -123,6 +119,8 @@ class WCOneKeyUnlock(WCHWUnlock):
         self.title = _("Unlocking {} ({})").format(info.model_name, info.label)
         client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False)
         if client is None:
+            client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=True)
+        if client is None:
             self.error = _("Client for hardware device was unpaired.")
             self.busy = False
             self.validate()
@@ -148,8 +146,12 @@ class WCOneKeyUnlock(WCHWUnlock):
         password = self._encryption_password(client, "standard")
         if self._password_decrypts(password):
             return password
+        if getattr(client, "passphrase_enabled", None) is False:
+            self.error = _("The current OneKey wallet did not encrypt this file. "
+                           "Unlock the matching wallet on your OneKey and retry.")
+            return None
         mode = client.handler.choose_passphrase_retry()
-        if mode not in ("standard", "select-hidden"):
+        if mode != "select-hidden":
             self.error = _("This OneKey wallet did not encrypt this file.")
             return None
         password = self._encryption_password(client, mode)
@@ -176,6 +178,14 @@ class WCOneKeyUnlock(WCHWUnlock):
 
 
 class WCOneKeyXPub(WCHWXPub):
+    def on_ready(self):
+        hw = self.wizard_data.get("hardware_device")
+        if hw and isinstance(hw, (tuple, list)) and len(hw) >= 2:
+            info = hw[1]
+            if self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False) is None:
+                self.plugins.device_manager.client_by_id(info.device.id_, scan_now=True)
+        super().on_ready()
+
     def get_xpub_from_client(self, client, derivation, xtype):
         if self.wizard_data["wallet_type"] not in ("standard", "multisig"):
             raise UserFacingException(_("Only standard and multisig OneKey wallets are supported."))
