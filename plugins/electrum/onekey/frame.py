@@ -86,23 +86,19 @@ def split_message(payload):
 
 def pop_frame(buf, limit=FRAME_MAX_SIZE):
     """Remove one complete frame from buf, or return None if more bytes are required."""
-    while True:
-        sof = buf.find(SOF)
-        if sof < 0:
-            buf.clear()
-            return None
-        if sof:
-            del buf[:sof]
-        if len(buf) < 3:
-            return None
-        total = buf[1] | (buf[2] << 8)
-        if total > min(limit, FRAME_MAX_SIZE):
-            raise ValueError("frame too large")
-        if total < HEAD_SIZE:
-            del buf[:1]
-            continue
-        if len(buf) < total:
-            return None
-        frame = bytes(buf[:total])
-        del buf[:total]
-        return frame
+    if not buf:
+        return None
+    if buf[0] != SOF:
+        raise ValueError("invalid SOF")
+    if len(buf) < 4:
+        return None
+    total = buf[1] | (buf[2] << 8)
+    if total < HEAD_SIZE or total > min(limit, FRAME_MAX_SIZE):
+        raise ValueError("invalid frame length")
+    if crc8(buf[:3]) != buf[3]:
+        raise ValueError("bad header CRC")
+    if len(buf) < total:
+        return None
+    frame = bytes(buf[:total])
+    del buf[:total]
+    return frame

@@ -112,6 +112,8 @@ def list_paths():
 def open_path(path):
     usb1 = _usb1()
     for device in _context().getDeviceIterator(skip_on_error=True):
+        if device.getVendorID() != USB_VID or device.getProductID() not in USB_PIDS:
+            continue
         if _path(device) != path:
             continue
         ends = _endpoints(device, usb1)
@@ -122,14 +124,24 @@ def open_path(path):
             handle = device.open()
         except Exception:
             raise LinkError("USB_UNAVAILABLE") from None
+        manually_detached = False
         try:
-            if handle.kernelDriverActive(number):
-                handle.detachKernelDriver(number)
+            handle.setAutoDetachKernelDriver(True)
         except Exception:
-            pass
+            try:
+                if handle.kernelDriverActive(number):
+                    handle.detachKernelDriver(number)
+                    manually_detached = True
+            except Exception:
+                pass
         try:
             handle.claimInterface(number)
         except Exception:
+            if manually_detached:
+                try:
+                    handle.attachKernelDriver(number)
+                except Exception:
+                    pass
             handle.close()
             raise LinkError("USB_UNAVAILABLE") from None
 
@@ -150,10 +162,15 @@ def open_path(path):
             if written != len(data):
                 raise LinkError("SDK_FAILED")
 
-        def close(handle=handle, number=number):
+        def close(handle=handle, number=number, manually_detached=manually_detached):
             try:
                 handle.releaseInterface(number)
             finally:
+                if manually_detached:
+                    try:
+                        handle.attachKernelDriver(number)
+                    except Exception:
+                        pass
                 handle.close()
 
         try:

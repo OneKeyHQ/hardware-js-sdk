@@ -512,13 +512,14 @@ class Session:
             kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self.deadline, cancelled=self.cancelled)
         if kind == codec.FAILURE:
             try:
-                _code, subcode, _message = codec.decode_failure(body)
+                code, subcode, _message = codec.decode_failure(body)
             except ValueError:
                 raise SessionError("PROTOCOL") from None
-            if subcode == codec.SESSION_INVALID:
-                _fail("WALLET_SESSION_INVALID")
-            if subcode == codec.SESSION_CANCELLED:
-                _fail("FIRMWARE_CANCELLED")
+            if code == 5:
+                if subcode == codec.SESSION_INVALID:
+                    _fail("WALLET_SESSION_INVALID")
+                if subcode == codec.SESSION_CANCELLED or subcode is None:
+                    _fail("FIRMWARE_CANCELLED")
             _fail("SDK_FAILED")
         if kind != expect:
             _fail("PROTOCOL")

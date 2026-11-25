@@ -194,8 +194,9 @@ class OneKeyClient(HardwareClientBase):
         elif self.binding["deviceId"] != self.device_id:
             raise UserFacingException(_("OneKey device identity changed."))
 
-    def _xpub(self, path, xtype, *, account=True):
-        response = self._call("xpub", dict(connectId=self.connect_id, binding=self.binding,
+    def _xpub(self, path, xtype, *, account=True, binding=None):
+        active_binding = self.binding if binding is None else binding
+        response = self._call("xpub", dict(connectId=self.connect_id, binding=active_binding,
                                           coin=coin_name(), path=path, scriptType=INPUT_SCRIPT_TYPES[xtype]))
         if type(response) is not dict or set(response) != {"xpub", "rootFingerprint"} or type(response["xpub"]) is not str:
             raise UserFacingException(_("Invalid OneKey public key response."))
@@ -241,12 +242,13 @@ class OneKeyClient(HardwareClientBase):
             # the xpub call. select-hidden would force a new wallet choice.
             if self.device_id is not None and saved["deviceId"] != self.device_id:
                 raise UserFacingException(_("This Electrum wallet is bound to a different OneKey device."))
-            self.binding = saved
-            actual = self._xpub(path, xtype)
+            actual = self._xpub(path, xtype, binding=saved)
             if actual != expected:
                 raise UserFacingException(_("OneKey account does not match this Electrum wallet."))
             if self.device_id is None:
                 self.device_id = saved["deviceId"]
+            # Commit binding and account together only after live xpub verification succeeds.
+            self.binding = saved
             # Persist only the public wallet identity, never the firmware session or secrets.
             keystore.onekey_binding = dict(self.binding)
             self.account = (path, xtype, expected)
@@ -378,6 +380,7 @@ class OneKeyClient(HardwareClientBase):
         finally:
             if force and not self.closed:
                 self.binding, self.account, self.device_id, self.root_fingerprint = saved
+                self._account_verified = False
 
     @runs_in_hwd_thread
     def get_xpub(self, bip32_path, xtype):

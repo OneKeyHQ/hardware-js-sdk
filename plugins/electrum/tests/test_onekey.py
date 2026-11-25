@@ -1147,9 +1147,10 @@ class TestOneKeyMultisig(unittest.TestCase):
 
     def test_legacy_multisig_script_is_refused_before_device_selection(self):
         try:
-            from onekey.qt import WCOneKeyXPub
-        except Exception as exc:
-            self.skipTest(f"PyQt is unavailable: {exc}")
+            import PyQt6  # noqa: F401
+        except ImportError as exc:
+            self.skipTest(f"PyQt6 is unavailable: {exc}")
+        from onekey.qt import WCOneKeyXPub
         step = WCOneKeyXPub.__new__(WCOneKeyXPub)
         client = mock.Mock()
         step.wizard_data = {"wallet_type": "multisig"}

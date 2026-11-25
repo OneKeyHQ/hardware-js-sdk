@@ -38,7 +38,7 @@ class Link:
             self._write(encode_message(msg_type, payload, seq=request_seq))
             return self._receive(deadline, cancelled, request_seq)
         except LinkError as error:
-            if self._pending and error.code in ("CANCELLED", "TIMEOUT"):
+            if self._pending and error.code in ("CANCELLED", "TIMEOUT", "PROTOCOL"):
                 # Interrupt only user requests, never protocol probes. This is
                 # one-way cancellation, not a retry of the original request.
                 try:

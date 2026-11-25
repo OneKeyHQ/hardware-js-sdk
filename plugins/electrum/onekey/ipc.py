@@ -17,7 +17,14 @@ OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "si
 class HelperError(Exception):
     def __init__(self, code="HELPER_FAILED"):
         self.code = code
-        super().__init__("OneKey helper failed (" + code + "). Reconnect using the wallet wizard.")
+        if code == "WALLET_MISMATCH":
+            message = (
+                "Active OneKey wallet does not match this Electrum wallet (WALLET_MISMATCH). "
+                "Lock your OneKey, unlock with the PIN for the saved wallet, and retry."
+            )
+        else:
+            message = "OneKey helper failed (" + code + "). Reconnect using the wallet wizard."
+        super().__init__(message)
 
 
 class Helper:

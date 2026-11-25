@@ -1,5 +1,8 @@
 name: Electrum Plugin CI
 
+permissions:
+  contents: read
+
 on:
   push:
     paths:
