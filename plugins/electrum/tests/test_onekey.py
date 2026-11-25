@@ -1147,7 +1147,7 @@ class TestOneKeyMultisig(unittest.TestCase):
 
     def test_legacy_multisig_script_is_refused_before_device_selection(self):
         try:
-            import PyQt6  # noqa: F401
+            from PyQt6 import QtWidgets  # noqa: F401
         except ImportError as exc:
             self.skipTest(f"PyQt6 is unavailable: {exc}")
         from onekey.qt import WCOneKeyXPub

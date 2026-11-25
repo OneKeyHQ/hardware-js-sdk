@@ -90,11 +90,15 @@ def pop_frame(buf, limit=FRAME_MAX_SIZE):
         return None
     if buf[0] != SOF:
         raise ValueError("invalid SOF")
-    if len(buf) < 4:
+    if len(buf) < 3:
         return None
     total = buf[1] | (buf[2] << 8)
-    if total < HEAD_SIZE or total > min(limit, FRAME_MAX_SIZE):
+    if total > min(limit, FRAME_MAX_SIZE):
+        raise ValueError("frame too large")
+    if total < HEAD_SIZE:
         raise ValueError("invalid frame length")
+    if len(buf) < 4:
+        return None
     if crc8(buf[:3]) != buf[3]:
         raise ValueError("bad header CRC")
     if len(buf) < total:

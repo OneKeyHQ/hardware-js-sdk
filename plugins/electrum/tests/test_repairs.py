@@ -324,6 +324,8 @@ class TestProtocolRepairs(unittest.TestCase):
         handle.bulkWrite.side_effect = write
         handle.kernelDriverActive.return_value = False
         device = mock.Mock()
+        device.getVendorID.return_value = usb.USB_VID
+        device.getProductID.return_value = next(iter(usb.USB_PIDS))
         device.open.return_value = handle
         context = mock.Mock()
         context.getDeviceIterator.return_value = [device]
@@ -531,6 +533,8 @@ class TestProtocolRepairs(unittest.TestCase):
 
     def test_device_open_error_is_usb_unavailable(self):
         device = mock.Mock()
+        device.getVendorID.return_value = usb.USB_VID
+        device.getProductID.return_value = next(iter(usb.USB_PIDS))
         device.open.side_effect = OSError('gone')
         context = mock.Mock()
         context.getDeviceIterator.return_value = [device]
