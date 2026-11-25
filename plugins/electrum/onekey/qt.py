@@ -82,13 +82,24 @@ class OneKeyQtHandler(QtHandlerBase):
             self._wallet_choice_done.set()
 
 
+def _device_manager(component):
+    plugins = getattr(component, "plugins", None) or getattr(getattr(component, "wizard", None), "plugins", None)
+    return getattr(plugins, "device_manager", None)
+
+
 class WCOneKeyScript(WCScriptAndDerivation):
     def _passphrase_known_disabled(self):
         hw = self.wizard_data.get("hardware_device")
         if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
             return False
+        manager = _device_manager(self)
+        if manager is None:
+            return False
         info = hw[1]
-        client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False)
+        try:
+            client = manager.client_by_id(info.device.id_, scan_now=False)
+        except Exception:
+            return False
         return client is not None and getattr(client, "passphrase_enabled", None) is False
 
     def on_ready(self):
@@ -117,9 +128,13 @@ class WCOneKeyUnlock(WCHWUnlock):
         _name, info = self.wizard_data["hardware_device"]
         self.plugin = self.plugins.get_plugin(info.plugin_name)
         self.title = _("Unlocking {} ({})").format(info.model_name, info.label)
-        client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False)
-        if client is None:
-            client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=True)
+        manager = _device_manager(self)
+        client = manager.client_by_id(info.device.id_, scan_now=False) if manager is not None else None
+        if client is None and manager is not None:
+            try:
+                client = manager.client_by_id(info.device.id_, scan_now=True)
+            except Exception:
+                client = None
         if client is None:
             self.error = _("Client for hardware device was unpaired.")
             self.busy = False
@@ -180,10 +195,14 @@ class WCOneKeyUnlock(WCHWUnlock):
 class WCOneKeyXPub(WCHWXPub):
     def on_ready(self):
         hw = self.wizard_data.get("hardware_device")
-        if hw and isinstance(hw, (tuple, list)) and len(hw) >= 2:
+        manager = _device_manager(self)
+        if manager is not None and hw and isinstance(hw, (tuple, list)) and len(hw) >= 2:
             info = hw[1]
-            if self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False) is None:
-                self.plugins.device_manager.client_by_id(info.device.id_, scan_now=True)
+            try:
+                if manager.client_by_id(info.device.id_, scan_now=False) is None:
+                    manager.client_by_id(info.device.id_, scan_now=True)
+            except Exception:
+                pass
         super().on_ready()
 
     def get_xpub_from_client(self, client, derivation, xtype):
