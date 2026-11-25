@@ -645,7 +645,9 @@ class TestOneKeySigning(unittest.TestCase):
                     self.assertIn("address", outputs[0])
                     self.assertEqual(1, outputs[1]["address_n"][-2])
                     self.assertEqual("100000", previous[inputs[0]["prev_hash"]]["bin_outputs"][0]["amount"])
-                    self.assertEqual(dict(version=2, lock_time=123), client.sign_tx.call_args.kwargs)
+                    kwargs = dict(client.sign_tx.call_args.kwargs)
+                    self.assertIs(client.take_bind_token.return_value, kwargs.pop("bind_token"))
+                    self.assertEqual(dict(version=2, lock_time=123), kwargs)
 
     def test_foreign_input_nondefault_sighash_missing_prev_and_bad_change_rejected(self):
         for mode in ("foreign", "sighash", "previous", "input-path", "change-path", "change-script"):

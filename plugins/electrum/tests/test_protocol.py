@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 
 from onekey import codec
+from onekey.device import Session, SessionError
 from onekey.frame import SeqCounter, decode, encode, pop_frame
 from onekey.ipc import Helper, HelperError
 from onekey.link import Link, LinkError
@@ -407,7 +408,9 @@ class TestDeviceSession(unittest.TestCase):
         with self.assertRaises(HelperError) as raised:
             call(helper, "xpub", {"connectId": "usb1", "binding": binding, "coin": "Bitcoin",
                                   "path": ACCOUNT, "scriptType": "SPENDWITNESS"})
-        self.assertEqual("WALLET_MISMATCH", raised.exception.code)
+        # Correct PIN, but the on-device passphrase opened another hidden wallet.
+        self.assertEqual("PASSPHRASE_MISMATCH", raised.exception.code)
+        self.assertIn("passphrase", str(raised.exception))
         self.assertEqual([(True, None)], device.on_device)
         self.assertEqual([(None, None), (None, None)], device.session_queries)
         self.assertEqual("other-wallet", device.session_address)
@@ -674,3 +677,52 @@ class TestDeviceSession(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFailureRequestFamily(unittest.TestCase):
+    """V2 Failure subcodes are decoded against the request that produced them."""
+
+    @staticmethod
+    def failure(subcode=None, message=None):
+        body = codec.enc_uint(1, 5)
+        if subcode is not None:
+            body += codec.enc_uint(2, subcode)
+        if message is not None:
+            body += codec.enc_str(3, message)
+        return body
+
+    def run_call(self, msg_type, body, *, button_first=False):
+        replies = ([(codec.BUTTON_REQUEST, b"")] if button_first else []) + [(codec.FAILURE, body)]
+
+        class Link:
+            def exchange(self, _msg_type, _payload, **_kwargs):
+                return replies.pop(0)
+
+        session = Session(Link(), deadline=None, cancelled=None, on_ui=None, cache={}, connect_id="usb1")
+        with self.assertRaises(SessionError) as raised:
+            session._call(msg_type, b"", codec.SUCCESS)
+        return raised.exception.code
+
+    def test_subcode_free_process_error_is_a_failure_not_a_cancel(self):
+        for message in ("Not enough funds", "device locked", None):
+            with self.subTest(message=message):
+                self.assertEqual("SDK_FAILED", self.run_call(codec.SIGN_TX, self.failure(message=message)))
+                self.assertEqual("SDK_FAILED", self.run_call(codec.DEVICE_STATUS_GET, self.failure(message=message)))
+
+    def test_legacy_cancel_messages_without_subcode_are_cancellation(self):
+        for message in ("Cancelled", "cancelled on device", "User cancelled", "Confirm dismissed"):
+            with self.subTest(message=message):
+                self.assertEqual("FIRMWARE_CANCELLED", self.run_call(codec.SIGN_TX, self.failure(message=message)))
+
+    def test_cancel_subcode_is_scoped_to_wallet_and_session_requests(self):
+        cancelled = self.failure(codec.SESSION_CANCELLED, "Busy")
+        self.assertEqual("FIRMWARE_CANCELLED", self.run_call(codec.DEVICE_SESSION_ASK_PIN, cancelled))
+        self.assertEqual("FIRMWARE_CANCELLED", self.run_call(codec.SIGN_TX, cancelled, button_first=True))
+        for msg_type in (codec.PING, codec.DEVICE_STATUS_GET, codec.DEVICE_INFO_GET, codec.PROTOCOL_INFO_REQUEST):
+            with self.subTest(msg_type=msg_type):
+                self.assertEqual("SDK_FAILED", self.run_call(msg_type, cancelled))
+
+    def test_invalid_session_subcode_only_for_session_requests(self):
+        invalid = self.failure(codec.SESSION_INVALID)
+        self.assertEqual("WALLET_SESSION_INVALID", self.run_call(codec.DEVICE_SESSION_GET, invalid))
+        self.assertEqual("SDK_FAILED", self.run_call(codec.SIGN_TX, invalid))

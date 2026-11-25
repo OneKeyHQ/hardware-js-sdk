@@ -6,6 +6,7 @@ then the legacy Bitcoin messages.
 """
 
 import importlib
+import re
 
 # Electrum mounts this zip as electrum_external_plugins.onekey. A package-level
 # "from . import codec" then looks up electrum_external_plugins, which is not a
@@ -21,6 +22,27 @@ _PURPOSES = {"SPENDADDRESS": 44, "SPENDP2SHWITNESS": 49, "SPENDWITNESS": 84,
 # BIP48 script-type index. 1 is nested p2wsh-p2sh, 2 is native p2wsh.
 _BIP48_SCRIPT_INDEX = {"SPENDP2SHWITNESS": 1, "PAYTOP2SHWITNESS": 1,
                        "SPENDWITNESS": 2, "PAYTOWITNESS": 2}
+
+# Failure subcodes belong to the originating request family (firmware-pro2):
+# management requests never carry the wallet-session cancel subcode, and only
+# DeviceSession* requests report an invalid session.
+_MANAGEMENT_CALLS = frozenset((codec.PING, codec.PROTOCOL_INFO_REQUEST, codec.DEVICE_INFO_GET,
+                               codec.DEVICE_STATUS_GET))
+_SESSION_CALLS = frozenset((codec.DEVICE_SESSION_GET, codec.DEVICE_SESSION_ASK_PIN,
+                            codec.DEVICE_SESSION_ASK_PASSPHRASE))
+# Older firmware may omit the cancel subcode. Same narrow fallback as
+# packages/core DeviceCommands.ts; any other subcode-free ProcessError is a real failure.
+_LEGACY_CANCEL_MESSAGE = re.compile(
+    r"^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|update cancel(?:led|ed)"
+    r"|user cancel(?:led|ed)(?:\s+.*)?)$",
+    re.IGNORECASE,
+)
+
+
+def _is_cancel_failure(msg_type, subcode, message):
+    if subcode is None:
+        return type(message) is str and bool(_LEGACY_CANCEL_MESSAGE.match(message.strip()))
+    return subcode == codec.SESSION_CANCELLED and msg_type not in _MANAGEMENT_CALLS
 
 
 class SessionError(Exception):
@@ -425,7 +447,8 @@ class Session:
             self._passphrase(None, on_device=True)
             restored, session_id = self._session()
             if restored != binding["passphraseState"]:
-                _fail("WALLET_MISMATCH")
+                # The PIN was right; the passphrase typed on the device opened another wallet.
+                _fail("PASSPHRASE_MISMATCH")
         # PIN entry may change initialization identity. Check it before any
         # public key, address or signing command, as well as after the operation.
         self._confirm(binding)
@@ -512,13 +535,14 @@ class Session:
             kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self.deadline, cancelled=self.cancelled)
         if kind == codec.FAILURE:
             try:
-                code, subcode, _message = codec.decode_failure(body)
+                code, subcode, message = codec.decode_failure(body)
             except ValueError:
                 raise SessionError("PROTOCOL") from None
             if code == 5:
-                if subcode == codec.SESSION_INVALID:
+                # msg_type is still the originating request when a ButtonAck relayed the reply.
+                if subcode == codec.SESSION_INVALID and msg_type in _SESSION_CALLS:
                     _fail("WALLET_SESSION_INVALID")
-                if subcode == codec.SESSION_CANCELLED or subcode is None:
+                if _is_cancel_failure(msg_type, subcode, message):
                     _fail("FIRMWARE_CANCELLED")
             _fail("SDK_FAILED")
         if kind != expect:

@@ -311,7 +311,36 @@ class TestLifecycleRepairs(unittest.TestCase):
                 mock.patch.object(client, '_xpub', return_value=store.xpub) as xpub:
             client.bind_keystore(store)
             self.assertEqual(1, xpub.call_count)
-            client._verify_account()
+            # The operation that requested the bind reuses its live comparison once.
+            client._verify_account(client.take_bind_token())
             self.assertEqual(1, xpub.call_count)
             client._verify_account()
             self.assertEqual(2, xpub.call_count)
+
+    def test_bind_proof_is_not_reused_by_direct_calls_or_after_storage_unlock(self):
+        plugin, manager = self.make_plugin()
+        client = self.client(plugin, manager)
+        store = SimpleNamespace(xpub='expected-account', onekey_binding=dict(BINDING),
+                                get_derivation_prefix=lambda: 'account')
+        with mock.patch.object(client_module, 'account_path', return_value=[1, 2, 3]), \
+                mock.patch.object(client_module, 'normalized_xpub', side_effect=lambda value, _: value), \
+                mock.patch.object(client, '_xpub', return_value=store.xpub) as xpub:
+            # A direct call after a bind it did not request repeats the live check.
+            client.bind_keystore(store)
+            client._verify_account()
+            self.assertEqual(2, xpub.call_count)
+            # A storage unlock between the bind and the operation voids the proof.
+            client.bind_keystore(store)
+            token = client.take_bind_token()
+            with mock.patch.object(client, 'flow'), mock.patch.object(client, '_select_wallet'):
+                client._storage_encryption_xpub([1, 2])
+            calls = xpub.call_count
+            client._verify_account(token)
+            self.assertEqual(calls + 1, xpub.call_count)
+            # A token cannot be replayed.
+            client.bind_keystore(store)
+            token = client.take_bind_token()
+            client._verify_account(token)
+            calls = xpub.call_count
+            client._verify_account(token)
+            self.assertEqual(calls + 1, xpub.call_count)

@@ -22,6 +22,11 @@ class HelperError(Exception):
                 "Active OneKey wallet does not match this Electrum wallet (WALLET_MISMATCH). "
                 "Lock your OneKey, unlock with the PIN for the saved wallet, and retry."
             )
+        elif code == "PASSPHRASE_MISMATCH":
+            message = (
+                "The passphrase entered on your OneKey opened a different hidden wallet "
+                "(PASSPHRASE_MISMATCH). Retry and enter this wallet's passphrase on the device."
+            )
         else:
             message = "OneKey helper failed (" + code + "). Reconnect using the wallet wizard."
         super().__init__(message)

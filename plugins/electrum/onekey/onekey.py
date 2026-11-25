@@ -89,7 +89,8 @@ class OneKeyKeyStore(Hardware_KeyStore):
         client = self.get_client()
         if client is None:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
-        signature = client.sign_message(path, script_type, raw, expected)
+        signature = client.sign_message(path, script_type, raw, expected,
+                                        bind_token=client.take_bind_token())
         if not bitcoin.verify_usermessage_with_address(expected, signature, raw):
             raise UserFacingException(_("Invalid OneKey signature encoding."))
         return signature
@@ -225,8 +226,11 @@ class OneKeyPlugin(HW_PluginBase):
                 return None
             if client is None:
                 return None
+            # Only the bind made by this lookup may vouch for the next operation.
+            client.discard_bind_token()
             if not allow_user_interaction:
-                # A silent lookup must not prompt. An already open matching account can be reused.
+                # A silent lookup must not prompt. An already open matching account can be reused,
+                # but the caller's operation repeats the live xpub comparison.
                 return client if client.matches_keystore(keystore) else None
             client.bind_keystore(keystore)
             return client
@@ -263,7 +267,7 @@ class OneKeyPlugin(HW_PluginBase):
         client = self.get_client(keystore)
         if client is None:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
-        client.show_address(path + suffix, wallet.txin_type, address)
+        client.show_address(path + suffix, wallet.txin_type, address, bind_token=client.take_bind_token())
 
     def _show_p2wsh_address(self, wallet, address, keystore):
         from .client import account_path
@@ -285,7 +289,7 @@ class OneKeyPlugin(HW_PluginBase):
         client = self.get_client(keystore)
         if client is None:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
-        client.show_address(prefix + suffix, script_type, address, payload)
+        client.show_address(prefix + suffix, script_type, address, payload, bind_token=client.take_bind_token())
 
     @staticmethod
     def _owned_path(keystore, item, script_type, *, change=False):
@@ -423,6 +427,7 @@ class OneKeyPlugin(HW_PluginBase):
         try:
             signatures = client.sign_tx(
                 inputs, outputs, previous, version=tx.version, lock_time=tx.locktime,
+                bind_token=client.take_bind_token(),
             )
             if type(signatures) is not list or len(signatures) != len(inputs):
                 raise UserFacingException(_("OneKey did not sign all inputs."))

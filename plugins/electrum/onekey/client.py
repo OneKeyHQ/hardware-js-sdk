@@ -96,7 +96,10 @@ class OneKeyClient(HardwareClientBase):
         self._unlock_selection = False
         self._requested_mode = None
         self._firmware_cancelled = False
-        self._account_verified = False
+        # One-shot proof that bind_keystore() just compared the live xpub. Only the
+        # operation that requested the bind may take it (take_bind_token()).
+        self._bind_token = None
+        self._taken_bind_token = None
         try:
             state = self._call("state", {"connectId": path})
             self._check_state(state)
@@ -158,7 +161,7 @@ class OneKeyClient(HardwareClientBase):
             self.handler.show_message(_("Check your OneKey device to continue."), on_cancel=self.cancelled.set)
             yield
         except BaseException as error:
-            self._account_verified = False
+            self._clear_bind_tokens()
             if close_on_error and not self._kept_after_firmware_cancel(error):
                 self.close()
             raise
@@ -252,7 +255,7 @@ class OneKeyClient(HardwareClientBase):
             # Persist only the public wallet identity, never the firmware session or secrets.
             keystore.onekey_binding = dict(self.binding)
             self.account = (path, xtype, expected)
-            self._account_verified = True
+            self._bind_token = object()
 
     def matches_keystore(self, keystore):
         try:
@@ -267,11 +270,28 @@ class OneKeyClient(HardwareClientBase):
         except Exception:
             return False
 
-    def _verify_account(self):
+    def _clear_bind_tokens(self):
+        self._bind_token = None
+        self._taken_bind_token = None
+
+    def discard_bind_token(self):
+        self._clear_bind_tokens()
+
+    def take_bind_token(self):
+        """Hand the proof of the bind that just ran to the operation that requested it.
+
+        Anything else that runs first (another lookup, a storage unlock, an error)
+        discards the proof, so a later direct call repeats the live xpub check.
+        """
+        token, self._bind_token = self._bind_token, None
+        self._taken_bind_token = token
+        return token
+
+    def _verify_account(self, bind_token=None):
         if self.account is None:
             raise UserFacingException(_("Verify the OneKey account before displaying or signing."))
-        if self._account_verified:
-            self._account_verified = False
+        taken, self._taken_bind_token = self._taken_bind_token, None
+        if bind_token is not None and bind_token is taken:
             return
         path, xtype, expected = self.account
         if self._xpub(path, xtype) != expected:
@@ -317,7 +337,7 @@ class OneKeyClient(HardwareClientBase):
         self.closed = True
         self.binding = None
         self.account = None
-        self._account_verified = False
+        self._clear_bind_tokens()
         self._drop_device_cache()
         self._release_helper_ref()
 
@@ -326,7 +346,7 @@ class OneKeyClient(HardwareClientBase):
         self.closed = True
         self.binding = None
         self.account = None
-        self._account_verified = False
+        self._clear_bind_tokens()
         self._release_helper_ref(scanning=True)
 
     def is_pairable(self):
@@ -363,6 +383,8 @@ class OneKeyClient(HardwareClientBase):
     def _storage_encryption_xpub(self, path):
         # Account encryption keeps the wallet just selected. Opening an encrypted file asks again,
         # and that answer is not stored on the client used by another wallet.
+        # A storage unlock is not the operation a pending bind was made for.
+        self._clear_bind_tokens()
         force = self._unlock_selection
         self._unlock_selection = False
         saved = (self.binding, self.account, self.device_id, self.root_fingerprint)
@@ -380,7 +402,7 @@ class OneKeyClient(HardwareClientBase):
         finally:
             if force and not self.closed:
                 self.binding, self.account, self.device_id, self.root_fingerprint = saved
-                self._account_verified = False
+                self._clear_bind_tokens()
 
     @runs_in_hwd_thread
     def get_xpub(self, bip32_path, xtype):
@@ -420,9 +442,9 @@ class OneKeyClient(HardwareClientBase):
         return self.root_fingerprint
 
     @runs_in_hwd_thread
-    def show_address(self, path, script_type, expected_address, multisig=None):
+    def show_address(self, path, script_type, expected_address, multisig=None, *, bind_token=None):
         with self.flow():
-            self._verify_account()
+            self._verify_account(bind_token)
             request = dict(connectId=self.connect_id, binding=self.binding,
                            coin=coin_name(), path=path, scriptType=INPUT_SCRIPT_TYPES[script_type])
             if multisig is not None:
@@ -432,9 +454,9 @@ class OneKeyClient(HardwareClientBase):
                 raise UserFacingException(_("OneKey returned a different address. Check the selected wallet."))
 
     @runs_in_hwd_thread
-    def sign_tx(self, inputs, outputs, prev_txes, *, version, lock_time):
+    def sign_tx(self, inputs, outputs, prev_txes, *, version, lock_time, bind_token=None):
         with self.flow():
-            self._verify_account()
+            self._verify_account(bind_token)
             response = self._call("sign", dict(connectId=self.connect_id, binding=self.binding,
                                                coin=coin_name(), inputs=inputs, outputs=outputs,
                                                refTxs=list(prev_txes.values()), version=version, locktime=lock_time))
@@ -443,9 +465,9 @@ class OneKeyClient(HardwareClientBase):
             return response["signatures"]
 
     @runs_in_hwd_thread
-    def sign_message(self, path, script_type, message, expected_address):
+    def sign_message(self, path, script_type, message, expected_address, *, bind_token=None):
         with self.flow():
-            self._verify_account()
+            self._verify_account(bind_token)
             response = self._call("sign-message", dict(
                 connectId=self.connect_id, binding=self.binding, coin=coin_name(), path=path,
                 scriptType=INPUT_SCRIPT_TYPES[script_type], message=message.hex()))
