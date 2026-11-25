@@ -106,6 +106,7 @@ class OneKeyClient(HardwareClientBase):
             self.device_id = state["deviceId"]
             self.serial = state["serialNo"]
             self.model = MODELS[state["model"]]
+            self.passphrase_enabled = state.get("passphraseEnabled")
             retain = getattr(self.plugin, "retain_client", None)
             if retain is not None:
                 retain(self)
@@ -118,11 +119,15 @@ class OneKeyClient(HardwareClientBase):
 
     @staticmethod
     def _check_state(state):
-        if (type(state) is not dict or set(state) != {"deviceId", "serialNo", "model"}
+        if (type(state) is not dict
+                or not {"deviceId", "serialNo", "model"}.issubset(state)
+                or not set(state).issubset({"deviceId", "serialNo", "model", "passphraseEnabled"})
                 or state["model"] not in MODELS
                 or type(state["serialNo"]) is not str or not state["serialNo"]):
             raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
         if state["deviceId"] is not None and (type(state["deviceId"]) is not str or not state["deviceId"]):
+            raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
+        if state.get("passphraseEnabled") is not None and type(state["passphraseEnabled"]) is not bool:
             raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
 
     def _call(self, op, params):
@@ -140,6 +145,10 @@ class OneKeyClient(HardwareClientBase):
             if error.code == "CANCELLED":
                 self._firmware_cancelled = False
                 raise UserCancelled() from None
+            if error.code == "PASSPHRASE_DISABLED":
+                raise UserFacingException(_(
+                    "Passphrase is disabled on this OneKey. Enable passphrase in device settings first."
+                )) from None
             raise UserFacingException(str(error)) from None
 
     def _ui(self, event):

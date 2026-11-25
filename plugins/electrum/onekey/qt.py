@@ -87,21 +87,33 @@ class OneKeyQtHandler(QtHandlerBase):
 
 
 class WCOneKeyScript(WCScriptAndDerivation):
+    def _passphrase_known_disabled(self):
+        hw = self.wizard_data.get("hardware_device")
+        if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
+            return False
+        info = hw[1]
+        client = self.plugins.device_manager.client_by_id(info.device.id_, scan_now=False)
+        return client is not None and getattr(client, "passphrase_enabled", None) is False
+
     def on_ready(self):
         super().on_ready()
-        if getattr(self, "hidden_cb", None) is not None:
-            return
-        self.hidden_cb = QCheckBox(_("Use a hidden wallet. Enter its passphrase on the device."))
-        self.hidden_cb.setChecked(self.wizard_data.get("onekey_wallet_mode") == "select-hidden")
-        self.hidden_cb.toggled.connect(lambda _checked: self.validate())
-        self.layout().insertWidget(self.layout().count() - 2, self.hidden_cb)
+        if getattr(self, "hidden_cb", None) is None:
+            self.hidden_cb = QCheckBox(_("Use a hidden wallet. Enter its passphrase on the device."))
+            self.hidden_cb.toggled.connect(lambda _checked: self.validate())
+            self.layout().insertWidget(self.layout().count() - 2, self.hidden_cb)
+        if self._passphrase_known_disabled():
+            self.hidden_cb.setChecked(False)
+            self.hidden_cb.setVisible(False)
+        else:
+            self.hidden_cb.setVisible(True)
+            self.hidden_cb.setChecked(self.wizard_data.get("onekey_wallet_mode") == "select-hidden")
         self.apply()
 
     def apply(self):
         super().apply()
         hidden = getattr(self, "hidden_cb", None)
         self.wizard_data["onekey_wallet_mode"] = (
-            "select-hidden" if hidden is not None and hidden.isChecked() else "standard")
+            "select-hidden" if hidden is not None and hidden.isVisible() and hidden.isChecked() else "standard")
 
 
 class WCOneKeyUnlock(WCHWUnlock):

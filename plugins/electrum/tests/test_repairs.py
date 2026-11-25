@@ -958,6 +958,30 @@ class TestProtocolRepairs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'invalid'):
             validate_binding(dict(serialNo='bad\nserial', deviceId='d', walletType='standard', passphraseState=None))
 
+    def test_passphrase_enabled_state_and_disabled_select_hidden_rejection(self):
+        locked = Scripted()
+        locked.passphrase_enabled = False
+        helper, _ = helper_for(locked)
+        self.assertIsNone(call(helper, 'state', dict(connectId='usb1'))['passphraseEnabled'])
+        with self.assertRaises(HelperError) as raised:
+            call(helper, 'open', dict(connectId='usb1', mode='select-hidden'))
+        self.assertEqual('PASSPHRASE_DISABLED', raised.exception.code)
+        self.assertEqual([], locked.on_device)
+
+        unlocked_disabled = Scripted()
+        unlocked_disabled.locked = False
+        unlocked_disabled.device_id = 'synthetic-device'
+        unlocked_disabled.passphrase_enabled = False
+        helper, _ = helper_for(unlocked_disabled)
+        self.assertIs(False, call(helper, 'state', dict(connectId='usb1'))['passphraseEnabled'])
+
+        unlocked_enabled = Scripted()
+        unlocked_enabled.locked = False
+        unlocked_enabled.device_id = 'synthetic-device'
+        unlocked_enabled.passphrase_enabled = True
+        helper, _ = helper_for(unlocked_enabled)
+        self.assertIs(True, call(helper, 'state', dict(connectId='usb1'))['passphraseEnabled'])
+
 
 class TestReceiveFrames(unittest.TestCase):
     @staticmethod

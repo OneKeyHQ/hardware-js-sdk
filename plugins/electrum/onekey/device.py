@@ -276,7 +276,13 @@ class Session:
 
     def state(self):
         status, info = self.identity()
-        return {"deviceId": status["device_id"], "serialNo": info["serial_no"], "model": info["model"]}
+        passphrase_enabled = status.get("passphrase_enabled") if status.get("unlocked") is True else None
+        return {
+            "deviceId": status["device_id"],
+            "serialNo": info["serial_no"],
+            "model": info["model"],
+            "passphraseEnabled": passphrase_enabled,
+        }
 
     def open(self, mode):
         if mode not in ("standard", "select-hidden"):
@@ -299,6 +305,8 @@ class Session:
                 wallet_type, passphrase_state = "standard", None
         else:
             status, info = self._main_pin(status, info)
+            if status.get("passphrase_enabled") is not True:
+                _fail("PASSPHRASE_DISABLED")
             self.on_ui("passphrase-select")
             self._passphrase(None, on_device=True)
             passphrase_state, session_id = self._session()
