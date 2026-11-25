@@ -92,8 +92,12 @@ def from_json(json_dict: "Transaction") -> messages.TransactionType:
             )
 
     def make_bin_output(vout: "Vout") -> messages.TxOutputBinType:
+        # str() keeps the RPC decimal representation; a float would truncate.
+        satoshis = Decimal(str(vout["value"])) * Decimal("100000000")
+        if satoshis != satoshis.to_integral_value():
+            raise ValueError("Previous output amount is not a whole number of satoshis")
         return messages.TxOutputBinType(
-            amount=int((Decimal(str(vout["value"])) * Decimal("100000000")).to_integral_exact()),
+            amount=int(satoshis),
             script_pubkey=bytes.fromhex(vout["scriptPubKey"]["hex"]),
         )
 

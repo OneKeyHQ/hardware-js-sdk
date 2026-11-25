@@ -19,6 +19,20 @@ UsbId = Tuple[int, int]
 
 VENDORS = ("onekey.so", "onekey.com", "trezor.io")
 
+# OneKey Touch/Pro firmware reports "trezor.io" while Trezor-compatible mode is
+# enabled (firmware-pro core/src/apps/base.py get_vendor()). Trezor hardware uses
+# the same vendor string and USB IDs, so that vendor is accepted only together
+# with OneKey-specific Features fields.
+TREZOR_COMPAT_VENDOR = "trezor.io"
+
+
+def is_onekey_features(features: messages.Features) -> bool:
+    if features.vendor not in VENDORS:
+        return False
+    if features.vendor != TREZOR_COMPAT_VENDOR:
+        return True
+    return features.onekey_device_type is not None or bool(features.onekey_serial_no)
+
 
 @dataclass(eq=True, frozen=True)
 class OneKeyModel:

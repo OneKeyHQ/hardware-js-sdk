@@ -116,8 +116,11 @@ class Transport(metaclass=ABCMeta):
                 f"Transport {self} is open via a context manager. Closing unconditionally."
             )
         LOG.info(f"Closing transport: {self}")
-        self._close()
-        self._opened = 0
+        try:
+            self._close()
+        finally:
+            # A failed release must not leave a dead handle counted as open.
+            self._opened = 0
 
     def __enter__(self) -> Transport:
         if self._opened == 0:

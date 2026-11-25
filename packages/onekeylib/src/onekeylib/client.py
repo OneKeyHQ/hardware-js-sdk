@@ -111,7 +111,7 @@ class Session(t.Generic[ClientType, SessionIdType]):
     ) -> MT:
         """Call a method on this session, process and return the response."""
         if self.is_invalid:
-            raise exceptions.InvalidSessionError(self.id)
+            raise exceptions.InvalidSessionError(None)
         with self:
             return self.client._call(self, msg, expect=expect, timeout=timeout)
 
@@ -397,7 +397,11 @@ class OneKeyClient(t.Generic[SessionType], metaclass=ABCMeta):
     def model(self) -> models.OneKeyModel:
         if self._model is None:
             self._model = models.detect(self.features)
-            if self.features.vendor not in self._model.vendors:
+            if (
+                self.features.vendor not in self._model.vendors
+                or not models.is_onekey_features(self.features)
+            ):
+                self._model = None
                 raise exceptions.OneKeyException(
                     f"Unrecognized vendor: {self.features.vendor}"
                 )
@@ -491,10 +495,10 @@ class OneKeyClient(t.Generic[SessionType], metaclass=ABCMeta):
                 ):
                     raise exceptions.Cancelled
                 elif resp.code == messages.FailureType.InvalidSession:
-                    raise exceptions.InvalidSessionError(session.id)
+                    raise exceptions.InvalidSessionError(None)
                 raise exceptions.OneKeyFailure(resp)
             elif isinstance(resp, messages.PassphraseRequest):
-                raise exceptions.InvalidSessionError(session.id, from_message=resp)
+                raise exceptions.InvalidSessionError(None, from_message=resp)
             elif not isinstance(resp, expect):
                 raise exceptions.UnexpectedMessageError(expect, resp)
             else:
@@ -610,6 +614,15 @@ def get_default_session(
     derive_cardano: bool = False,
 ) -> Session:
     """Get a default session for a connected OneKey device."""
+    from .protocol_v2 import OneKeyClientV2
+
+    if isinstance(client, OneKeyClientV2):
+        # V2 AUTO opens whichever wallet the unlock selected, including an
+        # Attach PIN wallet, and asks for an on-device passphrase otherwise.
+        return client.get_session(
+            passphrase=PassphraseSetting.AUTO, derive_cardano=derive_cardano
+        )
+
     passphrase = PassphraseSetting.STANDARD_WALLET
     client.ensure_unlocked()
     if client.features.passphrase_protection:

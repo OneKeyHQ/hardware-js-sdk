@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import socket
 import time
@@ -75,11 +76,10 @@ class UdpTransport(Transport):
     def enumerate(
         cls, models: Iterable["OneKeyModel"] | None = None
     ) -> Iterable["UdpTransport"]:
-        default_path = f"{cls.DEFAULT_HOST}:{cls.DEFAULT_PORT}"
-        try:
-            return [cls._try_path(default_path)]
-        except TransportException:
-            return []
+        # The emulator carries host PIN/passphrase acknowledgements in clear text,
+        # so it is never probed during automatic discovery. Select it explicitly
+        # with a `udp:` path (argument or ONEKEY_PATH).
+        return []
 
     @classmethod
     def find_by_path(cls, path: str, prefix_search: bool = False) -> "UdpTransport":
@@ -96,15 +96,36 @@ class UdpTransport(Transport):
     def get_path(self) -> str:
         return "{}:{}:{}".format(self.PATH_PREFIX, *self.device)
 
+    @staticmethod
+    def _is_loopback(address: str) -> bool:
+        try:
+            return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
+        except ValueError:
+            return False
+
     def _open(self) -> None:
-        host, _port = self.device
-        if host not in ("127.0.0.1", "::1", "localhost"):
+        host, port = self.device
+        try:
+            infos = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+        except OSError as e:
+            raise TransportException(f"Cannot resolve UDP emulator host: {host}") from e
+        loopback = [info for info in infos if self._is_loopback(info[4][0])]
+        if not infos or len(loopback) != len(infos):
             raise TransportException(
                 f"UDP emulator transport is restricted to loopback addresses, got: {host}"
             )
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.connect(self.device)
-        self.socket.settimeout(SOCKET_TIMEOUT)
+        family, socktype, proto, _canon, sockaddr = loopback[0]
+        sock = socket.socket(family, socktype, proto)
+        try:
+            sock.connect(sockaddr)
+            # Verify the destination the kernel actually bound, not only the host string.
+            if not self._is_loopback(sock.getpeername()[0]):
+                raise TransportException("UDP emulator peer is not a loopback address")
+            sock.settimeout(SOCKET_TIMEOUT)
+        except BaseException:
+            sock.close()
+            raise
+        self.socket = sock
 
     def _close(self) -> None:
         if self.socket is not None:

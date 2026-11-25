@@ -119,7 +119,10 @@ class UnexpectedMessageError(OneKeyException):
     def __init__(self, expected: type[MessageType], actual: MessageType) -> None:
         self.expected = expected
         self.actual = actual
-        super().__init__(f"Expected {expected.__name__} but OneKey sent {actual}")
+        # Name the type only: the message itself may carry wallet data.
+        super().__init__(
+            f"Expected {expected.__name__} but OneKey sent {type(actual).__name__}"
+        )
 
 
 class InvalidSessionError(OneKeyException):
@@ -130,7 +133,8 @@ class InvalidSessionError(OneKeyException):
     ) -> None:
         self.session_id = session_id
         self.from_message = from_message
-        super().__init__(session_id)
+        # Keep firmware session identifiers out of the printable error.
+        super().__init__("Invalid or expired session")
 
 
 class ProtocolError(OneKeyException):

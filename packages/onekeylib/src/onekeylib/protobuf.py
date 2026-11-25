@@ -380,9 +380,9 @@ def decode_varint_field(field: Field, reader: Reader) -> int | bool | IntEnum:
     if issubclass(field.py_type, IntEnum):
         try:
             return field.py_type(value)
-        except ValueError as e:
+        except ValueError:
             # treat enum errors as warnings
-            LOG.info(f"On field {field.name}: {e}")
+            LOG.info(f"On field {field.name}: unknown {field.proto_type} enum value")
             return value
 
     if issubclass(field.py_type, bool):
@@ -392,9 +392,7 @@ def decode_varint_field(field: Field, reader: Reader) -> int | bool | IntEnum:
         if field.proto_type.startswith("sint"):
             value = uint_to_sint(value)
         if not field.value_fits(value):
-            LOG.info(
-                f"On field {field.name}: value {value} out of range for {field.proto_type}"
-            )
+            LOG.info(f"On field {field.name}: value out of range for {field.proto_type}")
         return value
 
     raise TypeError  # not a varint field or unknown type
@@ -642,8 +640,8 @@ def value_to_proto(field: Field, value: t.Any) -> t.Any:
         else:
             try:
                 return field.py_type(value)
-            except ValueError as e:
-                LOG.info(f"On field {field.name}: {e}")
+            except ValueError:
+                LOG.info(f"On field {field.name}: unknown {field.proto_type} enum value")
                 return int(value)
 
     if issubclass(field.py_type, bytes):

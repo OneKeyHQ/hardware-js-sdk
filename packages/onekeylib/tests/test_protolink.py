@@ -1,3 +1,4 @@
+import threading
 import unittest
 from unittest import mock
 
@@ -21,6 +22,9 @@ class TestProtoLinkTransport(unittest.TestCase):
         transport._buffer = bytearray()
         transport._sequence = 0
         transport._last_response_seq = None
+        transport._unacked = set()
+        transport._write_lock = threading.Lock()
+        transport.generation = 1
         transport._opened = 1
         return transport
 
@@ -47,7 +51,53 @@ class TestProtoLinkTransport(unittest.TestCase):
         ack[-1] = crc8(ack[:-1])
         data = encode_frame(60603, b"status", 2)
         transport = self.make_transport([bytes(ack) + data])
-        self.assertEqual((60603, b"status"), transport.read_message(timeout=1.0))
+        transport.handle.bulkWrite.side_effect = lambda ep, chunk, timeout: len(chunk)
+        seq = transport.write_message(60602, b"")
+        self.assertEqual((60603, b"status"), transport.read_message(timeout=1.0, expected_ack_seq=seq))
+        self.assertEqual(set(), transport._unacked)
+
+    def test_cancel_ack_accepted_while_request_pending(self):
+        def ack(seq):
+            frame = bytearray.fromhex("5a080000000100") + bytes([0])
+            frame[6] = seq
+            frame[3] = crc8(frame[:3])
+            frame[-1] = crc8(frame[:-1])
+            return bytes(frame)
+
+        data = encode_frame(60208, b"", 3)
+        transport = self.make_transport([ack(1) + ack(2) + data])
+        transport.handle.bulkWrite.side_effect = lambda ep, chunk, timeout: len(chunk)
+        request_seq = transport.write_message(15, b"sign")
+        transport.write_message(20, b"")  # host Cancel from another thread
+        self.assertEqual((60208, b""), transport.read_message(timeout=1.0, expected_ack_seq=request_seq))
+        self.assertIsNotNone(transport.handle)
+
+    def test_unsolicited_ack_is_link_fatal(self):
+        ack = bytearray.fromhex("5a08000000010700")
+        ack[3] = crc8(ack[:3])
+        ack[-1] = crc8(ack[:-1])
+        transport = self.make_transport([bytes(ack)])
+        with self.assertRaises(TransportException):
+            transport.read_message(timeout=1.0)
+        self.assertIsNone(transport.handle)
+
+    def test_close_resets_open_count_when_release_fails(self):
+        transport = self.make_transport()
+        transport.handle.releaseInterface.side_effect = usb1.USBErrorNoDevice()
+        transport._opened = 2
+        with self.assertRaises(usb1.USBErrorNoDevice):
+            transport.close()
+        self.assertEqual(0, transport._opened)
+        self.assertIsNone(transport.handle)
+
+    def test_link_error_survives_failed_release(self):
+        transport = self.make_transport()
+        transport.handle.bulkWrite.side_effect = usb1.USBErrorIO()
+        transport.handle.releaseInterface.side_effect = usb1.USBErrorNoDevice()
+        with self.assertRaises(TransportException) as ctx:
+            transport.write_message(15, b"sign")
+        self.assertIn("write failed", str(ctx.exception))
+        self.assertEqual(0, transport._opened)
 
     def test_corrupt_frames_rejected(self):
         frame = encode_frame(60603, b"status", 1)

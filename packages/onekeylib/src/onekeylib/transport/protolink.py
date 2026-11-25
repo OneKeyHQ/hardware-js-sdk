@@ -13,8 +13,11 @@ from __future__ import annotations
 import atexit
 import logging
 import struct
+import threading
 import time
 import typing as t
+
+from contextlib import suppress
 
 from ..models import V2_MODELS, OneKeyModel
 from . import DeviceIsBusy, Timeout, Transport, TransportException
@@ -80,6 +83,13 @@ class ProtoLinkTransport(Transport):
         self._buffer = bytearray()
         self._sequence = 0
         self._last_response_seq: int | None = None
+        # Sequences written on the current link whose ACK has not been seen yet.
+        # Cancel may be written while another request is pending, so ACKs are
+        # matched against this set rather than only the latest request.
+        self._unacked: set[int] = set()
+        self._write_lock = threading.Lock()
+        # Incremented on every successful open so clients can detect a replaced link.
+        self.generation = 0
         super().__init__()
 
     @classmethod
@@ -157,11 +167,13 @@ class ProtoLinkTransport(Transport):
         self.ep_out = ep_out
         self._buffer.clear()
         self._last_response_seq = None
+        self._unacked.clear()
         try:
             self._drain()
         except BaseException:
             self._close()
             raise
+        self.generation += 1
 
     def _drain(self) -> None:
         assert self.handle is not None and self.ep_in is not None
@@ -188,6 +200,12 @@ class ProtoLinkTransport(Transport):
             self.ep_out = None
             self._buffer.clear()
             self._last_response_seq = None
+            self._unacked.clear()
+
+    def _close_after_link_error(self) -> None:
+        # Preserve the original link error even if releasing the dead handle fails.
+        with suppress(Exception):
+            self.close()
 
     def write_chunk(self, chunk: bytes, /) -> None:
         if self.handle is None or self.ep_out is None:
@@ -195,10 +213,10 @@ class ProtoLinkTransport(Transport):
         try:
             written = self.handle.bulkWrite(self.ep_out, chunk, timeout=USB_WRITE_TIMEOUT_MS)
         except Exception as e:
-            self.close()
+            self._close_after_link_error()
             raise TransportException(f"OneKey USB write failed: {e}") from e
         if written != len(chunk):
-            self.close()
+            self._close_after_link_error()
             raise TransportException("Incomplete OneKey USB write")
 
     def read_chunk(self, *, timeout: float | None = None) -> bytes:
@@ -210,14 +228,23 @@ class ProtoLinkTransport(Transport):
         except usb1.USBErrorTimeout as e:
             raise Timeout("OneKey USB read timed out") from e
         except Exception as e:
-            self.close()
+            self._close_after_link_error()
             raise TransportException(f"OneKey USB read failed: {e}") from e
 
     def write_message(self, wire_type: int, payload: bytes) -> int:
-        self._sequence = (self._sequence % 255) + 1
-        frame = encode_frame(wire_type, payload, self._sequence)
-        self.write_chunk(frame)
-        return self._sequence
+        # Serialized separately from the client's request lock so that a host
+        # Cancel can reach the device while a request waits for confirmation.
+        with self._write_lock:
+            self._sequence = (self._sequence % 255) + 1
+            seq = self._sequence
+            frame = encode_frame(wire_type, payload, seq)
+            self._unacked.add(seq)
+            try:
+                self.write_chunk(frame)
+            except BaseException:
+                self._unacked.discard(seq)
+                raise
+            return seq
 
     def read_message(
         self,
@@ -257,7 +284,10 @@ class ProtoLinkTransport(Transport):
                         if packet_type == 1:
                             if length != HEAD_SIZE:
                                 raise TransportException("Invalid OneKey proto_link ACK length")
-                            if expected_ack_seq is not None and seq != expected_ack_seq:
+                            with self._write_lock:
+                                acked = seq in self._unacked
+                                self._unacked.discard(seq)
+                            if not acked and (expected_ack_seq is None or seq != expected_ack_seq):
                                 raise TransportException("Mismatched OneKey proto_link ACK sequence")
                             continue
                         if packet_type != 0 or length < 10:
@@ -275,5 +305,5 @@ class ProtoLinkTransport(Transport):
                 except Timeout:
                     continue
         except (TransportException, Timeout):
-            self.close()
+            self._close_after_link_error()
             raise

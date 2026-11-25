@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import typing as t
 import unicodedata
@@ -39,7 +40,47 @@ REQUIRED_V2_MESSAGES = frozenset({
 
 # Messages sent mid-workflow (e.g. during SignTx) that must not be interrupted
 # by management status/session queries.
-_MID_WORKFLOW_MESSAGES = (messages.TxAck, messages.ButtonAck)
+_MID_WORKFLOW_MESSAGES = (messages.TxAck, messages.PaymentRequest, messages.ButtonAck)
+
+# Management requests. Their Failure subcodes are not wallet-session subcodes,
+# so subcode 1 does not mean cancellation for them.
+_MANAGEMENT_REQUESTS = (
+    messages.V2Ping,
+    messages.ProtocolInfoRequest,
+    messages.DeviceInfoGet,
+    messages.DeviceStatusGet,
+)
+_SESSION_REQUESTS = (
+    messages.DeviceSessionGet,
+    messages.DeviceSessionAskPin,
+    messages.DeviceSessionAskPassphrase,
+)
+# Messages a seedless session may send: nothing here reaches a wallet seed.
+_SEEDLESS_MESSAGES = (messages.Cancel, messages.LockDevice, *_MANAGEMENT_REQUESTS)
+
+_FAILURE_PROCESS_ERROR = 5
+# firmware-pro2: DeviceSessionErrorCode (session requests) and
+# app/utils/protocol.py SUBCODE_USER_CANCELLED (wallet requests) both use 1.
+_SUBCODE_USER_CANCELLED = 1
+_SUBCODE_INVALID_SESSION = 2
+
+# Older Protocol V2 firmware may omit the cancellation subcode. Keep the same
+# narrow message fallback as packages/core DeviceCommands.ts.
+_LEGACY_CANCEL_MESSAGE = re.compile(
+    r"^(?:cancel(?:led|ed)(?: on device)?|confirm dismissed|update cancel(?:led|ed)"
+    r"|user cancel(?:led|ed)(?:\s+.*)?)$",
+    re.IGNORECASE,
+)
+
+
+def _is_cancel_failure(request: MessageType, failure: messages.V2Failure) -> bool:
+    if failure.code != _FAILURE_PROCESS_ERROR:
+        return False
+    if failure.subcode is None:
+        return bool(_LEGACY_CANCEL_MESSAGE.match((failure.message or "").strip()))
+    if failure.subcode == _SUBCODE_USER_CANCELLED:
+        return not isinstance(request, _MANAGEMENT_REQUESTS)
+    return False
 
 
 class SessionV2(client.Session["OneKeyClientV2", t.Optional[str]]):
@@ -64,8 +105,12 @@ class SessionV2(client.Session["OneKeyClientV2", t.Optional[str]]):
         self._btc_test_address = btc_test_address
         self.attach_pin = attach_pin
 
+    @property
+    def seedless(self) -> bool:
+        return self._firmware_session_id is None
+
     def close(self) -> None:
-        self.is_invalid = True
+        self.client._retire_session(self)
 
 
 class OneKeyClientV2(client.OneKeyClient[SessionV2]):
@@ -90,15 +135,46 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         self._lock = threading.RLock()
         self._handshaked = False
         self._eventless = False
+        # Transport generation the handshake/eventless negotiation belongs to.
+        self._negotiated_generation: int | None = None
         self._device_status: messages.DeviceStatus | None = None
         self._device_info: messages.DeviceInfo | None = None
         self._active_session: SessionV2 | None = None
+        # Session whose multi-message workflow (e.g. SignTx/TxAck) is in progress.
+        self._workflow_session: SessionV2 | None = None
+        self._workflow_generation: int | None = None
         self._sessions: dict[str, SessionV2] = {}
 
     def _reset_link_state(self) -> None:
         self._handshaked = False
         self._eventless = False
+        self._negotiated_generation = None
         self._active_session = None
+        self._end_workflow()
+
+    def _link_generation(self) -> int:
+        return getattr(self.transport, "generation", 0)
+
+    def _retire_session(self, session: SessionV2) -> None:
+        session.is_invalid = True
+        with self._lock:
+            if session.id is not None and self._sessions.get(session.id) is session:
+                del self._sessions[session.id]
+            if self._active_session is session:
+                self._active_session = None
+            if self._workflow_session is session:
+                self._end_workflow()
+
+    def _end_workflow(self) -> None:
+        self._workflow_session = None
+        self._workflow_generation = None
+
+    def _check_workflow_owner(self, session: SessionV2 | None) -> None:
+        owner = self._workflow_session
+        if owner is not None and owner is not session:
+            raise exceptions.OneKeyException(
+                "Another OneKey wallet session has a workflow in progress"
+            )
 
     def _raw_write(self, msg: MessageType) -> int:
         active_mapping = self._mapping or mapping_mod.DEFAULT_MAPPING
@@ -130,8 +206,16 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
             while True:
                 resp = self._raw_read(timeout=timeout, expected_ack_seq=seq)
                 if isinstance(resp, messages.V2Failure):
-                    if resp.code == 5 and (resp.subcode == 1 or resp.subcode is None):
+                    # Decode against the originating request: a ButtonAck relay
+                    # still answers the request that started this exchange.
+                    if _is_cancel_failure(msg, resp):
                         raise exceptions.Cancelled(resp.message or "Cancelled on device")
+                    if (
+                        isinstance(msg, _SESSION_REQUESTS)
+                        and resp.code == _FAILURE_PROCESS_ERROR
+                        and resp.subcode == _SUBCODE_INVALID_SESSION
+                    ):
+                        raise exceptions.InvalidSessionError(None)
                     raise exceptions.OneKeyFailure(
                         messages.Failure(
                             code=messages.FailureType.ProcessError,
@@ -153,7 +237,9 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
                 return resp
 
     def _ensure_handshake(self) -> None:
-        if not self.transport.is_open():
+        generation = self._link_generation()
+        if not self.transport.is_open() or self._negotiated_generation != generation:
+            # A replaced link must renegotiate; state from the old link is void.
             self._reset_link_state()
         if not self._handshaked:
             self._v2_call(messages.V2Ping(message="handshake"), expect=messages.V2Success, timeout=5.0)
@@ -169,19 +255,28 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
                     "Unsupported OneKey Protocol V2 firmware"
                 )
             self._eventless = True
+        self._negotiated_generation = generation
 
     def _get_features(self) -> messages.Features:
         return self.refresh_features()
 
     @enter_context
-    def ping(self, message: str, button_protection: bool = False) -> str:
-        del button_protection
+    def ping(
+        self,
+        message: str,
+        button_protection: bool | None = None,
+        timeout: float | None = None,
+    ) -> str:
+        if button_protection:
+            raise exceptions.OneKeyException(
+                "Protocol V2 ping cannot request on-device confirmation"
+            )
         with self._lock:
             self._ensure_handshake()
             resp = self._v2_call(
                 messages.V2Ping(message=message),
                 expect=messages.V2Success,
-                timeout=5.0,
+                timeout=5.0 if timeout is None else timeout,
             )
             return resp.message or ""
 
@@ -278,7 +373,12 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         session_ref: str | None = None,
     ) -> SessionV2:
         del derive_cardano
+        if session_ref is not None and passphrase is not client.PassphraseSetting.AUTO:
+            # A session reference already names one wallet; an explicit wallet
+            # selector could silently resolve to a different one.
+            raise ValueError("session_ref cannot be combined with an explicit passphrase setting")
         with self._lock:
+            self._check_workflow_owner(None)
             self._ensure_handshake()
             if self._features is None:
                 self.refresh_features()
@@ -292,7 +392,7 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
 
             if session_ref is not None:
                 existing = self._sessions.get(session_ref)
-                if existing is None or existing._firmware_session_id is None:
+                if existing is None or existing.is_invalid or existing.seedless:
                     raise exceptions.InvalidSessionError(None)
                 self._resume_firmware_session(existing, status)
                 self._active_session = existing
@@ -381,22 +481,27 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         if status.unlocked is not True:
             raise exceptions.DeviceLockedError("OneKey was locked")
         if (status.unlocked_by_attach_to_pin is True) != session.attach_pin:
+            self._retire_session(session)
             raise exceptions.InvalidSessionError(None)
-        resumed = self._v2_call(
-            messages.DeviceSessionGet(
-                session_id=session._firmware_session_id,
-                btc_test_address=session._btc_test_address,
-            ),
-            expect=messages.DeviceSession,
-            timeout=10.0,
-        )
+        try:
+            resumed = self._v2_call(
+                messages.DeviceSessionGet(
+                    session_id=session._firmware_session_id,
+                    btc_test_address=session._btc_test_address,
+                ),
+                expect=messages.DeviceSession,
+                timeout=10.0,
+            )
+        except exceptions.InvalidSessionError:
+            self._retire_session(session)
+            raise
         if (
             not resumed.session_id
             or resumed.session_id != session._firmware_session_id
             or resumed.btc_test_address != session._btc_test_address
             or 1 not in resumed.seed_domains
         ):
-            session.is_invalid = True
+            self._retire_session(session)
             raise exceptions.InvalidSessionError(None)
 
     def get_seedless_session(self) -> SessionV2:
@@ -422,8 +527,22 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
             setting = passphrase
         return self.get_session(passphrase=setting, derive_cardano=derive_cardano)
 
+    def _check_seedless(self, session: SessionV2, msg: MessageType) -> None:
+        if session.seedless and not isinstance(msg, _SEEDLESS_MESSAGES):
+            raise exceptions.OneKeyException(
+                "Wallet operations are not available on a seedless session"
+            )
+
     def _write(self, session: SessionV2, msg: MessageType) -> None:
-        del session
+        if isinstance(msg, messages.Cancel):
+            # Host Cancel is flow control: it must reach the device while another
+            # thread holds the request lock waiting for user confirmation. The
+            # transport serializes the USB write and tracks the extra ACK.
+            self.transport.write_message(
+                *(self._mapping or mapping_mod.DEFAULT_MAPPING).encode(msg)
+            )
+            return
+        self._check_seedless(session, msg)
         with self._lock:
             self._raw_write(msg)
 
@@ -438,9 +557,18 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         msg: MessageType,
         timeout: float | None = None,
     ) -> MessageType:
+        self._check_seedless(session, msg)
         with self._lock:
             seq = self._raw_write(msg)
             return self._raw_read(timeout=timeout, expected_ack_seq=seq)
+
+    def cancel(self) -> None:
+        """Send a host Cancel, interrupting the current device workflow."""
+        with self._get_any_session() as session:
+            session.cancel()
+        # A cancelled workflow can no longer be continued; release the wallet even
+        # if no thread is waiting for its response.
+        self._end_workflow()
 
     def _call(
         self,
@@ -450,26 +578,54 @@ class OneKeyClientV2(client.OneKeyClient[SessionV2]):
         expect: type[MT] = messages.protobuf.MessageType,  # type: ignore[assignment]
         timeout: float | None = None,
     ) -> MT:
+        self._check_seedless(session, msg)
         with self._lock:
-            if session._firmware_session_id is not None and not isinstance(msg, _MID_WORKFLOW_MESSAGES):
-                # Restore and verify the exact wallet session before top-level commands,
-                # without interrupting mid-signing TxAck/ButtonAck exchanges.
-                status = self._v2_call(
-                    messages.DeviceStatusGet(),
-                    expect=messages.DeviceStatus,
-                    timeout=5.0,
-                )
-                self._resume_firmware_session(session, status)
-                self._active_session = session
+            mid_workflow = isinstance(msg, _MID_WORKFLOW_MESSAGES)
+            if mid_workflow:
+                # Continuations must stay on the wallet and link that started the
+                # workflow; another session or a reconnect voids it.
+                if (
+                    self._workflow_session is not session
+                    or self._active_session is not session
+                    or self._workflow_generation != self._link_generation()
+                    or not self.transport.is_open()
+                ):
+                    raise exceptions.InvalidSessionError(None)
+            else:
+                self._check_workflow_owner(session)
+                self._end_workflow()
+                if not session.seedless:
+                    # Restore and verify the exact wallet session before top-level commands.
+                    self._ensure_handshake()
+                    status = self._v2_call(
+                        messages.DeviceStatusGet(),
+                        expect=messages.DeviceStatus,
+                        timeout=5.0,
+                    )
+                    self._resume_firmware_session(session, status)
+                    self._active_session = session
             try:
-                return self._v2_call(msg, expect=expect, timeout=timeout or 120.0)
-            except exceptions.Cancelled:
-                # Device-side cancel leaves USB link intact; do not tear down transport.
+                resp = self._v2_call(msg, expect=expect, timeout=timeout or 120.0)
+            except (exceptions.Cancelled, exceptions.OneKeyFailure):
+                # The device returned a complete response; the link stays usable.
+                self._end_workflow()
                 raise
             except BaseException:
+                self._end_workflow()
                 with suppress(Exception):
                     self._raw_write(messages.Cancel())
                 with suppress(Exception):
                     self.transport.close()
                 self._reset_link_state()
                 raise
+            if (
+                isinstance(resp, messages.TxRequest)
+                and resp.request_type != messages.RequestType.TXFINISHED
+                and not session.seedless
+            ):
+                # Keep this wallet reserved until the signing exchange finishes.
+                self._workflow_session = session
+                self._workflow_generation = self._link_generation()
+            else:
+                self._end_workflow()
+            return resp

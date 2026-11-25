@@ -1536,6 +1536,8 @@ class Features(protobuf.MessageType):
         59: protobuf.Field("usb_connected", "bool", repeated=False, required=False, default=None),
         60: protobuf.Field("wireless_connected", "bool", repeated=False, required=False, default=None),
         63: protobuf.Field("tap_to_wake", "bool", repeated=False, required=False, default=None),
+        600: protobuf.Field("onekey_device_type", "uint32", repeated=False, required=False, default=None),
+        612: protobuf.Field("onekey_serial_no", "string", repeated=False, required=False, default=None),
     }
 
     def __init__(
@@ -1602,6 +1604,8 @@ class Features(protobuf.MessageType):
         usb_connected: Optional["bool"] = None,
         wireless_connected: Optional["bool"] = None,
         tap_to_wake: Optional["bool"] = None,
+        onekey_device_type: Optional["int"] = None,
+        onekey_serial_no: Optional["str"] = None,
     ) -> None:
         self.capabilities: Sequence["Capability"] = capabilities if capabilities is not None else []
         self.major_version = major_version
@@ -1664,6 +1668,8 @@ class Features(protobuf.MessageType):
         self.usb_connected = usb_connected
         self.wireless_connected = wireless_connected
         self.tap_to_wake = tap_to_wake
+        self.onekey_device_type = onekey_device_type
+        self.onekey_serial_no = onekey_serial_no
 
 class LockDevice(protobuf.MessageType):
     MESSAGE_WIRE_TYPE = 24

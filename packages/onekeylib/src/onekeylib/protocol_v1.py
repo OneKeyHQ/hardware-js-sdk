@@ -81,7 +81,7 @@ def read(
             if not chunk.startswith(magic):
                 if _ignore_bad_magic:
                     continue
-                raise exceptions.ProtocolError(f"Missing chunk magic: {chunk.hex()}")
+                raise exceptions.ProtocolError(f"Missing chunk magic ({len(chunk)} byte chunk)")
             return chunk[len(magic) :]
 
     # process first chunk
