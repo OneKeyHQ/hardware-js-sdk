@@ -1,0 +1,217 @@
+# This file is part of the OneKey Python library, derived from the Trezor project.
+#
+# Copyright (C) SatoshiLabs and contributors
+# Modifications Copyright (C) OneKey
+#
+# This library is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3
+# as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the License along with this library.
+# If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
+
+from __future__ import annotations
+
+import logging
+import typing as t
+from abc import ABCMeta, abstractmethod
+
+import typing_extensions as tx
+
+from ..exceptions import OneKeyException
+
+if t.TYPE_CHECKING:
+    from ..models import OneKeyModel
+
+    T = t.TypeVar("T", bound="Transport")
+
+
+LOG = logging.getLogger(__name__)
+
+UDEV_RULES_STR = """
+Do you have udev rules installed?
+https://help.onekey.so/hc/articles/360002123856
+""".strip()
+
+
+MessagePayload = t.Tuple[int, bytes]
+
+
+class TransportException(OneKeyException):
+    pass
+
+
+class DeviceIsBusy(TransportException):
+    pass
+
+
+class Timeout(TransportException):
+    pass
+
+
+class Transport(metaclass=ABCMeta):
+    PATH_PREFIX: t.ClassVar[str]
+    CHUNK_SIZE: t.ClassVar[int | None]
+    ENABLED: t.ClassVar[bool]
+
+    _opened: int = 0
+
+    @classmethod
+    def enumerate(
+        cls, models: t.Iterable[OneKeyModel] | None = None
+    ) -> t.Iterable[tx.Self]:
+        raise NotImplementedError
+
+    @classmethod
+    def find_by_path(cls, path: str, prefix_search: bool = False) -> tx.Self:
+        for device in cls.enumerate():
+
+            if device.get_path() == path:
+                return device
+
+            if prefix_search and device.get_path().startswith(path):
+                return device
+
+        raise TransportException(f"{cls.PATH_PREFIX} device not found: {path}")
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.get_path()})"
+
+    @abstractmethod
+    def get_path(self) -> str:
+        raise NotImplementedError
+
+    # find_debug is allowed to return a different type than Self
+    def find_debug(self) -> Transport:
+        raise NotImplementedError
+
+    def open(self, reopen: bool = False) -> None:
+        if self._opened == 0:
+            # the natural case: open a closed transport
+            LOG.info(f"Opening transport: {self}")
+            self._open()
+            self._opened = 1
+            return
+
+        if reopen:
+            # transport is already open, we want to close and reestablish
+            # the connection at the same open-height
+            LOG.info(f"Closing transport and reopening: {self}")
+            self._close()
+            self._open()
+            return
+
+        # finally, someone's calling open() when they're already open
+        # via a context manager.
+        LOG.warning(f"Transport {self} is already open")
+
+    def close(self) -> None:
+        if self._opened > 1:
+            LOG.warning(
+                f"Transport {self} is open via a context manager. Closing unconditionally."
+            )
+        LOG.info(f"Closing transport: {self}")
+        self._close()
+        self._opened = 0
+
+    def __enter__(self) -> Transport:
+        if self._opened == 0:
+            self.open()  # resets self._opened to 1
+        else:
+            self._opened += 1
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: t.Any,
+    ) -> None:
+        if self._opened > 0:
+            self._opened -= 1
+            if self._opened == 0:
+                self.close()
+
+    @abstractmethod
+    def is_open(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def _open(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def _close(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def write_chunk(self, chunk: bytes, /) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def read_chunk(self, *, timeout: float | None = None) -> bytes:
+        raise NotImplementedError
+
+    def is_ready(self) -> bool:
+        return self.is_open()
+
+
+def all_transports() -> t.Iterable[type[Transport]]:
+    from .protolink import ProtoLinkTransport
+    from .udp import UdpTransport
+    from .webusb import WebUsbTransport
+
+    transports: tuple[type[Transport], ...] = (
+        ProtoLinkTransport,
+        WebUsbTransport,
+        UdpTransport,
+    )
+    return [t for t in transports if t.ENABLED]
+
+
+def enumerate_devices(
+    models: t.Iterable[OneKeyModel] | None = None,
+) -> t.Sequence[Transport]:
+    devices: list[Transport] = []
+    for transport in all_transports():
+        name = transport.__name__
+        try:
+            found = list(transport.enumerate(models))
+            LOG.info(f"Enumerating {name}: found {len(found)} devices")
+            devices.extend(found)
+        except NotImplementedError:
+            LOG.error(f"{name} does not implement device enumeration")
+        except Exception as e:
+            excname = e.__class__.__name__
+            LOG.error(f"Failed to enumerate {name}. {excname}: {e}")
+    return devices
+
+
+def get_transport(path: str | None = None, prefix_search: bool = False) -> Transport:
+    if path is None:
+        try:
+            return next(iter(enumerate_devices()))
+        except StopIteration:
+            raise TransportException("No OneKey device found") from None
+
+    # Find whether B is prefix of A (transport name is part of the path)
+    # or A is prefix of B (path is a prefix, or a name, of transport).
+    # This naively expects that no two transports have a common prefix.
+    def match_prefix(a: str, b: str) -> bool:
+        return a.startswith(b) or b.startswith(a)
+
+    LOG.info(
+        "looking for device by {}: {}".format(
+            "prefix" if prefix_search else "full path", path
+        )
+    )
+    transports = [t for t in all_transports() if match_prefix(path, t.PATH_PREFIX)]
+    if transports:
+        return transports[0].find_by_path(path, prefix_search=prefix_search)
+
+    raise TransportException(f"Could not find device by path: {path}")
