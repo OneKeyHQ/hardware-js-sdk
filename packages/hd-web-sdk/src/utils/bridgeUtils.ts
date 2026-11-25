@@ -1,4 +1,9 @@
-import { JsBridgeIframe, setPostMessageListenerFlag } from '@onekeyfe/cross-inpage-provider-core';
+import {
+  JsBridgeIframe,
+  appDebugLogger,
+  fakeDebugLogger,
+  setPostMessageListenerFlag,
+} from '@onekeyfe/cross-inpage-provider-core';
 import { LoggerNames, getLogBlockLabel, getLogger } from '@onekeyfe/hd-core';
 import { ERRORS } from '@onekeyfe/hd-shared';
 
@@ -14,10 +19,40 @@ let hostBridge: JsBridgeIframe;
 
 const Log = getLogger(LoggerNames.SendMessage);
 
+// Keep sensitive SDK payloads (e.g. Starknet viewing keys, signing calldata)
+// out of cross-inpage-provider-core's jsBridge diagnostics by logging metadata only.
+const createMetadataOnlyBridgeDebugLogger = (): IJsBridgeIframeConfig['debugLogger'] => {
+  const logger = Object.create(fakeDebugLogger) as NonNullable<
+    IJsBridgeIframeConfig['debugLogger']
+  >;
+  logger.jsBridge = (...args: unknown[]) => {
+    const target = appDebugLogger.jsBridge as
+      | (((...logArgs: unknown[]) => void) & { enabled?: boolean })
+      | undefined;
+    if (!target?.enabled) {
+      return;
+    }
+    const [direction, payload] = args;
+    const meta =
+      payload && typeof payload === 'object'
+        ? {
+            id: (payload as { id?: unknown }).id,
+            type: (payload as { type?: unknown }).type,
+            scope: (payload as { scope?: unknown }).scope,
+          }
+        : undefined;
+    target(direction, meta);
+  };
+  return logger;
+};
+
 export const resetListenerFlag = () => setPostMessageListenerFlag(false);
 
 export const createJsBridge = (params: IJsBridgeIframeConfig & { isHost: boolean }) => {
-  const bridge = new JsBridgeIframe(params);
+  const bridge = new JsBridgeIframe({
+    ...params,
+    debugLogger: createMetadataOnlyBridgeDebugLogger(),
+  });
   if (params.isHost) {
     hostBridge = bridge;
   } else {
