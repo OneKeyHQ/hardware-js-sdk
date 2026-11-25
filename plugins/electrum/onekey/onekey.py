@@ -204,7 +204,11 @@ class OneKeyPlugin(HW_PluginBase):
     @runs_in_hwd_thread
     def create_client(self, device, handler):
         from .client import OneKeyClient
-        return OneKeyClient(device.path, handler, self)
+        client = OneKeyClient(device.path, handler, self)
+        if client.serial != device.id_:
+            client.close()
+            raise UserFacingException(_("OneKey device identity changed. Select the device again."))
+        return client
 
     @runs_in_hwd_thread
     def get_client(self, keystore, *args, allow_user_interaction=True, **kwargs):

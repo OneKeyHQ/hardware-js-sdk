@@ -537,6 +537,7 @@ class TestOneKeyClient(unittest.TestCase):
             client, helper, _ = self.make_client()
             xpub = self.public_key()
             client.binding = dict(BINDING)
+            client.account = ([0x80000054, 0x80000000, 0x80000000], "p2wpkh", xpub)
             binding = dict(BINDING)
             if field != "xpub":
                 binding[field] = "different"
@@ -546,7 +547,11 @@ class TestOneKeyClient(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(UserFacingException):
                 client.bind_keystore(key)
             self.assertFalse(any(call.args[0] in ("address", "sign") for call in helper.call.call_args_list))
-            helper.shutdown.assert_called_once()
+            self.assertIsNone(client.binding)
+            self.assertIsNone(client.account)
+            self.assertTrue(client.attached())
+            helper.shutdown.assert_not_called()
+            helper.release.assert_not_called()
 
     def test_bound_account_is_checked_before_address_and_address_is_compared(self):
         client, helper, _ = self.make_client()
@@ -557,7 +562,11 @@ class TestOneKeyClient(unittest.TestCase):
         with self.assertRaisesRegex(UserFacingException, "different address"):
             client.show_address(client.account[0] + [0, 0], "p2wpkh", "expected-address")
         self.assertEqual(["xpub", "address"], [call.args[0] for call in helper.call.call_args_list[-2:]])
-        helper.shutdown.assert_called_once()
+        self.assertIsNone(client.binding)
+        self.assertIsNone(client.account)
+        self.assertTrue(client.attached())
+        helper.shutdown.assert_not_called()
+        helper.release.assert_not_called()
 
     def test_missing_binding_invalid_binding_and_stale_child_fail_closed(self):
         client, helper, _ = self.make_client()
@@ -1154,6 +1163,7 @@ class TestOneKeyMultisig(unittest.TestCase):
             self.skipTest(f"PyQt6 is unavailable: {exc}")
         from onekey.qt import WCOneKeyXPub
         step = WCOneKeyXPub.__new__(WCOneKeyXPub)
+        step.wizard = NewWalletWizard.__new__(NewWalletWizard)
         client = mock.Mock()
         step.wizard_data = {"wallet_type": "multisig"}
         for xtype in ("standard", "p2wpkh", "p2wpkh-p2sh"):
@@ -1224,3 +1234,193 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertTrue(step["last"]({"last": True}))
         wizard.single = False
         self.assertFalse(step["last"]({"last": True}))
+
+
+class TestOneKeyWizardRepairs(unittest.TestCase):
+    def setUp(self):
+        from onekey import qt
+        self.qt = qt
+
+    def wizard_component(self, plugin, manager, data=None):
+        wizard = SimpleNamespace(plugins=SimpleNamespace(device_manager=manager, get_plugin=lambda _: plugin))
+        wizard.current_cosigner = NewWalletWizard.current_cosigner.__get__(wizard)
+        return SimpleNamespace(wizard=wizard, wizard_data=data or {})
+
+    def test_cache_miss_recreates_on_worker_and_registers_before_queued_sweep(self):
+        from electrum.plugin import DeviceMgr, _hwd_comms_executor
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin._live_clients = set()
+        plugin.helper = mock.Mock(generation="generation-one")
+        plugin.helper.call.return_value = dict(STATE)
+        manager = SimpleNamespace(clients={}, lock=threading.RLock(), logger=mock.Mock())
+        manager._client_by_id = lambda serial: next((c for c, id_ in manager.clients.items() if id_ == serial), None)
+        manager.client_by_id = lambda serial, **_: manager._client_by_id(serial)
+        manager.create_client = DeviceMgr.create_client.__get__(manager)
+        plugin.device_manager = lambda: manager
+        selected = SimpleNamespace(path="new-usb-port", id_=STATE["serialNo"])
+        info = SimpleNamespace(device=selected, plugin_name="onekey")
+        plugin.enumerate = mock.Mock(return_value=[selected])
+        plugin.create_handler = mock.Mock(return_value=mock.Mock())
+        original_create = OneKeyPlugin.create_client.__get__(plugin)
+        queued = []
+
+        def create(device, handler):
+            self.assertTrue(threading.current_thread().name.startswith("hwd_comms_thread"))
+            client = original_create(device, handler)
+            # Runs as soon as creation's hardware operation returns to its caller.
+            queued.append(_hwd_comms_executor.submit(plugin._sweep_unplugged))
+            return client
+
+        plugin.create_client = create
+        component = self.wizard_component(plugin, manager)
+        client = self.qt._ensure_wizard_client(component, info)
+        for task in queued:
+            task.result(timeout=2)
+        self.assertIsNotNone(client)
+        self.assertFalse(client.closed)
+        self.assertEqual({client: selected.id_}, manager.clients)
+        self.assertEqual("new-usb-port", client.connect_id)
+        plugin.helper.release.assert_not_called()
+        self.assertIs(client, self.qt._ensure_wizard_client(component, info))
+        plugin.create_handler.assert_called_once_with(component.wizard)
+
+    def test_reopened_device_must_match_selected_serial_before_registration(self):
+        from electrum.plugin import DeviceMgr
+        for serial in (STATE["serialNo"], "different-synthetic-serial"):
+            with self.subTest(serial=serial):
+                plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+                plugin._live_clients = set()
+                plugin.helper = mock.Mock(generation="generation-one")
+                plugin.helper.call.return_value = dict(STATE, serialNo=serial)
+                manager = SimpleNamespace(clients={}, lock=threading.RLock(), logger=mock.Mock())
+                manager._client_by_id = lambda _: None
+                plugin.device_manager = lambda: manager
+                device = SimpleNamespace(path="reused-usb-port", id_=STATE["serialNo"])
+                if serial == device.id_:
+                    client = DeviceMgr.create_client(manager, device, mock.Mock(), plugin)
+                    self.assertEqual({client: device.id_}, manager.clients)
+                else:
+                    with self.assertRaisesRegex(UserFacingException, "identity changed"):
+                        DeviceMgr.create_client(manager, device, mock.Mock(), plugin)
+                    self.assertEqual({}, manager.clients)
+                    self.assertEqual(set(), plugin._live_clients)
+                    plugin.helper.release.assert_called_once_with(device.path)
+
+    def test_current_cosigner_features_and_mode_are_used_on_both_pages(self):
+        first = SimpleNamespace(device=SimpleNamespace(id_="first"))
+        second = SimpleNamespace(device=SimpleNamespace(id_="second"))
+        clients = {"first": mock.Mock(passphrase_enabled=False), "second": mock.Mock(passphrase_enabled=True)}
+        manager = mock.Mock()
+        manager.client_by_id.side_effect = lambda serial, **_: clients[serial]
+        data = dict(wallet_type="multisig", hardware_device=("onekey", first),
+                    onekey_wallet_mode="standard", multisig_current_cosigner=2,
+                    multisig_cosigner_data={"2": dict(hardware_device=("onekey", second),
+                                                     onekey_wallet_mode="select-hidden")})
+        step = self.wizard_component(mock.Mock(), manager, data)
+        self.assertFalse(self.qt.WCOneKeyScript._passphrase_known_disabled(step))
+        manager.client_by_id.assert_called_once_with("second", scan_now=False)
+        clients["second"].has_usable_connection_with_device.assert_called_once()
+        xpub_step = self.qt.WCOneKeyXPub.__new__(self.qt.WCOneKeyXPub)
+        xpub_step.wizard, xpub_step.wizard_data = step.wizard, data
+        with mock.patch.object(self.qt, "_ensure_wizard_client") as ensure, \
+                mock.patch.object(self.qt.WCHWXPub, "on_ready"):
+            xpub_step.on_ready()
+        ensure.assert_called_once_with(xpub_step, second)
+        with mock.patch.object(self.qt.WCHWXPub, "get_xpub_from_client", return_value="xpub"):
+            xpub_step.get_xpub_from_client(clients["second"], "m/48'/0'/0'/2'", "p2wsh")
+        clients["second"].request_wallet_mode.assert_called_once_with("select-hidden")
+        script_step = self.qt.WCOneKeyScript.__new__(self.qt.WCOneKeyScript)
+        script_step.wizard, script_step.wizard_data = step.wizard, data
+        script_step.hidden_cb = mock.Mock()
+        script_step.hidden_cb.isVisible.return_value = True
+        script_step.hidden_cb.isChecked.return_value = False
+        with mock.patch.object(self.qt.WCScriptAndDerivation, "apply"):
+            script_step.apply()
+        self.assertEqual("standard", data["multisig_cosigner_data"]["2"]["onekey_wallet_mode"])
+        self.assertEqual("standard", data["onekey_wallet_mode"])
+
+    def test_script_page_refreshes_disabled_features_and_preserves_unknown_choice(self):
+        client = mock.Mock(passphrase_enabled=False)
+        manager = mock.Mock()
+        manager.client_by_id.return_value = client
+        info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+        step = self.wizard_component(mock.Mock(), manager, dict(hardware_device=("onekey", info)))
+        for current in (True, False, None):
+            def refresh():
+                self.assertTrue(threading.current_thread().name.startswith("hwd_comms_thread"))
+                client.passphrase_enabled = current
+                return True
+            client.has_usable_connection_with_device.side_effect = refresh
+            self.assertEqual(current is False, self.qt.WCOneKeyScript._passphrase_known_disabled(step))
+        client.has_usable_connection_with_device.return_value = False
+        client.has_usable_connection_with_device.side_effect = None
+        client.passphrase_enabled = False
+        self.assertFalse(self.qt.WCOneKeyScript._passphrase_known_disabled(step))
+
+    def test_unlock_refreshes_features_and_retries_new_attach_pin_session(self):
+        factory = TestOneKeyClient()
+        client, helper, handler = factory.make_client()
+        client.passphrase_enabled = False
+        standard = dict(BINDING, walletType="standard", passphraseState=None)
+        active = [standard]
+        encryption_xpub = factory.encryption_xpub()
+        bindings = []
+
+        def dispatch(op, params, **_kwargs):
+            if op == "state":
+                return dict(STATE, passphraseEnabled=True)
+            if op == "open":
+                self.assertEqual("standard", params["mode"])
+                return dict(active[0])
+            if op == "xpub":
+                bindings.append(dict(params["binding"]))
+                return dict(xpub=encryption_xpub, rootFingerprint=None)
+            self.fail(op)
+
+        helper.call.side_effect = dispatch
+
+        def switch_pin(**kwargs):
+            self.assertEqual({"allow_hidden": True}, kwargs)
+            active[0] = BINDING
+            return "standard"
+
+        handler.choose_passphrase_retry.side_effect = switch_pin
+        step = SimpleNamespace(_password_decrypts=mock.Mock(side_effect=[False, True]))
+        step._encryption_password = self.qt.WCOneKeyUnlock._encryption_password.__get__(step)
+        password = self.qt.WCOneKeyUnlock._unlock_password(step, client)
+        self.assertIsNotNone(password)
+        self.assertEqual([standard, BINDING], bindings)
+        self.assertFalse(client.closed)
+        helper.shutdown.assert_not_called()
+
+    def test_unlock_can_retry_hidden_wallet_or_cancel_with_refreshed_availability(self):
+        for enabled, mode, expected in ((True, "select-hidden", "hidden-key"), (False, None, None),
+                                        (None, "standard", "current-key")):
+            with self.subTest(enabled=enabled, mode=mode):
+                client = mock.Mock(passphrase_enabled=False)
+                def refresh():
+                    client.passphrase_enabled = enabled
+                    return True
+                client.has_usable_connection_with_device.side_effect = refresh
+                client.handler.choose_passphrase_retry.return_value = mode
+                step = SimpleNamespace(_encryption_password=mock.Mock(side_effect=["wrong-key", expected]),
+                                       _password_decrypts=mock.Mock(side_effect=[False, True]))
+                self.assertEqual(expected, self.qt.WCOneKeyUnlock._unlock_password(step, client))
+                client.handler.choose_passphrase_retry.assert_called_once_with(allow_hidden=enabled is not False)
+                self.assertEqual(1 if mode is None else 2, step._encryption_password.call_count)
+
+    def test_wallet_retry_dialog_offers_current_wallet_even_when_hidden_disabled(self):
+        for enabled, choice in ((False, "current"), (True, "hidden"), (True, "cancel")):
+            with self.subTest(enabled=enabled, choice=choice):
+                current, hidden, cancel = object(), object(), object()
+                box = mock.Mock()
+                box.addButton.side_effect = [current, hidden, cancel] if enabled else [current, cancel]
+                box.clickedButton.return_value = {"current": current, "hidden": hidden, "cancel": cancel}[choice]
+                handler = SimpleNamespace(top_level_window=lambda: None, _allow_hidden_retry=enabled,
+                                          _wallet_choice=None, _wallet_choice_done=threading.Event())
+                with mock.patch.object(self.qt, "QMessageBox", return_value=box):
+                    self.qt.OneKeyQtHandler._choose_passphrase_retry(handler)
+                self.assertEqual({"current": "standard", "hidden": "select-hidden", "cancel": None}[choice],
+                                 handler._wallet_choice)
+                self.assertTrue(handler._wallet_choice_done.is_set())
+                self.assertEqual(3 if enabled else 2, box.addButton.call_count)

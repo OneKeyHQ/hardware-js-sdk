@@ -7,7 +7,7 @@ from electrum.gui.qt.wizard.wallet import WCScriptAndDerivation, WCHWXPub, WCHWU
 from electrum.hw_wallet.qt import QtHandlerBase, QtPluginBase
 from electrum.hw_wallet.plugin import only_hook_if_libraries_available
 from electrum.i18n import _
-from electrum.plugin import hook
+from electrum.plugin import hook, runs_in_hwd_thread
 from electrum.storage import WalletStorage
 from electrum.util import InvalidPassword, UserCancelled, UserFacingException
 from electrum.wallet import Multisig_Wallet, Standard_Wallet
@@ -53,10 +53,11 @@ class OneKeyQtHandler(QtHandlerBase):
         self._wallet_choice = None
         self.passphrase_retry_signal.connect(self._choose_passphrase_retry)
 
-    def choose_passphrase_retry(self):
+    def choose_passphrase_retry(self, *, allow_hidden=True):
         if threading.current_thread() is threading.main_thread():
             raise UserFacingException(_("OneKey wallet selection must run on the hardware thread."))
         self._wallet_choice = None
+        self._allow_hidden_retry = allow_hidden
         self._wallet_choice_done.clear()
         self.passphrase_retry_signal.emit()
         self._wallet_choice_done.wait()
@@ -70,13 +71,17 @@ class OneKeyQtHandler(QtHandlerBase):
             box.setWindowTitle("OneKey")
             box.setText(_(
                 "The current OneKey wallet did not encrypt this file. "
-                "Enter a passphrase on your OneKey to try a hidden wallet?"
+                "Unlock the matching wallet on your OneKey and retry."
             ))
-            hidden = box.addButton(_("Enter passphrase on device"), QMessageBox.ButtonRole.AcceptRole)
+            current = box.addButton(_("Retry current wallet"), QMessageBox.ButtonRole.AcceptRole)
+            hidden = (box.addButton(_("Enter passphrase on device"), QMessageBox.ButtonRole.AcceptRole)
+                      if self._allow_hidden_retry else None)
             box.addButton(QMessageBox.StandardButton.Cancel)
-            box.setDefaultButton(hidden)
+            box.setDefaultButton(current)
             box.exec()
-            if box.clickedButton() is hidden:
+            if box.clickedButton() is current:
+                self._wallet_choice = "standard"
+            elif hidden is not None and box.clickedButton() is hidden:
                 self._wallet_choice = "select-hidden"
         finally:
             self._wallet_choice_done.set()
@@ -95,41 +100,44 @@ def _ensure_wizard_client(component, info):
     client = manager.client_by_id(info.device.id_, scan_now=False)
     if client is not None and getattr(client, "attached", lambda: True)():
         return client
-    try:
-        client = manager.client_by_id(info.device.id_, scan_now=True)
-        if client is not None and getattr(client, "attached", lambda: True)():
-            return client
-    except Exception:
-        pass
     # DeviceMgr.scan_devices() does not call create_client() for an unpaired device.
     # Re-create and register the client if the physical device is still attached.
     plugins = getattr(component, "plugins", None) or getattr(getattr(component, "wizard", None), "plugins", None)
     plugin = plugins.get_plugin(info.plugin_name) if plugins is not None else None
     if plugin is None or not hasattr(plugin, "create_client"):
         return None
-    try:
+    # Qt handlers must be constructed on the GUI thread.
+    handler = plugin.create_handler(getattr(component, "wizard", None))
+
+    @runs_in_hwd_thread
+    def restore():
+        client = manager.client_by_id(info.device.id_, scan_now=False)
+        if client is not None:
+            if client.attached():
+                return client
+            client.close()
+        client = manager.client_by_id(info.device.id_, scan_now=True)
+        if client is not None:
+            if client.attached():
+                return client
+            client.close()
         devices = plugin.enumerate()
         matched = next((dev for dev in devices if dev.id_ == info.device.id_), None)
         if matched is None:
             return None
-        handler = plugin.create_handler(getattr(component, "wizard", None))
-        client = plugin.create_client(matched, handler)
-        clients = getattr(manager, "clients", None)
-        if isinstance(clients, dict):
-            lock = getattr(manager, "lock", None)
-            if lock is not None:
-                with lock:
-                    clients[client] = matched.id_
-            else:
-                clients[client] = matched.id_
-        return client
+        # Creation and registration must finish before a queued lookup can sweep.
+        return manager.create_client(matched, handler, plugin)
+
+    try:
+        return restore()
     except Exception:
         return None
 
 
 class WCOneKeyScript(WCScriptAndDerivation):
+    @runs_in_hwd_thread
     def _passphrase_known_disabled(self):
-        hw = self.wizard_data.get("hardware_device")
+        hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
         if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
             return False
         manager = _device_manager(self)
@@ -140,7 +148,8 @@ class WCOneKeyScript(WCScriptAndDerivation):
             client = manager.client_by_id(info.device.id_, scan_now=False)
         except Exception:
             return False
-        return client is not None and getattr(client, "passphrase_enabled", None) is False
+        return (client is not None and client.has_usable_connection_with_device()
+                and client.passphrase_enabled is False)
 
     def on_ready(self):
         super().on_ready()
@@ -153,13 +162,14 @@ class WCOneKeyScript(WCScriptAndDerivation):
             self.hidden_cb.setVisible(False)
         else:
             self.hidden_cb.setVisible(True)
-            self.hidden_cb.setChecked(self.wizard_data.get("onekey_wallet_mode") == "select-hidden")
+            self.hidden_cb.setChecked(
+                self.wizard.current_cosigner(self.wizard_data).get("onekey_wallet_mode") == "select-hidden")
         self.apply()
 
     def apply(self):
         super().apply()
         hidden = getattr(self, "hidden_cb", None)
-        self.wizard_data["onekey_wallet_mode"] = (
+        self.wizard.current_cosigner(self.wizard_data)["onekey_wallet_mode"] = (
             "select-hidden" if hidden is not None and hidden.isVisible() and hidden.isChecked() else "standard")
 
 
@@ -192,22 +202,17 @@ class WCOneKeyUnlock(WCHWUnlock):
 
     def _unlock_password(self, client):
         # Try the active device session first (PIN_ANY accepts both Main PIN and Attach PIN).
-        password = self._encryption_password(client, "standard")
-        if self._password_decrypts(password):
-            return password
-        if getattr(client, "passphrase_enabled", None) is False:
-            self.error = _("The current OneKey wallet did not encrypt this file. "
-                           "Unlock the matching wallet on your OneKey and retry.")
-            return None
-        mode = client.handler.choose_passphrase_retry()
-        if mode != "select-hidden":
-            self.error = _("This OneKey wallet did not encrypt this file.")
-            return None
-        password = self._encryption_password(client, mode)
-        if not self._password_decrypts(password):
-            self.error = _("This OneKey wallet did not encrypt this file.")
-            return None
-        return password
+        mode = "standard"
+        while True:
+            password = self._encryption_password(client, mode)
+            if self._password_decrypts(password):
+                return password
+            if not client.has_usable_connection_with_device():
+                raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+            mode = client.handler.choose_passphrase_retry(allow_hidden=client.passphrase_enabled is not False)
+            if mode not in ("standard", "select-hidden"):
+                self.error = _("This OneKey wallet did not encrypt this file.")
+                return None
 
     def _encryption_password(self, client, mode):
         # Decrypting an existing file must not reuse a wallet already open on this device.
@@ -228,7 +233,7 @@ class WCOneKeyUnlock(WCHWUnlock):
 
 class WCOneKeyXPub(WCHWXPub):
     def on_ready(self):
-        hw = self.wizard_data.get("hardware_device")
+        hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
         if hw and isinstance(hw, (tuple, list)) and len(hw) >= 2:
             _ensure_wizard_client(self, hw[1])
         super().on_ready()
@@ -238,7 +243,7 @@ class WCOneKeyXPub(WCHWXPub):
             raise UserFacingException(_("Only standard and multisig OneKey wallets are supported."))
         if self.wizard_data["wallet_type"] == "multisig" and xtype not in ("p2wsh", "p2wsh-p2sh"):
             raise UserFacingException(_("OneKey supports only BIP48 segwit multisig wallets."))
-        mode = self.wizard_data.get("onekey_wallet_mode") or "standard"
+        mode = self.wizard.current_cosigner(self.wizard_data).get("onekey_wallet_mode") or "standard"
         if mode not in ("standard", "select-hidden"):
             mode = "standard"
         client.request_wallet_mode(mode)

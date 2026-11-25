@@ -150,7 +150,8 @@ class OneKeyClient(HardwareClientBase):
                 raise UserFacingException(_(
                     "Passphrase is disabled on this OneKey. Enable passphrase in device settings first."
                 )) from None
-            if error.code in ("DEVICE_MISMATCH", "STALE", "UNSUPPORTED"):
+            if error.code in ("DEVICE_MISMATCH", "STALE", "UNSUPPORTED", "SDK_FAILED",
+                              "USB_UNAVAILABLE", "TIMEOUT", "PROTOCOL"):
                 self._fatal_error = True
             raise UserFacingException(str(error)) from None
 
@@ -175,10 +176,10 @@ class OneKeyClient(HardwareClientBase):
             yield
         except BaseException as error:
             self._clear_bind_tokens()
-            if close_on_error:
-                if self._fatal_error or not self.attached():
-                    self.close()
-                elif not self._kept_after_firmware_cancel(error):
+            if self._fatal_error or not self.attached():
+                self.close()
+            elif close_on_error:
+                if not self._kept_after_firmware_cancel(error):
                     # Keep the logical client paired in Electrum's DeviceMgr on
                     # recoverable business errors or host/wizard cancellation so
                     # retrying in the wizard never hits "Client for hardware
@@ -222,10 +223,12 @@ class OneKeyClient(HardwareClientBase):
             raise UserCancelled()
         self.binding = check_binding(self._call("open", {"connectId": self.connect_id, "mode": mode}))
         if self.binding["serialNo"] != self.serial:
+            self._fatal_error = True
             raise UserFacingException(_("OneKey device identity changed."))
         if self.device_id is None:
             self.device_id = self.binding["deviceId"]
         elif self.binding["deviceId"] != self.device_id:
+            self._fatal_error = True
             raise UserFacingException(_("OneKey device identity changed."))
 
     def _xpub(self, path, xtype, *, account=True, binding=None):
@@ -406,6 +409,7 @@ class OneKeyClient(HardwareClientBase):
             if self.device_id is not None and state["deviceId"] not in (None, self.device_id):
                 self._detach_without_cache_drop()
                 return False
+            self.passphrase_enabled = state.get("passphraseEnabled")
             return True
         except Exception:
             self._detach_without_cache_drop()

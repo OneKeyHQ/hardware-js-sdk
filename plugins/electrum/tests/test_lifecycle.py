@@ -347,3 +347,87 @@ class TestLifecycleRepairs(unittest.TestCase):
             calls = xpub.call_count
             client._verify_account(token)
             self.assertEqual(calls + 1, xpub.call_count)
+
+    def test_link_failures_invalidate_cache_even_during_storage_unlock(self):
+        for code in ('SDK_FAILED', 'USB_UNAVAILABLE', 'TIMEOUT', 'PROTOCOL', 'STALE', 'DEVICE_MISMATCH'):
+            for storage in (False, True):
+                with self.subTest(code=code, storage=storage):
+                    plugin, manager = self.make_plugin()
+                    client = self.client(plugin, manager)
+                    other = self.client(plugin, manager, 'usb2')
+                    client.binding, client.account = dict(BINDING), ('saved-account',)
+                    plugin.helper.call.side_effect = HelperError(code)
+                    with self.assertRaises(client_module.UserFacingException):
+                        with client.flow(close_on_error=not storage):
+                            client._call('xpub', {'connectId': 'usb1'})
+                    self.assertTrue(client.closed)
+                    self.assertIsNone(client.account)
+                    self.assertIsNone(client.binding)
+                    self.assertNotIn(client, manager.clients)
+                    self.assertTrue(other.attached())
+                    plugin.helper.release.assert_called_once_with('usb1')
+                    plugin.helper.shutdown.assert_not_called()
+
+    def test_live_identity_change_is_fatal_but_saved_wallet_mismatch_and_cancels_are_not(self):
+        for field in ('serialNo', 'deviceId'):
+            with self.subTest(field=field):
+                plugin, manager = self.make_plugin()
+                client = self.client(plugin, manager)
+                plugin.helper.call.return_value = dict(BINDING, **{field: 'changed-identity'})
+                with self.assertRaisesRegex(client_module.UserFacingException, 'identity changed'):
+                    with client.flow():
+                        client._select_wallet()
+                self.assertTrue(client.closed)
+                self.assertNotIn(client, manager.clients)
+        for code in ('WALLET_MISMATCH', 'PASSPHRASE_MISMATCH', 'PASSPHRASE_DISABLED',
+                     'CANCELLED', 'FIRMWARE_CANCELLED'):
+            with self.subTest(code=code):
+                plugin, manager = self.make_plugin()
+                client = self.client(plugin, manager)
+                plugin.helper.call.side_effect = HelperError(code)
+                with self.assertRaises((client_module.UserFacingException, client_module.UserCancelled)):
+                    with client.flow():
+                        client._call('open', {'connectId': 'usb1'})
+                self.assertTrue(client.attached())
+                self.assertIn(client, manager.clients)
+                plugin.helper.shutdown.assert_not_called()
+
+    def test_actual_helper_old_route_failure_evicts_client_without_replay(self):
+        plugin, manager = self.make_plugin()
+        device = Scripted()
+        helper = Helper(ports={'usb1': pipe_link(device)})
+        plugin.helper = helper
+        self.addCleanup(helper.shutdown)
+        call(helper, 'search', {})
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            client = pool.submit(self.client, plugin, manager).result(timeout=2)
+            # Same device on another port, before Electrum performs a scan.
+            helper.ports['usb2'] = helper.ports.pop('usb1')
+            def attempt():
+                with client.flow():
+                    client._select_wallet()
+            with self.assertRaises(client_module.UserFacingException):
+                pool.submit(attempt).result(timeout=2)
+            self.assertTrue(client.closed)
+            self.assertNotIn(client, manager.clients)
+            discovered = call(helper, 'search', {})
+            self.assertEqual(['usb2'], [item['connectId'] for item in discovered])
+            replacement = pool.submit(self.client, plugin, manager, 'usb2').result(timeout=2)
+            self.assertTrue(replacement.attached())
+            self.assertEqual(device.serial, replacement.serial)
+
+    def test_health_refreshes_passphrase_feature_and_clears_stale_false_when_locked(self):
+        plugin, manager = self.make_plugin()
+        device = Scripted()
+        device.locked, device.device_id, device.passphrase_enabled = False, STATE['deviceId'], False
+        helper = Helper(ports={'usb1': pipe_link(device)})
+        plugin.helper = helper
+        self.addCleanup(helper.shutdown)
+        call(helper, 'search', {})
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            client = pool.submit(self.client, plugin, manager).result(timeout=2)
+            self.assertFalse(client.passphrase_enabled)
+            for enabled, locked, expected in ((True, False, True), (False, False, False), (False, True, None)):
+                device.passphrase_enabled, device.locked = enabled, locked
+                self.assertTrue(pool.submit(client.has_usable_connection_with_device).result(timeout=2))
+                self.assertIs(expected, client.passphrase_enabled)
