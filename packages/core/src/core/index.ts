@@ -885,7 +885,7 @@ const onCallDevice = async (
   }
 };
 
-async function initDeviceList(method: BaseMethod) {
+async function initDeviceList(method: BaseMethod, abortSignal?: AbortSignal) {
   const env = DataManager.getSettings('env');
   if (DataManager.isBleConnect(env) && method.connectId) {
     await TransportManager.configure();
@@ -898,7 +898,14 @@ async function initDeviceList(method: BaseMethod) {
     _deviceList.connector = _connector;
   }
 
-  await _deviceList.getDeviceLists(method.connectId, parseInitOptions(method));
+  const initOptions = parseInitOptions(method);
+  if (method.payload.onlyConnectBleDevice !== undefined) {
+    initOptions.onlyConnectBleDevice = method.payload.onlyConnectBleDevice;
+  }
+  if (abortSignal) {
+    initOptions.abortSignal = abortSignal;
+  }
+  await _deviceList.getDeviceLists(method.connectId, initOptions);
 }
 
 function initDevice(method: BaseMethod) {
@@ -1144,16 +1151,32 @@ async function connectDeviceForBle(
       if (!useAcquireGuards) {
         await device.acquire(connectProtocol, {
           forceProtocolDetection: method.payload.forceProtocolDetection,
+          onlyConnectBleDevice: method.payload.onlyConnectBleDevice,
+          abortSignal,
         });
       } else {
+        const attemptAbortController = new AbortController();
+        const forwardAbort = () => attemptAbortController.abort();
+        if (abortSignal) {
+          if (abortSignal.aborted) {
+            attemptAbortController.abort();
+          } else {
+            abortSignal.addEventListener('abort', forwardAbort, { once: true });
+          }
+        }
         try {
           await raceBleAcquire(
             device.acquire(connectProtocol, {
               forceProtocolDetection: method.payload.forceProtocolDetection,
+              onlyConnectBleDevice: method.payload.onlyConnectBleDevice,
+              abortSignal: attemptAbortController.signal,
             }),
             abortSignal
           );
         } catch (err) {
+          // Abort the per-attempt signal so a late-settling setup IPC cannot continue into
+          // a session-resetting V1 wake after the 60s desktop acquire deadline expires.
+          attemptAbortController.abort();
           // A deadline hit means the transport is wedged mid-acquire; drop the
           // link before the retry so it cold-connects instead of stacking a
           // second connect onto the half-open one.
@@ -1166,6 +1189,8 @@ async function connectDeviceForBle(
             device.markTransportDisconnected();
           }
           throw err;
+        } finally {
+          abortSignal?.removeEventListener('abort', forwardAbort);
         }
       }
     }
@@ -1273,18 +1298,37 @@ const ensureConnected = async (
       if (timer) {
         clearTimeout(timer);
       }
+      const pollAbortController = new AbortController();
+      const onParentAbort = () => pollAbortController.abort();
+      if (abortSignal) {
+        if (abortSignal.aborted) {
+          pollAbortController.abort();
+        } else {
+          abortSignal.addEventListener('abort', onParentAbort, { once: true });
+        }
+      }
+      const cleanupPollAbort = () => {
+        abortSignal?.removeEventListener('abort', onParentAbort);
+      };
+      let timedOut = false;
       timer = setTimeout(() => {
+        timedOut = true;
+        pollAbortController.abort();
+        cleanupPollAbort();
         reject(ERRORS.TypedError(HardwareErrorCode.PollingTimeout));
       }, TIME_OUT);
 
       tryCount += 1;
       Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
       try {
-        await initDeviceList(method);
+        await initDeviceList(method, pollAbortController.signal);
         lastInitializeError = undefined;
       } catch (error) {
         lastInitializeError = error;
         Log.debug('device list error: ', error);
+        if (timedOut) {
+          return;
+        }
         if (
           [
             HardwareErrorCode.BridgeNotInstalled,
@@ -1295,6 +1339,10 @@ const ensureConnected = async (
             HardwareErrorCode.TransportProtocolMismatch,
           ].includes(error.errorCode)
         ) {
+          if (timer) {
+            clearTimeout(timer);
+          }
+          cleanupPollAbort();
           _deviceList = undefined;
           reject(error);
           return;
@@ -1303,9 +1351,11 @@ const ensureConnected = async (
           await TransportManager.configure();
           lastInitializeError = undefined;
         }
+      } finally {
+        cleanupPollAbort();
       }
 
-      if (abort()) {
+      if (timedOut || abort()) {
         return;
       }
 

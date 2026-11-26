@@ -67,6 +67,10 @@ export type AcquireInput = {
   forceProtocolDetection?: boolean;
   /** Reuse expectedProtocol only when this transport previously confirmed it for the same endpoint. */
   skipProtocolProbe?: boolean;
+  /** Connection-only acquire: never send a session-resetting Initialize wake during probing. */
+  onlyConnectBleDevice?: boolean;
+  /** Optional cancellation signal checked before sending a session-resetting wake. */
+  abortSignal?: AbortSignal;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };

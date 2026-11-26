@@ -19,12 +19,17 @@ import {
   HardwareErrorCodeMessage,
   createDeferred,
   isHeaderChunk,
+  isLegacyProtocolV1BleName,
 } from '@onekeyfe/hd-shared';
 
 import { resolveBlePacketCapacity } from './ble-packet-capacity';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { DesktopAPI, NobleBleIpcErrorResponse } from '@onekeyfe/hd-transport-electron';
+import type {
+  DesktopAPI,
+  NobleBleIpcErrorResponse,
+  NobleBleWriteOptions,
+} from '@onekeyfe/hd-transport-electron';
 import type {
   AcquireInput,
   OneKeyDeviceInfo,
@@ -47,6 +52,8 @@ export type BleAcquireInput = {
   forceCleanRunPromise?: boolean;
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
+  onlyConnectBleDevice?: boolean;
+  abortSignal?: AbortSignal;
 };
 
 interface PacketProcessResult {
@@ -90,6 +97,43 @@ const BLE_PACKET_SIZE_MAXIMUM = 244;
 const BLE_WRITE_DELAY_MS = 5;
 const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
+
+const shouldRethrowElectronProtocolProbeError = (error: unknown): boolean => {
+  if (isProtocolV2LinkDisabledError(error)) {
+    return true;
+  }
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  // Pairing rejections, disconnects, and missing GATT state are link failures rather than
+  // evidence of a protocol mismatch. Rethrow them instead of entering wake or probing V2.
+  return (
+    code === HardwareErrorCode.TransportCallInProgress ||
+    code === HardwareErrorCode.BleConnectedError ||
+    code === HardwareErrorCode.BleDeviceNotBonded ||
+    code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BleDeviceDisconnected ||
+    code === HardwareErrorCode.BleCharacteristicNotFound ||
+    code === HardwareErrorCode.BleCharacteristicNotifyError ||
+    code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
+    code === HardwareErrorCode.BleServiceNotFound ||
+    code === HardwareErrorCode.BlePoweredOff ||
+    code === HardwareErrorCode.BleUnsupported ||
+    code === HardwareErrorCode.BleLocationError
+  );
+};
+
+const isUnstartedElectronWakeError = (error: unknown): boolean => {
+  const candidate = error as { errorCode?: unknown; params?: { writeRejected?: unknown } };
+  const code = candidate?.errorCode;
+  // Errors returned before a GATT write is submitted or explicitly rejected by the host
+  // (e.g. Windows pairing rejection with status: 3) leave the peripheral untouched.
+  return (
+    candidate?.params?.writeRejected === true ||
+    code === HardwareErrorCode.BleCharacteristicNotFound ||
+    code === HardwareErrorCode.BlePoweredOff ||
+    code === HardwareErrorCode.BleUnsupported ||
+    code === HardwareErrorCode.BleLocationError
+  );
+};
 
 /**
  * Desktop Electron BLE transport with automatic Protocol V1/V2 detection.
@@ -138,6 +182,16 @@ export default class ElectronBleTransport {
   private deviceProtocol: Map<string, ProtocolType> = new Map();
 
   private deviceProtocolHints: Map<string, ProtocolType> = new Map();
+
+  private silentDetections = new Map<string, 'silent' | 'woken'>();
+
+  private probeResponseTimeoutErrors = new WeakSet<Error>();
+
+  private lastV1ProbeFailedWithoutTimeout: Set<string> = new Set();
+
+  private acquireGenerations: Map<string, number> = new Map();
+
+  private nextAcquireGeneration = 1;
 
   private deviceMtus: Map<string, number> = new Map();
 
@@ -251,6 +305,7 @@ export default class ElectronBleTransport {
     // and doesn't depend on connection state. Preserving it avoids redundant V1 probe on reconnect.
     this.v1Buffers.delete(deviceId);
     this.v2Assemblers.delete(deviceId);
+    this.lastV1ProbeFailedWithoutTimeout.delete(deviceId);
     this.resetProtocolV2Frames(deviceId);
     this.notificationTokens.delete(deviceId);
     if (this.runPromise && this.runPromiseDeviceId === deviceId) {
@@ -321,7 +376,10 @@ export default class ElectronBleTransport {
 
     await Promise.all(Array.from(trackedDeviceIds, deviceId => this.releaseNative(deviceId)));
     this.acquiringDevices.clear();
+    this.acquireGenerations.clear();
+    this.lastV1ProbeFailedWithoutTimeout.clear();
     this.protocolV2CallCounts.clear();
+    this.silentDetections.clear();
     await this.protocolV2Links
       .dispose('Electron BLE transport stopped')
       .catch(error => this.Log?.debug('[Electron BLE] link dispose failed:', error));
@@ -413,6 +471,20 @@ export default class ElectronBleTransport {
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
+    if (input.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+
+    const acquireGeneration = this.nextAcquireGeneration;
+    this.nextAcquireGeneration += 1;
+    this.acquireGenerations.set(uuid, acquireGeneration);
+    const isCurrentAcquire = () => this.acquireGenerations.get(uuid) === acquireGeneration;
+    const assertAcquireActive = () => {
+      this.assertRunning();
+      if (input.abortSignal?.aborted || !isCurrentAcquire()) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+      }
+    };
 
     const retainedToken =
       this.retainedDevices.has(uuid) &&
@@ -426,6 +498,8 @@ export default class ElectronBleTransport {
       await this.release(uuid);
     }
 
+    assertAcquireActive();
+
     if (forceCleanRunPromise && this.runPromise) {
       const error = ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise);
       this.runPromise.reject(error);
@@ -433,7 +507,6 @@ export default class ElectronBleTransport {
       this.runPromiseDeviceId = null;
     }
 
-    this.assertRunning();
     this.acquiringDevices.add(uuid);
     let connectAttempted = false;
     try {
@@ -442,7 +515,7 @@ export default class ElectronBleTransport {
       }
 
       const device = await invokeNobleBle(window.desktopApi.nobleBle.getDevice(uuid));
-      this.assertRunning();
+      assertAcquireActive();
       if (!device) {
         throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${uuid} not found`);
       }
@@ -468,11 +541,12 @@ export default class ElectronBleTransport {
       try {
         connectAttempted = true;
         await invokeNobleBle(window.desktopApi.nobleBle.connect(uuid));
+        assertAcquireActive();
         this.connectedDevices.add(uuid);
       } catch (error) {
         this.handleBluetoothError(error);
       }
-      this.assertRunning();
+      assertAcquireActive();
 
       const mtuCleanup = this.createMtuSubscription(uuid);
       if (mtuCleanup) {
@@ -487,14 +561,20 @@ export default class ElectronBleTransport {
       } catch (error) {
         this.handleBluetoothError(error);
       }
-      await this.refreshBlePacketCapacity(uuid);
-      this.assertRunning();
+      assertAcquireActive();
+      const connectedDevice = await this.refreshBlePacketCapacity(uuid);
+      assertAcquireActive();
+      const resolvedDeviceName = connectedDevice?.name || device.name;
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
 
-      const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint);
-      this.assertRunning();
+      const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint, {
+        isKnownLegacyV1Device: isLegacyProtocolV1BleName(resolvedDeviceName),
+        onlyConnectBleDevice: input.onlyConnectBleDevice,
+        abortSignal: input.abortSignal,
+      });
+      assertAcquireActive();
       if (protocolType === 'V2') {
         this.Log?.debug('[Electron BLE] Protocol V2 write configured', {
           writeMode: 'withoutResponse',
@@ -504,28 +584,32 @@ export default class ElectronBleTransport {
       }
 
       return {
-        ...toBleDescriptor({ id: device.id, name: device.name }, protocolType),
+        ...toBleDescriptor({ id: device.id, name: resolvedDeviceName }, protocolType),
         uuid,
       };
     } catch (error) {
       this.Log?.error('[Electron BLE] acquire failed:', error);
-      try {
-        const nobleBle = window.desktopApi?.nobleBle;
-        if (nobleBle && !this.stopped && (connectAttempted || this.connectedDevices.has(uuid))) {
-          if (this.connectedDevices.has(uuid)) {
-            await invokeNobleBle(nobleBle.unsubscribe(uuid)).catch(cleanupError => {
-              this.Log?.debug('[Electron BLE] acquire unsubscribe failed:', cleanupError);
-            });
+      if (isCurrentAcquire()) {
+        try {
+          const nobleBle = window.desktopApi?.nobleBle;
+          if (nobleBle && !this.stopped && (connectAttempted || this.connectedDevices.has(uuid))) {
+            if (this.connectedDevices.has(uuid)) {
+              await invokeNobleBle(nobleBle.unsubscribe(uuid)).catch(cleanupError => {
+                this.Log?.debug('[Electron BLE] acquire unsubscribe failed:', cleanupError);
+              });
+            }
+            await invokeNobleBle(nobleBle.disconnect(uuid));
           }
-          await invokeNobleBle(nobleBle.disconnect(uuid));
+        } catch (cleanupError) {
+          this.Log?.debug('[Electron BLE] acquire cleanup failed:', cleanupError);
         }
-      } catch (cleanupError) {
-        this.Log?.debug('[Electron BLE] acquire cleanup failed:', cleanupError);
+        this.cleanupDeviceState(uuid);
       }
-      this.cleanupDeviceState(uuid);
-      this.handleBluetoothError(error);
+      throw this.normalizeBluetoothError(error);
     } finally {
-      this.acquiringDevices.delete(uuid);
+      if (isCurrentAcquire()) {
+        this.acquiringDevices.delete(uuid);
+      }
     }
   }
 
@@ -633,8 +717,17 @@ export default class ElectronBleTransport {
   private async detectProtocol(
     uuid: string,
     expectedProtocol?: ProtocolType,
-    protocolHint?: ProtocolType
+    protocolHint?: ProtocolType,
+    options: {
+      isKnownLegacyV1Device?: boolean;
+      onlyConnectBleDevice?: boolean;
+      abortSignal?: AbortSignal;
+    } = {}
   ): Promise<ProtocolType> {
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+
     // A declared V1 is taken at face value, as the React Native transport
     // already does on iOS: the caller reads the protocol off its own device
     // record, so probing re-asks a question that is already answered and adds a
@@ -674,18 +767,102 @@ export default class ElectronBleTransport {
         await this.resetProbeStateAfterProtocolProbe(uuid, probeOrder[i - 1]);
         this.assertRunning();
       }
-      const detected =
+      this.lastV1ProbeFailedWithoutTimeout.delete(uuid);
+      let detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+      if (!detected && protocol === 'V1' && !this.lastV1ProbeFailedWithoutTimeout.has(uuid)) {
+        detected = await this.wakeSilentProtocolV1Device(uuid, probeOrder, options);
+      }
       this.assertRunning();
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
+        this.silentDetections.delete(uuid);
         this.Log?.debug(`[Electron BLE] detectProtocol: uuid=${uuid} -> ${protocol}`);
         return protocol;
       }
     }
 
+    if (!this.silentDetections.has(uuid)) {
+      this.silentDetections.set(uuid, 'silent');
+    }
     this.deviceProtocol.delete(uuid);
     throw this.createProtocolDetectionError();
+  }
+
+  private async wakeSilentProtocolV1Device(
+    uuid: string,
+    probeOrder: ProtocolType[],
+    options: {
+      isKnownLegacyV1Device?: boolean;
+      onlyConnectBleDevice?: boolean;
+      abortSignal?: AbortSignal;
+    } = {}
+  ): Promise<boolean> {
+    if (
+      options.onlyConnectBleDevice ||
+      probeOrder[0] !== 'V1' ||
+      this.silentDetections.get(uuid) === 'woken' ||
+      (!options.isKnownLegacyV1Device && this.silentDetections.get(uuid) !== 'silent')
+    ) {
+      return false;
+    }
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+    this.assertRunning();
+
+    // A timed-out GetFeatures probe retires the renderer notification listener;
+    // re-attach it on the live physical link before sending Initialize.
+    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+    this.assertRunning();
+
+    const previousSilentState = this.silentDetections.get(uuid);
+    this.silentDetections.set(uuid, 'woken');
+    this.Log?.debug('[Electron BLE] sending Protocol V1 Initialize wake', {
+      connectIdSuffix: uuid.slice(-8),
+      source: options.isKnownLegacyV1Device ? 'legacy-v1-name' : 'silent-retry',
+    });
+
+    let answeredV1 = false;
+    try {
+      this.deviceProtocol.set(uuid, 'V1');
+      const response = await this.callProtocolV1(
+        uuid,
+        'Initialize',
+        {},
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS },
+        { oneShot: true },
+        true
+      );
+      answeredV1 = typeof response?.type === 'string';
+    } catch (error) {
+      this.clearProbeProtocol(uuid, 'V1');
+      if (isUnstartedElectronWakeError(error)) {
+        if (previousSilentState) {
+          this.silentDetections.set(uuid, previousSilentState);
+        } else {
+          this.silentDetections.delete(uuid);
+        }
+      }
+      this.Log?.debug('[Electron BLE] Protocol V1 Initialize wake failed:', error);
+      if (shouldRethrowElectronProtocolProbeError(error)) {
+        throw error;
+      }
+    }
+
+    if (answeredV1) {
+      return true;
+    }
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+    this.assertRunning();
+    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+    this.assertRunning();
+    return this.probeProtocolV1(uuid);
   }
 
   private createNotificationSubscription(uuid: string) {
@@ -736,14 +913,27 @@ export default class ElectronBleTransport {
     try {
       this.deviceProtocol.set(uuid, 'V1');
       // GetFeatures identifies Protocol V1 without resetting an existing wallet
-      // session before Core has a chance to restore a hidden wallet.
-      await this.callProtocolV1(uuid, 'GetFeatures', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      // session before Core has a chance to restore a hidden wallet. Use a one-shot
+      // native write so a fresh Windows link does not stall 28s in the 15-attempt
+      // pairing retry loop when a sleeping Classic silently ignores GetFeatures.
+      this.lastV1ProbeFailedWithoutTimeout.delete(uuid);
+      await this.callProtocolV1(
+        uuid,
+        'GetFeatures',
+        {},
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS },
+        { oneShot: true },
+        true
+      );
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
-      if (isProtocolV2LinkDisabledError(error)) {
+      if (shouldRethrowElectronProtocolProbeError(error)) {
         throw error;
+      }
+      if (!(error instanceof Error && this.probeResponseTimeoutErrors.has(error))) {
+        this.lastV1ProbeFailedWithoutTimeout.add(uuid);
       }
       return false;
     }
@@ -789,10 +979,11 @@ export default class ElectronBleTransport {
     }
   }
 
-  private async refreshBlePacketCapacity(uuid: string): Promise<void> {
+  private async refreshBlePacketCapacity(uuid: string) {
     const nobleBle = window.desktopApi?.nobleBle;
     const device = nobleBle ? await invokeNobleBle(nobleBle.getDevice(uuid)) : undefined;
     this.updateBlePacketCapacity(uuid, device?.mtu);
+    return device;
   }
 
   private updateBlePacketCapacity(uuid: string, mtu?: number): void {
@@ -1016,7 +1207,9 @@ export default class ElectronBleTransport {
     uuid: string,
     name: string,
     data: Record<string, unknown>,
-    options?: TransportCallOptions
+    options?: TransportCallOptions,
+    writeOptions?: NobleBleWriteOptions,
+    isProtocolProbe = false
   ) {
     if (!this._messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
@@ -1034,6 +1227,7 @@ export default class ElectronBleTransport {
     const messages = this._messages;
     const buffers = ProtocolV1.encodeTransportPackets(messages, name, data);
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    let responseTimedOut = false;
 
     try {
       if (!window.desktopApi?.nobleBle) {
@@ -1049,7 +1243,11 @@ export default class ElectronBleTransport {
         if (hexString.length === 0) {
           throw new Error(`Buffer ${i + 1} is empty`);
         }
-        await invokeNobleBle(window.desktopApi.nobleBle.write(uuid, hexString));
+        await invokeNobleBle(
+          writeOptions
+            ? window.desktopApi.nobleBle.write(uuid, hexString, writeOptions)
+            : window.desktopApi.nobleBle.write(uuid, hexString)
+        );
       }
 
       const response = await Promise.race([
@@ -1057,6 +1255,7 @@ export default class ElectronBleTransport {
         new Promise<never>((_, reject) => {
           if (options?.timeoutMs) {
             timeout = setTimeout(() => {
+              responseTimedOut = true;
               const error = ERRORS.TypedError(
                 HardwareErrorCode.BleTimeoutError,
                 `BLE response timeout after ${options.timeoutMs}ms for ${name}`
@@ -1075,19 +1274,21 @@ export default class ElectronBleTransport {
       return check.call(jsonData);
     } catch (e) {
       this.Log?.error('[Electron BLE] Protocol V1 call error:', e);
-      const isProbeTimeout =
-        name === 'GetFeatures' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS;
       if ((e as { errorCode?: unknown })?.errorCode === HardwareErrorCode.BleTimeoutError) {
         this.v1Buffers.set(uuid, { buffer: [], bufferLength: 0 });
         const notifyCleanup = this.notificationCleanups.get(uuid);
         notifyCleanup?.();
         this.notificationCleanups.delete(uuid);
         this.notificationTokens.delete(uuid);
-        if (!isProbeTimeout) {
+        if (!isProtocolProbe) {
           await this.releaseNative(uuid, { forceNative: true });
         }
       }
-      throw this.normalizeBluetoothError(e);
+      const normalized = this.normalizeBluetoothError(e);
+      if (isProtocolProbe && responseTimedOut && normalized instanceof Error) {
+        this.probeResponseTimeoutErrors.add(normalized);
+      }
+      throw normalized;
     } finally {
       if (timeout) clearTimeout(timeout);
       if (this.runPromise === runPromise) {

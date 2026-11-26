@@ -238,4 +238,36 @@ describe('DevicePool state lifecycle', () => {
 
     expect(release).toHaveBeenCalledTimes(1);
   });
+
+  test('forwards onlyConnectBleDevice and abortSignal in _createDevice and skips initialize', async () => {
+    const descriptor = { path: 'classic-path', commType: 'ble' } as any;
+    const abortController = new AbortController();
+    const connect = jest.fn().mockResolvedValue(true);
+    const initialize = jest.fn().mockResolvedValue(undefined);
+    const release = jest.fn().mockResolvedValue(undefined);
+    const device = {
+      connect,
+      initialize,
+      release,
+    } as any;
+    const fromDescriptor = jest.spyOn(Device, 'fromDescriptor').mockReturnValue(device);
+
+    try {
+      await expect(
+        (DevicePool as any)._createDevice(descriptor, {
+          onlyConnectBleDevice: true,
+          abortSignal: abortController.signal,
+        })
+      ).resolves.toBe(device);
+    } finally {
+      fromDescriptor.mockRestore();
+    }
+
+    expect(connect).toHaveBeenCalledWith(undefined, {
+      onlyConnectBleDevice: true,
+      abortSignal: abortController.signal,
+    });
+    expect(initialize).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
 });

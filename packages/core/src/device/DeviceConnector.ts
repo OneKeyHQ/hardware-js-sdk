@@ -97,7 +97,11 @@ export default class DeviceConnector {
     expectedProtocol?: HardwareConnectProtocol,
     protocolHint?: HardwareConnectProtocol,
     forceProtocolDetection?: boolean,
-    skipProtocolProbe?: boolean
+    skipProtocolProbe?: boolean,
+    bleOptions?: {
+      onlyConnectBleDevice?: boolean;
+      abortSignal?: AbortSignal;
+    }
   ) {
     Log.debug('acquire', path, session, expectedProtocol, protocolHint);
     const env = DataManager.getSettings('env');
@@ -112,6 +116,8 @@ export default class DeviceConnector {
           protocolHint,
           forceProtocolDetection,
           skipProtocolProbe,
+          onlyConnectBleDevice: bleOptions?.onlyConnectBleDevice,
+          abortSignal: bleOptions?.abortSignal,
         };
         res = await transport.acquire(acquireInput);
       } else {

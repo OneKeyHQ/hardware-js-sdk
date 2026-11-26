@@ -8,6 +8,11 @@ import type { EBleDisconnectReason } from '@onekeyfe/hd-shared';
 // Noble BLE API interface - core BLE functionality
 export interface NobleBleWriteOptions {
   pacingDelayMs?: number;
+  /**
+   * Submit the GATT write once without entering the Windows unpaired retry loop
+   * (which otherwise replays the frame up to 15 times until a notification arrives).
+   */
+  oneShot?: boolean;
 }
 
 export type NobleBleIpcErrorPayload = {

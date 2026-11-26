@@ -935,8 +935,8 @@ async function transmitHexDataToDevice(
   );
   const pacingDelayMs = resolveNobleBleWritePacingDelay(options);
 
-  if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
-    // macOS / Linux or already paired on Windows: direct write
+  if (!IS_WINDOWS || pairedDevices.has(deviceId) || options?.oneShot) {
+    // macOS / Linux, already paired on Windows, or explicit one-shot write: direct write
     const writeCharacteristic = doGetWriteCharacteristic();
     if (!writeCharacteristic) {
       throw ERRORS.TypedError(
@@ -944,9 +944,31 @@ async function transmitHexDataToDevice(
         `Write characteristic not available for ${deviceId}`
       );
     }
+    const writeOnePacket = async (target: Characteristic, chunk: Buffer) => {
+      try {
+        await writeCharacteristicWithoutResponse(deviceId, target, chunk);
+      } catch (e) {
+        if (IS_WINDOWS && !pairedDevices.has(deviceId)) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          if (ABORTABLE_WRITE_ERROR_PATTERNS.some(p => p.test(errorMessage))) {
+            await unsubscribeNotifications(deviceId).catch(() => {});
+            await disconnectDevice(deviceId).catch(() => {});
+            discoveredDevices.delete(deviceId);
+            subscriptionOperations.set(deviceId, 'idle');
+            logger?.info('[NobleBLE] Deep cleanup to reset device state to initial', { deviceId });
+            throw ERRORS.TypedError(
+              HardwareErrorCode.BleConnectedError,
+              `Write failed with abortable error for device ${deviceId}: ${errorMessage}`,
+              { writeRejected: true }
+            );
+          }
+        }
+        throw e;
+      }
+    };
     if (toBuffer.length <= packetCapacity) {
       if (pacingDelayMs > 0) await wait(pacingDelayMs);
-      await writeCharacteristicWithoutResponse(deviceId, writeCharacteristic, toBuffer);
+      await writeOnePacket(writeCharacteristic, toBuffer);
       return;
     }
     // chunked
@@ -961,7 +983,7 @@ async function transmitHexDataToDevice(
           `Write characteristic not available for ${deviceId}`
         );
       }
-      await writeCharacteristicWithoutResponse(deviceId, latest, chunk);
+      await writeOnePacket(latest, chunk);
       if (offset < toBuffer.length && pacingDelayMs > 0) {
         await wait(pacingDelayMs);
       }

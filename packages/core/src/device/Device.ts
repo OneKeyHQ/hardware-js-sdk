@@ -106,6 +106,8 @@ export type InitOptions = {
    * short value so an unanswered probe settles before the next poll tick.
    */
   timeoutMs?: number;
+  onlyConnectBleDevice?: boolean;
+  abortSignal?: AbortSignal;
 };
 
 export type RunOptions = {
@@ -413,7 +415,11 @@ export class Device extends EventEmitter {
    */
   connect(
     connectProtocol?: HardwareConnectProtocol,
-    options?: { forceProtocolDetection?: boolean }
+    options?: {
+      forceProtocolDetection?: boolean;
+      onlyConnectBleDevice?: boolean;
+      abortSignal?: AbortSignal;
+    }
   ) {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
@@ -451,7 +457,12 @@ export class Device extends EventEmitter {
 
   async acquire(
     expectedProtocol?: HardwareConnectProtocol,
-    options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
+    options?: {
+      throwOnRunPromiseError?: boolean;
+      forceProtocolDetection?: boolean;
+      onlyConnectBleDevice?: boolean;
+      abortSignal?: AbortSignal;
+    }
   ) {
     const attempt = this.connectionAttempt;
     this.throwIfInterruptedByUser();
@@ -471,14 +482,30 @@ export class Device extends EventEmitter {
         // session, such as an interrupted probe or firmware-update reboot, and would
         // otherwise block the new session. Device cannot distinguish recovery from a
         // regular acquire, so BLE always clears it intentionally.
-        acquireResult = await this.deviceConnector?.acquire(
-          this.originalDescriptor.id,
-          undefined,
-          true,
-          strictProtocol,
-          undefined,
-          options?.forceProtocolDetection
-        );
+        const hasBleOptions =
+          options?.onlyConnectBleDevice !== undefined || options?.abortSignal !== undefined;
+        acquireResult = hasBleOptions
+          ? await this.deviceConnector?.acquire(
+              this.originalDescriptor.id,
+              undefined,
+              true,
+              strictProtocol,
+              undefined,
+              options?.forceProtocolDetection,
+              undefined,
+              {
+                onlyConnectBleDevice: options?.onlyConnectBleDevice,
+                abortSignal: options?.abortSignal,
+              }
+            )
+          : await this.deviceConnector?.acquire(
+              this.originalDescriptor.id,
+              undefined,
+              true,
+              strictProtocol,
+              undefined,
+              options?.forceProtocolDetection
+            );
         this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {
@@ -1536,12 +1563,13 @@ export class Device extends EventEmitter {
     };
 
     const env = DataManager.getSettings('env');
-    if (options.forceProtocolDetection && env !== 'react-native' && this.isUsedHere()) {
+    const isBleEnv = DataManager.isBleConnect(env);
+    if (options.forceProtocolDetection && !isBleEnv && this.isUsedHere()) {
       await this.release();
     }
 
     if (options.forceProtocolDetection || !this.isUsedHere() || this.commands.disposed) {
-      if (env !== 'react-native') {
+      if (!isBleEnv) {
         try {
           await this.acquire(options.connectProtocol, {
             forceProtocolDetection: options.forceProtocolDetection,
@@ -1573,12 +1601,11 @@ export class Device extends EventEmitter {
           );
           return;
         }
-      } else if (env === 'react-native') {
-        // TODO: implement react-native acquire
+      } else if (this.commands) {
+        // BLE transports (react-native, desktop-web-ble, lowlevel) already ran acquire
+        // and protocol detection in connectDeviceForBle with the request's abortSignal.
         // cancel input pin or passphrase on device request, then the following requests will report an error
-        if (this.commands) {
-          this.commands.disposed = false;
-        }
+        this.commands.disposed = false;
       }
     }
 

@@ -17,6 +17,7 @@ import GetDeviceState from '../src/api/GetDeviceState';
 import DeviceVerify from '../src/api/device/DeviceVerify';
 import TransportManager from '../src/data-manager/TransportManager';
 import { Device } from '../src/device/Device';
+import DeviceConnector from '../src/device/DeviceConnector';
 import { cancelDeviceInPrompt, cancelDeviceWithInitialize } from '../src/device/DeviceCommands';
 import { DevicePool } from '../src/device/DevicePool';
 import { CORE_EVENT, DEVICE, IFRAME } from '../src/events';
@@ -589,6 +590,36 @@ describe('public device lifecycle events', () => {
     expect(device.originalDescriptor.protocolType).toBe('V2');
   });
 
+  test('forwards onlyConnectBleDevice and abortSignal through Device.acquire into BLE transport', async () => {
+    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
+    const abortController = new AbortController();
+    const device = Device.fromDescriptor({
+      id: 'ble-id',
+      path: 'ble-id',
+      commType: 'ble',
+    } as never);
+    const transportAcquire = jest.fn().mockResolvedValue({ uuid: 'ble-id', protocolType: 'V1' });
+    const connector = new DeviceConnector();
+    jest.spyOn(connector as any, 'getActiveTransport').mockReturnValue({
+      acquire: transportAcquire,
+      getProtocolType: () => 'V1',
+    });
+    device.deviceConnector = connector;
+
+    await device.acquire(undefined, {
+      onlyConnectBleDevice: true,
+      abortSignal: abortController.signal,
+    });
+
+    expect(transportAcquire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uuid: 'ble-id',
+        onlyConnectBleDevice: true,
+        abortSignal: abortController.signal,
+      })
+    );
+  });
+
   test('does not reuse a stale protocol when active detection returns no protocol', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
     const device = Device.fromDescriptor({
@@ -649,28 +680,31 @@ describe('public device lifecycle events', () => {
     expect(device.getProtocol()).toBe('V2');
   });
 
-  test('keeps the freshly probed React Native BLE session until the call completes', async () => {
-    jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);
-    const device = Device.fromDescriptor({
-      id: 'ble-device',
-      path: 'ble-device',
-      commType: 'ble',
-      protocolType: 'V1',
-    } as never);
-    device.mainId = 'ble-device';
-    device.commands = { disposed: false } as never;
-    (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
-    const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
-    const run = jest.fn().mockResolvedValue(undefined);
+  test.each(['react-native', 'desktop-web-ble'] as const)(
+    'keeps the freshly probed %s BLE session until the call completes',
+    async env => {
+      jest.spyOn(DataManager, 'getSettings').mockReturnValue(env as never);
+      const device = Device.fromDescriptor({
+        id: 'ble-device',
+        path: 'ble-device',
+        commType: 'ble',
+        protocolType: 'V1',
+      } as never);
+      device.mainId = 'ble-device';
+      device.commands = { disposed: false } as never;
+      (device as unknown as { deviceAcquired: boolean }).deviceAcquired = true;
+      const release = jest.spyOn(device, 'release').mockResolvedValue(undefined);
+      const run = jest.fn().mockResolvedValue(undefined);
 
-    await device.run(run, {
-      forceProtocolDetection: true,
-      skipInitialize: true,
-    });
+      await device.run(run, {
+        forceProtocolDetection: true,
+        skipInitialize: true,
+      });
 
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(release).toHaveBeenCalledTimes(1);
-  });
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(release).toHaveBeenCalledTimes(1);
+    }
+  );
 
   test('keeps an explicit connectProtocol as a strict expected protocol', async () => {
     jest.spyOn(DataManager, 'getSettings').mockReturnValue('react-native' as never);

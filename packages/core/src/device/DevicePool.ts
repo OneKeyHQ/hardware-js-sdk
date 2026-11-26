@@ -185,15 +185,32 @@ export class DevicePool extends EventEmitter {
       // Search/discovery acquires outside Device.run(). Start a new attempt so
       // a previous user cancel does not hide this device from later searches.
       device.beginConnectionAttempt?.();
+      const bleGuardOptions =
+        initOptions?.onlyConnectBleDevice !== undefined || initOptions?.abortSignal !== undefined
+          ? {
+              ...(initOptions.onlyConnectBleDevice !== undefined
+                ? { onlyConnectBleDevice: initOptions.onlyConnectBleDevice }
+                : {}),
+              ...(initOptions.abortSignal !== undefined
+                ? { abortSignal: initOptions.abortSignal }
+                : {}),
+            }
+          : undefined;
       if (forceProtocolDetection && !isNewDevice) {
-        await device.acquire(initOptions?.connectProtocol, { forceProtocolDetection: true });
+        await device.acquire(initOptions?.connectProtocol, {
+          forceProtocolDetection: true,
+          ...bleGuardOptions,
+        });
       } else {
         await device.connect(initOptions?.connectProtocol, {
           forceProtocolDetection: initOptions?.forceProtocolDetection,
+          ...bleGuardOptions,
         });
       }
       try {
-        await device.initialize(initOptions);
+        if (!initOptions?.onlyConnectBleDevice) {
+          await device.initialize(initOptions);
+        }
         if (initOptions?.refreshRuntimeState && device.isProtocolV2()) {
           await this._refreshProtocolV2DiscoveryState(device);
         }
