@@ -7,6 +7,7 @@ then the legacy Bitcoin messages.
 
 import importlib
 import re
+import time
 
 # Electrum mounts this zip as electrum_external_plugins.onekey. A package-level
 # "from . import codec" then looks up electrum_external_plugins, which is not a
@@ -30,6 +31,13 @@ _MANAGEMENT_CALLS = frozenset((codec.PING, codec.PROTOCOL_INFO_REQUEST, codec.DE
                                codec.DEVICE_STATUS_GET))
 _SESSION_CALLS = frozenset((codec.DEVICE_SESSION_GET, codec.DEVICE_SESSION_ASK_PIN,
                             codec.DEVICE_SESSION_ASK_PASSPHRASE))
+# Requests that wait for the user on the device. Each one gets its own time
+# window, so PIN entry plus several confirmations do not share one deadline.
+_INTERACTIVE_CALLS = frozenset((codec.DEVICE_SESSION_ASK_PIN, codec.DEVICE_SESSION_ASK_PASSPHRASE,
+                                codec.GET_ADDRESS, codec.SIGN_MESSAGE, codec.SIGN_TX, codec.TX_ACK,
+                                codec.BUTTON_ACK))
+INTERACTIVE_STEP_TIMEOUT = 120
+WALLET_MODES = ("standard", "current", "select-hidden")
 # Older firmware may omit the cancel subcode. Same narrow fallback as
 # packages/core DeviceCommands.ts; any other subcode-free ProcessError is a real failure.
 _LEGACY_CANCEL_MESSAGE = re.compile(
@@ -285,13 +293,22 @@ class Session:
         }
 
     def open(self, mode):
-        if mode not in ("standard", "select-hidden"):
+        if mode not in WALLET_MODES:
             _fail("INVALID_REQUEST")
         status, info = self.identity()
         self._eventless_session()
         if mode == "standard":
+            # An explicit standard request must not follow an Attach PIN session.
+            # Main PIN relocks an attach unlock; the empty host passphrase then
+            # selects the standard wallet.
+            status, info = self._main_pin(status, info)
+            if status.get("passphrase_enabled"):
+                self._passphrase("", on_device=False)
+            _address, session_id = self._session()
+            wallet_type, passphrase_state = "standard", None
+        elif mode == "current":
+            # Storage unlock only: use whichever wallet the device has open.
             # PIN_ANY accepts both Main PIN and Attach PIN natively on the device.
-            # If the user unlocked via Attach PIN, follow that active session directly.
             if status.get("unlocked") is not True:
                 self._pin(codec.PIN_ANY)
                 status, info = self.identity()
@@ -536,11 +553,18 @@ class Session:
         self._call(codec.DEVICE_SESSION_ASK_PASSPHRASE,
                    codec.encode_ask_passphrase(passphrase, on_device=on_device), codec.SUCCESS)
 
+    def _step_deadline(self, msg_type):
+        if msg_type in _INTERACTIVE_CALLS and self.deadline is not None:
+            self.deadline = max(self.deadline, time.monotonic() + INTERACTIVE_STEP_TIMEOUT)
+        return self.deadline
+
     def _call(self, msg_type, payload, expect):
-        kind, body = self.link.exchange(msg_type, payload, deadline=self.deadline, cancelled=self.cancelled)
+        kind, body = self.link.exchange(msg_type, payload, deadline=self._step_deadline(msg_type),
+                                        cancelled=self.cancelled)
         while kind == codec.BUTTON_REQUEST:
             self.on_ui("button")
-            kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self.deadline, cancelled=self.cancelled)
+            kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self._step_deadline(codec.BUTTON_ACK),
+                                            cancelled=self.cancelled)
         if kind == codec.FAILURE:
             try:
                 code, subcode, message = codec.decode_failure(body)

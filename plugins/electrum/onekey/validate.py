@@ -27,7 +27,7 @@ def validate_binding(value):
     if wallet_type == "standard":
         if passphrase_state is not None:
             raise ValueError("standard binding must not carry passphraseState")
-    elif wallet_type in ("hidden", "attach-pin"):
+    elif wallet_type == "hidden":
         if not is_valid_text(passphrase_state):
             raise ValueError("hidden binding requires passphraseState")
     else:

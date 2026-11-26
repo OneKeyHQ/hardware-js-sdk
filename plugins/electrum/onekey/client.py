@@ -208,8 +208,8 @@ class OneKeyClient(HardwareClientBase):
         return isinstance(error, UserCancelled) and self._firmware_cancelled and self.attached()
 
     def request_wallet_mode(self, mode):
-        # The next open uses this. Unset means the current unlocked wallet (PIN_ANY).
-        if mode not in ("standard", "select-hidden"):
+        # The next open uses this. Unset means the standard wallet; "current" (storage unlock) follows the open session.
+        if mode not in ("standard", "current", "select-hidden"):
             raise UserFacingException(_("Invalid OneKey wallet binding. Reconnect using the wallet wizard."))
         self._requested_mode = mode
 
@@ -219,7 +219,7 @@ class OneKeyClient(HardwareClientBase):
         self.handler.finished()
         mode = self._requested_mode or "standard"
         self._requested_mode = None
-        if mode not in ("standard", "select-hidden"):
+        if mode not in ("standard", "current", "select-hidden"):
             raise UserCancelled()
         self.binding = check_binding(self._call("open", {"connectId": self.connect_id, "mode": mode}))
         if self.binding["serialNo"] != self.serial:

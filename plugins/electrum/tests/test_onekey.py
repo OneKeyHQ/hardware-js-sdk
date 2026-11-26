@@ -643,7 +643,8 @@ class TestOneKeyClient(unittest.TestCase):
         key = OneKeyKeyStore(dict(xpub=self.public_key(), derivation="m/84'/0'/0'"))
         with self.assertRaisesRegex(UserFacingException, "no OneKey device binding"):
             client.bind_keystore(key)
-        self.assertEqual("attach-pin", check_binding({**BINDING, "walletType": "attach-pin"})["walletType"])
+        with self.assertRaises(UserFacingException):
+            check_binding({**BINDING, "walletType": "attach-pin"})
         for bad in ({**BINDING, "walletType": "standard"}, {**BINDING, "passphraseState": None},
                     {**BINDING, "sessionId": "forbidden"}, {**BINDING, "walletType": "attach"}):
             with self.assertRaises(UserFacingException):
@@ -1495,7 +1496,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
             if op == "state":
                 return dict(STATE, passphraseEnabled=True)
             if op == "open":
-                self.assertEqual("standard", params["mode"])
+                self.assertEqual("current", params["mode"])
                 return dict(active[0])
             if op == "xpub":
                 bindings.append(dict(params["binding"]))
@@ -1507,7 +1508,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         def switch_pin(**kwargs):
             self.assertEqual({"allow_hidden": True}, kwargs)
             active[0] = BINDING
-            return "standard"
+            return "current"
 
         handler.choose_passphrase_retry.side_effect = switch_pin
         step = SimpleNamespace(_password_decrypts=mock.Mock(side_effect=[False, True]))
@@ -1520,7 +1521,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
 
     def test_unlock_can_retry_hidden_wallet_or_cancel_with_refreshed_availability(self):
         for enabled, mode, expected in ((True, "select-hidden", "hidden-key"), (False, None, None),
-                                        (None, "standard", "current-key")):
+                                        (None, "current", "current-key")):
             with self.subTest(enabled=enabled, mode=mode):
                 client = mock.Mock(passphrase_enabled=False)
                 def refresh():
@@ -1545,7 +1546,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                                           _wallet_choice=None, _wallet_choice_done=threading.Event())
                 with mock.patch.object(self.qt, "QMessageBox", return_value=box):
                     self.qt.OneKeyQtHandler._choose_passphrase_retry(handler)
-                self.assertEqual({"current": "standard", "hidden": "select-hidden", "cancel": None}[choice],
+                self.assertEqual({"current": "current", "hidden": "select-hidden", "cancel": None}[choice],
                                  handler._wallet_choice)
                 self.assertTrue(handler._wallet_choice_done.is_set())
                 self.assertEqual(3 if enabled else 2, box.addButton.call_count)

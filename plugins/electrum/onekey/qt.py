@@ -80,7 +80,7 @@ class OneKeyQtHandler(QtHandlerBase):
             box.setDefaultButton(current)
             box.exec()
             if box.clickedButton() is current:
-                self._wallet_choice = "standard"
+                self._wallet_choice = "current"
             elif hidden is not None and box.clickedButton() is hidden:
                 self._wallet_choice = "select-hidden"
         finally:
@@ -218,7 +218,7 @@ class WCOneKeyUnlock(WCHWUnlock):
 
     def _unlock_password(self, client):
         # Try the active device session first (PIN_ANY accepts both Main PIN and Attach PIN).
-        mode = "standard"
+        mode = "current"
         while True:
             password = self._encryption_password(client, mode)
             if self._password_decrypts(password):
@@ -226,7 +226,7 @@ class WCOneKeyUnlock(WCHWUnlock):
             if not client.has_usable_connection_with_device():
                 raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
             mode = client.handler.choose_passphrase_retry(allow_hidden=client.passphrase_enabled is not False)
-            if mode not in ("standard", "select-hidden"):
+            if mode not in ("current", "select-hidden"):
                 self.error = _("This OneKey wallet did not encrypt this file.")
                 return None
 

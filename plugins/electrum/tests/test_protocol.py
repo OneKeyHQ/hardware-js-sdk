@@ -309,7 +309,7 @@ class TestDeviceSession(unittest.TestCase):
             opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
             self.assertEqual("standard", opened["walletType"])
             self.assertIsNone(opened["passphraseState"])
-            self.assertEqual([codec.PIN_ANY], device.pins)
+            self.assertEqual([codec.PIN_MAIN], device.pins)
             self.assertIn((False, ""), device.on_device)
             hidden = Scripted()
             helper, hidden = helper_for(hidden)
@@ -345,11 +345,11 @@ class TestDeviceSession(unittest.TestCase):
             popen.assert_not_called()
 
     def test_pin_any_unlock_follows_attach_pin_session_without_separate_mode(self):
-        # User unlocks with Attach PIN during standard open (PIN_ANY): bound directly as hidden session.
+        # Storage unlock ("current") with Attach PIN (PIN_ANY): bound directly as the hidden session.
         device = Scripted()
         device.pin_any_as_attach = True
         helper, device = helper_for(device)
-        opened = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        opened = call(helper, "open", {"connectId": "usb1", "mode": "current"})
         self.assertEqual("hidden", opened["walletType"])
         self.assertEqual(device.hidden, opened["passphraseState"])
         self.assertEqual([codec.PIN_ANY], device.pins)
@@ -726,3 +726,21 @@ class TestFailureRequestFamily(unittest.TestCase):
         invalid = self.failure(codec.SESSION_INVALID)
         self.assertEqual("WALLET_SESSION_INVALID", self.run_call(codec.DEVICE_SESSION_GET, invalid))
         self.assertEqual("SDK_FAILED", self.run_call(codec.SIGN_TX, invalid))
+
+
+class TestInteractiveDeadline(unittest.TestCase):
+    def test_each_user_confirmation_gets_its_own_window(self):
+        seen = []
+        replies = [(codec.BUTTON_REQUEST, b""), (codec.SUCCESS, b""), (codec.DEVICE_STATUS, b"")]
+
+        class FakeLink:
+            def exchange(self, msg_type, _payload, *, deadline, cancelled):
+                seen.append((msg_type, deadline))
+                return replies.pop(0)
+
+        with mock.patch("onekey.device.time.monotonic", side_effect=[1000.0, 1500.0]):
+            session = Session(FakeLink(), deadline=130.0, cancelled=None, on_ui=None, cache={}, connect_id="usb1")
+            session._call(codec.DEVICE_SESSION_ASK_PIN, b"", codec.SUCCESS)
+            session._call(codec.DEVICE_STATUS_GET, b"", codec.DEVICE_STATUS)
+        self.assertEqual([(codec.DEVICE_SESSION_ASK_PIN, 1120.0), (codec.BUTTON_ACK, 1620.0),
+                          (codec.DEVICE_STATUS_GET, 1620.0)], seen)

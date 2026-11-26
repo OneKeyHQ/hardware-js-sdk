@@ -150,11 +150,27 @@ class TestProtocolRepairs(unittest.TestCase):
         device.unlocked_by_attach = True
         device.install_session('target-attach-wallet')
         helper, device = helper_for(device)
-        result = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+        result = call(helper, 'open', dict(connectId='usb1', mode='current'))
         self.assertEqual('hidden', result['walletType'])
         self.assertEqual('target-attach-wallet', result['passphraseState'])
         self.assertEqual(0, device.locks)
         self.assertEqual([], device.pins)
+
+    def test_standard_open_never_binds_the_attach_pin_session(self):
+        for locked in (True, False):
+            with self.subTest(locked=locked):
+                device = Scripted()
+                device.pin_any_as_attach = True
+                if not locked:
+                    device.locked = False
+                    device.device_id = 'synthetic-device'
+                    device.unlocked_by_attach = True
+                    device.install_session('target-attach-wallet')
+                helper, device = helper_for(device)
+                result = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+                self.assertEqual('standard', result['walletType'])
+                self.assertIsNone(result['passphraseState'])
+                self.assertEqual([codec.PIN_MAIN], device.pins)
 
     def test_saved_hidden_wallet_rejects_different_attach_slot_without_locking(self):
         for cached in (False, True):
@@ -210,7 +226,7 @@ class TestProtocolRepairs(unittest.TestCase):
         device.pin_any_as_attach = True
         device.passphrase_enabled = False
         helper, device = helper_for(device)
-        selected = call(helper, 'open', dict(connectId='usb1', mode='standard'))
+        selected = call(helper, 'open', dict(connectId='usb1', mode='current'))
         device.unlocked_by_attach = False
         device.install_session('standard-wallet')
         with self.assertRaises(HelperError) as raised:
@@ -266,7 +282,7 @@ class TestProtocolRepairs(unittest.TestCase):
             self.assertEqual([20], [kind for kind in sent if kind == 20])
             self.assertEqual(['usb1'], closed)
             call(helper, 'state', dict(connectId='usb1'))
-            self.assertEqual(1, device.pins.count(codec.PIN_ANY))
+            self.assertEqual(1, device.pins.count(codec.PIN_MAIN))
 
     def test_reconnect_continues_the_device_send_sequence(self):
         device = Scripted()

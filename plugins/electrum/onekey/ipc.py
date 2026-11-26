@@ -117,7 +117,7 @@ class Helper:
             if op == "state":
                 return session.state()
             if op == "open":
-                if params.get("mode") not in ("standard", "select-hidden"):
+                if params.get("mode") not in ("standard", "current", "select-hidden"):
                     raise SessionError("INVALID_REQUEST")
                 return session.open(params["mode"])
             if op == "xpub":
