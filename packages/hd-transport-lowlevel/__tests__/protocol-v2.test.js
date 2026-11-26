@@ -12,6 +12,9 @@ const protocolV1Schema = {
     Initialize: {
       fields: {},
     },
+    GetFeatures: {
+      fields: {},
+    },
     Success: {
       fields: {
         message: {
@@ -24,6 +27,7 @@ const protocolV1Schema = {
       values: {
         MessageType_Initialize: 1,
         MessageType_Success: 2,
+        MessageType_GetFeatures: 55,
       },
     },
   },
@@ -652,5 +656,47 @@ describe('LowlevelTransport protocol framing', () => {
     await stopping;
     expect(sendCalls).toBe(1);
     expect(plugin.receive).not.toHaveBeenCalled();
+  });
+
+  test('probes Protocol V1 with read-only GetFeatures when onlyConnectBleDevice is true', async () => {
+    const responseChunks = ProtocolV1.encodeTransportPackets(schemas.protocolV1, 'Success', {
+      message: 'ok',
+    }).map(chunk => chunk.toString('hex'));
+    const plugin = createPlugin({
+      devices: [{ id: 'readonly-classic-id', name: 'OneKey Classic', commType: 'ble' }],
+      responses: responseChunks,
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(
+      lowlevel.acquire({ uuid: 'readonly-classic-id', onlyConnectBleDevice: true })
+    ).resolves.toEqual({
+      uuid: 'readonly-classic-id',
+      protocolType: 'V1',
+    });
+
+    // GetFeatures is message type 55 (0x0037), Initialize is 1 (0x0001).
+    expect(plugin.send).toHaveBeenCalledTimes(1);
+    expect(plugin.send.mock.calls[0][1]).toMatch(/^3f23230037/);
+  });
+
+  test('resets lowlevel connection when an ordinary 3000ms Protocol V1 call times out', async () => {
+    const plugin = createPlugin({
+      devices: [{ id: 'v1-3s-timeout-id', name: 'OneKey Classic', commType: 'ble' }],
+      responses: [],
+    });
+    const lowlevel = configureTransport(plugin);
+    lowlevel.deviceProtocol.set('v1-3s-timeout-id', 'V1');
+    lowlevel.connectedDevices.add('v1-3s-timeout-id');
+    const timeoutErr = lowlevel.createProtocolTimeoutError('GetFeatures', 3000);
+    jest.spyOn(lowlevel, 'readProtocolV1Message').mockRejectedValueOnce(timeoutErr);
+    const resetSpy = jest.spyOn(lowlevel, 'resetConnectionAfterProbe').mockResolvedValue();
+
+    await expect(
+      lowlevel.call('v1-3s-timeout-id', 'GetFeatures', {}, { timeoutMs: 3000 })
+    ).rejects.toBe(timeoutErr);
+
+    expect(resetSpy).toHaveBeenCalledTimes(1);
+    expect(resetSpy).toHaveBeenCalledWith('v1-3s-timeout-id', 'V1');
   });
 });

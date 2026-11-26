@@ -1583,4 +1583,65 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.write).toHaveBeenCalledTimes(1);
     expect(nobleBle.write.mock.calls[0]?.[2]).toEqual({ oneShot: true });
   });
+
+  test('sends initial V1 GetFeatures probe with oneShot and rethrows TransportCallInProgress without waking', async () => {
+    const device = { id: 'oneshot-getfeatures-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    let notifyHandler: ((id: string, hex: string) => void) | undefined;
+    nobleBle.onNotification.mockImplementation(handler => {
+      notifyHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementationOnce((id: string) => {
+      const reply = ProtocolV1.encodeTransportPackets(schemas.protocolV1, 'Success', {
+        message: 'ok',
+      });
+      const packetHex = reply[0].toString('hex');
+      const payloadLen = parseInt(packetHex.slice(10, 18), 16);
+      notifyHandler?.(id, packetHex.slice(0, (9 + payloadLen) * 2));
+      return Promise.resolve();
+    });
+    const bleTransport = configureTransport(nobleBle);
+
+    await expect(bleTransport.acquire({ uuid: device.id })).resolves.toMatchObject({
+      uuid: device.id,
+      protocolType: 'V1',
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(nobleBle.write.mock.calls[0]?.[2]).toEqual({ oneShot: true });
+
+    await bleTransport.release(device.id);
+
+    const probes = bleTransport as any;
+    const inProgressErr = ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
+    const callSpy = jest.spyOn(probes, 'callProtocolV1').mockRejectedValueOnce(inProgressErr);
+    const wakeSpy = jest.spyOn(probes, 'wakeSilentProtocolV1Device');
+
+    await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportCallInProgress,
+    });
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    expect(wakeSpy).not.toHaveBeenCalled();
+  });
+
+  test('skips Electron Initialize wake if abortSignal aborts during probe state reset', async () => {
+    const device = { id: 'abort-reset-classic-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    const abortController = new AbortController();
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'resetProbeStateAfterProtocolProbe').mockImplementation(() => {
+      abortController.abort();
+      return Promise.resolve();
+    });
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1');
+
+    await expect(
+      bleTransport.acquire({ uuid: device.id, abortSignal: abortController.signal })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(callProtocolV1).not.toHaveBeenCalled();
+  });
 });

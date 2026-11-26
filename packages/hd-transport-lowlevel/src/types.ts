@@ -4,4 +4,5 @@ export type LowLevelAcquireInput = {
   uuid: string;
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
+  onlyConnectBleDevice?: boolean;
 };

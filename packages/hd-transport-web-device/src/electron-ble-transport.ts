@@ -106,6 +106,7 @@ const shouldRethrowElectronProtocolProbeError = (error: unknown): boolean => {
   // Pairing rejections, disconnects, and missing GATT state are link failures rather than
   // evidence of a protocol mismatch. Rethrow them instead of entering wake or probing V2.
   return (
+    code === HardwareErrorCode.TransportCallInProgress ||
     code === HardwareErrorCode.BleConnectedError ||
     code === HardwareErrorCode.BleDeviceNotBonded ||
     code === HardwareErrorCode.BleDeviceBondedCanceled ||
@@ -776,6 +777,9 @@ export default class ElectronBleTransport {
     // A timed-out GetFeatures probe retires the renderer notification listener;
     // re-attach it on the live physical link before sending Initialize.
     await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
     this.assertRunning();
 
     const previousSilentState = this.silentDetections.get(uuid);
@@ -871,8 +875,16 @@ export default class ElectronBleTransport {
     try {
       this.deviceProtocol.set(uuid, 'V1');
       // GetFeatures identifies Protocol V1 without resetting an existing wallet
-      // session before Core has a chance to restore a hidden wallet.
-      await this.callProtocolV1(uuid, 'GetFeatures', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      // session before Core has a chance to restore a hidden wallet. Use a one-shot
+      // native write so a fresh Windows link does not stall 28s in the 15-attempt
+      // pairing retry loop when a sleeping Classic silently ignores GetFeatures.
+      await this.callProtocolV1(
+        uuid,
+        'GetFeatures',
+        {},
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS },
+        { oneShot: true }
+      );
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');

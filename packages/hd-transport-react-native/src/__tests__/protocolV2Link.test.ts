@@ -1846,6 +1846,66 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
   });
 
+  test('rethrows TransportCallInProgress during V1 GetFeatures probe without entering wake', async () => {
+    setPlatformOS('ios');
+    const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+    const probes = transport as any;
+    const callInProgressError = ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
+    const callProtocolV1 = jest
+      .spyOn(probes, 'callProtocolV1')
+      .mockRejectedValueOnce(callInProgressError);
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2');
+
+    await expect(transport.acquire({ uuid })).rejects.toBe(callInProgressError);
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('GetFeatures');
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+  });
+
+  test('rethrows native monitor link timeout during V1 GetFeatures probe without waking', async () => {
+    setPlatformOS('android');
+    const { transport, uuid } = createHarness({ deviceName: 'K1361' });
+    const probes = transport as any;
+    const monitorTimeoutError = ERRORS.TypedError(
+      HardwareErrorCode.BleTimeoutError,
+      'The connection has timed out unexpectedly.'
+    );
+    probes.monitorTimeoutErrors.add(monitorTimeoutError);
+    const callProtocolV1 = jest
+      .spyOn(probes, 'callProtocolV1')
+      .mockRejectedValueOnce(monitorTimeoutError);
+    const wakeSpy = jest.spyOn(probes, 'wakeSilentProtocolV1Device');
+
+    await expect(transport.acquire({ uuid })).rejects.toBe(monitorTimeoutError);
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(wakeSpy).not.toHaveBeenCalled();
+  });
+
+  test('resets RN probe monitor state before sending Initialize wake to isolate late GetFeatures replies', async () => {
+    setPlatformOS('ios');
+    const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+    const probes = transport as any;
+    const events: string[] = [];
+    jest.spyOn(probes, 'probeProtocolV1').mockImplementation(() => {
+      events.push('probe-v1');
+      return Promise.resolve(false);
+    });
+    const resetSpy = jest
+      .spyOn(probes, 'resetProbeStateAfterProtocolProbe')
+      .mockImplementation(() => {
+        events.push('reset-probe');
+        return Promise.resolve();
+      });
+    jest.spyOn(probes, 'callProtocolV1').mockImplementation((_id: string, name: string) => {
+      events.push(`call-${name}`);
+      return Promise.resolve({ type: 'Features', message: {} });
+    });
+
+    await expect(transport.acquire({ uuid })).resolves.toEqual({ uuid, protocolType: 'V1' });
+    expect(resetSpy).toHaveBeenCalledWith(uuid, 'V1');
+    expect(events).toEqual(['probe-v1', 'reset-probe', 'call-Initialize']);
+  });
+
   test.each(['android', 'ios'] as const)(
     'does not send the Initialize wake before a V2-first probe on %s',
     async platform => {

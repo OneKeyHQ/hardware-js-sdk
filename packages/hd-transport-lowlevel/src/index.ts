@@ -221,7 +221,8 @@ export default class LowlevelTransport {
         const protocolType = await this.detectProtocol(
           input.uuid,
           input.expectedProtocol,
-          protocolHint
+          protocolHint,
+          { onlyConnectBleDevice: input.onlyConnectBleDevice }
         );
         this.assertRunning();
         return { uuid: input.uuid, protocolType };
@@ -355,7 +356,8 @@ export default class LowlevelTransport {
     uuid: string,
     name: string,
     data: Record<string, unknown>,
-    options?: TransportCallOptions
+    options?: TransportCallOptions,
+    isProtocolProbe = false
   ) {
     this.assertRunning();
     if (!this._messages) {
@@ -417,11 +419,7 @@ export default class LowlevelTransport {
       const jsonData = ProtocolV1.decodeMessage(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      if (
-        !this.stopped &&
-        e?.errorCode === HardwareErrorCode.BleTimeoutError &&
-        options?.timeoutMs !== PROTOCOL_PROBE_TIMEOUT_MS
-      ) {
+      if (!this.stopped && e?.errorCode === HardwareErrorCode.BleTimeoutError && !isProtocolProbe) {
         try {
           await this.resetConnectionAfterProbe(uuid, 'V1');
         } catch (resetError) {
@@ -431,8 +429,8 @@ export default class LowlevelTransport {
           );
         }
       }
-      if (name === 'Initialize' && options?.timeoutMs === PROTOCOL_PROBE_TIMEOUT_MS) {
-        this.Log.debug('[LowlevelTransport] Protocol V1 Initialize probe call failed:', e);
+      if (isProtocolProbe) {
+        this.Log.debug(`[LowlevelTransport] Protocol V1 ${name} probe call failed:`, e);
       } else {
         this.Log.error('lowlevel call error: ', e);
       }
@@ -466,7 +464,8 @@ export default class LowlevelTransport {
   private async detectProtocol(
     uuid: string,
     expectedProtocol?: ProtocolType,
-    protocolHint?: ProtocolType
+    protocolHint?: ProtocolType,
+    options: { onlyConnectBleDevice?: boolean } = {}
   ): Promise<ProtocolType> {
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
@@ -478,7 +477,7 @@ export default class LowlevelTransport {
     }
 
     if (expectedProtocol === 'V1') {
-      if (await this.probeProtocolV1(uuid)) {
+      if (await this.probeProtocolV1(uuid, options.onlyConnectBleDevice)) {
         this.deviceProtocol.set(uuid, 'V1');
         this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V1 (expected)`);
         return 'V1';
@@ -494,7 +493,9 @@ export default class LowlevelTransport {
         await this.resetConnectionAfterProbe(uuid, probeOrder[index - 1]);
       }
       const detected =
-        protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
+        protocol === 'V1'
+          ? await this.probeProtocolV1(uuid, options.onlyConnectBleDevice)
+          : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
         this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> ${protocol}`);
@@ -546,18 +547,25 @@ export default class LowlevelTransport {
     }
   }
 
-  private async probeProtocolV1(uuid: string) {
+  private async probeProtocolV1(uuid: string, onlyConnectBleDevice = false) {
     if (!this._messages) {
       return false;
     }
 
+    const probeCommand = onlyConnectBleDevice ? 'GetFeatures' : 'Initialize';
     try {
       this.deviceProtocol.set(uuid, 'V1');
-      await this.callProtocolV1(uuid, 'Initialize', {}, { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS });
+      await this.callProtocolV1(
+        uuid,
+        probeCommand,
+        {},
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS },
+        true
+      );
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
-      this.Log?.debug('[LowlevelTransport] Protocol V1 Initialize probe failed:', error);
+      this.Log?.debug(`[LowlevelTransport] Protocol V1 ${probeCommand} probe failed:`, error);
       return false;
     }
   }

@@ -185,6 +185,7 @@ const shouldRethrowProtocolProbeError = (error: unknown): boolean => {
   // "was disconnected" fallback) must match before Protocol V2 probing.
   return (
     isNativeBleDisconnectError(error) ||
+    code === HardwareErrorCode.TransportCallInProgress ||
     code === HardwareErrorCode.BleDeviceNotBonded ||
     code === HardwareErrorCode.BleDeviceBondedCanceled ||
     code === HardwareErrorCode.BleDeviceDisconnected ||
@@ -728,6 +729,9 @@ export default class ReactNativeBleTransport {
 
   /** Errors created from BleErrorCode.OperationStartFailed (native write never started). */
   private unstartedWriteErrors = new WeakSet<Error>();
+
+  /** Native monitor link-timeout errors (distinct from protocol probe response deadlines). */
+  private monitorTimeoutErrors = new WeakSet<Error>();
 
   /** Android endpoints whose cached GATT table is suspect; the next connect refreshes it. */
   private androidGattCacheRefreshes = new Set<string>();
@@ -1705,6 +1709,9 @@ export default class ReactNativeBleTransport {
             return;
           }
           const notifyError = ERRORS.TypedError(ERROR);
+          if (ERROR === HardwareErrorCode.BleTimeoutError) {
+            this.monitorTimeoutErrors.add(notifyError);
+          }
           this.runPromise.reject(notifyError);
           Log?.debug(': monitor notify error, and has unreleased Promise', Error);
         }
@@ -2894,7 +2901,12 @@ export default class ReactNativeBleTransport {
       let detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
       if (!detected && protocol === 'V1') {
-        detected = await this.wakeSilentProtocolV1Device(uuid, probeOrder, options);
+        detected = await this.wakeSilentProtocolV1Device(
+          uuid,
+          probeOrder,
+          rebuildTransport,
+          options
+        );
       }
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
@@ -2950,6 +2962,7 @@ export default class ReactNativeBleTransport {
   private async wakeSilentProtocolV1Device(
     uuid: string,
     probeOrder: ProtocolType[],
+    rebuildTransport?: () => Promise<void>,
     options: {
       isKnownLegacyV1Device?: boolean;
       onlyConnectBleDevice?: boolean;
@@ -2969,6 +2982,25 @@ export default class ReactNativeBleTransport {
     }
     if (this.stopped) {
       throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    }
+
+    // Retire the timed-out GetFeatures monitor generation so a delayed partial/full reply
+    // from GetFeatures cannot collide with the Initialize wake.
+    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+    if (this.stopped) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    }
+    if (!transportCache[uuid] && rebuildTransport) {
+      await rebuildTransport();
+      if (options.abortSignal?.aborted) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+      }
+      if (this.stopped) {
+        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+      }
     }
 
     const previousSilentState = this.silentDetections.get(uuid);
@@ -2996,7 +3028,12 @@ export default class ReactNativeBleTransport {
           this.silentDetections.delete(uuid);
         }
       }
-      if (shouldRethrowProtocolProbeError(error)) throw error;
+      if (
+        shouldRethrowProtocolProbeError(error) ||
+        (error instanceof Error && this.monitorTimeoutErrors.has(error))
+      ) {
+        throw error;
+      }
     } finally {
       this.clearProbeProtocol(uuid, 'V1');
     }
@@ -3004,6 +3041,13 @@ export default class ReactNativeBleTransport {
     if (answeredV1) {
       return true;
     }
+    if (options.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+    if (this.stopped) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    }
+    await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
     if (options.abortSignal?.aborted) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
@@ -3080,7 +3124,10 @@ export default class ReactNativeBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       Log?.debug('[ReactNativeBleTransport] Protocol V1 GetFeatures probe failed:', error);
-      if (shouldRethrowProtocolProbeError(error)) {
+      if (
+        shouldRethrowProtocolProbeError(error) ||
+        (error instanceof Error && this.monitorTimeoutErrors.has(error))
+      ) {
         throw error;
       }
       return false;
