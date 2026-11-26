@@ -282,6 +282,17 @@ const networkConfigMap: NetworkConfigMap = {
       };
     },
   },
+  starknet: {
+    methodName: 'starknetGetPublicKey',
+    getParams: (baseParams: AllNetworkAddressParams) => {
+      const { path, showOnOneKey } = baseParams;
+      return {
+        path,
+        publicKeyType: PROTO.StarknetPublicKeyType.STARK,
+        showOnOneKey: showOnOneKey ?? false,
+      };
+    },
+  },
 };
 
 type MethodParams = {

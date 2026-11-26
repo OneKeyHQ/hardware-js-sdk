@@ -36,7 +36,8 @@ export type INetwork =
   | 'neo'
   | 'stellar'
   | 'xmr'
-  | 'zcash';
+  | 'zcash'
+  | 'starknet';
 
 export type CommonResponseParams = {
   path: string;
@@ -67,6 +68,10 @@ type AllNetworkAddressPayload =
       publicKey?: string;
       // Nostr public key (bech32)
       npub?: string;
+    }
+  | {
+      // Starknet
+      pub: string;
     }
   | {
       // Zcash
