@@ -1,4 +1,5 @@
 import AllNetworkGetAddress from '../src/api/allnetwork/AllNetworkGetAddress';
+import { PROTO } from '../src/constants';
 
 import type { AllNetworkAddressParams } from '../src/types/api/allNetworkGetAddress';
 
@@ -69,6 +70,26 @@ describe('allNetworkGetAddress privacy networks', () => {
           scope: 0,
           diversifierIndex: 0,
           includeSeedFingerprint: true,
+          originPayload: payload,
+        },
+      })
+    );
+  });
+
+  test('asks starknetGetPublicKey for the Stark curve public key', () => {
+    const payload = {
+      network: 'starknet' as const,
+      path: "m/2645'/1195502025'/1148870696'/0'/0'/0",
+      showOnOneKey: false,
+    };
+
+    expect(mapItem(payload)).toEqual(
+      expect.objectContaining({
+        methodName: 'starknetGetPublicKey',
+        params: {
+          path: "m/2645'/1195502025'/1148870696'/0'/0'/0",
+          publicKeyType: PROTO.StarknetPublicKeyType.STARK,
+          showOnOneKey: false,
           originPayload: payload,
         },
       })
