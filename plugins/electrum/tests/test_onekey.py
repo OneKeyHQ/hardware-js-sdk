@@ -654,6 +654,18 @@ class TestOneKeyClient(unittest.TestCase):
         self.assertFalse(client.has_usable_connection_with_device())
         self.assertTrue(client.closed)
 
+    def test_cancelled_health_probe_keeps_the_client_paired(self):
+        client, helper, _ = self.make_client()
+        token = threading.Event()
+        token.set()
+        helper.call.side_effect = HelperError("CANCELLED")
+        self.assertFalse(client.has_usable_connection_with_device(cancelled=token))
+        self.assertIs(token, helper.call.call_args.kwargs["cancelled"])
+        self.assertFalse(client.closed)
+        # A cancel that this probe did not request still means the link is gone.
+        self.assertFalse(client.has_usable_connection_with_device())
+        self.assertTrue(client.closed)
+
     def test_mainnet_testnet_and_unsupported_account_paths(self):
         self.assertEqual("Bitcoin", coin_name())
         with mock.patch.object(constants, "net", constants.BitcoinTestnet):
@@ -1440,7 +1452,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                 entered, release, finished = threading.Event(), threading.Event(), threading.Event()
                 client = mock.Mock(passphrase_enabled=False)
 
-                def refresh():
+                def refresh(**_kwargs):
                     self.assertTrue(threading.current_thread().name.startswith("hwd_comms_thread"))
                     entered.set()
                     try:
@@ -1482,6 +1494,68 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                     _hwd_comms_executor.submit(lambda: None).result(timeout=2)
                     app.processEvents()
                     step.close()
+
+    def test_hidden_choice_waits_for_probe_and_leaving_cancels_it(self):
+        from PyQt6.QtGui import QHideEvent, QShowEvent
+        from PyQt6.QtWidgets import QApplication
+        from electrum.plugin import _hwd_comms_executor
+
+        app = QApplication.instance() or QApplication([])
+        entered, tokens = threading.Event(), []
+        client = mock.Mock(passphrase_enabled=False)
+
+        def refresh(*, cancelled):
+            tokens.append(cancelled)
+            entered.set()
+            cancelled.wait(2)
+            return False
+
+        client.has_usable_connection_with_device.side_effect = refresh
+        manager = mock.Mock()
+        manager.client_by_id.return_value = client
+        info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+        component = self.wizard_component(mock.Mock(), manager, dict(
+            hardware_device=("onekey", info), onekey_wallet_mode="select-hidden"))
+        step = self.qt.WCOneKeyScript(None, component.wizard)
+        step.wizard_data = component.wizard_data
+        step.apply = mock.Mock()
+        valid_after_base = []
+
+        def base_validate(page):
+            page.valid = True
+            valid_after_base.append(True)
+
+        try:
+            with mock.patch.object(self.qt.WCScriptAndDerivation, "on_ready"), \
+                    mock.patch.object(self.qt.WCScriptAndDerivation, "validate", base_validate):
+                step.on_ready()
+                self.assertTrue(entered.wait(1))
+                # Checked hidden choice stays blocked while the status request runs.
+                self.assertTrue(step.hidden_cb.isChecked())
+                self.assertFalse(step.valid)
+                step.hidden_cb.setChecked(False)
+                self.assertTrue(step.valid)
+                step.hidden_cb.setChecked(True)
+                self.assertFalse(step.valid)
+                # Leaving the page cancels the device request.
+                step.hideEvent(QHideEvent())
+                self.assertTrue(tokens[0].is_set())
+                _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                app.processEvents()
+                self.assertTrue(step.valid)
+                # Coming back starts a fresh probe with a new token.
+                entered.clear()
+                step.showEvent(QShowEvent())
+                self.assertTrue(entered.wait(1))
+                self.assertEqual(2, len(tokens))
+                self.assertFalse(tokens[1].is_set())
+                self.assertFalse(step.valid)
+        finally:
+            for token in tokens:
+                token.set()
+            _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+            app.processEvents()
+            step.close()
 
     def test_unlock_refreshes_features_and_retries_new_attach_pin_session(self):
         factory = TestOneKeyClient()

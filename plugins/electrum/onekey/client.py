@@ -131,12 +131,13 @@ class OneKeyClient(HardwareClientBase):
         if state.get("passphraseEnabled") is not None and type(state["passphraseEnabled"]) is not bool:
             raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
 
-    def _call(self, op, params):
+    def _call(self, op, params, *, cancelled=None):
         if self.closed:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
         try:
             return self.helper.call(op, params, generation=self.generation,
-                                    cancelled=self.cancelled, on_ui=self._ui)
+                                    cancelled=self.cancelled if cancelled is None else cancelled,
+                                    on_ui=self._ui)
         except HelperError as error:
             # flow() closes the client when this call belongs to the open wallet.
             # A storage-unlock cancel passes close_on_error=False and must keep it.
@@ -399,9 +400,9 @@ class OneKeyClient(HardwareClientBase):
         return self.device_id
 
     @runs_in_hwd_thread
-    def has_usable_connection_with_device(self):
+    def has_usable_connection_with_device(self, *, cancelled=None):
         try:
-            state = self._call("state", {"connectId": self.connect_id})
+            state = self._call("state", {"connectId": self.connect_id}, cancelled=cancelled)
             self._check_state(state)
             if state["serialNo"] != self.serial:
                 self._detach_without_cache_drop()
@@ -411,6 +412,12 @@ class OneKeyClient(HardwareClientBase):
                 return False
             self.passphrase_enabled = state.get("passphraseEnabled")
             return True
+        except UserCancelled:
+            # An abandoned wizard probe is not a lost device. Keep the client paired.
+            if cancelled is not None and cancelled.is_set():
+                return False
+            self._detach_without_cache_drop()
+            return False
         except Exception:
             self._detach_without_cache_drop()
             return False

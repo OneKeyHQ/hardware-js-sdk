@@ -137,7 +137,7 @@ class WCOneKeyScript(WCScriptAndDerivation):
         self.passphrase_status_signal.connect(self._on_passphrase_status)
 
     @runs_in_hwd_thread
-    def _passphrase_known_disabled(self):
+    def _passphrase_known_disabled(self, cancelled=None):
         hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
         if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
             return False
@@ -149,8 +149,10 @@ class WCOneKeyScript(WCScriptAndDerivation):
             client = manager.client_by_id(info.device.id_, scan_now=False)
         except Exception:
             return False
-        return (client is not None and client.has_usable_connection_with_device()
-                and client.passphrase_enabled is False)
+        if client is None or (cancelled is not None and cancelled.is_set()):
+            return False
+        kwargs = {} if cancelled is None else {"cancelled": cancelled}
+        return client.has_usable_connection_with_device(**kwargs) and client.passphrase_enabled is False
 
     def on_ready(self):
         super().on_ready()
@@ -163,24 +165,71 @@ class WCOneKeyScript(WCScriptAndDerivation):
         self.hidden_cb.setChecked(
             self.wizard.current_cosigner(self.wizard_data).get("onekey_wallet_mode") == "select-hidden")
         self.apply()
+        self._start_passphrase_probe()
+
+    def _start_passphrase_probe(self):
+        previous = getattr(self, "_passphrase_cancel", None)
+        if previous is not None:
+            previous.set()
         request = self._passphrase_request = object()
+        cancel = self._passphrase_cancel = threading.Event()
+        self._passphrase_pending = True
+        self._passphrase_interrupted = False
+        # A checked hidden-wallet choice cannot advance until the probe answers.
+        self.validate()
 
         def refresh():
-            disabled = self._passphrase_known_disabled()
-            self.passphrase_status_signal.emit(request, disabled)
+            disabled = False
+            try:
+                if not cancel.is_set():
+                    disabled = self._passphrase_known_disabled(cancelled=cancel)
+            finally:
+                if not cancel.is_set():
+                    try:
+                        self.passphrase_status_signal.emit(request, disabled)
+                    except RuntimeError:
+                        pass  # The page was deleted while the probe ran.
 
         _hwd_comms_executor.submit(refresh)
+
+    def _stop_passphrase_probe(self):
+        cancel = getattr(self, "_passphrase_cancel", None)
+        if cancel is not None and getattr(self, "_passphrase_pending", False):
+            cancel.set()
+            self._passphrase_pending = False
+            self._passphrase_interrupted = True
+            self.validate()
+
+    def hideEvent(self, event):
+        # Back, Next and closing the wizard all hide this page. Stop the probe so
+        # it does not hold Electrum's only hardware worker.
+        if not event.spontaneous():
+            self._stop_passphrase_probe()
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not event.spontaneous() and getattr(self, "_passphrase_interrupted", False):
+            self._start_passphrase_probe()
+
+    def validate(self):
+        super().validate()
+        hidden = getattr(self, "hidden_cb", None)
+        if getattr(self, "_passphrase_pending", False) and hidden is not None and hidden.isChecked():
+            self.valid = False
 
     @pyqtSlot(object, bool)
     def _on_passphrase_status(self, request, disabled):
         if request is not self._passphrase_request:
             return
+        self._passphrase_pending = False
         if disabled:
             self.hidden_cb.setChecked(False)
             self.hidden_cb.setVisible(False)
         else:
             self.hidden_cb.setVisible(True)
         self.apply()
+        self.validate()
 
     def apply(self):
         super().apply()
