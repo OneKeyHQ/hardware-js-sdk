@@ -738,9 +738,65 @@ class TestInteractiveDeadline(unittest.TestCase):
                 seen.append((msg_type, deadline))
                 return replies.pop(0)
 
-        with mock.patch("onekey.device.time.monotonic", side_effect=[1000.0, 1500.0]):
+        with mock.patch("onekey.device.time.monotonic", side_effect=[10.0, 1000.0, 1500.0]):
             session = Session(FakeLink(), deadline=130.0, cancelled=None, on_ui=None, cache={}, connect_id="usb1")
             session._call(codec.DEVICE_SESSION_ASK_PIN, b"", codec.SUCCESS)
             session._call(codec.DEVICE_STATUS_GET, b"", codec.DEVICE_STATUS)
-        self.assertEqual([(codec.DEVICE_SESSION_ASK_PIN, 1120.0), (codec.BUTTON_ACK, 1620.0),
-                          (codec.DEVICE_STATUS_GET, 1620.0)], seen)
+        # Each prompt renews to 120 s, but never past start + 900 s (= 910).
+        self.assertEqual([(codec.DEVICE_SESSION_ASK_PIN, 910.0), (codec.BUTTON_ACK, 910.0),
+                          (codec.DEVICE_STATUS_GET, 910.0)], seen)
+
+    def test_probe_button_request_keeps_the_probe_deadline(self):
+        seen = []
+        replies = [(codec.BUTTON_REQUEST, b"")] * 3 + [(codec.DEVICE_STATUS, b"")]
+
+        class FakeLink:
+            def exchange(self, msg_type, _payload, *, deadline, cancelled):
+                seen.append(deadline)
+                return replies.pop(0)
+
+        session = Session(FakeLink(), deadline=5.0, cancelled=None, on_ui=None, cache={}, connect_id="usb1")
+        session._call(codec.DEVICE_STATUS_GET, b"", codec.DEVICE_STATUS)
+        self.assertEqual([5.0] * 4, seen)
+
+    def test_attach_mode_asks_attach_pin_and_binds_that_wallet(self):
+        for state in ("locked", "main", "attach"):
+            with self.subTest(state=state):
+                device = Scripted()
+                if state != "locked":
+                    device.locked = False
+                    device.device_id = "synthetic-device"
+                    device.unlocked_by_attach = state == "attach"
+                    device.install_session(device.hidden if state == "attach" else None)
+                helper, device = helper_for(device)
+                opened = call(helper, "open", {"connectId": "usb1", "mode": "attach"})
+                self.assertEqual("hidden", opened["walletType"])
+                self.assertEqual(device.hidden, opened["passphraseState"])
+                self.assertEqual([] if state == "attach" else [codec.PIN_ATTACH], device.pins)
+                self.assertEqual([], device.on_device)
+
+    def test_cancelled_state_probe_keeps_the_wallet_resume_entry(self):
+        def run(fn):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(fn).result(timeout=2)
+
+        helper = Helper(ports={})
+        self.addCleanup(helper.shutdown)
+        helper.generation = "g"
+        helper._wallets["usb1"] = ("hidden", "addr", "dev", b"\x01" * 32, False)
+        link = mock.Mock()
+        helper._links["usb1"] = link
+        with mock.patch.object(helper, "_acquire", return_value=link), \
+                mock.patch("onekey.ipc.Session") as session:
+            session.return_value.handshake.side_effect = LinkError("CANCELLED")
+            with self.assertRaises(HelperError) as raised:
+                run(lambda: helper.call("state", {"connectId": "usb1"}, generation="g"))
+            self.assertEqual("CANCELLED", raised.exception.code)
+            self.assertIn("usb1", helper._wallets)
+            self.assertNotIn("usb1", helper._links)
+            session.return_value.handshake.side_effect = LinkError("SDK_FAILED")
+            helper._links["usb1"] = link
+            with self.assertRaises(HelperError) as raised:
+                run(lambda: helper.call("state", {"connectId": "usb1"}, generation="g"))
+            self.assertEqual("SDK_FAILED", raised.exception.code)
+            self.assertNotIn("usb1", helper._wallets)

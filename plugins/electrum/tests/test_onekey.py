@@ -643,8 +643,9 @@ class TestOneKeyClient(unittest.TestCase):
         key = OneKeyKeyStore(dict(xpub=self.public_key(), derivation="m/84'/0'/0'"))
         with self.assertRaisesRegex(UserFacingException, "no OneKey device binding"):
             client.bind_keystore(key)
-        with self.assertRaises(UserFacingException):
-            check_binding({**BINDING, "walletType": "attach-pin"})
+        # Builds that saved "attach-pin" keep pairing; the value is read as "hidden".
+        legacy = check_binding({**BINDING, "walletType": "attach-pin"})
+        self.assertEqual({**BINDING, "walletType": "hidden"}, legacy)
         for bad in ({**BINDING, "walletType": "standard"}, {**BINDING, "passphraseState": None},
                     {**BINDING, "sessionId": "forbidden"}, {**BINDING, "walletType": "attach"}):
             with self.assertRaises(UserFacingException):
@@ -1486,8 +1487,11 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                     self.assertFalse(step.hidden_cb.isHidden())
                     app.processEvents()
                     disabled = enabled is False and usable
-                    self.assertEqual(disabled, step.hidden_cb.isHidden())
-                    self.assertEqual(not disabled, step.hidden_cb.isChecked())
+                    # A ticked hidden choice is never cleared behind the user's back.
+                    self.assertFalse(step.hidden_cb.isHidden())
+                    self.assertTrue(step.hidden_cb.isChecked())
+                    self.assertEqual(disabled, step._passphrase_disabled)
+                    self.assertEqual(disabled, step.attach_cb.isHidden())
                     self.assertEqual([threading.main_thread()] * 2, applied_on)
                 finally:
                     release.set()
@@ -1555,6 +1559,58 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                 token.set()
             _hwd_comms_executor.submit(lambda: None).result(timeout=2)
             app.processEvents()
+            step.close()
+
+    def test_disabled_passphrase_keeps_choice_and_drops_queued_result(self):
+        from PyQt6.QtGui import QHideEvent
+        from PyQt6.QtWidgets import QApplication, QLabel
+
+        app = QApplication.instance() or QApplication([])  # noqa: F841 (keep alive)
+        info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+        component = self.wizard_component(mock.Mock(), mock.Mock(), dict(
+            hardware_device=("onekey", info), onekey_wallet_mode="attach"))
+        step = self.qt.WCOneKeyScript(None, component.wizard)
+        step.wizard_data = component.wizard_data
+        step.warn_label = QLabel()
+
+        def base_validate(page):
+            # Electrum's WCScriptAndDerivation.validate() applies the page first.
+            page.apply()
+            page.valid = True
+
+        try:
+            with mock.patch.object(self.qt.WCScriptAndDerivation, "on_ready"), \
+                    mock.patch.object(self.qt.WCScriptAndDerivation, "apply"), \
+                    mock.patch.object(self.qt.WCScriptAndDerivation, "validate", base_validate), \
+                    mock.patch.object(self.qt, "_hwd_comms_executor"):
+                step.on_ready()
+                self.assertTrue(step.attach_cb.isChecked())
+                self.assertEqual("attach", step.wizard_data["onekey_wallet_mode"])
+                # Choices are exclusive.
+                step.hidden_cb.setChecked(True)
+                self.assertFalse(step.attach_cb.isChecked())
+                self.assertEqual("select-hidden", step.wizard_data["onekey_wallet_mode"])
+                # Disabled passphrase keeps the ticked choice and blocks Next with a reason.
+                step._on_passphrase_status(step._passphrase_request, True)
+                self.assertTrue(step.hidden_cb.isChecked())
+                self.assertFalse(step.hidden_cb.isHidden())
+                self.assertTrue(step.attach_cb.isHidden())
+                self.assertFalse(step.valid)
+                self.assertIn("Passphrase is disabled", step.warn_label.text())
+                self.assertEqual("select-hidden", step.wizard_data["onekey_wallet_mode"])
+                # Unticking is the user's explicit switch to the standard wallet.
+                step.hidden_cb.setChecked(False)
+                self.assertTrue(step.valid)
+                self.assertTrue(step.hidden_cb.isHidden())
+                self.assertEqual("standard", step.wizard_data["onekey_wallet_mode"])
+                # A result queued before the page was left is discarded.
+                step.on_ready()
+                queued = step._passphrase_request
+                step.hideEvent(QHideEvent())
+                step._on_passphrase_status(queued, True)
+                self.assertFalse(step._passphrase_disabled)
+                self.assertFalse(step.attach_cb.isHidden())
+        finally:
             step.close()
 
     def test_unlock_refreshes_features_and_retries_new_attach_pin_session(self):

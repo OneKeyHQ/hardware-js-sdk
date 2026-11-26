@@ -33,11 +33,13 @@ _SESSION_CALLS = frozenset((codec.DEVICE_SESSION_GET, codec.DEVICE_SESSION_ASK_P
                             codec.DEVICE_SESSION_ASK_PASSPHRASE))
 # Requests that wait for the user on the device. Each one gets its own time
 # window, so PIN entry plus several confirmations do not share one deadline.
+# A ButtonAck renews only when the request it answers is interactive, and no
+# window may pass the operation's hard budget. Management probes never renew.
 _INTERACTIVE_CALLS = frozenset((codec.DEVICE_SESSION_ASK_PIN, codec.DEVICE_SESSION_ASK_PASSPHRASE,
-                                codec.GET_ADDRESS, codec.SIGN_MESSAGE, codec.SIGN_TX, codec.TX_ACK,
-                                codec.BUTTON_ACK))
+                                codec.GET_ADDRESS, codec.SIGN_MESSAGE, codec.SIGN_TX, codec.TX_ACK))
 INTERACTIVE_STEP_TIMEOUT = 120
-WALLET_MODES = ("standard", "current", "select-hidden")
+INTERACTIVE_OPERATION_BUDGET = 900
+WALLET_MODES = ("standard", "current", "attach", "select-hidden")
 # Older firmware may omit the cancel subcode. Same narrow fallback as
 # packages/core DeviceCommands.ts; any other subcode-free ProcessError is a real failure.
 _LEGACY_CANCEL_MESSAGE = re.compile(
@@ -259,6 +261,7 @@ class Session:
         self.cache = cache
         self.connect_id = connect_id
         self._eventless = False
+        self._hard_deadline = None if deadline is None else time.monotonic() + INTERACTIVE_OPERATION_BUDGET
 
     def handshake(self, *, force=False):
         if not force and getattr(self.link, "handshaked", False):
@@ -320,6 +323,19 @@ class Session:
                     self._passphrase("", on_device=False)
                 _address, session_id = self._session()
                 wallet_type, passphrase_state = "standard", None
+        elif mode == "attach":
+            # New wallet from the Attach PIN slot. An existing attach unlock is used
+            # as is; otherwise AskPin AttachToPin collects that PIN on the device.
+            if status.get("unlocked") is not True or status.get("unlocked_by_attach_to_pin") is not True:
+                self._pin(codec.PIN_ATTACH)
+                status, info = self.identity()
+            if status.get("unlocked_by_attach_to_pin") is not True:
+                _fail("WALLET_MISMATCH")
+            # The attach slot loads its bound passphrase wallet. The binding is the
+            # same public identity as an on-device hidden wallet, so restore can use
+            # either PIN path and still prove the wallet by btc_test_address.
+            passphrase_state, session_id = self._session()
+            wallet_type = "hidden"
         else:
             status, info = self._main_pin(status, info)
             if status.get("passphrase_enabled") is not True:
@@ -553,9 +569,10 @@ class Session:
         self._call(codec.DEVICE_SESSION_ASK_PASSPHRASE,
                    codec.encode_ask_passphrase(passphrase, on_device=on_device), codec.SUCCESS)
 
-    def _step_deadline(self, msg_type):
-        if msg_type in _INTERACTIVE_CALLS and self.deadline is not None:
-            self.deadline = max(self.deadline, time.monotonic() + INTERACTIVE_STEP_TIMEOUT)
+    def _step_deadline(self, origin):
+        if origin in _INTERACTIVE_CALLS and self.deadline is not None:
+            renewed = max(self.deadline, time.monotonic() + INTERACTIVE_STEP_TIMEOUT)
+            self.deadline = min(renewed, max(self.deadline, self._hard_deadline))
         return self.deadline
 
     def _call(self, msg_type, payload, expect):
@@ -563,7 +580,8 @@ class Session:
                                         cancelled=self.cancelled)
         while kind == codec.BUTTON_REQUEST:
             self.on_ui("button")
-            kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self._step_deadline(codec.BUTTON_ACK),
+            # msg_type is the originating request: a probe's ButtonAck keeps the probe deadline.
+            kind, body = self.link.exchange(codec.BUTTON_ACK, b"", deadline=self._step_deadline(msg_type),
                                             cancelled=self.cancelled)
         if kind == codec.FAILURE:
             try:

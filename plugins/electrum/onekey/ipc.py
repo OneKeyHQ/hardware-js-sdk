@@ -117,7 +117,7 @@ class Helper:
             if op == "state":
                 return session.state()
             if op == "open":
-                if params.get("mode") not in ("standard", "current", "select-hidden"):
+                if params.get("mode") not in ("standard", "current", "attach", "select-hidden"):
                     raise SessionError("INVALID_REQUEST")
                 return session.open(params["mode"])
             if op == "xpub":
@@ -132,8 +132,13 @@ class Helper:
                 return session.sign_message(params.get("binding"), params.get("coin"), params.get("path"),
                                             params.get("scriptType"), params.get("message"))
             raise SessionError("INVALID_REQUEST")
-        except LinkError:
-            self.release(connect_id)
+        except LinkError as error:
+            if op == "state" and error.code == "CANCELLED":
+                # A host-cancelled read-only probe interrupts the pipe, not the wallet.
+                # Keep the resume entry; the next operation still re-proves the session.
+                self._drop(connect_id)
+            else:
+                self.release(connect_id)
             raise
         except SessionError as error:
             self._wallets.pop(connect_id, None)

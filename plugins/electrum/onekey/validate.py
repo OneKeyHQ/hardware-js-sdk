@@ -27,12 +27,17 @@ def validate_binding(value):
     if wallet_type == "standard":
         if passphrase_state is not None:
             raise ValueError("standard binding must not carry passphraseState")
-    elif wallet_type == "hidden":
+    elif wallet_type in ("hidden", "attach-pin"):
         if not is_valid_text(passphrase_state):
             raise ValueError("hidden binding requires passphraseState")
     else:
         raise ValueError("unsupported walletType")
-    return dict(value)
+    result = dict(value)
+    if wallet_type == "attach-pin":
+        # Earlier builds saved Attach PIN wallets as "attach-pin". It is the same
+        # public identity as "hidden"; the live xpub check still proves the account.
+        result["walletType"] = "hidden"
+    return result
 
 
 def validate_der_signature(signature, *, low_s=False):
