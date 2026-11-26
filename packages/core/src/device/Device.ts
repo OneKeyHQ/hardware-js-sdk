@@ -451,7 +451,12 @@ export class Device extends EventEmitter {
 
   async acquire(
     expectedProtocol?: HardwareConnectProtocol,
-    options?: { throwOnRunPromiseError?: boolean; forceProtocolDetection?: boolean }
+    options?: {
+      throwOnRunPromiseError?: boolean;
+      forceProtocolDetection?: boolean;
+      onlyConnectBleDevice?: boolean;
+      abortSignal?: AbortSignal;
+    }
   ) {
     const attempt = this.connectionAttempt;
     this.throwIfInterruptedByUser();
@@ -471,14 +476,30 @@ export class Device extends EventEmitter {
         // session, such as an interrupted probe or firmware-update reboot, and would
         // otherwise block the new session. Device cannot distinguish recovery from a
         // regular acquire, so BLE always clears it intentionally.
-        acquireResult = await this.deviceConnector?.acquire(
-          this.originalDescriptor.id,
-          undefined,
-          true,
-          strictProtocol,
-          undefined,
-          options?.forceProtocolDetection
-        );
+        const hasBleOptions =
+          options?.onlyConnectBleDevice !== undefined || options?.abortSignal !== undefined;
+        acquireResult = hasBleOptions
+          ? await this.deviceConnector?.acquire(
+              this.originalDescriptor.id,
+              undefined,
+              true,
+              strictProtocol,
+              undefined,
+              options?.forceProtocolDetection,
+              undefined,
+              {
+                onlyConnectBleDevice: options?.onlyConnectBleDevice,
+                abortSignal: options?.abortSignal,
+              }
+            )
+          : await this.deviceConnector?.acquire(
+              this.originalDescriptor.id,
+              undefined,
+              true,
+              strictProtocol,
+              undefined,
+              options?.forceProtocolDetection
+            );
         this.mainId = (acquireResult as any)?.uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {

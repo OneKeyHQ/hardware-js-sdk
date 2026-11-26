@@ -374,6 +374,38 @@ export const isPro2FamilyBleName = (value?: string | null): boolean => {
   );
 };
 
+const LEGACY_PRO_V1_NAME_PATTERN = /^(?:onekey\s+)?pro\s+(?!2(?:\s|$|-))[a-f0-9]{4}$/i;
+
+/**
+ * Legacy Protocol V1 BLE advertisement names (Classic / Classic 1S / BixinKey / Touch / Pro 1).
+ * Excludes Pro 2 / Neo names (including Find My advertisements) and generic names so Protocol V2
+ * devices are never misclassified as legacy V1.
+ */
+export const isLegacyProtocolV1BleName = (value?: string | null): boolean => {
+  if (!value) {
+    return false;
+  }
+  if (isPro2FamilyBleName(value) || isPro2FindMyAdvertisementName(value)) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || isKnownNonOneKeyDeviceName(normalized)) {
+    return false;
+  }
+  if (isOneKeyShortName(normalized)) {
+    return true;
+  }
+  if (
+    normalized.startsWith('bixinkey') ||
+    normalized.startsWith('onekey classic') ||
+    normalized.startsWith('onekey touch') ||
+    normalized.startsWith('touch ')
+  ) {
+    return true;
+  }
+  return LEGACY_PRO_V1_NAME_PATTERN.test(normalized);
+};
+
 // Pro2 / Neo manufacturer-specific data has no Bluetooth SIG company ID: byte 0 is
 // serial_number[10] (the color letter, 0x00 before the SN is known) and bytes 1-4
 // are a nonce. Older Pro2 / Neo firmware sends 4 zero bytes and Classic sends a

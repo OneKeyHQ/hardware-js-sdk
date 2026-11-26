@@ -1144,12 +1144,16 @@ async function connectDeviceForBle(
       if (!useAcquireGuards) {
         await device.acquire(connectProtocol, {
           forceProtocolDetection: method.payload.forceProtocolDetection,
+          onlyConnectBleDevice: method.payload.onlyConnectBleDevice,
+          abortSignal,
         });
       } else {
         try {
           await raceBleAcquire(
             device.acquire(connectProtocol, {
               forceProtocolDetection: method.payload.forceProtocolDetection,
+              onlyConnectBleDevice: method.payload.onlyConnectBleDevice,
+              abortSignal,
             }),
             abortSignal
           );

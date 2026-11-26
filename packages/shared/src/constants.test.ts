@@ -4,6 +4,7 @@ import {
   hasOnekeyCommunicationService,
   inferProtocolHintFromUsbId,
   isKnownTrezorWebUsbDevice,
+  isLegacyProtocolV1BleName,
   isOnekeyBluetoothDevice,
   isOnekeyDevice,
   isPro2FindMyAdvertisementName,
@@ -277,5 +278,48 @@ describe('Pro2 / Neo BLE advertisement color', () => {
     expect(parseOnekeyBleColorCode(new Uint8Array())).toBeUndefined();
     expect(parseOnekeyBleColorCode(null)).toBeUndefined();
     expect(parseOnekeyBleColorCode(undefined)).toBeUndefined();
+  });
+});
+
+describe('legacy Protocol V1 BLE advertisement names', () => {
+  it.each([
+    'K8141',
+    'K1361',
+    'k0001',
+    'T1234',
+    'S8',
+    'BixinKey1234',
+    'BixinKey',
+    'OneKey Classic',
+    'OneKey Classic 1S',
+    'Touch A1B2',
+    'OneKey Touch',
+    'Pro A9CA',
+    'Pro 22D8',
+    'OneKey Pro A9CA',
+  ])('identifies %s as legacy Protocol V1', name => {
+    expect(isLegacyProtocolV1BleName(name)).toBe(true);
+  });
+
+  it.each([
+    'Pro 2 C445',
+    'Pro2 6E9E',
+    'Pro2A1B2',
+    'OneKey Pro 2 C445',
+    'OneKey Pro 2',
+    'Pro 2',
+    'Pro 2 - Find My',
+    'Pro2 22D8 - Find My',
+    'Neo 1CC4',
+    'Neo Test',
+    'OneKey',
+    'Unknown BLE Device',
+    'Trezor Safe 7',
+    'Ledger Nano X',
+    '',
+    null,
+    undefined,
+  ])('does not classify %s as legacy Protocol V1', name => {
+    expect(isLegacyProtocolV1BleName(name)).toBe(false);
   });
 });

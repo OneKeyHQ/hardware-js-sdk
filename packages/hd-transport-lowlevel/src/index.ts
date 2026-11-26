@@ -24,7 +24,7 @@ import type { LowLevelAcquireInput } from './types';
 
 const { check, ProtocolV1, parseTransportConfigure } = transport;
 
-const PROTOCOL_PROBE_TIMEOUT_MS = 1000;
+const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
 const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH_FALLBACK = 192;
 const LOWLEVEL_PROTOCOL_V2_PACKET_LENGTH_MAX = 244;

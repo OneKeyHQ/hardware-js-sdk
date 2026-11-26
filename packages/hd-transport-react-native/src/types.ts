@@ -11,4 +11,6 @@ export type BleAcquireInput = {
   forceCleanRunPromise?: boolean;
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
+  onlyConnectBleDevice?: boolean;
+  abortSignal?: AbortSignal;
 };

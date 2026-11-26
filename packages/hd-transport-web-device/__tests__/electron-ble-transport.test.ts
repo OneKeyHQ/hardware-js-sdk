@@ -1449,4 +1449,45 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.connect).not.toHaveBeenCalled();
     expect(nobleBle.disconnect).not.toHaveBeenCalled();
   });
+
+  test('wakes a sleeping legacy V1 Classic with Initialize after silent GetFeatures without probing V2', async () => {
+    const device = { id: 'sleeping-classic-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    const probeProtocolV1 = jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+      type: 'Features',
+      message: {},
+    });
+
+    await expect(bleTransport.acquire({ uuid: device.id })).resolves.toMatchObject({
+      uuid: device.id,
+      protocolType: 'V1',
+    });
+
+    expect(probeProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+  });
+
+  test('skips Initialize wake on Electron BLE when onlyConnectBleDevice is true', async () => {
+    const device = { id: 'only-connect-classic-id', name: 'K1361' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+      type: 'Features',
+      message: {},
+    });
+
+    await expect(
+      bleTransport.acquire({ uuid: device.id, onlyConnectBleDevice: true })
+    ).rejects.toBeDefined();
+    expect(callProtocolV1).not.toHaveBeenCalled();
+  });
 });

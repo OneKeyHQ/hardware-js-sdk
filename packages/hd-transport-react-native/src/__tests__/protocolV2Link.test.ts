@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { BleErrorCode } from 'react-native-ble-plx';
 import transportPackage, {
   PROTOCOL_V2_CHANNEL_BLE_UART,
   ProtocolV2,
@@ -33,6 +34,7 @@ jest.mock('react-native-ble-plx', () => ({
     DeviceDisconnected: 201,
     DeviceMTUChangeFailed: 206,
     OperationCancelled: 2,
+    OperationStartFailed: 4,
     CharacteristicNotFound: 404,
   },
   BleManager: jest.fn(),
@@ -1675,57 +1677,192 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     });
   });
 
-  test('spends one Initialize wake on the detection after a fully silent one', async () => {
+  test.each(['android', 'ios'] as const)(
+    'spends one Initialize wake on %s after a fully silent detection, trying GetFeatures first on the new link',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid } = createHarness();
+      const probes = transport as any;
+      const probeProtocolV1 = jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+      jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+      const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+
+      // Nothing has gone silent yet, so the device keeps whatever session it has.
+      await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+      expect(callProtocolV1).not.toHaveBeenCalled();
+
+      // The previous detection answered on no protocol: probe GetFeatures first on the
+      // new link, then spend one Initialize wake only because GetFeatures stayed silent.
+      probeProtocolV1.mockClear();
+      await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+      expect(callProtocolV1).toHaveBeenCalledTimes(1);
+      expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+      expect(probeProtocolV1).toHaveBeenCalledTimes(2);
+
+      // Still silent: the wake is not repeated, so a device that is simply away is not
+      // pushed into a fresh wallet session on every poll.
+      callProtocolV1.mockClear();
+      probeProtocolV1.mockClear();
+      await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+      expect(callProtocolV1).not.toHaveBeenCalled();
+      expect(probeProtocolV1).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test.each(['android', 'ios'] as const)(
+    'skips the Initialize wake on %s retry when GetFeatures already succeeds on the new link',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid } = createHarness();
+      const probes = transport as any;
+      const probeProtocolV1 = jest
+        .spyOn(probes, 'probeProtocolV1')
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+      jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+      const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+        type: 'Features',
+        message: {},
+      });
+
+      await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+      await expect(transport.acquire({ uuid })).resolves.toEqual({ uuid, protocolType: 'V1' });
+
+      expect(probeProtocolV1).toHaveBeenCalledTimes(2);
+      expect(callProtocolV1).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['android', 'ios'] as const)(
+    'wakes a sleeping legacy V1 Classic on %s in the first attempt without probing V2 Ping',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+      const probes = transport as any;
+      const probeProtocolV1 = jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+      const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+      const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+        type: 'Features',
+        message: {},
+      });
+
+      await expect(transport.acquire({ uuid })).resolves.toEqual({ uuid, protocolType: 'V1' });
+
+      expect(probeProtocolV1).toHaveBeenCalledTimes(1);
+      expect(callProtocolV1).toHaveBeenCalledTimes(1);
+      expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+      expect(probeProtocolV2).not.toHaveBeenCalled();
+    }
+  );
+
+  test('confirms Protocol V1 immediately when Classic 1S Initialize wake replies Failure(ActionCancelled)', async () => {
     setPlatformOS('android');
-    const { transport, uuid } = createHarness();
+    const { transport, uuid } = createHarness({ deviceName: 'K1361' });
     const probes = transport as any;
-    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
-    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
-    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+    const probeProtocolV1 = jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+      type: 'Failure',
+      message: { code: 'Failure_ActionCancelled' },
+    });
 
-    // Nothing has gone silent yet, so the device keeps whatever session it has.
-    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
-    expect(callProtocolV1).not.toHaveBeenCalled();
+    await expect(transport.acquire({ uuid })).resolves.toEqual({ uuid, protocolType: 'V1' });
 
-    // The previous detection answered on no protocol, which is what a sleeping Classic
-    // looks like, so this one wakes on the fresh link before probing.
-    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
+    expect(probeProtocolV1).toHaveBeenCalledTimes(1);
     expect(callProtocolV1).toHaveBeenCalledTimes(1);
     expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
-
-    // Still silent: the wake is not repeated, so a device that is simply away is not
-    // pushed into a fresh wallet session on every poll.
-    callProtocolV1.mockClear();
-    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
-    expect(callProtocolV1).not.toHaveBeenCalled();
+    expect(probeProtocolV2).not.toHaveBeenCalled();
   });
 
-  test('does not send the Initialize wake before a V2-first probe', async () => {
-    setPlatformOS('android');
-    const { transport, uuid } = createHarness();
+  test.each(['android', 'ios'] as const)(
+    'does not send Initialize wake on %s for connection-only acquires (onlyConnectBleDevice)',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+      const probes = transport as any;
+      jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+      jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+      const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+        type: 'Features',
+        message: {},
+      });
+
+      await expect(transport.acquire({ uuid, onlyConnectBleDevice: true })).rejects.toBeDefined();
+      await expect(transport.acquire({ uuid, onlyConnectBleDevice: true })).rejects.toBeDefined();
+
+      expect(callProtocolV1).not.toHaveBeenCalled();
+    }
+  );
+
+  test('suppresses Initialize wake when acquire is canceled via abortSignal', async () => {
+    setPlatformOS('ios');
+    const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+    const probes = transport as any;
+    const abortController = new AbortController();
+    jest.spyOn(probes, 'probeProtocolV1').mockImplementation(() => {
+      abortController.abort();
+      return Promise.resolve(false);
+    });
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+      type: 'Features',
+      message: {},
+    });
+
+    await expect(
+      transport.acquire({ uuid, abortSignal: abortController.signal })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+
+    expect(callProtocolV1).not.toHaveBeenCalled();
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+  });
+
+  test('keeps Initialize wake armed when iOS write fails with OperationStartFailed', async () => {
+    setPlatformOS('ios');
+    const { transport, uuid, writeCharacteristic } = createHarness({ deviceName: 'K8141' });
     const probes = transport as any;
     jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
-    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
-    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    writeCharacteristic.writeWithResponse.mockRejectedValueOnce({
+      errorCode: BleErrorCode.OperationStartFailed,
+      reason: 'Operation start failed',
+    });
 
-    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
-    // Silent now, but the next detection probes V2 first: a late V1 reply would land on
-    // the V2 probe, so no Initialize is sent.
-    await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
-    expect(callProtocolV1).not.toHaveBeenCalled();
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleWriteCharacteristicError,
+    });
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+
+    // Wake must still be available on the next acquire because OperationStartFailed proved
+    // the Initialize frame never started.
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+      type: 'Features',
+      message: {},
+    });
+    await expect(transport.acquire({ uuid })).resolves.toEqual({ uuid, protocolType: 'V1' });
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
   });
 
-  test('does not send the Initialize wake on iOS', async () => {
-    const { transport, uuid } = createHarness();
-    const probes = transport as any;
-    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
-    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
-    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
+  test.each(['android', 'ios'] as const)(
+    'does not send the Initialize wake before a V2-first probe on %s',
+    async platform => {
+      setPlatformOS(platform);
+      const { transport, uuid } = createHarness();
+      const probes = transport as any;
+      jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+      jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+      const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({});
 
-    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
-    await expect(transport.acquire({ uuid })).rejects.toBeDefined();
-    expect(callProtocolV1).not.toHaveBeenCalled();
-  });
+      await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
+      // Silent now, but the next detection probes V2 first: a late V1 reply would land on
+      // the V2 probe, so no Initialize is sent.
+      await expect(transport.acquire({ uuid, protocolHint: 'V2' })).rejects.toBeDefined();
+      expect(callProtocolV1).not.toHaveBeenCalled();
+    }
+  );
 
   test('an unanswered Initialize wake settles the acquire and frees the lifecycle lock', async () => {
     setPlatformOS('android');
