@@ -18,11 +18,12 @@ validate = importlib.import_module(__package__ + ".validate")
 
 
 STORAGE_ENCRYPTION_PATH = (0x80000000 + 4541509, 0x80000000 + 1112098098)
-_PURPOSES = {"SPENDADDRESS": 44, "SPENDP2SHWITNESS": 49, "SPENDWITNESS": 84,
-             "PAYTOADDRESS": 44, "PAYTOP2SHWITNESS": 49, "PAYTOWITNESS": 84}
-# BIP48 script-type index. 1 is nested p2wsh-p2sh, 2 is native p2wsh.
-_BIP48_SCRIPT_INDEX = {"SPENDP2SHWITNESS": 1, "PAYTOP2SHWITNESS": 1,
-                       "SPENDWITNESS": 2, "PAYTOWITNESS": 2}
+_SINGLESIG_INPUTS = ("SPENDADDRESS", "SPENDWITNESS", "SPENDP2SHWITNESS")
+_MULTISIG_INPUTS = ("SPENDMULTISIG", "SPENDWITNESS", "SPENDP2SHWITNESS")
+_SINGLESIG_CHANGE = ("PAYTOADDRESS", "PAYTOWITNESS", "PAYTOP2SHWITNESS")
+_MULTISIG_CHANGE = ("PAYTOMULTISIG", "PAYTOWITNESS", "PAYTOP2SHWITNESS")
+# Legacy sighash re-reads every input and output for each of these inputs.
+_LEGACY_INPUTS = ("SPENDADDRESS", "SPENDMULTISIG")
 
 # Failure subcodes belong to the originating request family (firmware-pro2):
 # management requests never carry the wallet-session cancel subcode, and only
@@ -93,30 +94,20 @@ def _request_index(index, items):
         _fail("PROTOCOL")
 
 
-def _coin_index(coin):
-    return 0 if coin == "Bitcoin" else 1
+def _slip44(coin):
+    return validate.SLIP44_BITCOIN if coin == "Bitcoin" else validate.SLIP44_TESTNET
 
 
-def _path(value, coin, script_type):
-    if type(value) is not list or len(value) not in (3, 4, 5, 6):
+def _path(value, coin, *, account=False):
+    # Same keychain schemas as firmware-pro2. A path outside them would be
+    # refused by the device; one of another script type gets its warning there.
+    if type(value) is not list or not 1 <= len(value) <= 10:
         _fail("INVALID_REQUEST")
     for item in value:
         _uint(item)
-    # m/48'/coin'/account'/script'[/change/index]. Index 1 is nested, index 2 is native.
-    if len(value) in (4, 6):
-        script_index = _BIP48_SCRIPT_INDEX.get(script_type)
-        if (script_index is None or value[0] != 0x80000000 + 48
-                or value[1] != 0x80000000 + _coin_index(coin) or value[2] < 0x80000000
-                or value[3] != 0x80000000 + script_index
-                or (len(value) == 6 and not (value[4] in (0, 1) and value[5] < 0x80000000))):
-            _fail("INVALID_REQUEST")
-        return
-    if any(item < 0x80000000 for item in value[:3]):
-        _fail("INVALID_REQUEST")
-    if len(value) == 5 and not (value[3] <= 1 and value[4] < 0x80000000):
-        _fail("INVALID_REQUEST")
-    purpose = _PURPOSES.get(script_type)
-    if purpose is None or value[0] != 0x80000000 + purpose or value[1] != 0x80000000 + _coin_index(coin):
+    allowed = (validate.firmware_account_allowed(value, _slip44(coin)) if account
+               else validate.firmware_path_allowed(value, _slip44(coin)))
+    if not allowed:
         _fail("INVALID_REQUEST")
 
 
@@ -178,23 +169,16 @@ def _check_signing_item(coin, item, *, output):
             _fail("INVALID_REQUEST")
         return
     address_n = item["address_n"]
-    _path(address_n, coin, script_type)
+    _path(address_n, coin)
     if output and "address" in item:
         _fail("INVALID_REQUEST")
-    multisig_types = (("PAYTOWITNESS", "PAYTOP2SHWITNESS") if output
-                      else ("SPENDWITNESS", "SPENDP2SHWITNESS"))
-    if len(address_n) == 6:
-        if script_type not in multisig_types or multisig is None:
+    if multisig is None:
+        if script_type not in (_SINGLESIG_CHANGE if output else _SINGLESIG_INPUTS):
             _fail("INVALID_REQUEST")
-    elif len(address_n) == 5:
-        if multisig is not None:
-            _fail("INVALID_REQUEST")
-    else:
+        return
+    if script_type not in (_MULTISIG_CHANGE if output else _MULTISIG_INPUTS):
         _fail("INVALID_REQUEST")
-    if multisig is not None:
-        if script_type not in multisig_types:
-            _fail("INVALID_REQUEST")
-        _multisig(multisig, address_n)
+    _multisig(multisig, address_n)
 
 
 def _binding(value):
@@ -240,7 +224,7 @@ def _sign_budget(inputs, outputs, ref_txs):
             steps += refs.get(item.get("prev_hash"), 0)
     # Legacy SIGHASH_ALL re-reads every input/output for each legacy input.
     # SegWit inputs are requested again for serialization and witness signing.
-    legacy = sum(item.get("script_type") == "SPENDADDRESS" for item in inputs)
+    legacy = sum(item.get("script_type") in _LEGACY_INPUTS for item in inputs)
     segwit = sum(item.get("script_type") in ("SPENDWITNESS", "SPENDP2SHWITNESS") for item in inputs)
     return steps + legacy * (len(inputs) + len(outputs)) + 2 * segwit
 
@@ -372,10 +356,12 @@ class Session:
 
     def address(self, binding, coin, path, script_type, multisig=None):
         self._account(binding, coin, path, script_type, address=True)
-        if len(path) == 6 or multisig is not None:
-            if multisig is None or script_type not in ("SPENDWITNESS", "SPENDP2SHWITNESS") or len(path) != 6:
+        if multisig is not None:
+            if script_type not in _MULTISIG_INPUTS:
                 _fail("INVALID_REQUEST")
             _multisig(multisig, path)
+        elif script_type not in _SINGLESIG_INPUTS:
+            _fail("INVALID_REQUEST")
         self._ready(binding)
         text = _payload(codec.decode_address, self._call(
             codec.GET_ADDRESS, codec.encode_get_address(path, coin, script_type, True, multisig), codec.ADDRESS))
@@ -432,6 +418,8 @@ class Session:
 
     def sign_message(self, binding, coin, path, script_type, message):
         self._account(binding, coin, path, script_type, address=True)
+        if script_type not in _SINGLESIG_INPUTS:
+            _fail("INVALID_REQUEST")
         if (type(message) is not str or not message or len(message) > 2048 or len(message) % 2
                 or any(character not in "0123456789abcdef" for character in message)):
             _fail("INVALID_REQUEST")
@@ -642,12 +630,6 @@ class Session:
             if address or script_type != "SPENDADDRESS":
                 _fail("INVALID_REQUEST")
             return
-        _path(path, coin, script_type)
         if script_type not in codec.INPUT_SCRIPTS:
             _fail("INVALID_REQUEST")
-        if address:
-            if len(path) == 5 or (len(path) == 6 and script_type in ("SPENDWITNESS", "SPENDP2SHWITNESS")):
-                return
-        elif len(path) == 3 or (len(path) == 4 and script_type in ("SPENDWITNESS", "SPENDP2SHWITNESS")):
-            return
-        _fail("INVALID_REQUEST")
+        _path(path, coin, account=not address)

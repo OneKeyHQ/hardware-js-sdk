@@ -25,6 +25,15 @@ def _is_valid_suffix(suffix, *, change_only=False):
     )
 
 
+MULTISIG_TXIN_TYPES = ("p2sh", "p2wsh", "p2wsh-p2sh")
+MULTISIG_UNSUPPORTED = "Only sorted multisig (p2sh, p2wsh, p2wsh-p2sh) from this OneKey wallet is supported."
+
+
+def _keystore_xtype(txin_type):
+    # Legacy p2pkh and legacy p2sh multisig keystores both carry the "standard" xpub type.
+    return {"p2pkh": "standard", "p2sh": "standard"}.get(txin_type, txin_type)
+
+
 def _derive_pubkey(xpub, suffix):
     return BIP32Node.from_xkey(xpub).subkey_at_public_derivation(list(suffix)).eckey.get_public_key_bytes(compressed=True)
 
@@ -257,8 +266,8 @@ class OneKeyPlugin(HW_PluginBase):
         keystore = keystore or wallet.get_keystore()
         if not self.show_address_helper(wallet, address, keystore):
             return
-        if wallet.txin_type in ("p2wsh", "p2wsh-p2sh"):
-            self._show_p2wsh_address(wallet, address, keystore)
+        if wallet.txin_type in MULTISIG_TXIN_TYPES:
+            self._show_multisig_address(wallet, address, keystore)
             return
         if wallet.txin_type not in ("p2pkh", "p2wpkh-p2sh", "p2wpkh"):
             raise UserFacingException(_("Only single-signature legacy and SegWit wallets are supported."))
@@ -273,15 +282,15 @@ class OneKeyPlugin(HW_PluginBase):
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
         client.show_address(path + suffix, wallet.txin_type, address, bind_token=client.take_bind_token())
 
-    def _show_p2wsh_address(self, wallet, address, keystore):
+    def _show_multisig_address(self, wallet, address, keystore):
         from .client import account_path
         script_type = wallet.txin_type
         desc = wallet.get_script_descriptor_for_address(address)
         multi = desc.get_simple_multisig() if desc is not None else None
-        if (script_type not in ("p2wsh", "p2wsh-p2sh") or desc is None or multi is None or not multi.is_sorted
+        if (script_type not in MULTISIG_TXIN_TYPES or desc is None or multi is None or not multi.is_sorted
                 or desc.to_legacy_electrum_script_type() != script_type):
-            raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
-        if BIP32Node.from_xkey(keystore.xpub).xtype != script_type:
+            raise UserFacingException(_(MULTISIG_UNSUPPORTED))
+        if BIP32Node.from_xkey(keystore.xpub).xtype != _keystore_xtype(script_type):
             raise UserFacingException(_("Script type does not match the OneKey account."))
         suffix = list(wallet.get_address_index(address))
         prefix = account_path(keystore.get_derivation_prefix(), script_type)
@@ -299,7 +308,7 @@ class OneKeyPlugin(HW_PluginBase):
     def _owned_path(keystore, item, script_type, *, change=False):
         from .client import account_path
         prefix = account_path(keystore.get_derivation_prefix(), script_type)
-        if BIP32Node.from_xkey(keystore.xpub).xtype != {"p2pkh": "standard"}.get(script_type, script_type):
+        if BIP32Node.from_xkey(keystore.xpub).xtype != _keystore_xtype(script_type):
             raise UserFacingException(_("Script type does not match the OneKey account."))
         pubkey, path = keystore.find_my_pubkey_in_txinout(item)
         branch = len(prefix)
@@ -312,8 +321,8 @@ class OneKeyPlugin(HW_PluginBase):
         desc = item.script_descriptor
         multi = desc.get_simple_multisig() if desc is not None else None
         if multi is not None:
-            if script_type not in ("p2wsh", "p2wsh-p2sh") or not multi.is_sorted or desc.to_legacy_electrum_script_type() != script_type:
-                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+            if script_type not in MULTISIG_TXIN_TYPES or not multi.is_sorted or desc.to_legacy_electrum_script_type() != script_type:
+                raise UserFacingException(_(MULTISIG_UNSUPPORTED))
             return list(path), desc.expand().output_script, OneKeyPlugin._multisig_payload(multi, derived, suffix)
         expected_script = _singlesig_script(derived, script_type)
         if desc is None or desc.expand().output_script != expected_script:
@@ -330,14 +339,14 @@ class OneKeyPlugin(HW_PluginBase):
     def _multisig_payload(multi, our_pubkey, suffix):
         if (multi.is_range() or not multi.is_sorted or not 1 <= multi.thresh <= len(multi.pubkeys) <= 15
                 or not _is_valid_suffix(suffix)):
-            raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+            raise UserFacingException(_(MULTISIG_UNSUPPORTED))
         nodes = []
         found = False
         seen = set()
         for provider in multi.pubkeys:
             node = provider.extkey
             if node is None or provider.is_range() or node.is_private():
-                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+                raise UserFacingException(_(MULTISIG_UNSUPPORTED))
             provider_suffix = list(provider.get_der_suffix_int_list())
             if provider_suffix != list(suffix):
                 raise UserFacingException(_("Input or change does not belong to this OneKey account."))
@@ -349,7 +358,7 @@ class OneKeyPlugin(HW_PluginBase):
             master = node.depth == 0 and fingerprint == 0 and child_num == 0
             if (type(node.depth) is not int or not 0 <= node.depth <= 255 or (node.depth == 0 and not master)
                     or len(chain) != 32 or len(pubkey) != 33 or pubkey[0] not in (2, 3) or pubkey in seen):
-                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+                raise UserFacingException(_(MULTISIG_UNSUPPORTED))
             seen.add(pubkey)
             child = node.subkey_at_public_derivation(provider_suffix).eckey.get_public_key_bytes(compressed=True)
             found = found or child == our_pubkey
@@ -373,8 +382,8 @@ class OneKeyPlugin(HW_PluginBase):
             desc = txin.script_descriptor
             if not txin.is_mine or desc is None:
                 raise UserFacingException(_("Only inputs from this OneKey wallet are supported."))
-            if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in ("p2wsh", "p2wsh-p2sh"):
-                raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+            if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in MULTISIG_TXIN_TYPES:
+                raise UserFacingException(_(MULTISIG_UNSUPPORTED))
             script_type = desc.to_legacy_electrum_script_type()
             if script_type not in OUTPUT_SCRIPT_TYPES:
                 raise UserFacingException(_("Unsupported OneKey input script type."))
@@ -402,8 +411,8 @@ class OneKeyPlugin(HW_PluginBase):
                 desc = txout.script_descriptor
                 if not txout.is_mine or desc is None:
                     raise UserFacingException(_("Unsupported OneKey change script."))
-                if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in ("p2wsh", "p2wsh-p2sh"):
-                    raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+                if desc.get_simple_multisig() and desc.to_legacy_electrum_script_type() not in MULTISIG_TXIN_TYPES:
+                    raise UserFacingException(_(MULTISIG_UNSUPPORTED))
                 script_type = desc.to_legacy_electrum_script_type()
                 if script_type not in OUTPUT_SCRIPT_TYPES:
                     raise UserFacingException(_("Unsupported OneKey change script."))
@@ -423,7 +432,7 @@ class OneKeyPlugin(HW_PluginBase):
         change_multisig = ["multisig" in item for item in outputs if "address_n" in item]
         if (any("multisig" in item for item in inputs) != all("multisig" in item for item in inputs)
                 or (multisig and not all(change_multisig)) or (not multisig and any(change_multisig))):
-            raise UserFacingException(_("Only BIP48 segwit multisig from this OneKey wallet is supported."))
+            raise UserFacingException(_(MULTISIG_UNSUPPORTED))
 
         client = self.get_client(keystore)
         if client is None:

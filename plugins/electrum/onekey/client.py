@@ -10,16 +10,17 @@ from electrum.storage import get_derivation_used_for_hw_device_encryption
 from electrum.util import UserCancelled, UserFacingException
 
 from .ipc import HelperError, SDK_VERSION
-from .validate import validate_binding
+from .validate import SLIP44_BITCOIN, SLIP44_TESTNET, firmware_account_allowed, validate_binding
 
 
 LIBRARY_VERSION = SDK_VERSION
 MODELS = {"pro2": "OneKey Pro 2", "neo": "OneKey Neo"}
 INPUT_SCRIPT_TYPES = {"standard": "SPENDADDRESS", "p2pkh": "SPENDADDRESS",
                       "p2wpkh-p2sh": "SPENDP2SHWITNESS", "p2wpkh": "SPENDWITNESS",
-                      "p2wsh": "SPENDWITNESS", "p2wsh-p2sh": "SPENDP2SHWITNESS"}
+                      "p2sh": "SPENDMULTISIG", "p2wsh": "SPENDWITNESS", "p2wsh-p2sh": "SPENDP2SHWITNESS"}
 OUTPUT_SCRIPT_TYPES = {"p2pkh": "PAYTOADDRESS", "p2wpkh-p2sh": "PAYTOP2SHWITNESS", "p2wpkh": "PAYTOWITNESS",
-                       "p2wsh": "PAYTOWITNESS", "p2wsh-p2sh": "PAYTOP2SHWITNESS"}
+                       "p2sh": "PAYTOMULTISIG", "p2wsh": "PAYTOWITNESS", "p2wsh-p2sh": "PAYTOP2SHWITNESS"}
+MULTISIG_TXIN_TYPES = ("p2sh", "p2wsh", "p2wsh-p2sh")
 
 
 def coin_name():
@@ -37,24 +38,26 @@ def check_binding(value):
         raise UserFacingException(_("Invalid OneKey wallet binding. Reconnect using the wallet wizard.")) from None
 
 
+ACCOUNT_XTYPES = ("standard", "p2pkh", "p2wpkh-p2sh", "p2wpkh", "p2sh", "p2wsh", "p2wsh-p2sh")
+
+
 def account_path(path, xtype):
-    path = convert_bip32_strpath_to_intpath(path) if isinstance(path, str) else list(path)
-    coin = 1 if coin_name() == "Testnet" else 0
-    # BIP48 account m/48'/coin'/account'/script'. Index 2 is native p2wsh, index 1 is nested p2wsh-p2sh.
-    script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}.get(xtype)
-    if script_index is not None:
-        if (len(path) != 4 or path[0] != 48 + 0x80000000 or path[1] != coin + 0x80000000
-                or type(path[2]) is not int or not 0x80000000 <= path[2] <= 0xffffffff
-                or path[3] != script_index + 0x80000000):
-            message = (_("OneKey requires the BIP48 native segwit account derivation.") if xtype == "p2wsh"
-                       else _("OneKey requires the BIP48 nested segwit account derivation."))
-            raise UserFacingException(message)
-        return path
-    purpose = {"standard": 44, "p2pkh": 44, "p2wpkh-p2sh": 49, "p2wpkh": 84}.get(xtype)
-    if (len(path) != 3 or purpose is None or path[0] != purpose + 0x80000000
-            or path[1] != coin + 0x80000000 or type(path[2]) is not int
-            or not 0x80000000 <= path[2] <= 0xffffffff):
-        raise UserFacingException(_("OneKey requires the matching BIP44/49/84 account derivation."))
+    """Accept any account prefix whose addresses the firmware can show and sign.
+
+    Standard BIP44/49/84/48/45 paths sign silently. Another path the firmware
+    keychain allows (for example a BIP44 purpose on a SegWit wallet) signs after
+    the device shows its non-standard path warning. Anything else is refused
+    here, because the device would export its xpub but never sign with it.
+    """
+    try:
+        path = convert_bip32_strpath_to_intpath(path) if isinstance(path, str) else list(path)
+    except Exception:
+        path = None
+    slip44 = SLIP44_TESTNET if coin_name() == "Testnet" else SLIP44_BITCOIN
+    if xtype not in ACCOUNT_XTYPES or path is None or not firmware_account_allowed(path, slip44):
+        raise UserFacingException(_(
+            "OneKey cannot sign from this derivation path. Use a BIP44, BIP45, BIP48, BIP49 "
+            "or BIP84 style account path (purpose'/coin'/account'[/script'])."))
     return path
 
 

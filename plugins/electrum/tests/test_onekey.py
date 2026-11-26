@@ -497,7 +497,7 @@ class TestOneKeyClient(unittest.TestCase):
         client, helper, _ = self.make_client()
         path = get_derivation_used_for_hw_device_encryption()
         for requested, xtype in ((path + "/0'", "standard"), ("m/4541509'/0'", "standard"), (path, "p2wpkh"),
-                                 ("m/86'/0'/0'", "p2wpkh")):
+                                 ("m/0'/0'", "p2wpkh")):
             with self.subTest(path=requested, xtype=xtype), self.assertRaises(UserFacingException):
                 client.get_xpub(requested, xtype)
         self.assertEqual(1, helper.call.call_count)
@@ -667,12 +667,25 @@ class TestOneKeyClient(unittest.TestCase):
         self.assertFalse(client.has_usable_connection_with_device())
         self.assertTrue(client.closed)
 
+    def test_mislabeled_but_signable_derivation_fails_the_live_xpub_check(self):
+        client, helper, _ = self.make_client()
+        stored = self.public_key()  # an m/84'/0'/0' account
+        live = BIP32Node.from_rootseed(os.urandom(32), xtype="p2wpkh").subkey_at_private_derivation(
+            "m/49'/0'/0'").to_xpub()
+        keystore = OneKeyKeyStore(dict(xpub=stored, derivation="m/49'/0'/0'", onekey_binding=BINDING))
+        helper.call.side_effect = None
+        helper.call.return_value = dict(xpub=live, rootFingerprint=None)
+        with self.assertRaisesRegex(UserFacingException, "does not match this Electrum wallet"):
+            client.bind_keystore(keystore)
+        self.assertEqual([0x80000031, 0x80000000, 0x80000000], helper.call.call_args.args[1]["path"])
+        self.assertIsNone(client.account)
+
     def test_mainnet_testnet_and_unsupported_account_paths(self):
         self.assertEqual("Bitcoin", coin_name())
         with mock.patch.object(constants, "net", constants.BitcoinTestnet):
             self.assertEqual("Testnet", coin_name())
         client, helper, _ = self.make_client()
-        for path, xtype in (("m/86'/0'/0'", "p2wpkh"), ("m/84'/1'/0'", "p2wpkh"), ("m/84'/0'", "p2wpkh")):
+        for path, xtype in (("m/0'/0'", "p2wpkh"), ("m/84'/1'/0'", "p2wpkh"), ("m/84'/0'", "p2wpkh")):
             with self.assertRaises(UserFacingException):
                 client.get_xpub(path, xtype)
         self.assertEqual(1, helper.call.call_count)
@@ -856,12 +869,16 @@ class TestOneKeyMessage(unittest.TestCase):
 class TestOneKeyMultisig(unittest.TestCase):
     def make_wallet(self, thresh=2, script_type="p2wsh", input_count=1, master_cosigner=False):
         coin = 1 if constants.net.TESTNET else 0
-        script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}[script_type]
-        prefix = f"m/48'/{coin}'/0'/{script_index}'"
+        if script_type == "p2sh":
+            # Electrum's legacy multisig default is BIP45; Testnet has no BIP45, so use BIP48 raw.
+            prefix = "m/48'/1'/0'/0'" if coin else "m/45'/0"
+        else:
+            script_index = {"p2wsh": 2, "p2wsh-p2sh": 1}[script_type]
+            prefix = f"m/48'/{coin}'/0'/{script_index}'"
         accounts = []
         roots = []
         for seed in (b"\x11" * 32, b"\x22" * 32, b"\x33" * 32):
-            root = BIP32Node.from_rootseed(seed, xtype=script_type)
+            root = BIP32Node.from_rootseed(seed, xtype="standard" if script_type == "p2sh" else script_type)
             roots.append(root)
             accounts.append(root.subkey_at_private_derivation(prefix))
         fingerprint = roots[0].calc_fingerprint_of_this_node()
@@ -877,9 +894,12 @@ class TestOneKeyMultisig(unittest.TestCase):
                 public = source.convert_to_public()._replace(xtype="standard").to_xpub()
                 providers.append(descriptor.PubkeyProvider(None, public, f"/{change}/{addr_index}"))
             multi = descriptor.MultisigDescriptor(providers, thresh, True)
-            desc = descriptor.WSHDescriptor(multi)
-            if script_type == "p2wsh-p2sh":
-                desc = descriptor.SHDescriptor(desc)
+            if script_type == "p2sh":
+                desc = descriptor.SHDescriptor(multi)
+            else:
+                desc = descriptor.WSHDescriptor(multi)
+                if script_type == "p2wsh-p2sh":
+                    desc = descriptor.SHDescriptor(desc)
             output = PartialTxOutput(scriptpubkey=desc.expand().output_script, value=value)
             output.script_descriptor = desc
             pubkey = keys[0].eckey.get_public_key_bytes(compressed=True)
@@ -910,6 +930,27 @@ class TestOneKeyMultisig(unittest.TestCase):
         if input_count == 1:
             return keystore, tx, groups[0]
         return keystore, tx, groups
+
+    def test_partial_legacy_p2sh_signature_is_kept(self):
+        for network in (constants.BitcoinMainnet, constants.BitcoinTestnet):
+            with self.subTest(network=network), mock.patch.object(constants, "net", network):
+                keystore, tx, keys = self.make_wallet(script_type="p2sh")
+                signature = tx.sign_txin(0, keys[0].eckey.get_secret_bytes())[:-1]
+                plugin, client = TestOneKeySigning().plugin(signature)
+                plugin.sign_transaction(keystore, tx)
+                txin = tx.inputs()[0]
+                self.assertIn(keys[0].eckey.get_public_key_bytes(compressed=True), txin.sigs_ecdsa)
+                self.assertFalse(tx.is_complete())
+                self.assertEqual((1, 2), txin.get_satisfaction_progress())
+                signed, outputs, previous = client.sign_tx.call_args.args
+                self.assertEqual("SPENDMULTISIG", signed[0]["script_type"])
+                self.assertEqual(2, signed[0]["multisig"]["m"])
+                self.assertEqual(3, len(signed[0]["multisig"]["pubkeys"]))
+                self.assertEqual([0, 0], signed[0]["address_n"][-2:])
+                self.assertEqual("PAYTOMULTISIG", outputs[1]["script_type"])
+                self.assertEqual([1, 2], outputs[1]["address_n"][-2:])
+                # Legacy inputs always carry the full previous transaction.
+                self.assertEqual([signed[0]["prev_hash"]], list(previous))
 
     def test_partial_native_segwit_signature_is_kept(self):
         for network in (constants.BitcoinMainnet, constants.BitcoinTestnet):
@@ -1037,7 +1078,11 @@ class TestOneKeyMultisig(unittest.TestCase):
             with self.subTest(kind=name), self.assertRaises(UserFacingException):
                 plugin.sign_transaction(keystore, tx)
             plugin.get_client.assert_not_called()
-        for derivation in ("m/45'/0", "m/48'/0'/0'/1'", "m/48'/0'/0'/0'", "m/48'/0'/0'/2'/0/0"):
+        # Paths the firmware cannot sign from stop before the device. A mislabeled
+        # path it can sign from (m/45'/0, m/48'/0'/0'/1') is caught by the live xpub
+        # comparison in bind_keystore instead; see
+        # test_mislabeled_but_signable_derivation_fails_the_live_xpub_check.
+        for derivation in ("m/48'/0'/0'/2'/0/0", "m/1'/0'/0'/2'", "m/48'/1'/0'/2'"):
             keystore, tx, _keys = self.make_wallet()
             keystore = OneKeyKeyStore(dict(xpub=keystore.xpub, derivation=derivation,
                                           root_fingerprint=keystore.get_root_fingerprint(), onekey_binding=BINDING))
@@ -1046,33 +1091,39 @@ class TestOneKeyMultisig(unittest.TestCase):
                 plugin.sign_transaction(keystore, tx)
             plugin.get_client.assert_not_called()
 
-    def test_account_path_accepts_only_bip48_script_type_two(self):
-        self.assertEqual([0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 2],
-                         account_path("m/48'/0'/0'/2'", "p2wsh"))
-        with mock.patch.object(constants, "net", constants.BitcoinTestnet):
-            self.assertEqual([0x80000000 + 48, 0x80000000 + 1, 0x80000000 + 3, 0x80000000 + 2],
-                             account_path("m/48'/1'/3'/2'", "p2wsh"))
-            with self.assertRaises(UserFacingException):
-                account_path("m/48'/0'/0'/2'", "p2wsh")
-        for path, xtype in (("m/45'/0", "p2wsh"), ("m/48'/0'/0'/1'", "p2wsh"),
-                            ("m/48'/0'/0'/2'/0/0", "p2wsh"), ("m/84'/0'/0'", "p2wsh"),
-                            ("m/48'/0'/0'/2'", "p2wpkh"), ("m/48'/1'/0'/2'", "p2wsh")):
+    def test_account_path_accepts_what_the_firmware_keychain_can_sign(self):
+        h = 0x80000000
+        accepted = (
+            ("m/48'/0'/0'/2'", "p2wsh"), ("m/48'/0'/0'/1'", "p2wsh-p2sh"), ("m/48'/0'/7'/0'", "p2sh"),
+            ("m/45'/0", "p2sh"), ("m/45'/0'/0'", "p2sh"),
+            ("m/44'/0'/0'", "standard"), ("m/49'/0'/0'", "p2wpkh-p2sh"), ("m/84'/0'/5'", "p2wpkh"),
+            # Another script type's schema: the device signs after its path warning.
+            ("m/44'/0'/0'", "p2wpkh"), ("m/84'/0'/0'", "standard"), ("m/48'/0'/0'/1'", "p2wsh"),
+            ("m/84'/0'/0'", "p2wsh"), ("m/86'/0'/0'", "p2wpkh"), ("m/44'/0'/0'/1", "p2wpkh"),
+            ("m/49/0/0", "p2wpkh-p2sh"),
+        )
+        for path, xtype in accepted:
+            with self.subTest(path=path, xtype=xtype):
+                self.assertEqual(convert_bip32_strpath_to_intpath(path), account_path(path, xtype))
+        self.assertEqual([h + 48, h + 1, h + 3, h + 2], [x for x in self._testnet(account_path, "m/48'/1'/3'/2'", "p2wsh")])
+        rejected = (
+            ("m/0'/0'", "p2wpkh"), ("m", "standard"), ("m/84'/0'", "p2wpkh"), ("m/1'/0'/0'/2'", "p2wsh"),
+            ("m/48'/1'/0'/2'", "p2wsh"), ("m/84'/1'/0'", "p2wpkh"),  # Testnet coin type on mainnet
+            ("m/48'/0'/0'/2'/0/0", "p2wsh"), ("m/84'/0'/0'/0/0", "p2wpkh"),  # address paths, not accounts
+            ("m/45'/101", "p2sh"), ("m/84'/0'/0'", "p2tr"),
+        )
+        for path, xtype in rejected:
             with self.subTest(path=path, xtype=xtype), self.assertRaises(UserFacingException):
                 account_path(path, xtype)
+        for path, xtype in (("m/48'/0'/0'/2'", "p2wsh"), ("m/45'/0", "p2sh")):
+            # Mainnet coin type and BIP45 (no coin_type field) are not Testnet accounts.
+            with self.subTest(testnet=path), self.assertRaises(UserFacingException):
+                self._testnet(account_path, path, xtype)
 
-    def test_account_path_accepts_only_bip48_script_type_one(self):
-        self.assertEqual([0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 1],
-                         account_path("m/48'/0'/0'/1'", "p2wsh-p2sh"))
+    @staticmethod
+    def _testnet(fn, *args):
         with mock.patch.object(constants, "net", constants.BitcoinTestnet):
-            self.assertEqual([0x80000000 + 48, 0x80000000 + 1, 0x80000000 + 3, 0x80000000 + 1],
-                             account_path("m/48'/1'/3'/1'", "p2wsh-p2sh"))
-            with self.assertRaises(UserFacingException):
-                account_path("m/48'/0'/0'/1'", "p2wsh-p2sh")
-        for path, xtype in (("m/45'/0", "p2wsh-p2sh"), ("m/48'/0'/0'/2'", "p2wsh-p2sh"),
-                            ("m/48'/0'/0'/1'/0/0", "p2wsh-p2sh"), ("m/49'/0'/0'", "p2wsh-p2sh"),
-                            ("m/48'/0'/0'/1'", "p2wpkh-p2sh"), ("m/48'/1'/0'/1'", "p2wsh-p2sh")):
-            with self.subTest(path=path, xtype=xtype), self.assertRaises(UserFacingException):
-                account_path(path, xtype)
+            return fn(*args)
 
     def test_depth_zero_master_cosigner_uses_the_same_suffix(self):
         for script_type in ("p2wsh", "p2wsh-p2sh"):
@@ -1177,7 +1228,7 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertEqual(4, len(sent["path"]))
         self.assertEqual(0x80000002, sent["path"][-1])
         with self.assertRaises(UserFacingException):
-            client.get_xpub("m/48'/0'/0'/1'", "p2wsh")
+            client.get_xpub("m/1'/0'/0'/2'", "p2wsh")
 
     def test_ypub_from_the_device_is_stored_as_a_nested_multisig_xpub(self):
         stored_xpub = ("Ypub6jdDBbZ1HP6Lbi2gW5BCddjJDTye9oyDz4P4qCz14AvPfp2WxXjLyHzirjy73LgNwC2g8qrB83wEde6rWR868Q2Q"
@@ -1202,7 +1253,7 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertEqual(4, len(sent["path"]))
         self.assertEqual(0x80000001, sent["path"][-1])
         with self.assertRaises(UserFacingException):
-            client.get_xpub("m/48'/0'/0'/2'", "p2wsh-p2sh")
+            client.get_xpub("m/1'/0'/0'/1'", "p2wsh-p2sh")
 
     def test_finished_multisig_input_keeps_its_witness(self):
         keystore, tx, groups = self.make_wallet(input_count=2)
@@ -1240,7 +1291,7 @@ class TestOneKeyMultisig(unittest.TestCase):
         self.assertEqual(2, len(signed))
         self.assertTrue(all("multisig" in item for item in signed))
 
-    def test_legacy_multisig_script_is_refused_before_device_selection(self):
+    def test_multisig_wizard_takes_p2sh_and_segwit_but_not_singlesig_scripts(self):
         try:
             from PyQt6 import QtWidgets  # noqa: F401
         except ImportError as exc:
@@ -1250,13 +1301,13 @@ class TestOneKeyMultisig(unittest.TestCase):
         step.wizard = NewWalletWizard.__new__(NewWalletWizard)
         client = mock.Mock()
         step.wizard_data = {"wallet_type": "multisig"}
-        for xtype in ("standard", "p2wpkh", "p2wpkh-p2sh"):
+        for xtype in ("p2wpkh", "p2wpkh-p2sh"):
             client.reset_mock()
-            with self.subTest(xtype=xtype), self.assertRaisesRegex(UserFacingException, "BIP48 segwit multisig"):
+            with self.subTest(xtype=xtype), self.assertRaisesRegex(UserFacingException, "p2sh, p2wsh and p2wsh-p2sh"):
                 WCOneKeyXPub.get_xpub_from_client(step, client, "m/44'/0'/0'", xtype)
             client.begin_new_wallet_selection.assert_not_called()
             client.request_wallet_mode.assert_not_called()
-        for xtype, path in (("p2wsh", "m/48'/0'/0'/2'"), ("p2wsh-p2sh", "m/48'/0'/0'/1'")):
+        for xtype, path in (("p2wsh", "m/48'/0'/0'/2'"), ("p2wsh-p2sh", "m/48'/0'/0'/1'"), ("standard", "m/45'/0")):
             client.reset_mock()
             with mock.patch("electrum.gui.qt.wizard.wallet.WCHWXPub.get_xpub_from_client", return_value="xpub") as parent:
                 self.assertEqual("xpub", WCOneKeyXPub.get_xpub_from_client(step, client, path, xtype))

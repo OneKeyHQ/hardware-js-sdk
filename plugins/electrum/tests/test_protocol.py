@@ -537,13 +537,17 @@ class TestDeviceSession(unittest.TestCase):
         self.assertEqual(path[-2:], codec.decode_multisig(codec._last(signed_output, 5, 2))["pubkeys"][0]["address_n"])
         self.assertEqual(bytes.fromhex(node["public_key"]),
                          codec.decode_multisig(codec._last(signed_input, 7, 2))["pubkeys"][0]["public_key"])
+        # Rejected before SignTx: outside the firmware keychain, a broken redeem
+        # script, or a multisig script type without multisig data (and back).
         rejected = (
-            dict(path=account + [0, 0], scriptType="SPENDWITNESS"),
-            dict(path=ADDRESS_PATH, scriptType="SPENDWITNESS", multisig=multisig),
             dict(path=[0x80000000 + 45, 0x80000000, 0, 0], scriptType="SPENDWITNESS", multisig=multisig),
-            dict(path=account + [0, 0], scriptType="SPENDWITNESS", multisig={**multisig, "m": 0}),
-            dict(path=[0x80000000 + 48, 0x80000000, 0x80000000, 0x80000000 + 1, 0, 0],
+            dict(path=[0x80000000 + 1, 0x80000000, 0x80000000, 0x80000000 + 2, 0, 0],
                  scriptType="SPENDWITNESS", multisig=multisig),
+            dict(path=[0x80000000 + 48, 0x80000001, 0x80000000, 0x80000000 + 2, 0, 0],
+                 scriptType="SPENDWITNESS", multisig=multisig),
+            dict(path=account + [0, 0], scriptType="SPENDWITNESS", multisig={**multisig, "m": 0}),
+            dict(path=account + [0, 0], scriptType="SPENDMULTISIG"),
+            dict(path=account + [0, 0], scriptType="SPENDADDRESS", multisig=multisig),
         )
         for params in rejected:
             device.order.clear()
@@ -556,6 +560,49 @@ class TestDeviceSession(unittest.TestCase):
                     outputs=[dict(amount="1", address="bc1qexample", script_type="PAYTOADDRESS")]))
             self.assertEqual("INVALID_REQUEST", raised.exception.code)
             self.assertEqual([], device.order)
+
+    def test_legacy_p2sh_multisig_and_cross_type_singlesig_reach_the_device(self):
+        from onekey.device import _sign_budget
+        h = 0x80000000
+        helper, device = helper_for()
+        binding = call(helper, "open", {"connectId": "usb1", "mode": "standard"})
+        bip45 = [h + 45, 0]
+        self.assertEqual("xpub-test", call(helper, "xpub", dict(
+            connectId="usb1", binding=binding, coin="Bitcoin", path=bip45, scriptType="SPENDADDRESS"))["xpub"])
+        node = {"depth": 2, "fingerprint": 1, "child_num": 0, "chain_code": "cd" * 32,
+                "public_key": "02" + "44" * 32, "address_n": [0, 3]}
+        multisig = {"m": 2, "pubkeys": [node, {**node, "public_key": "03" + "55" * 32}]}
+        path = bip45 + [0, 3]
+        device.address = "3legacy"
+        self.assertEqual("3legacy", call(helper, "address", dict(
+            connectId="usb1", binding=binding, coin="Bitcoin", path=path,
+            scriptType="SPENDMULTISIG", multisig=multisig))["address"])
+        previous = dict(hash=TXID, version=1, lock_time=0,
+                        inputs=[dict(prev_hash="22" * 32, prev_index=0, script_sig="", sequence=0xFFFFFFFF)],
+                        bin_outputs=[dict(amount="1000", script_pubkey="a914" + "33" * 20 + "87")])
+        inputs = [dict(prev_hash=TXID, prev_index=0, amount="1000", sequence=0xFFFFFFFF,
+                       address_n=path, script_type="SPENDMULTISIG", multisig=multisig)]
+        outputs = [dict(amount="900", address_n=bip45 + [1, 0], script_type="PAYTOMULTISIG",
+                        multisig={**multisig, "pubkeys": [{**n, "address_n": [1, 0]} for n in multisig["pubkeys"]]})]
+        call(helper, "sign", dict(connectId="usb1", binding=binding, coin="Bitcoin", version=2, locktime=0,
+                                  refTxs=[previous], inputs=inputs, outputs=outputs))
+        input_tx = codec.decode_fields(codec._last(codec.decode_fields(device.acks[0]), 1, 2))
+        output_tx = codec.decode_fields(codec._last(codec.decode_fields(device.acks[1]), 1, 2))
+        self.assertEqual(1, codec.opt_uint(codec.decode_fields(codec._last(input_tx, 2, 2)), 6))
+        self.assertEqual(2, codec.opt_uint(codec.decode_fields(codec._last(output_tx, 5, 2)), 4))
+        # Legacy multisig re-streams every input and output, like a legacy single-sig input.
+        self.assertEqual(_sign_budget([dict(inputs[0], script_type="SPENDADDRESS")], outputs, [previous]),
+                         _sign_budget(inputs, outputs, [previous]))
+        # A BIP44 path on a SegWit single-sig wallet goes to the device, which shows its path warning.
+        cross = [h + 44, h, h, 0, 0]
+        self.assertEqual("3legacy", call(helper, "address", dict(
+            connectId="usb1", binding=binding, coin="Bitcoin", path=cross, scriptType="SPENDWITNESS"))["address"])
+        # Testnet has no BIP45, and a multisig script type needs multisig data.
+        for params in (dict(coin="Testnet", path=path, scriptType="SPENDMULTISIG", multisig=multisig),
+                       dict(coin="Bitcoin", path=path, scriptType="SPENDMULTISIG")):
+            with self.subTest(params=params["coin"]), self.assertRaises(HelperError) as raised:
+                call(helper, "address", dict(connectId="usb1", binding=binding, **params))
+            self.assertEqual("INVALID_REQUEST", raised.exception.code)
 
     def test_bip48_nested_segwit_is_accepted_and_the_native_script_type_is_not(self):
         helper, device = helper_for()
@@ -589,10 +636,9 @@ class TestDeviceSession(unittest.TestCase):
         self.assertEqual(5, codec.opt_uint(signed_output, 4))
         self.assertEqual(0x80000001, codec.decode_multisig(codec._last(signed_input, 7, 2))["pubkeys"][0]["child_num"])
         rejected = (
-            dict(path=path, scriptType="SPENDP2SHWITNESS"),
-            dict(path=account + [0, 0], scriptType="SPENDWITNESS", multisig=multisig),
-            dict(path=[0x80000000 + 49, 0x80000000, 0x80000000, 0, 0],
-                 scriptType="SPENDP2SHWITNESS", multisig=multisig),
+            dict(path=account + [2, 0], scriptType="SPENDP2SHWITNESS", multisig=multisig),
+            dict(path=[0x80000000 + 49, 0x80000000, 0x80000000, 0], scriptType="SPENDP2SHWITNESS"),
+            dict(path=path, scriptType="SPENDMULTISIG"),
         )
         for params in rejected:
             device.order.clear()

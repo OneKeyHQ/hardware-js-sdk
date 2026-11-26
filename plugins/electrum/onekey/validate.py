@@ -6,6 +6,70 @@ reused by any Python client speaking OneKey Protocol V2.
 
 SECP256K1_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 BINDING_KEYS = frozenset({"serialNo", "deviceId", "walletType", "passphraseState"})
+HARDENED = 0x80000000
+SLIP44_BITCOIN = 0
+SLIP44_TESTNET = 1
+
+
+def _firmware_path_schemas(slip44):
+    """Bitcoin keychain schemas of firmware-pro2 (app/bitcoin/keychain.py).
+
+    GetAddress and SignTx reject a single-signature path outside these, even with
+    safety checks relaxed, and strict safety checks reject multisig paths too.
+    A path that fits a schema of another script type is still signed after the
+    device shows its non-standard path warning. GetPublicKey accepts any path,
+    so an xpub alone does not prove that the account can sign.
+    Each entry is (components, trailing); a component is an inclusive (low, high).
+    """
+    h = HARDENED
+    coin_h, coin = (h + slip44, h + slip44), (slip44, slip44)
+    account_h, account = (h, 0xFFFFFFFF), (0, h - 1)
+    change, index, any_unhardened = (0, 1), (0, h - 1), (0, h - 1)
+
+    def hard(value):
+        return (h + value, h + value)
+
+    schemas = [
+        ([hard(44), coin_h, account_h, change], any_unhardened),  # BIP44 ".../change/*"
+        ([hard(48), coin_h, account_h, hard(0), change, index], None),  # BIP48 raw
+        ([hard(48), coin_h, account_h, hard(1), change, index], None),  # BIP48 p2sh-segwit
+        ([hard(48), coin_h, account_h, hard(2), change, index], None),  # BIP48 segwit
+        ([hard(49), coin_h, account_h, change, index], None),
+        ([hard(84), coin_h, account_h, change, index], None),
+        ([hard(86), coin_h, account_h, change, index], None),
+        # Compatibility patterns for "Bitcoin", "Testnet" and "Regtest".
+        ([(49, 49), coin, account, change, index], None),  # Casa
+        ([hard(45), coin_h, account_h, (0, 1000000), change, index], None),  # Unchained
+        ([hard(45), coin, account, (0, 1000000), change, index], None),
+        ([hard(45), coin_h, account_h, (0, 1000000), index], None),  # Unchained, deprecated
+    ]
+    if slip44 == SLIP44_BITCOIN:
+        # BIP45 has no coin_type field, so the firmware allows it only for Bitcoin.
+        schemas.append(([hard(45), (0, 100), change, index], None))
+    return schemas
+
+
+def firmware_path_allowed(path, slip44):
+    """True when firmware-pro2 can show an address or sign at this full path."""
+    if type(path) not in (list, tuple) or any(type(item) is not int or not 0 <= item <= 0xFFFFFFFF
+                                              for item in path):
+        return False
+    for components, trailing in _firmware_path_schemas(slip44):
+        if len(path) < len(components) or (trailing is None and len(path) != len(components)):
+            continue
+        if (all(low <= value <= high for value, (low, high) in zip(path, components))
+                and all(trailing[0] <= value <= trailing[1] for value in path[len(components):])):
+            return True
+    return False
+
+
+def firmware_account_allowed(prefix, slip44):
+    """True when every Electrum address under prefix (prefix/change/index) can sign."""
+    if type(prefix) not in (list, tuple):
+        return False
+    prefix = list(prefix)
+    return all(firmware_path_allowed(prefix + [change, index], slip44)
+               for change in (0, 1) for index in (0, HARDENED - 1))
 
 
 def is_valid_text(value, max_len=256):
