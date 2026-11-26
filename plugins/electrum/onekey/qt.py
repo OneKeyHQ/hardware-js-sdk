@@ -130,41 +130,49 @@ def _ensure_wizard_client(component, info):
 
 
 class WCOneKeyScript(WCScriptAndDerivation):
-    passphrase_status_signal = pyqtSignal(object, bool)
+    passphrase_status_signal = pyqtSignal(object, bool, bool)
 
     def __init__(self, parent, wizard):
         super().__init__(parent, wizard)
         self.passphrase_status_signal.connect(self._on_passphrase_status)
 
     @runs_in_hwd_thread
-    def _passphrase_known_disabled(self, cancelled=None):
+    def _wallet_options_known_off(self, cancelled=None):
+        """(passphrase off, Attach PIN off), each True only when an unlocked device said so."""
         hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
         if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
-            return False
+            return False, False
         manager = _device_manager(self)
         if manager is None:
-            return False
+            return False, False
         info = hw[1]
         try:
             client = manager.client_by_id(info.device.id_, scan_now=False)
         except Exception:
-            return False
+            return False, False
         if client is None or (cancelled is not None and cancelled.is_set()):
-            return False
+            return False, False
         kwargs = {} if cancelled is None else {"cancelled": cancelled}
-        return client.has_usable_connection_with_device(**kwargs) and client.passphrase_enabled is False
+        if not client.has_usable_connection_with_device(**kwargs):
+            return False, False
+        return (client.passphrase_enabled is False,
+                getattr(client, "attach_pin_enabled", None) is False)
+
+    def _passphrase_known_disabled(self, cancelled=None):
+        return WCOneKeyScript._wallet_options_known_off(self, cancelled=cancelled)[0]
 
     def on_ready(self):
         super().on_ready()
         if getattr(self, "hidden_cb", None) is None:
             self.hidden_cb = QCheckBox(_("Use a hidden wallet. Enter its passphrase on the device."))
             self.attach_cb = QCheckBox(_("Use the Attach PIN wallet. Enter the Attach PIN on the device."))
-            self.hidden_cb.toggled.connect(lambda checked: self._on_choice_toggled(self.hidden_cb, checked))
-            self.attach_cb.toggled.connect(lambda checked: self._on_choice_toggled(self.attach_cb, checked))
+            self.hidden_cb.toggled.connect(lambda checked: self._on_choice_toggled(self.hidden_cb, "select-hidden", checked))
+            self.attach_cb.toggled.connect(lambda checked: self._on_choice_toggled(self.attach_cb, "attach", checked))
             self.layout().insertWidget(self.layout().count() - 2, self.hidden_cb)
             self.layout().insertWidget(self.layout().count() - 2, self.attach_cb)
         # Keep passphrase-based choices available until an unlocked device confirms otherwise.
         self._passphrase_disabled = False
+        self._attach_disabled = False
         mode = self.wizard.current_cosigner(self.wizard_data).get("onekey_wallet_mode")
         for box, value in self._choices():
             box.setVisible(True)
@@ -185,15 +193,25 @@ class WCOneKeyScript(WCScriptAndDerivation):
                 return value
         return None
 
-    def _on_choice_toggled(self, source, checked):
+    def _on_choice_toggled(self, source, value, checked):
         if checked:
             for box, _value in self._choices():
                 if box is not source:
                     box.setChecked(False)
-        elif getattr(self, "_passphrase_disabled", False):
-            # Passphrase is off on the device: an unticked choice can go away now.
+        elif self._blocked_reason(value):
+            # The device cannot open this wallet: an unticked choice can go away now.
             source.setVisible(False)
         self.validate()
+
+    def _blocked_reason(self, value):
+        if getattr(self, "_passphrase_disabled", False):
+            return _("Passphrase is disabled on this OneKey. Enable it on the device, "
+                     "or untick the hidden or Attach PIN wallet option to continue "
+                     "with the standard wallet.")
+        if value == "attach" and getattr(self, "_attach_disabled", False):
+            return _("No Attach PIN is set on this OneKey. Set one up on the device, "
+                     "or untick the Attach PIN wallet option to choose another wallet.")
+        return None
 
     def _start_passphrase_probe(self):
         previous = getattr(self, "_passphrase_cancel", None)
@@ -207,14 +225,14 @@ class WCOneKeyScript(WCScriptAndDerivation):
         self.validate()
 
         def refresh():
-            disabled = False
+            disabled = attach_disabled = False
             try:
                 if not cancel.is_set():
-                    disabled = self._passphrase_known_disabled(cancelled=cancel)
+                    disabled, attach_disabled = self._wallet_options_known_off(cancelled=cancel)
             finally:
                 if not cancel.is_set():
                     try:
-                        self.passphrase_status_signal.emit(request, disabled)
+                        self.passphrase_status_signal.emit(request, disabled, attach_disabled)
                     except RuntimeError:
                         pass  # The page was deleted while the probe ran.
 
@@ -244,29 +262,31 @@ class WCOneKeyScript(WCScriptAndDerivation):
 
     def validate(self):
         super().validate()
-        if self._selected_choice() is None:
+        selected = self._selected_choice()
+        if selected is None:
             return
         if getattr(self, "_passphrase_pending", False):
             # A passphrase-based choice cannot advance until the probe answers.
             self.valid = False
-        elif getattr(self, "_passphrase_disabled", False):
-            # Never swap the user's choice for the standard wallet. Ask them to change it.
+            return
+        reason = self._blocked_reason(selected)
+        if reason:
+            # Never swap the user's choice for another wallet. Ask them to change it.
             self.valid = False
             warn = getattr(self, "warn_label", None)
             if warn is not None:
-                warn.setText(_("Passphrase is disabled on this OneKey. Enable it on the device, "
-                               "or untick the hidden or Attach PIN wallet option to continue "
-                               "with the standard wallet."))
+                warn.setText(reason)
 
-    @pyqtSlot(object, bool)
-    def _on_passphrase_status(self, request, disabled):
+    @pyqtSlot(object, bool, bool)
+    def _on_passphrase_status(self, request, disabled, attach_disabled=False):
         if request is None or request is not self._passphrase_request:
             return
         self._passphrase_pending = False
         self._passphrase_disabled = disabled
-        for box, _value in self._choices():
+        self._attach_disabled = attach_disabled
+        for box, value in self._choices():
             # A ticked choice stays visible so the user sees why Next is blocked.
-            box.setVisible(not disabled or box.isChecked())
+            box.setVisible(self._blocked_reason(value) is None or box.isChecked())
         self.apply()
         self.validate()
 

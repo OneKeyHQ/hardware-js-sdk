@@ -1613,6 +1613,53 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         finally:
             step.close()
 
+    def test_missing_attach_pin_gates_only_the_attach_choice(self):
+        from PyQt6.QtWidgets import QApplication, QLabel
+
+        app = QApplication.instance() or QApplication([])  # noqa: F841 (keep alive)
+        client = mock.Mock(passphrase_enabled=True, attach_pin_enabled=False)
+        client.has_usable_connection_with_device.return_value = True
+        manager = mock.Mock()
+        manager.client_by_id.return_value = client
+        info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+        for mode in ("attach", "standard"):
+            with self.subTest(mode=mode):
+                component = self.wizard_component(mock.Mock(), manager, dict(
+                    hardware_device=("onekey", info), onekey_wallet_mode=mode))
+                step = self.qt.WCOneKeyScript(None, component.wizard)
+                step.wizard_data = component.wizard_data
+                step.warn_label = QLabel()
+
+                def base_validate(page):
+                    page.apply()
+                    page.valid = True
+
+                try:
+                    with mock.patch.object(self.qt.WCScriptAndDerivation, "on_ready"), \
+                            mock.patch.object(self.qt.WCScriptAndDerivation, "apply"), \
+                            mock.patch.object(self.qt.WCScriptAndDerivation, "validate", base_validate), \
+                            mock.patch.object(self.qt, "_hwd_comms_executor"):
+                        step.on_ready()
+                        self.assertEqual((False, True), run_in_hwd_thread(
+                            lambda: self.qt.WCOneKeyScript._wallet_options_known_off(step)))
+                        step._on_passphrase_status(step._passphrase_request, False, True)
+                        self.assertFalse(step.hidden_cb.isHidden())
+                        if mode == "attach":
+                            # The ticked choice stays and Next explains the missing Attach PIN.
+                            self.assertFalse(step.attach_cb.isHidden())
+                            self.assertFalse(step.valid)
+                            self.assertIn("No Attach PIN", step.warn_label.text())
+                            step.attach_cb.setChecked(False)
+                            self.assertTrue(step.attach_cb.isHidden())
+                        else:
+                            self.assertTrue(step.attach_cb.isHidden())
+                        self.assertTrue(step.valid)
+                        step.hidden_cb.setChecked(True)
+                        self.assertTrue(step.valid)
+                        self.assertEqual("select-hidden", step.wizard_data["onekey_wallet_mode"])
+                finally:
+                    step.close()
+
     def test_unlock_refreshes_features_and_retries_new_attach_pin_session(self):
         factory = TestOneKeyClient()
         client, helper, handler = factory.make_client()

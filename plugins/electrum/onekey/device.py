@@ -287,12 +287,14 @@ class Session:
 
     def state(self):
         status, info = self.identity()
-        passphrase_enabled = status.get("passphrase_enabled") if status.get("unlocked") is True else None
+        unlocked = status.get("unlocked") is True
+        # Locked firmware does not report wallet settings. None means unknown.
         return {
             "deviceId": status["device_id"],
             "serialNo": info["serial_no"],
             "model": info["model"],
-            "passphraseEnabled": passphrase_enabled,
+            "passphraseEnabled": status.get("passphrase_enabled") if unlocked else None,
+            "attachPinEnabled": status.get("attach_to_pin_enabled") if unlocked else None,
         }
 
     def open(self, mode):
@@ -326,6 +328,9 @@ class Session:
         elif mode == "attach":
             # New wallet from the Attach PIN slot. An existing attach unlock is used
             # as is; otherwise AskPin AttachToPin collects that PIN on the device.
+            if status.get("unlocked") is True and status.get("attach_to_pin_enabled") is False:
+                # No Attach PIN wallet exists on this device; do not ask for one.
+                _fail("ATTACH_PIN_DISABLED")
             if status.get("unlocked") is not True or status.get("unlocked_by_attach_to_pin") is not True:
                 self._pin(codec.PIN_ATTACH)
                 status, info = self.identity()

@@ -763,6 +763,7 @@ class TestInteractiveDeadline(unittest.TestCase):
         for state in ("locked", "main", "attach"):
             with self.subTest(state=state):
                 device = Scripted()
+                device.attach_to_pin_enabled = True
                 if state != "locked":
                     device.locked = False
                     device.device_id = "synthetic-device"
@@ -774,6 +775,22 @@ class TestInteractiveDeadline(unittest.TestCase):
                 self.assertEqual(device.hidden, opened["passphraseState"])
                 self.assertEqual([] if state == "attach" else [codec.PIN_ATTACH], device.pins)
                 self.assertEqual([], device.on_device)
+
+    def test_attach_mode_without_attach_pin_fails_before_asking(self):
+        device = Scripted()
+        device.locked = False
+        device.device_id = "synthetic-device"
+        device.attach_to_pin_enabled = False
+        helper, device = helper_for(device)
+        self.assertIs(False, call(helper, "state", {"connectId": "usb1"})["attachPinEnabled"])
+        with self.assertRaises(HelperError) as raised:
+            call(helper, "open", {"connectId": "usb1", "mode": "attach"})
+        self.assertEqual("ATTACH_PIN_DISABLED", raised.exception.code)
+        self.assertEqual([], device.pins)
+        locked = Scripted()
+        locked.attach_to_pin_enabled = True
+        helper, locked = helper_for(locked)
+        self.assertIsNone(call(helper, "state", {"connectId": "usb1"})["attachPinEnabled"])
 
     def test_cancelled_state_probe_keeps_the_wallet_resume_entry(self):
         def run(fn):

@@ -108,6 +108,7 @@ class OneKeyClient(HardwareClientBase):
             self.serial = state["serialNo"]
             self.model = MODELS[state["model"]]
             self.passphrase_enabled = state.get("passphraseEnabled")
+            self.attach_pin_enabled = state.get("attachPinEnabled")
             retain = getattr(self.plugin, "retain_client", None)
             if retain is not None:
                 retain(self)
@@ -122,14 +123,16 @@ class OneKeyClient(HardwareClientBase):
     def _check_state(state):
         if (type(state) is not dict
                 or not {"deviceId", "serialNo", "model"}.issubset(state)
-                or not set(state).issubset({"deviceId", "serialNo", "model", "passphraseEnabled"})
+                or not set(state).issubset({"deviceId", "serialNo", "model", "passphraseEnabled",
+                                            "attachPinEnabled"})
                 or state["model"] not in MODELS
                 or type(state["serialNo"]) is not str or not state["serialNo"]):
             raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
         if state["deviceId"] is not None and (type(state["deviceId"]) is not str or not state["deviceId"]):
             raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
-        if state.get("passphraseEnabled") is not None and type(state["passphraseEnabled"]) is not bool:
-            raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
+        for key in ("passphraseEnabled", "attachPinEnabled"):
+            if state.get(key) is not None and type(state[key]) is not bool:
+                raise UserFacingException(_("Unsupported or incomplete OneKey device state."))
 
     def _call(self, op, params, *, cancelled=None):
         if self.closed:
@@ -150,6 +153,10 @@ class OneKeyClient(HardwareClientBase):
             if error.code == "PASSPHRASE_DISABLED":
                 raise UserFacingException(_(
                     "Passphrase is disabled on this OneKey. Enable passphrase in device settings first."
+                )) from None
+            if error.code == "ATTACH_PIN_DISABLED":
+                raise UserFacingException(_(
+                    "No Attach PIN is set on this OneKey. Set one up on the device, or choose another wallet."
                 )) from None
             if error.link_failed or error.code in ("DEVICE_MISMATCH", "STALE", "UNSUPPORTED",
                                                    "USB_UNAVAILABLE", "TIMEOUT", "PROTOCOL"):
@@ -411,6 +418,7 @@ class OneKeyClient(HardwareClientBase):
                 self._detach_without_cache_drop()
                 return False
             self.passphrase_enabled = state.get("passphraseEnabled")
+            self.attach_pin_enabled = state.get("attachPinEnabled")
             return True
         except UserCancelled:
             # An abandoned wizard probe is not a lost device. Keep the client paired.
