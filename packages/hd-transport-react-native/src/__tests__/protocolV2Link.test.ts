@@ -1906,6 +1906,40 @@ describe('ReactNativeBleTransport Protocol V2 link lifecycle', () => {
     expect(events).toEqual(['probe-v1', 'reset-probe', 'call-Initialize']);
   });
 
+  test('rejects a React Native wake if abortSignal aborts while Initialize reply is in flight', async () => {
+    setPlatformOS('ios');
+    const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+    const probes = transport as any;
+    const abortController = new AbortController();
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'resetProbeStateAfterProtocolProbe').mockResolvedValue(undefined);
+    jest.spyOn(probes, 'callProtocolV1').mockImplementation(() => {
+      abortController.abort();
+      return Promise.resolve({ type: 'Features', message: {} });
+    });
+
+    await expect(
+      transport.acquire({ uuid, abortSignal: abortController.signal })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(transport.getProtocolType(uuid)).toBeUndefined();
+  });
+
+  test('does not enter Initialize wake on React Native when V1 GetFeatures fails with a decode error', async () => {
+    setPlatformOS('android');
+    const { transport, uuid } = createHarness({ deviceName: 'K8141' });
+    const probes = transport as any;
+    jest.spyOn(probes, 'callProtocolV1').mockRejectedValueOnce(new Error('Unknown message type'));
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const wakeSpy = jest.spyOn(probes, 'wakeSilentProtocolV1Device');
+
+    await expect(transport.acquire({ uuid })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+    });
+    expect(wakeSpy).not.toHaveBeenCalled();
+  });
+
   test.each(['android', 'ios'] as const)(
     'does not send the Initialize wake before a V2-first probe on %s',
     async platform => {

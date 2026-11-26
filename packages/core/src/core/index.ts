@@ -1310,7 +1310,9 @@ const ensureConnected = async (
       const cleanupPollAbort = () => {
         abortSignal?.removeEventListener('abort', onParentAbort);
       };
+      let timedOut = false;
       timer = setTimeout(() => {
+        timedOut = true;
         pollAbortController.abort();
         cleanupPollAbort();
         reject(ERRORS.TypedError(HardwareErrorCode.PollingTimeout));
@@ -1324,6 +1326,9 @@ const ensureConnected = async (
       } catch (error) {
         lastInitializeError = error;
         Log.debug('device list error: ', error);
+        if (timedOut) {
+          return;
+        }
         if (
           [
             HardwareErrorCode.BridgeNotInstalled,
@@ -1350,7 +1355,7 @@ const ensureConnected = async (
         cleanupPollAbort();
       }
 
-      if (abort()) {
+      if (timedOut || abort()) {
         return;
       }
 

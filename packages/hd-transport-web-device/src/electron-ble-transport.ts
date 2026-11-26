@@ -471,6 +471,9 @@ export default class ElectronBleTransport {
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
+    if (input.abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
 
     const acquireGeneration = this.nextAcquireGeneration;
     this.nextAcquireGeneration += 1;
@@ -559,14 +562,15 @@ export default class ElectronBleTransport {
         this.handleBluetoothError(error);
       }
       assertAcquireActive();
-      await this.refreshBlePacketCapacity(uuid);
+      const connectedDevice = await this.refreshBlePacketCapacity(uuid);
       assertAcquireActive();
+      const resolvedDeviceName = connectedDevice?.name || device.name;
 
       const cleanup = this.createNotificationSubscription(uuid);
       this.notificationCleanups.set(uuid, cleanup);
 
       const protocolType = await this.detectProtocol(uuid, expectedProtocol, protocolHint, {
-        isKnownLegacyV1Device: isLegacyProtocolV1BleName(device.name),
+        isKnownLegacyV1Device: isLegacyProtocolV1BleName(resolvedDeviceName),
         onlyConnectBleDevice: input.onlyConnectBleDevice,
         abortSignal: input.abortSignal,
       });
@@ -580,7 +584,7 @@ export default class ElectronBleTransport {
       }
 
       return {
-        ...toBleDescriptor({ id: device.id, name: device.name }, protocolType),
+        ...toBleDescriptor({ id: device.id, name: resolvedDeviceName }, protocolType),
         uuid,
       };
     } catch (error) {
@@ -975,10 +979,11 @@ export default class ElectronBleTransport {
     }
   }
 
-  private async refreshBlePacketCapacity(uuid: string): Promise<void> {
+  private async refreshBlePacketCapacity(uuid: string) {
     const nobleBle = window.desktopApi?.nobleBle;
     const device = nobleBle ? await invokeNobleBle(nobleBle.getDevice(uuid)) : undefined;
     this.updateBlePacketCapacity(uuid, device?.mtu);
+    return device;
   }
 
   private updateBlePacketCapacity(uuid: string, mtu?: number): void {

@@ -1757,4 +1757,53 @@ describe('ElectronBleTransport protocol detection', () => {
     expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
     expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
   });
+
+  test('uses the post-connect device name for Electron legacy V1 wake when initial lookup has a placeholder name', async () => {
+    const placeholder = { id: 'cold-classic-id', name: 'OneKey Device' };
+    const connected = { id: 'cold-classic-id', name: 'K8141', mtu: 247 };
+    const nobleBle = createNobleBle(placeholder);
+    nobleBle.getDevice.mockResolvedValueOnce(placeholder).mockResolvedValueOnce(connected);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValue({
+      type: 'Features',
+      message: {},
+    });
+
+    await expect(bleTransport.acquire({ uuid: placeholder.id })).resolves.toMatchObject({
+      uuid: placeholder.id,
+      name: 'K8141',
+      protocolType: 'V1',
+    });
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+  });
+
+  test('rejects an already-aborted acquire without releasing an existing Electron BLE link', async () => {
+    const device = { id: 'existing-link-id', name: 'OneKey Classic' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V1' });
+
+    const aborted = new AbortController();
+    aborted.abort();
+    const releaseSpy = jest.spyOn(bleTransport, 'release');
+    nobleBle.disconnect.mockClear();
+
+    await expect(
+      bleTransport.acquire({
+        uuid: device.id,
+        expectedProtocol: 'V1',
+        abortSignal: aborted.signal,
+      })
+    ).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(releaseSpy).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+    expect(bleTransport.getProtocolType(device.id)).toBe('V1');
+  });
 });

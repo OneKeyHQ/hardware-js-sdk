@@ -727,6 +727,8 @@ export default class ReactNativeBleTransport {
   /** Endpoints whose last detection got no answer; 'woken' once their Initialize wake is spent. */
   private silentDetections = new Map<string, 'silent' | 'woken'>();
 
+  private lastV1ProbeFailedWithoutTimeout: Set<string> = new Set();
+
   /** Errors created from BleErrorCode.OperationStartFailed (native write never started). */
   private unstartedWriteErrors = new WeakSet<Error>();
 
@@ -2774,6 +2776,7 @@ export default class ReactNativeBleTransport {
     // firmware reconnect after the native BLE manager is recreated.
     this.protocolReprobeFailures.clear();
     this.silentDetections.clear();
+    this.lastV1ProbeFailedWithoutTimeout.clear();
     this.writeTimeoutCounts.clear();
     this.connectionSetupTimeoutCounts.clear();
     this.monitorTokens.clear();
@@ -2898,9 +2901,10 @@ export default class ReactNativeBleTransport {
           await rebuildTransport();
         }
       }
+      this.lastV1ProbeFailedWithoutTimeout.delete(uuid);
       let detected =
         protocol === 'V1' ? await this.probeProtocolV1(uuid) : await this.probeProtocolV2(uuid);
-      if (!detected && protocol === 'V1') {
+      if (!detected && protocol === 'V1' && !this.lastV1ProbeFailedWithoutTimeout.has(uuid)) {
         detected = await this.wakeSilentProtocolV1Device(
           uuid,
           probeOrder,
@@ -3038,14 +3042,14 @@ export default class ReactNativeBleTransport {
       this.clearProbeProtocol(uuid, 'V1');
     }
 
-    if (answeredV1) {
-      return true;
-    }
     if (options.abortSignal?.aborted) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
     }
     if (this.stopped) {
       throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+    }
+    if (answeredV1) {
+      return true;
     }
     await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
     if (options.abortSignal?.aborted) {
@@ -3115,6 +3119,7 @@ export default class ReactNativeBleTransport {
     }
 
     try {
+      this.lastV1ProbeFailedWithoutTimeout.delete(uuid);
       this.probingProtocols.set(uuid, 'V1');
       // GetFeatures identifies Protocol V1 without resetting an existing wallet
       // session before Core has a chance to restore a hidden wallet.
@@ -3129,6 +3134,9 @@ export default class ReactNativeBleTransport {
         (error instanceof Error && this.monitorTimeoutErrors.has(error))
       ) {
         throw error;
+      }
+      if ((error as { errorCode?: unknown })?.errorCode !== HardwareErrorCode.BleTimeoutError) {
+        this.lastV1ProbeFailedWithoutTimeout.add(uuid);
       }
       return false;
     }
