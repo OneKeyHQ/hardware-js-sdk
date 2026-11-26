@@ -15,8 +15,10 @@ OPERATIONS = {"hello", "search", "state", "open", "xpub", "address", "sign", "si
 
 
 class HelperError(Exception):
-    def __init__(self, code="HELPER_FAILED"):
+    def __init__(self, code="HELPER_FAILED", *, link_failed=None):
         self.code = code
+        # Unclassified SDK failures stay fatal; a surviving session route opts out.
+        self.link_failed = code == "SDK_FAILED" if link_failed is None else link_failed
         if code == "WALLET_MISMATCH":
             message = (
                 "Active OneKey wallet does not match this Electrum wallet (WALLET_MISMATCH). "
@@ -66,17 +68,17 @@ class Helper:
             except LinkError as error:
                 # The pipe failed. Drop only that interface; other devices keep
                 # their generation and claimed links.
-                raise HelperError(error.code) from None
+                raise HelperError(error.code, link_failed=True) from None
             except SessionError as error:
-                # Cancel and wallet mismatch are not a dead USB link.
-                raise HelperError(error.code) from None
+                # Acquisition/discovery failed before a usable route was returned.
+                raise HelperError(error.code, link_failed=True) from None
             except HelperError:
                 raise
             except Exception:
                 self.generation = None
                 self._wallets.clear()
                 self._release_links()
-                raise HelperError("SDK_FAILED") from None
+                raise HelperError("SDK_FAILED", link_failed=True) from None
 
     def shutdown(self):
         with self._lock:
@@ -135,9 +137,10 @@ class Helper:
             raise
         except SessionError as error:
             self._wallets.pop(connect_id, None)
-            if error.code == "PROTOCOL" or getattr(link, "_closed", False):
+            link_failed = error.code == "PROTOCOL" or getattr(link, "_closed", False)
+            if link_failed:
                 self._drop(connect_id)
-            raise
+            raise HelperError(error.code, link_failed=link_failed) from None
         except BaseException:
             self._wallets.pop(connect_id, None)
             self._drop(connect_id)

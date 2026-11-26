@@ -150,8 +150,8 @@ class OneKeyClient(HardwareClientBase):
                 raise UserFacingException(_(
                     "Passphrase is disabled on this OneKey. Enable passphrase in device settings first."
                 )) from None
-            if error.code in ("DEVICE_MISMATCH", "STALE", "UNSUPPORTED", "SDK_FAILED",
-                              "USB_UNAVAILABLE", "TIMEOUT", "PROTOCOL"):
+            if error.link_failed or error.code in ("DEVICE_MISMATCH", "STALE", "UNSUPPORTED",
+                                                   "USB_UNAVAILABLE", "TIMEOUT", "PROTOCOL"):
                 self._fatal_error = True
             raise UserFacingException(str(error)) from None
 

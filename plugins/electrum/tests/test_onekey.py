@@ -193,6 +193,76 @@ class TestOneKeyClient(unittest.TestCase):
         client.close()
         self.assertNotIn(client, manager.clients)
 
+    def test_connection_check_refreshes_passphrase_availability_on_every_success(self):
+        client, helper, _ = self.make_client()
+        for enabled in (False, True, None, False):
+            with self.subTest(enabled=enabled):
+                helper.call.return_value = dict(STATE, passphraseEnabled=enabled)
+                self.assertTrue(client.has_usable_connection_with_device())
+                self.assertIs(enabled, client.passphrase_enabled)
+
+    def test_sdk_failure_evicts_only_when_the_helper_loses_the_link(self):
+        from onekey import codec
+        from onekey.ipc import Helper
+        from onekey.link import LinkError
+        from test_protocol import ACCOUNT, Scripted, pipe_link
+
+        for failure in ("firmware", "closed", "SDK_FAILED", "USB_UNAVAILABLE", "TIMEOUT", "PROTOCOL", "unexpected"):
+            with self.subTest(failure=failure):
+                device = Scripted()
+                link = pipe_link(device)
+                helper = Helper()
+                self.addCleanup(helper.shutdown)
+                manager = SimpleNamespace(clients={}, lock=threading.RLock())
+                plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+                plugin.helper, plugin._live_clients = helper, set()
+                plugin.device_manager = lambda: manager
+                with mock.patch("onekey.ipc.open_path", return_value=link):
+                    run_in_hwd_thread(lambda: helper.call("hello", {}))
+                    client = run_in_hwd_thread(lambda: OneKeyClient("usb1", mock.Mock(), plugin))
+                    manager.clients[client] = client.serial
+                    client.binding = run_in_hwd_thread(lambda: client._call("open", dict(connectId="usb1", mode="standard")))
+                    client.account = ("synthetic-account",)
+                    generation = helper.generation
+                    self.assertIn("usb1", helper._wallets)
+                    original = device.handle
+
+                    def handle(kind, payload):
+                        if kind != codec.GET_PUBLIC_KEY:
+                            return original(kind, payload)
+                        if failure in ("firmware", "closed"):
+                            if failure == "closed":
+                                link.close()
+                            return codec.FAILURE, codec.enc_uint(1, 1)
+                        if failure == "unexpected":
+                            raise RuntimeError("synthetic helper failure")
+                        raise LinkError(failure)
+
+                    device.handle = handle
+
+                    def invoke():
+                        with client.flow():
+                            client._call("xpub", dict(connectId="usb1", binding=client.binding, coin="Bitcoin",
+                                                      path=ACCOUNT, scriptType="SPENDWITNESS"))
+
+                    with self.assertRaises(UserFacingException):
+                        run_in_hwd_thread(invoke)
+                    self.assertIsNone(client.binding)
+                    self.assertIsNone(client.account)
+                    self.assertNotIn("usb1", helper._wallets)
+                    if failure == "firmware":
+                        self.assertFalse(client.closed)
+                        self.assertIn(client, manager.clients)
+                        self.assertIs(link, helper._links["usb1"])
+                        self.assertFalse(link._closed)
+                        self.assertEqual(generation, helper.generation)
+                        self.assertTrue(client.has_usable_connection_with_device())
+                    else:
+                        self.assertTrue(client.closed)
+                        self.assertNotIn(client, manager.clients)
+                        self.assertNotIn("usb1", helper._links)
+                        self.assertTrue(link._closed)
+
     def test_health_check_failure_does_not_change_the_client_dict(self):
         client, helper, _ = self.make_client()
         manager = SimpleNamespace(lock=threading.RLock(), clients={client: client.serial})
@@ -1254,7 +1324,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         plugin.helper.call.return_value = dict(STATE)
         manager = SimpleNamespace(clients={}, lock=threading.RLock(), logger=mock.Mock())
         manager._client_by_id = lambda serial: next((c for c, id_ in manager.clients.items() if id_ == serial), None)
-        manager.client_by_id = lambda serial, **_: manager._client_by_id(serial)
+        manager.client_by_id = mock.Mock(side_effect=lambda serial, **_: manager._client_by_id(serial))
         manager.create_client = DeviceMgr.create_client.__get__(manager)
         plugin.device_manager = lambda: manager
         selected = SimpleNamespace(path="new-usb-port", id_=STATE["serialNo"])
@@ -1280,6 +1350,8 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         self.assertFalse(client.closed)
         self.assertEqual({client: selected.id_}, manager.clients)
         self.assertEqual("new-usb-port", client.connect_id)
+        self.assertTrue(all(call.kwargs == {"scan_now": False} for call in manager.client_by_id.call_args_list))
+        plugin.enumerate.assert_called_once_with()
         plugin.helper.release.assert_not_called()
         self.assertIs(client, self.qt._ensure_wizard_client(component, info))
         plugin.create_handler.assert_called_once_with(component.wizard)
@@ -1356,6 +1428,59 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         client.has_usable_connection_with_device.side_effect = None
         client.passphrase_enabled = False
         self.assertFalse(self.qt.WCOneKeyScript._passphrase_known_disabled(step))
+
+    def test_script_page_returns_while_probe_waits_and_updates_via_qt_signal(self):
+        from PyQt6.QtWidgets import QApplication
+        from electrum.plugin import _hwd_comms_executor
+
+        app = QApplication.instance() or QApplication([])
+        for enabled, usable in ((False, True), (True, True), (None, True), (False, False)):
+            with self.subTest(enabled=enabled, usable=usable):
+                entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+                client = mock.Mock(passphrase_enabled=False)
+
+                def refresh():
+                    self.assertTrue(threading.current_thread().name.startswith("hwd_comms_thread"))
+                    entered.set()
+                    try:
+                        release.wait(1)
+                        client.passphrase_enabled = enabled
+                        return usable
+                    finally:
+                        finished.set()
+
+                client.has_usable_connection_with_device.side_effect = refresh
+                manager = mock.Mock()
+                manager.client_by_id.return_value = client
+                info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+                component = self.wizard_component(mock.Mock(), manager, dict(
+                    hardware_device=("onekey", info), onekey_wallet_mode="select-hidden"))
+                step = self.qt.WCOneKeyScript(None, component.wizard)
+                step.wizard_data = component.wizard_data
+                applied_on = []
+                step.apply = mock.Mock(side_effect=lambda: applied_on.append(threading.current_thread()))
+                step.validate = mock.Mock()
+                try:
+                    with mock.patch.object(self.qt.WCScriptAndDerivation, "on_ready"):
+                        step.on_ready()
+                    self.assertTrue(entered.wait(1))
+                    self.assertFalse(finished.is_set(), "on_ready waited for hardware I/O")
+                    self.assertFalse(step.hidden_cb.isHidden())
+                    self.assertTrue(step.hidden_cb.isChecked())
+                    release.set()
+                    _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                    # The hardware task must queue the UI update, not touch the widget itself.
+                    self.assertFalse(step.hidden_cb.isHidden())
+                    app.processEvents()
+                    disabled = enabled is False and usable
+                    self.assertEqual(disabled, step.hidden_cb.isHidden())
+                    self.assertEqual(not disabled, step.hidden_cb.isChecked())
+                    self.assertEqual([threading.main_thread()] * 2, applied_on)
+                finally:
+                    release.set()
+                    _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                    app.processEvents()
+                    step.close()
 
     def test_unlock_refreshes_features_and_retries_new_attach_pin_session(self):
         factory = TestOneKeyClient()

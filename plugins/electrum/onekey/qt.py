@@ -7,7 +7,7 @@ from electrum.gui.qt.wizard.wallet import WCScriptAndDerivation, WCHWXPub, WCHWU
 from electrum.hw_wallet.qt import QtHandlerBase, QtPluginBase
 from electrum.hw_wallet.plugin import only_hook_if_libraries_available
 from electrum.i18n import _
-from electrum.plugin import hook, runs_in_hwd_thread
+from electrum.plugin import _hwd_comms_executor, hook, runs_in_hwd_thread
 from electrum.storage import WalletStorage
 from electrum.util import InvalidPassword, UserCancelled, UserFacingException
 from electrum.wallet import Multisig_Wallet, Standard_Wallet
@@ -116,11 +116,6 @@ def _ensure_wizard_client(component, info):
             if client.attached():
                 return client
             client.close()
-        client = manager.client_by_id(info.device.id_, scan_now=True)
-        if client is not None:
-            if client.attached():
-                return client
-            client.close()
         devices = plugin.enumerate()
         matched = next((dev for dev in devices if dev.id_ == info.device.id_), None)
         if matched is None:
@@ -135,6 +130,12 @@ def _ensure_wizard_client(component, info):
 
 
 class WCOneKeyScript(WCScriptAndDerivation):
+    passphrase_status_signal = pyqtSignal(object, bool)
+
+    def __init__(self, parent, wizard):
+        super().__init__(parent, wizard)
+        self.passphrase_status_signal.connect(self._on_passphrase_status)
+
     @runs_in_hwd_thread
     def _passphrase_known_disabled(self):
         hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
@@ -157,13 +158,28 @@ class WCOneKeyScript(WCScriptAndDerivation):
             self.hidden_cb = QCheckBox(_("Use a hidden wallet. Enter its passphrase on the device."))
             self.hidden_cb.toggled.connect(lambda _checked: self.validate())
             self.layout().insertWidget(self.layout().count() - 2, self.hidden_cb)
-        if self._passphrase_known_disabled():
+        # Keep hidden-wallet choices available until an unlocked device confirms otherwise.
+        self.hidden_cb.setVisible(True)
+        self.hidden_cb.setChecked(
+            self.wizard.current_cosigner(self.wizard_data).get("onekey_wallet_mode") == "select-hidden")
+        self.apply()
+        request = self._passphrase_request = object()
+
+        def refresh():
+            disabled = self._passphrase_known_disabled()
+            self.passphrase_status_signal.emit(request, disabled)
+
+        _hwd_comms_executor.submit(refresh)
+
+    @pyqtSlot(object, bool)
+    def _on_passphrase_status(self, request, disabled):
+        if request is not self._passphrase_request:
+            return
+        if disabled:
             self.hidden_cb.setChecked(False)
             self.hidden_cb.setVisible(False)
         else:
             self.hidden_cb.setVisible(True)
-            self.hidden_cb.setChecked(
-                self.wizard.current_cosigner(self.wizard_data).get("onekey_wallet_mode") == "select-hidden")
         self.apply()
 
     def apply(self):
