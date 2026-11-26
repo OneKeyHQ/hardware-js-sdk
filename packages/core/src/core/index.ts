@@ -1298,14 +1298,28 @@ const ensureConnected = async (
       if (timer) {
         clearTimeout(timer);
       }
+      const pollAbortController = new AbortController();
+      const onParentAbort = () => pollAbortController.abort();
+      if (abortSignal) {
+        if (abortSignal.aborted) {
+          pollAbortController.abort();
+        } else {
+          abortSignal.addEventListener('abort', onParentAbort, { once: true });
+        }
+      }
+      const cleanupPollAbort = () => {
+        abortSignal?.removeEventListener('abort', onParentAbort);
+      };
       timer = setTimeout(() => {
+        pollAbortController.abort();
+        cleanupPollAbort();
         reject(ERRORS.TypedError(HardwareErrorCode.PollingTimeout));
       }, TIME_OUT);
 
       tryCount += 1;
       Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
       try {
-        await initDeviceList(method, abortSignal);
+        await initDeviceList(method, pollAbortController.signal);
         lastInitializeError = undefined;
       } catch (error) {
         lastInitializeError = error;
@@ -1320,6 +1334,10 @@ const ensureConnected = async (
             HardwareErrorCode.TransportProtocolMismatch,
           ].includes(error.errorCode)
         ) {
+          if (timer) {
+            clearTimeout(timer);
+          }
+          cleanupPollAbort();
           _deviceList = undefined;
           reject(error);
           return;
@@ -1328,6 +1346,8 @@ const ensureConnected = async (
           await TransportManager.configure();
           lastInitializeError = undefined;
         }
+      } finally {
+        cleanupPollAbort();
       }
 
       if (abort()) {

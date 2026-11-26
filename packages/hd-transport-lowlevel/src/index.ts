@@ -184,8 +184,15 @@ export default class LowlevelTransport {
     }
   }
 
+  private assertNotAborted(abortSignal?: AbortSignal) {
+    if (abortSignal?.aborted) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+  }
+
   async acquire(input: LowLevelAcquireInput) {
     this.assertRunning();
+    this.assertNotAborted(input.abortSignal);
     const alreadyConnected = this.connectedDevices.has(input.uuid);
     this.acquiringDevices.add(input.uuid);
     try {
@@ -218,13 +225,15 @@ export default class LowlevelTransport {
         ? undefined
         : input.protocolHint ?? this.deviceProtocolHints.get(input.uuid);
       try {
+        this.assertNotAborted(input.abortSignal);
         const protocolType = await this.detectProtocol(
           input.uuid,
           input.expectedProtocol,
           protocolHint,
-          { onlyConnectBleDevice: input.onlyConnectBleDevice }
+          { onlyConnectBleDevice: input.onlyConnectBleDevice, abortSignal: input.abortSignal }
         );
         this.assertRunning();
+        this.assertNotAborted(input.abortSignal);
         return { uuid: input.uuid, protocolType };
       } catch (error) {
         try {
@@ -465,8 +474,10 @@ export default class LowlevelTransport {
     uuid: string,
     expectedProtocol?: ProtocolType,
     protocolHint?: ProtocolType,
-    options: { onlyConnectBleDevice?: boolean } = {}
+    options: { onlyConnectBleDevice?: boolean; abortSignal?: AbortSignal } = {}
   ): Promise<ProtocolType> {
+    this.assertNotAborted(options.abortSignal);
+
     if (expectedProtocol === 'V2') {
       if (await this.probeProtocolV2(uuid)) {
         this.deviceProtocol.set(uuid, 'V2');
@@ -477,7 +488,14 @@ export default class LowlevelTransport {
     }
 
     if (expectedProtocol === 'V1') {
-      if (await this.probeProtocolV1(uuid, options.onlyConnectBleDevice)) {
+      if (options.onlyConnectBleDevice) {
+        this.deviceProtocol.set(uuid, 'V1');
+        this.Log?.debug(
+          `[LowlevelTransport] detectProtocol: uuid=${uuid} -> V1 (expected, connection-only)`
+        );
+        return 'V1';
+      }
+      if (await this.probeProtocolV1(uuid, options.onlyConnectBleDevice, options.abortSignal)) {
         this.deviceProtocol.set(uuid, 'V1');
         this.Log?.debug(`[LowlevelTransport] detectProtocol: uuid=${uuid} -> V1 (expected)`);
         return 'V1';
@@ -489,12 +507,14 @@ export default class LowlevelTransport {
       protocolHint === 'V2' || this.deviceProtocol.get(uuid) === 'V2' ? ['V2', 'V1'] : ['V1', 'V2'];
 
     for (const [index, protocol] of probeOrder.entries()) {
+      this.assertNotAborted(options.abortSignal);
       if (index > 0) {
         await this.resetConnectionAfterProbe(uuid, probeOrder[index - 1]);
+        this.assertNotAborted(options.abortSignal);
       }
       const detected =
         protocol === 'V1'
-          ? await this.probeProtocolV1(uuid, options.onlyConnectBleDevice)
+          ? await this.probeProtocolV1(uuid, options.onlyConnectBleDevice, options.abortSignal)
           : await this.probeProtocolV2(uuid);
       if (detected) {
         this.deviceProtocol.set(uuid, protocol);
@@ -547,11 +567,16 @@ export default class LowlevelTransport {
     }
   }
 
-  private async probeProtocolV1(uuid: string, onlyConnectBleDevice = false) {
+  private async probeProtocolV1(
+    uuid: string,
+    onlyConnectBleDevice?: boolean,
+    abortSignal?: AbortSignal
+  ) {
     if (!this._messages) {
       return false;
     }
 
+    this.assertNotAborted(abortSignal);
     const probeCommand = onlyConnectBleDevice ? 'GetFeatures' : 'Initialize';
     try {
       this.deviceProtocol.set(uuid, 'V1');
@@ -565,6 +590,9 @@ export default class LowlevelTransport {
       return true;
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
+      if (error?.errorCode === HardwareErrorCode.DeviceInterruptedFromUser) {
+        throw error;
+      }
       this.Log?.debug(`[LowlevelTransport] Protocol V1 ${probeCommand} probe failed:`, error);
       return false;
     }

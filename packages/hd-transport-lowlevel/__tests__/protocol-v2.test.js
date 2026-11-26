@@ -699,4 +699,55 @@ describe('LowlevelTransport protocol framing', () => {
     expect(resetSpy).toHaveBeenCalledTimes(1);
     expect(resetSpy).toHaveBeenCalledWith('v1-3s-timeout-id', 'V1');
   });
+
+  test('trusts expected Protocol V1 without probing when onlyConnectBleDevice is true', async () => {
+    const plugin = createPlugin({
+      devices: [{ id: 'sleeping-v1-id', name: 'OneKey Classic', commType: 'ble' }],
+      responses: [],
+    });
+    const lowlevel = configureTransport(plugin);
+
+    await expect(
+      lowlevel.acquire({
+        uuid: 'sleeping-v1-id',
+        expectedProtocol: 'V1',
+        onlyConnectBleDevice: true,
+      })
+    ).resolves.toEqual({
+      uuid: 'sleeping-v1-id',
+      protocolType: 'V1',
+    });
+
+    expect(plugin.send).not.toHaveBeenCalled();
+    expect(plugin.disconnect).not.toHaveBeenCalled();
+  });
+
+  test('honors abortSignal canceled during plugin.connect before sending Initialize', async () => {
+    let resolveConnect;
+    const plugin = createPlugin({
+      devices: [{ id: 'canceled-lowlevel-id', name: 'OneKey Classic', commType: 'ble' }],
+      responses: [],
+    });
+    plugin.connect.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveConnect = resolve;
+        })
+    );
+    const lowlevel = configureTransport(plugin);
+    const abortController = new AbortController();
+
+    const acquiring = lowlevel.acquire({
+      uuid: 'canceled-lowlevel-id',
+      abortSignal: abortController.signal,
+    });
+    abortController.abort();
+    resolveConnect();
+
+    await expect(acquiring).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(plugin.send).not.toHaveBeenCalled();
+    expect(plugin.disconnect).toHaveBeenCalledWith('canceled-lowlevel-id');
+  });
 });

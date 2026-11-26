@@ -5,4 +5,5 @@ export type LowLevelAcquireInput = {
   expectedProtocol?: ProtocolType;
   protocolHint?: ProtocolType;
   onlyConnectBleDevice?: boolean;
+  abortSignal?: AbortSignal;
 };

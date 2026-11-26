@@ -1534,7 +1534,8 @@ describe('ElectronBleTransport protocol detection', () => {
       'Initialize',
       {},
       { timeoutMs: 3000 },
-      { oneShot: true }
+      { oneShot: true },
+      true
     );
   });
 
@@ -1643,5 +1644,117 @@ describe('ElectronBleTransport protocol detection', () => {
       errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
     });
     expect(callProtocolV1).not.toHaveBeenCalled();
+  });
+
+  test('does not send Initialize wake when GetFeatures fails from an ordinary GATT write error', async () => {
+    const device = { id: 'gatt-write-err-classic-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    const wakeSpy = jest.spyOn(probes, 'wakeSilentProtocolV1Device');
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+    nobleBle.write.mockRejectedValueOnce(new Error('GATT write error'));
+
+    await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.TransportProtocolProbeFailed,
+    });
+    expect(wakeSpy).not.toHaveBeenCalled();
+  });
+
+  test('prevents a canceled acquire whose getDevice settles late from disconnecting a replacement acquire', async () => {
+    const device = { id: 'superseded-acquire-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    let resolveFirstGetDevice: ((d: typeof device) => void) | undefined;
+    nobleBle.getDevice
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirstGetDevice = resolve;
+          })
+      )
+      .mockResolvedValue(device);
+    const bleTransport = configureTransport(nobleBle);
+    const abortA = new AbortController();
+
+    const acquireA = bleTransport.acquire({
+      uuid: device.id,
+      expectedProtocol: 'V1',
+      abortSignal: abortA.signal,
+    });
+    abortA.abort();
+
+    // Acquire B succeeds while acquire A is still waiting on getDevice.
+    await expect(
+      bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V1' })
+    ).resolves.toMatchObject({ uuid: device.id, protocolType: 'V1' });
+    nobleBle.disconnect.mockClear();
+    nobleBle.unsubscribe.mockClear();
+
+    // Acquire A resumes when its delayed lookup settles; it must not tear down B's link.
+    resolveFirstGetDevice?.(device);
+    await expect(acquireA).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.DeviceInterruptedFromUser,
+    });
+    expect(nobleBle.unsubscribe).not.toHaveBeenCalled();
+    expect(nobleBle.disconnect).not.toHaveBeenCalled();
+    expect(bleTransport.getProtocolType(device.id)).toBe('V1');
+  });
+
+  test('restores wake eligibility when Windows rejects the Initialize wake write with writeRejected', async () => {
+    const device = { id: 'win-wake-reject-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+
+    nobleBle.write.mockRejectedValueOnce(
+      ERRORS.TypedError(
+        HardwareErrorCode.BleConnectedError,
+        'Write failed with abortable error for device win-wake-reject-id: status: 3',
+        { writeRejected: true }
+      )
+    );
+    await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+
+    // After pairing succeeds on the next acquire, Initialize wake must still run.
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValueOnce({
+      type: 'Features',
+      message: {},
+    });
+    await expect(bleTransport.acquire({ uuid: device.id })).resolves.toMatchObject({
+      uuid: device.id,
+      protocolType: 'V1',
+    });
+    expect(callProtocolV1).toHaveBeenCalledTimes(1);
+    expect(callProtocolV1.mock.calls[0]?.[1]).toBe('Initialize');
+  });
+
+  test('disconnects an ordinary 3000ms Initialize call on timeout instead of treating it as a probe', async () => {
+    const device = { id: 'ordinary-init-3s-id', name: 'OneKey Classic' };
+    const nobleBle = createNobleBle(device);
+    nobleBle.onNotification.mockImplementation(() => jest.fn());
+    nobleBle.write.mockImplementation(() => Promise.resolve());
+    const bleTransport = configureTransport(nobleBle);
+
+    await bleTransport.acquire({ uuid: device.id, expectedProtocol: 'V1' });
+    jest.useFakeTimers({ doNotFake: ['performance'] });
+    try {
+      const pending = bleTransport.call(device.id, 'Initialize', {}, { timeoutMs: 3000 });
+      const expectation = expect(pending).rejects.toMatchObject({
+        errorCode: HardwareErrorCode.BleTimeoutError,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(3000);
+      await expectation;
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(nobleBle.disconnect).toHaveBeenCalledWith(device.id);
+    expect(bleTransport.getProtocolType(device.id)).toBeUndefined();
   });
 });

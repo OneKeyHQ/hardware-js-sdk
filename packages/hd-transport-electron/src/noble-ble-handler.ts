@@ -958,7 +958,8 @@ async function transmitHexDataToDevice(
             logger?.info('[NobleBLE] Deep cleanup to reset device state to initial', { deviceId });
             throw ERRORS.TypedError(
               HardwareErrorCode.BleConnectedError,
-              `Write failed with abortable error for device ${deviceId}: ${errorMessage}`
+              `Write failed with abortable error for device ${deviceId}: ${errorMessage}`,
+              { writeRejected: true }
             );
           }
         }
