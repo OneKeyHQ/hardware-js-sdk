@@ -1,5 +1,10 @@
 import transport, { PROTOCOL_V2_CHANNEL_BLE_UART, bytesToHex } from '@onekeyfe/hd-transport';
-import { EBleDisconnectReason, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
+import {
+  EBleDisconnectReason,
+  ERRORS,
+  HardwareErrorCode,
+  createDeferred,
+} from '@onekeyfe/hd-shared';
 import EventEmitter from 'events';
 
 import ElectronBleTransport from '../src/electron-ble-transport';
@@ -1489,5 +1494,93 @@ describe('ElectronBleTransport protocol detection', () => {
       bleTransport.acquire({ uuid: device.id, onlyConnectBleDevice: true })
     ).rejects.toBeDefined();
     expect(callProtocolV1).not.toHaveBeenCalled();
+  });
+
+  test('propagates Windows pairing rejection from GetFeatures without consuming the wake for later reconnects', async () => {
+    const device = { id: 'win-pairing-classic-id', name: 'K8141' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    const probeProtocolV2 = jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+
+    // Attempt 1: host aborts GetFeatures write after Windows pairing rejection.
+    nobleBle.write.mockRejectedValueOnce(
+      ERRORS.TypedError(
+        HardwareErrorCode.BleConnectedError,
+        'Write failed with abortable error for device win-pairing-classic-id: status: 3'
+      )
+    );
+    await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleConnectedError,
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(probeProtocolV2).not.toHaveBeenCalled();
+
+    // Attempt 2: paired successfully, GetFeatures still silent (device asleep), so the
+    // preserved wake sends a one-shot Initialize and confirms V1.
+    nobleBle.write.mockClear();
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValueOnce(false);
+    const callProtocolV1 = jest.spyOn(probes, 'callProtocolV1').mockResolvedValueOnce({
+      type: 'Features',
+      message: {},
+    });
+
+    await expect(bleTransport.acquire({ uuid: device.id })).resolves.toMatchObject({
+      uuid: device.id,
+      protocolType: 'V1',
+    });
+    expect(callProtocolV1).toHaveBeenCalledWith(
+      device.id,
+      'Initialize',
+      {},
+      { timeoutMs: 3000 },
+      { oneShot: true }
+    );
+  });
+
+  test('sends Initialize wake as a single one-shot native write and preserves wake when host proves write never started', async () => {
+    const device = { id: 'oneshot-classic-id', name: 'K1361' };
+    const nobleBle = createNobleBle(device);
+    const bleTransport = configureTransport(nobleBle);
+    const probes = bleTransport as any;
+    jest.spyOn(probes, 'probeProtocolV1').mockResolvedValue(false);
+    jest.spyOn(probes, 'probeProtocolV2').mockResolvedValue(false);
+
+    // Attempt 1: host rejects Initialize before submitting a GATT write.
+    nobleBle.write.mockRejectedValueOnce(
+      ERRORS.TypedError(
+        HardwareErrorCode.BleCharacteristicNotFound,
+        'Device oneshot-classic-id not connected or characteristics not available'
+      )
+    );
+    await expect(bleTransport.acquire({ uuid: device.id })).rejects.toMatchObject({
+      errorCode: HardwareErrorCode.BleCharacteristicNotFound,
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(nobleBle.write.mock.calls[0]?.[2]).toEqual({ oneShot: true });
+
+    // Attempt 2: wake is still armed and executes one native write with { oneShot: true }.
+    nobleBle.write.mockClear();
+    let notifyHandler: ((id: string, hex: string) => void) | undefined;
+    nobleBle.onNotification.mockImplementation(handler => {
+      notifyHandler = handler;
+      return jest.fn();
+    });
+    nobleBle.write.mockImplementationOnce((id: string) => {
+      const reply = ProtocolV1.encodeTransportPackets(schemas.protocolV1, 'Success', {
+        message: 'ok',
+      });
+      const packetHex = reply[0].toString('hex');
+      const payloadLen = parseInt(packetHex.slice(10, 18), 16);
+      notifyHandler?.(id, packetHex.slice(0, (9 + payloadLen) * 2));
+      return Promise.resolve();
+    });
+
+    await expect(bleTransport.acquire({ uuid: device.id })).resolves.toMatchObject({
+      uuid: device.id,
+      protocolType: 'V1',
+    });
+    expect(nobleBle.write).toHaveBeenCalledTimes(1);
+    expect(nobleBle.write.mock.calls[0]?.[2]).toEqual({ oneShot: true });
   });
 });

@@ -935,8 +935,8 @@ async function transmitHexDataToDevice(
   );
   const pacingDelayMs = resolveNobleBleWritePacingDelay(options);
 
-  if (!IS_WINDOWS || pairedDevices.has(deviceId)) {
-    // macOS / Linux or already paired on Windows: direct write
+  if (!IS_WINDOWS || pairedDevices.has(deviceId) || options?.oneShot) {
+    // macOS / Linux, already paired on Windows, or explicit one-shot write: direct write
     const writeCharacteristic = doGetWriteCharacteristic();
     if (!writeCharacteristic) {
       throw ERRORS.TypedError(

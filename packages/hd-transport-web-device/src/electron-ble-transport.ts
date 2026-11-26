@@ -25,7 +25,11 @@ import {
 import { resolveBlePacketCapacity } from './ble-packet-capacity';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
-import type { DesktopAPI, NobleBleIpcErrorResponse } from '@onekeyfe/hd-transport-electron';
+import type {
+  DesktopAPI,
+  NobleBleIpcErrorResponse,
+  NobleBleWriteOptions,
+} from '@onekeyfe/hd-transport-electron';
 import type {
   AcquireInput,
   OneKeyDeviceInfo,
@@ -93,6 +97,39 @@ const BLE_PACKET_SIZE_MAXIMUM = 244;
 const BLE_WRITE_DELAY_MS = 5;
 const PROTOCOL_PROBE_TIMEOUT_MS = 3000;
 const PROTOCOL_V2_PROBE_TIMEOUT_MS = 5000;
+
+const shouldRethrowElectronProtocolProbeError = (error: unknown): boolean => {
+  if (isProtocolV2LinkDisabledError(error)) {
+    return true;
+  }
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  // Pairing rejections, disconnects, and missing GATT state are link failures rather than
+  // evidence of a protocol mismatch. Rethrow them instead of entering wake or probing V2.
+  return (
+    code === HardwareErrorCode.BleConnectedError ||
+    code === HardwareErrorCode.BleDeviceNotBonded ||
+    code === HardwareErrorCode.BleDeviceBondedCanceled ||
+    code === HardwareErrorCode.BleDeviceDisconnected ||
+    code === HardwareErrorCode.BleCharacteristicNotFound ||
+    code === HardwareErrorCode.BleCharacteristicNotifyError ||
+    code === HardwareErrorCode.BleCharacteristicNotifyChangeFailure ||
+    code === HardwareErrorCode.BleServiceNotFound ||
+    code === HardwareErrorCode.BlePoweredOff ||
+    code === HardwareErrorCode.BleUnsupported ||
+    code === HardwareErrorCode.BleLocationError
+  );
+};
+
+const isUnstartedElectronWakeError = (error: unknown): boolean => {
+  const code = (error as { errorCode?: unknown })?.errorCode;
+  // Errors returned before a GATT write is submitted to the peripheral.
+  return (
+    code === HardwareErrorCode.BleCharacteristicNotFound ||
+    code === HardwareErrorCode.BlePoweredOff ||
+    code === HardwareErrorCode.BleUnsupported ||
+    code === HardwareErrorCode.BleLocationError
+  );
+};
 
 /**
  * Desktop Electron BLE transport with automatic Protocol V1/V2 detection.
@@ -741,6 +778,7 @@ export default class ElectronBleTransport {
     await this.resetProbeStateAfterProtocolProbe(uuid, 'V1');
     this.assertRunning();
 
+    const previousSilentState = this.silentDetections.get(uuid);
     this.silentDetections.set(uuid, 'woken');
     this.Log?.debug('[Electron BLE] sending Protocol V1 Initialize wake', {
       connectIdSuffix: uuid.slice(-8),
@@ -754,13 +792,21 @@ export default class ElectronBleTransport {
         uuid,
         'Initialize',
         {},
-        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS }
+        { timeoutMs: PROTOCOL_PROBE_TIMEOUT_MS },
+        { oneShot: true }
       );
       answeredV1 = typeof response?.type === 'string';
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
+      if (isUnstartedElectronWakeError(error)) {
+        if (previousSilentState) {
+          this.silentDetections.set(uuid, previousSilentState);
+        } else {
+          this.silentDetections.delete(uuid);
+        }
+      }
       this.Log?.debug('[Electron BLE] Protocol V1 Initialize wake failed:', error);
-      if (isProtocolV2LinkDisabledError(error)) {
+      if (shouldRethrowElectronProtocolProbeError(error)) {
         throw error;
       }
     }
@@ -831,7 +877,7 @@ export default class ElectronBleTransport {
     } catch (error) {
       this.clearProbeProtocol(uuid, 'V1');
       this.Log?.debug('[Electron BLE] Protocol V1 GetFeatures probe failed:', error);
-      if (isProtocolV2LinkDisabledError(error)) {
+      if (shouldRethrowElectronProtocolProbeError(error)) {
         throw error;
       }
       return false;
@@ -1105,7 +1151,8 @@ export default class ElectronBleTransport {
     uuid: string,
     name: string,
     data: Record<string, unknown>,
-    options?: TransportCallOptions
+    options?: TransportCallOptions,
+    writeOptions?: NobleBleWriteOptions
   ) {
     if (!this._messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
@@ -1138,7 +1185,11 @@ export default class ElectronBleTransport {
         if (hexString.length === 0) {
           throw new Error(`Buffer ${i + 1} is empty`);
         }
-        await invokeNobleBle(window.desktopApi.nobleBle.write(uuid, hexString));
+        await invokeNobleBle(
+          writeOptions
+            ? window.desktopApi.nobleBle.write(uuid, hexString, writeOptions)
+            : window.desktopApi.nobleBle.write(uuid, hexString)
+        );
       }
 
       const response = await Promise.race([
