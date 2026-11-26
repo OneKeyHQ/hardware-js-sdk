@@ -5446,6 +5446,126 @@ export type ViewVerifyPage = {
   multisig_policy?: string;
 };
 
+export enum StarknetPublicKeyType {
+  SECP256K1 = 0,
+  STARK = 1,
+}
+
+export enum StarknetPrivacyViewingKeyDerivation {
+  STARKNET_PRIVACY_VIEWING_KEY_DERIVATION_UNSPECIFIED = 0,
+  STARKNET_PRIVACY_VIEWING_KEY_DERIVATION_ACCOUNT_LEAF_V1 = 1,
+}
+
+export enum StarknetDAMode {
+  STARKNET_DA_MODE_L1 = 0,
+  STARKNET_DA_MODE_L2 = 1,
+}
+
+// StarknetGetPublicKey
+export type StarknetGetPublicKey = {
+  address_n: number[];
+  show_display?: boolean;
+  type?: StarknetPublicKeyType;
+};
+
+// StarknetPublicKey
+export type StarknetPublicKey = {
+  public_key: string;
+};
+
+// StarknetGetAddress
+export type StarknetGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  public_key_type: StarknetPublicKeyType;
+  class_hash: string;
+  contract_address_salt: string;
+  constructor_calldata: string[];
+};
+
+// StarknetAddress
+export type StarknetAddress = {
+  address: string;
+};
+
+// StarknetExportPrivacyViewingKey
+export type StarknetExportPrivacyViewingKey = {
+  address_n: number[];
+  public_key_type: StarknetPublicKeyType;
+  chain_id: string;
+  account_address: string;
+  pool_address: string;
+  derivation_version: StarknetPrivacyViewingKeyDerivation;
+};
+
+// StarknetPrivacyViewingKey
+export type StarknetPrivacyViewingKey = {
+  viewing_key: string;
+};
+
+// StarknetResourceBounds
+export type StarknetResourceBounds = {
+  max_amount: UintType;
+  max_price_per_unit: string;
+};
+
+// StarknetResourceBoundsMapping
+export type StarknetResourceBoundsMapping = {
+  l1_gas: StarknetResourceBounds;
+  l2_gas: StarknetResourceBounds;
+  l1_data_gas: StarknetResourceBounds;
+};
+
+// StarknetInvokeV3
+export type StarknetInvokeV3 = {
+  sender_address: string;
+  calldata_count: number;
+  account_deployment_data: string[];
+  proof_facts: string[];
+};
+
+// StarknetDeployAccountV3
+export type StarknetDeployAccountV3 = {
+  class_hash: string;
+  contract_address_salt: string;
+  constructor_calldata: string[];
+  expected_contract_address?: string;
+};
+
+// StarknetSignTx
+export type StarknetSignTx = {
+  address_n: number[];
+  public_key_type: StarknetPublicKeyType;
+  version?: number;
+  chain_id: string;
+  nonce: string;
+  resource_bounds: StarknetResourceBoundsMapping;
+  tip?: UintType;
+  paymaster_data: string[];
+  nonce_data_availability_mode?: StarknetDAMode;
+  fee_data_availability_mode?: StarknetDAMode;
+  privacy_viewing_key_derivation_version?: StarknetPrivacyViewingKeyDerivation;
+  invoke_v3?: StarknetInvokeV3;
+  deploy_account_v3?: StarknetDeployAccountV3;
+};
+
+// StarknetCalldataRequest
+export type StarknetCalldataRequest = {
+  offset: number;
+  count: number;
+};
+
+// StarknetCalldataAck
+export type StarknetCalldataAck = {
+  calldata: string[];
+};
+
+// StarknetSignedTx
+export type StarknetSignedTx = {
+  transaction_hash: string;
+  signature: string;
+};
+
 export enum ProtocolV2FailureType {
   Failure_InvalidMessage = 1,
   Failure_UndefinedError = 2,
@@ -6145,6 +6265,20 @@ export type MessageType = {
   ViewSignPage: ViewSignPage;
   ViewWarningPage: ViewWarningPage;
   ViewVerifyPage: ViewVerifyPage;
+  StarknetGetPublicKey: StarknetGetPublicKey;
+  StarknetPublicKey: StarknetPublicKey;
+  StarknetGetAddress: StarknetGetAddress;
+  StarknetAddress: StarknetAddress;
+  StarknetExportPrivacyViewingKey: StarknetExportPrivacyViewingKey;
+  StarknetPrivacyViewingKey: StarknetPrivacyViewingKey;
+  StarknetResourceBounds: StarknetResourceBounds;
+  StarknetResourceBoundsMapping: StarknetResourceBoundsMapping;
+  StarknetInvokeV3: StarknetInvokeV3;
+  StarknetDeployAccountV3: StarknetDeployAccountV3;
+  StarknetSignTx: StarknetSignTx;
+  StarknetCalldataRequest: StarknetCalldataRequest;
+  StarknetCalldataAck: StarknetCalldataAck;
+  StarknetSignedTx: StarknetSignedTx;
 };
 
 export type MessageKey = keyof MessageType;

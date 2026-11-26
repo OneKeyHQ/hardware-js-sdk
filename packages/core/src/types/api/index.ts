@@ -161,6 +161,10 @@ import type { moneroGetAddress } from './moneroGetAddress';
 import type { moneroGetWatchKey } from './moneroGetWatchKey';
 import type { moneroKeyImageSync } from './moneroKeyImageSync';
 import type { moneroSignTransaction } from './moneroSignTransaction';
+import type { starknetGetPublicKey } from './starknetGetPublicKey';
+import type { starknetGetAddress } from './starknetGetAddress';
+import type { starknetSignTransaction } from './starknetSignTransaction';
+import type { starknetExportPrivacyViewingKey } from './starknetExportPrivacyViewingKey';
 import type { ConnectSettings } from '../settings';
 import type { HardwareConnectProtocol } from '@onekeyfe/hd-shared';
 
@@ -494,4 +498,11 @@ export type CoreApi = {
   moneroGetWatchKey: typeof moneroGetWatchKey;
   moneroKeyImageSync: typeof moneroKeyImageSync;
   moneroSignTransaction: typeof moneroSignTransaction;
+  /**
+   * Starknet
+   */
+  starknetGetPublicKey: typeof starknetGetPublicKey;
+  starknetGetAddress: typeof starknetGetAddress;
+  starknetSignTransaction: typeof starknetSignTransaction;
+  starknetExportPrivacyViewingKey: typeof starknetExportPrivacyViewingKey;
 };
