@@ -1563,6 +1563,78 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                     finally:
                         step.close()
 
+    def test_refresh_repairs_a_client_closed_by_unplug(self):
+        from PyQt6.QtWidgets import QApplication
+        from electrum.plugin import _hwd_comms_executor
+
+        app = QApplication.instance() or QApplication([])
+        for mode, warning in (("select-hidden", "Passphrase is disabled"), ("attach", "No Attach PIN")):
+            with self.subTest(mode=mode):
+                old = mock.Mock(passphrase_enabled=mode != "select-hidden", attach_pin_enabled=False)
+                old.attached.return_value = True
+                old.has_usable_connection_with_device.return_value = True
+                manager = mock.Mock()
+                manager.client_by_id.side_effect = lambda *_a, **_k: old
+                plugin = mock.Mock()
+                gui = threading.current_thread()
+                handler_threads = []
+                plugin.create_handler.side_effect = lambda _w: handler_threads.append(threading.current_thread()) \
+                    or mock.Mock(name="handler")
+                plugin.enumerate.return_value = []
+                info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]), plugin_name="onekey")
+                component = self.wizard_component(plugin, manager, dict(
+                    wallet_type="standard", keystore_type="hardware", hardware_device=("onekey", info),
+                    onekey_wallet_mode="standard"))
+                component.wizard.check_multisig_constraints = lambda _data: (True, "")
+                step = self.qt.WCOneKeyScript(None, component.wizard)
+                step.wizard_data = component.wizard_data
+
+                def settle():
+                    _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                    app.processEvents()
+
+                try:
+                    step.on_ready()
+                    choice = step.hidden_cb if mode == "select-hidden" else step.attach_cb
+                    choice.setChecked(True)
+                    settle()
+                    self.assertFalse(step.valid)
+
+                    def unplugged(**_kwargs):
+                        # The failed read closes the cached client, as OneKeyClient does.
+                        old.attached.return_value = False
+                        return False
+
+                    old.has_usable_connection_with_device.side_effect = unplugged
+                    step.refresh_button.click()
+                    settle()
+                    # Still unplugged: Refresh finds no device and keeps the block.
+                    step.refresh_button.click()
+                    settle()
+                    plugin.enumerate.assert_called()
+                    manager.create_client.assert_not_called()
+                    self.assertFalse(step.valid)
+                    self.assertIn(warning, step.warn_label.label.text())
+
+                    # Replugged with the setting enabled: Refresh re-pairs the same serial.
+                    new = mock.Mock(passphrase_enabled=True, attach_pin_enabled=True)
+                    new.has_usable_connection_with_device.return_value = True
+                    device = SimpleNamespace(id_=STATE["serialNo"])
+                    plugin.enumerate.return_value = [SimpleNamespace(id_="other"), device]
+                    manager.create_client.return_value = new
+                    step.refresh_button.click()
+                    settle()
+                    manager.create_client.assert_called_once()
+                    self.assertIs(device, manager.create_client.call_args.args[0])
+                    new.has_usable_connection_with_device.assert_called()
+                    self.assertEqual([gui], handler_threads, "the Qt handler is built once, on the GUI thread")
+                    self.assertTrue(choice.isChecked())
+                    self.assertEqual(mode, step.wizard_data["onekey_wallet_mode"])
+                    self.assertTrue(step.valid)
+                    self.assertTrue(step.refresh_button.isHidden())
+                finally:
+                    step.close()
+
     def test_cache_miss_recreates_on_worker_and_registers_before_queued_sweep(self):
         from electrum.plugin import DeviceMgr, _hwd_comms_executor
         plugin = OneKeyPlugin.__new__(OneKeyPlugin)

@@ -94,8 +94,11 @@ def _device_manager(component):
     return getattr(plugins, "device_manager", None)
 
 
-def _ensure_wizard_client(component, info):
-    """Return a paired client for info.device.id_, re-pairing if it was dropped."""
+def _ensure_wizard_client(component, info, handler=None):
+    """Return a paired client for info.device.id_, re-pairing if it was dropped.
+
+    Without handler this must run on the GUI thread, which builds the Qt handler.
+    """
     manager = _device_manager(component)
     if manager is None:
         return None
@@ -108,8 +111,9 @@ def _ensure_wizard_client(component, info):
     plugin = plugins.get_plugin(info.plugin_name) if plugins is not None else None
     if plugin is None or not hasattr(plugin, "create_client"):
         return None
-    # Qt handlers must be constructed on the GUI thread.
-    handler = plugin.create_handler(getattr(component, "wizard", None))
+    if handler is None:
+        # Qt handlers must be constructed on the GUI thread.
+        handler = plugin.create_handler(getattr(component, "wizard", None))
 
     @runs_in_hwd_thread
     def restore():
@@ -139,7 +143,7 @@ class WCOneKeyScript(WCScriptAndDerivation):
         self.passphrase_status_signal.connect(self._on_passphrase_status)
 
     @runs_in_hwd_thread
-    def _wallet_options_known_off(self, cancelled=None):
+    def _wallet_options_known_off(self, cancelled=None, handler=None):
         """(passphrase off, Attach PIN off): True/False when read, None when unavailable."""
         hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
         if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
@@ -152,6 +156,11 @@ class WCOneKeyScript(WCScriptAndDerivation):
             client = manager.client_by_id(info.device.id_, scan_now=False)
         except Exception:
             return None, None
+        if cancelled is not None and cancelled.is_set():
+            return None, None
+        if (client is None or not getattr(client, "attached", lambda: True)()) and handler is not None:
+            # A failed read closes the client. Re-pair the same serial once it is plugged in again.
+            client = _ensure_wizard_client(self, info, handler)
         if client is None or (cancelled is not None and cancelled.is_set()):
             return None, None
         kwargs = {} if cancelled is None else {"cancelled": cancelled}
@@ -244,12 +253,14 @@ class WCOneKeyScript(WCScriptAndDerivation):
         self._passphrase_interrupted = False
         # A checked hidden-wallet choice cannot advance until the probe answers.
         self.validate()
+        handler = self._repair_handler()
 
         def refresh():
             disabled = attach_disabled = None
             try:
                 if not cancel.is_set():
-                    disabled, attach_disabled = self._wallet_options_known_off(cancelled=cancel)
+                    disabled, attach_disabled = self._wallet_options_known_off(
+                        cancelled=cancel, handler=handler)
             finally:
                 if not cancel.is_set():
                     try:
@@ -258,6 +269,19 @@ class WCOneKeyScript(WCScriptAndDerivation):
                         pass  # The page was deleted while the probe ran.
 
         _hwd_comms_executor.submit(refresh)
+
+    def _repair_handler(self):
+        # Built here on the GUI thread, so the hardware worker can re-pair a closed client.
+        if vars(self).get("_handler") is None:
+            hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
+            plugins = getattr(self.wizard, "plugins", None)
+            try:
+                plugin = (plugins.get_plugin(hw[1].plugin_name)
+                          if plugins is not None and isinstance(hw, (tuple, list)) and len(hw) >= 2 else None)
+                self._handler = plugin.create_handler(self.wizard) if hasattr(plugin, "create_handler") else None
+            except Exception:
+                self._handler = None
+        return self._handler
 
     def _stop_passphrase_probe(self):
         cancel = getattr(self, "_passphrase_cancel", None)
