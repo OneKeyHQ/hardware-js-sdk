@@ -1494,6 +1494,75 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                 finally:
                     step.close()
 
+    def test_wallet_warning_refresh_unavailable_preserves_block_until_enabled(self):
+        from PyQt6.QtWidgets import QApplication
+        from electrum.plugin import _hwd_comms_executor
+
+        app = QApplication.instance() or QApplication([])
+        for mode, passphrase, attach, warning in (("select-hidden", False, True, "Passphrase is disabled"),
+                                                 ("attach", False, True, "Passphrase is disabled"),
+                                                 ("attach", True, False, "No Attach PIN")):
+            for unavailable in ("connection", "exception", "lookup", "missing-client", "unknown-status"):
+                with self.subTest(mode=mode, warning=warning, unavailable=unavailable):
+                    client = mock.Mock(passphrase_enabled=passphrase, attach_pin_enabled=attach)
+                    client.has_usable_connection_with_device.return_value = True
+                    manager = mock.Mock()
+                    manager.client_by_id.return_value = client
+                    info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+                    component = self.wizard_component(mock.Mock(), manager, dict(
+                        wallet_type="standard", keystore_type="hardware", hardware_device=("onekey", info),
+                        onekey_wallet_mode="standard"))
+                    component.wizard.check_multisig_constraints = lambda _data: (True, "")
+                    step = self.qt.WCOneKeyScript(None, component.wizard)
+                    step.wizard_data = component.wizard_data
+                    try:
+                        step.on_ready()
+                        choice = step.hidden_cb if mode == "select-hidden" else step.attach_cb
+                        choice.setChecked(True)
+                        _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                        app.processEvents()
+                        self.assertFalse(step.valid)
+                        self.assertIn(warning, step.warn_label.label.text())
+
+                        if unavailable == "connection":
+                            client.has_usable_connection_with_device.return_value = False
+                        elif unavailable == "exception":
+                            client.has_usable_connection_with_device.side_effect = RuntimeError("unavailable")
+                        elif unavailable == "lookup":
+                            manager.client_by_id.side_effect = RuntimeError("unavailable")
+                        elif unavailable == "missing-client":
+                            manager.client_by_id.return_value = None
+                        else:
+                            client.passphrase_enabled = client.attach_pin_enabled = None
+                        step.refresh_button.click()
+                        self.assertFalse(step.valid)
+                        self.assertFalse(step.refresh_button.isEnabled())
+                        _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                        app.processEvents()
+                        self.assertTrue(choice.isChecked())
+                        self.assertFalse(choice.isHidden())
+                        self.assertEqual(mode, step.wizard_data["onekey_wallet_mode"])
+                        self.assertFalse(step.valid)
+                        self.assertIn(warning, step.warn_label.label.text())
+                        self.assertFalse(step.refresh_button.isHidden())
+                        self.assertTrue(step.refresh_button.isEnabled())
+
+                        manager.client_by_id.side_effect = None
+                        manager.client_by_id.return_value = client
+                        client.has_usable_connection_with_device.side_effect = None
+                        client.has_usable_connection_with_device.return_value = True
+                        client.passphrase_enabled = client.attach_pin_enabled = True
+                        step.refresh_button.click()
+                        _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                        app.processEvents()
+                        self.assertTrue(choice.isChecked())
+                        self.assertEqual(mode, step.wizard_data["onekey_wallet_mode"])
+                        self.assertTrue(step.valid)
+                        self.assertEqual("", step.warn_label.label.text())
+                        self.assertTrue(step.refresh_button.isHidden())
+                    finally:
+                        step.close()
+
     def test_cache_miss_recreates_on_worker_and_registers_before_queued_sweep(self):
         from electrum.plugin import DeviceMgr, _hwd_comms_executor
         plugin = OneKeyPlugin.__new__(OneKeyPlugin)

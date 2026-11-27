@@ -132,7 +132,7 @@ def _ensure_wizard_client(component, info):
 
 
 class WCOneKeyScript(WCScriptAndDerivation):
-    passphrase_status_signal = pyqtSignal(object, bool, bool)
+    passphrase_status_signal = pyqtSignal(object, object, object)
 
     def __init__(self, parent, wizard):
         super().__init__(parent, wizard)
@@ -140,28 +140,30 @@ class WCOneKeyScript(WCScriptAndDerivation):
 
     @runs_in_hwd_thread
     def _wallet_options_known_off(self, cancelled=None):
-        """(passphrase off, Attach PIN off), each True only when an unlocked device said so."""
+        """(passphrase off, Attach PIN off): True/False when read, None when unavailable."""
         hw = self.wizard.current_cosigner(self.wizard_data).get("hardware_device")
         if not hw or not isinstance(hw, (tuple, list)) or len(hw) < 2:
-            return False, False
+            return None, None
         manager = _device_manager(self)
         if manager is None:
-            return False, False
+            return None, None
         info = hw[1]
         try:
             client = manager.client_by_id(info.device.id_, scan_now=False)
         except Exception:
-            return False, False
+            return None, None
         if client is None or (cancelled is not None and cancelled.is_set()):
-            return False, False
+            return None, None
         kwargs = {} if cancelled is None else {"cancelled": cancelled}
         if not client.has_usable_connection_with_device(**kwargs):
-            return False, False
-        return (client.passphrase_enabled is False,
-                getattr(client, "attach_pin_enabled", None) is False)
+            return None, None
+        passphrase = client.passphrase_enabled
+        attach_pin = getattr(client, "attach_pin_enabled", None)
+        return (not passphrase if isinstance(passphrase, bool) else None,
+                not attach_pin if isinstance(attach_pin, bool) else None)
 
     def _passphrase_known_disabled(self, cancelled=None):
-        return WCOneKeyScript._wallet_options_known_off(self, cancelled=cancelled)[0]
+        return WCOneKeyScript._wallet_options_known_off(self, cancelled=cancelled)[0] is True
 
     def on_ready(self):
         super().on_ready()
@@ -244,7 +246,7 @@ class WCOneKeyScript(WCScriptAndDerivation):
         self.validate()
 
         def refresh():
-            disabled = attach_disabled = False
+            disabled = attach_disabled = None
             try:
                 if not cancel.is_set():
                     disabled, attach_disabled = self._wallet_options_known_off(cancelled=cancel)
@@ -300,13 +302,16 @@ class WCOneKeyScript(WCScriptAndDerivation):
             if warn is not None:
                 warn.setText(reason)
 
-    @pyqtSlot(object, bool, bool)
-    def _on_passphrase_status(self, request, disabled, attach_disabled=False):
+    @pyqtSlot(object, object, object)
+    def _on_passphrase_status(self, request, disabled, attach_disabled=None):
         if request is None or request is not self._passphrase_request:
             return
         self._passphrase_pending = False
-        self._passphrase_disabled = disabled
-        self._attach_disabled = attach_disabled
+        # An unavailable read cannot clear a previously confirmed block.
+        if disabled is not None:
+            self._passphrase_disabled = disabled
+        if attach_disabled is not None:
+            self._attach_disabled = attach_disabled
         for box, value in self._choices():
             # A ticked choice stays visible so the user sees why Next is blocked.
             box.setVisible(self._blocked_reason(value) is None or box.isChecked())
