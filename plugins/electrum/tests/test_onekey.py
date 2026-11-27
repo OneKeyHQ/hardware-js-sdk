@@ -27,6 +27,7 @@ from electrum.zip_importer import MemoryZipImporter
 from onekey.client import OneKeyClient, account_path, coin_name, check_binding, normalized_xpub
 from onekey.onekey import OneKeyKeyStore, OneKeyPlugin
 from onekey.ipc import HelperError
+from onekey.validate import firmware_account_allowed, firmware_path_allowed
 from build import build
 
 
@@ -1120,6 +1121,19 @@ class TestOneKeyMultisig(unittest.TestCase):
             with self.subTest(testnet=path), self.assertRaises(UserFacingException):
                 self._testnet(account_path, path, xtype)
 
+    def test_bip44_account_addresses_must_fit_the_ten_component_limit(self):
+        prefix = convert_bip32_strpath_to_intpath("m/44'/0'/0'/0/0/0/0/0")
+        self.assertTrue(firmware_account_allowed(prefix, 0))
+        self.assertEqual(prefix, account_path(prefix, "standard"))
+        self.assertTrue(firmware_path_allowed(prefix + [1, 0x7fffffff], 0))
+        too_long = prefix + [0]
+        self.assertTrue(firmware_path_allowed(too_long, 0))
+        self.assertTrue(firmware_path_allowed(too_long + [0], 0))
+        self.assertFalse(firmware_path_allowed(too_long + [0, 0], 0))
+        self.assertFalse(firmware_account_allowed(too_long, 0))
+        with self.assertRaises(UserFacingException):
+            account_path("m/44'/0'/0'/0/0/0/0/0/0", "standard")
+
     @staticmethod
     def _testnet(fn, *args):
         with mock.patch.object(constants, "net", constants.BitcoinTestnet):
@@ -1380,6 +1394,105 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         wizard = SimpleNamespace(plugins=SimpleNamespace(device_manager=manager, get_plugin=lambda _: plugin))
         wizard.current_cosigner = NewWalletWizard.current_cosigner.__get__(wizard)
         return SimpleNamespace(wizard=wizard, wizard_data=data or {})
+
+    def test_legacy_multisig_wizard_uses_a_signable_network_default(self):
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QApplication([])  # noqa: F841 (keep alive)
+        base_ready = self.qt.WCScriptAndDerivation.on_ready
+        replacement = "m/48'/1'/0'/0'"
+        custom = "m/48'/1'/4'/0'"
+        cases = ((constants.BitcoinMainnet, False, None, "m/45h/0"),
+                 (constants.BitcoinTestnet, False, None, replacement),
+                 (constants.BitcoinTestnet, True, None, replacement),
+                 (constants.BitcoinTestnet, True, "m/45h/0", replacement),
+                 (constants.BitcoinTestnet, True, custom, custom))
+        for network, later_cosigner, prefill, expected in cases:
+            with self.subTest(network=network, later=later_cosigner, prefill=prefill):
+                data = dict(wallet_type="multisig")
+                if later_cosigner:
+                    data.update(multisig_current_cosigner=2, multisig_cosigner_data={"2": {}})
+                component = self.wizard_component(mock.Mock(), mock.Mock(), data)
+                component.wizard.keystore_from_data = mock.Mock()
+                component.wizard.check_multisig_constraints = lambda _data: (True, "")
+                step = self.qt.WCOneKeyScript(None, component.wizard)
+                step.wizard_data = data
+
+                def ready(page):
+                    base_ready(page)
+                    if prefill is not None:
+                        page.derivation_path_edit.setText(prefill)
+
+                try:
+                    with mock.patch.object(constants, "net", network), \
+                            mock.patch("electrum.gui.qt.wizard.wallet.xpub_type", return_value="standard"), \
+                            mock.patch.object(self.qt.WCScriptAndDerivation, "on_ready", ready), \
+                            mock.patch.object(step, "_start_passphrase_probe"):
+                        step.on_ready()
+                        legacy = next(c for c in step.choice_w.choices if c.key == "standard")
+                        self.assertEqual(replacement if network is constants.BitcoinTestnet else "m/45h/0",
+                                         legacy.extra_data)
+                        if not later_cosigner:
+                            step.choice_w.select("standard")
+                        self.assertEqual(expected, step.derivation_path_edit.text())
+                        step.apply()
+                        submitted = component.wizard.current_cosigner(data)["derivation_path"]
+                        self.assertEqual(expected, submitted)
+                        self.assertEqual(convert_bip32_strpath_to_intpath(expected), account_path(submitted, "standard"))
+                        if network is constants.BitcoinTestnet:
+                            with self.assertRaises(UserFacingException) as error:
+                                account_path("m/45'/0", "standard")
+                            self.assertNotIn("BIP45", str(error.exception))
+                finally:
+                    step.close()
+
+    def test_wallet_warning_refresh_preserves_choice_and_unblocks_next(self):
+        from PyQt6.QtWidgets import QApplication
+        from electrum.plugin import _hwd_comms_executor
+
+        app = QApplication.instance() or QApplication([])
+        for mode, passphrase, attach, warning in (("select-hidden", False, True, "Passphrase is disabled"),
+                                                 ("attach", False, True, "Passphrase is disabled"),
+                                                 ("attach", True, False, "No Attach PIN")):
+            with self.subTest(mode=mode, warning=warning):
+                client = mock.Mock(passphrase_enabled=passphrase, attach_pin_enabled=attach)
+                client.has_usable_connection_with_device.return_value = True
+                manager = mock.Mock()
+                manager.client_by_id.return_value = client
+                info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]))
+                component = self.wizard_component(mock.Mock(), manager, dict(
+                    wallet_type="standard", keystore_type="hardware", hardware_device=("onekey", info),
+                    onekey_wallet_mode="standard"))
+                component.wizard.check_multisig_constraints = lambda _data: (True, "")
+                step = self.qt.WCOneKeyScript(None, component.wizard)
+                step.wizard_data = component.wizard_data
+                try:
+                    step.on_ready()
+                    choice = step.hidden_cb if mode == "select-hidden" else step.attach_cb
+                    choice.setChecked(True)
+                    _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                    app.processEvents()
+                    self.assertTrue(choice.isChecked())
+                    self.assertFalse(step.valid)
+                    self.assertIn(warning, step.warn_label.label.text())
+                    self.assertFalse(step.refresh_button.isHidden())
+                    self.assertTrue(step.refresh_button.isEnabled())
+                    client.passphrase_enabled = client.attach_pin_enabled = True
+                    step.refresh_button.click()
+                    self.assertTrue(choice.isChecked())
+                    self.assertFalse(step.valid)
+                    self.assertFalse(step.refresh_button.isEnabled())
+                    _hwd_comms_executor.submit(lambda: None).result(timeout=2)
+                    app.processEvents()
+                    self.assertEqual(2, client.has_usable_connection_with_device.call_count)
+                    self.assertTrue(choice.isChecked())
+                    self.assertFalse(choice.isHidden())
+                    self.assertEqual(mode, step.wizard_data["onekey_wallet_mode"])
+                    self.assertTrue(step.valid)
+                    self.assertEqual("", step.warn_label.label.text())
+                    self.assertTrue(step.refresh_button.isHidden())
+                finally:
+                    step.close()
 
     def test_cache_miss_recreates_on_worker_and_registers_before_queued_sweep(self):
         from electrum.plugin import DeviceMgr, _hwd_comms_executor

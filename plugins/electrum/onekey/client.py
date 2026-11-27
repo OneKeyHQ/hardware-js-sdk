@@ -55,6 +55,11 @@ def account_path(path, xtype):
         path = None
     slip44 = SLIP44_TESTNET if coin_name() == "Testnet" else SLIP44_BITCOIN
     if xtype not in ACCOUNT_XTYPES or path is None or not firmware_account_allowed(path, slip44):
+        if slip44 == SLIP44_TESTNET:
+            raise UserFacingException(_(
+                "OneKey cannot sign from this derivation path. Use a BIP44, BIP48, BIP49 "
+                "or BIP84 style Testnet account path (purpose'/1'/account'[/script']). "
+                "For legacy multisig, use m/48'/1'/0'/0'."))
         raise UserFacingException(_(
             "OneKey cannot sign from this derivation path. Use a BIP44, BIP45, BIP48, BIP49 "
             "or BIP84 style account path (purpose'/coin'/account'[/script'])."))

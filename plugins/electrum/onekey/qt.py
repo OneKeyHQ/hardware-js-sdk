@@ -1,8 +1,10 @@
 import threading
 
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QCheckBox, QMessageBox
+from PyQt6.QtWidgets import QCheckBox, QMessageBox, QPushButton
 
+from electrum import constants
+from electrum.bip32 import normalize_bip32_derivation
 from electrum.gui.qt.wizard.wallet import WCScriptAndDerivation, WCHWXPub, WCHWUnlock, WCHWUninitialized
 from electrum.hw_wallet.qt import QtHandlerBase, QtPluginBase
 from electrum.hw_wallet.plugin import only_hook_if_libraries_available
@@ -163,6 +165,19 @@ class WCOneKeyScript(WCScriptAndDerivation):
 
     def on_ready(self):
         super().on_ready()
+        if (constants.net is constants.BitcoinTestnet and self.wizard_data.get("wallet_type") == "multisig"
+                and self.choice_w is not None):
+            bip45 = normalize_bip32_derivation("m/45'/0")
+            for choice in self.choice_w.choices:
+                if choice.key == "standard" and normalize_bip32_derivation(choice.extra_data) == bip45:
+                    choice.extra_data = "m/48'/1'/0'/0'"
+                    if self.choice_w.selected_key == "standard":
+                        try:
+                            is_default = normalize_bip32_derivation(self.derivation_path_edit.text()) == bip45
+                        except ValueError:
+                            is_default = False
+                        if is_default:
+                            self.derivation_path_edit.setText(choice.extra_data)
         if getattr(self, "hidden_cb", None) is None:
             self.hidden_cb = QCheckBox(_("Use a hidden wallet. Enter its passphrase on the device."))
             self.attach_cb = QCheckBox(_("Use the Attach PIN wallet. Enter the Attach PIN on the device."))
@@ -170,6 +185,10 @@ class WCOneKeyScript(WCScriptAndDerivation):
             self.attach_cb.toggled.connect(lambda checked: self._on_choice_toggled(self.attach_cb, "attach", checked))
             self.layout().insertWidget(self.layout().count() - 2, self.hidden_cb)
             self.layout().insertWidget(self.layout().count() - 2, self.attach_cb)
+            self.refresh_button = QPushButton(_("Refresh device status"))
+            self.refresh_button.clicked.connect(self._start_passphrase_probe)
+            self.refresh_button.hide()
+            self.layout().addWidget(self.refresh_button)
         # Keep passphrase-based choices available until an unlocked device confirms otherwise.
         self._passphrase_disabled = False
         self._attach_disabled = False
@@ -205,11 +224,11 @@ class WCOneKeyScript(WCScriptAndDerivation):
 
     def _blocked_reason(self, value):
         if getattr(self, "_passphrase_disabled", False):
-            return _("Passphrase is disabled on this OneKey. Enable it on the device, "
+            return _("Passphrase is disabled on this OneKey. Enable it on the device, then refresh, "
                      "or untick the hidden or Attach PIN wallet option to continue "
                      "with the standard wallet.")
         if value == "attach" and getattr(self, "_attach_disabled", False):
-            return _("No Attach PIN is set on this OneKey. Set one up on the device, "
+            return _("No Attach PIN is set on this OneKey. Set one up on the device, then refresh, "
                      "or untick the Attach PIN wallet option to choose another wallet.")
         return None
 
@@ -263,6 +282,10 @@ class WCOneKeyScript(WCScriptAndDerivation):
     def validate(self):
         super().validate()
         selected = self._selected_choice()
+        refresh = vars(self).get("refresh_button")
+        if refresh is not None:
+            refresh.setVisible(selected is not None and self._blocked_reason(selected) is not None)
+            refresh.setEnabled(not getattr(self, "_passphrase_pending", False))
         if selected is None:
             return
         if getattr(self, "_passphrase_pending", False):

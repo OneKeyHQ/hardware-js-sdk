@@ -51,8 +51,8 @@ def _firmware_path_schemas(slip44):
 
 def firmware_path_allowed(path, slip44):
     """True when firmware-pro2 can show an address or sign at this full path."""
-    if type(path) not in (list, tuple) or any(type(item) is not int or not 0 <= item <= 0xFFFFFFFF
-                                              for item in path):
+    if (type(path) not in (list, tuple) or not 1 <= len(path) <= 10
+            or any(type(item) is not int or not 0 <= item <= 0xFFFFFFFF for item in path)):
         return False
     for components, trailing in _firmware_path_schemas(slip44):
         if len(path) < len(components) or (trailing is None and len(path) != len(components)):
