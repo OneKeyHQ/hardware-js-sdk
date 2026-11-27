@@ -1,0 +1,5 @@
+Electrum[crypto] @ https://download.electrum.org/4.8.4/Electrum-4.8.4.tar.gz#sha256=b3cbeefe37e84f62f6cec096eec28085d7a99097841eb96c9ee3e9bec20b0367
+PyQt6~=6.10.2
+pytest>=8
+flake8>=7,<8
+libusb1>=1.6.4
