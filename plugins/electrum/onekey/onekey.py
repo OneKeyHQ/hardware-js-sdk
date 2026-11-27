@@ -183,8 +183,17 @@ class OneKeyPlugin(HW_PluginBase):
     @runs_in_hwd_thread
     def enumerate(self):
         self._sweep_unplugged()
+        return self._enumerate()
+
+    @runs_in_hwd_thread
+    def enumerate_for_recovery(self, serial, *, cancelled=None):
+        # A page repair must not sweep clients belonging to other windows.
+        return self._enumerate(serial=serial, cancelled=cancelled)
+
+    def _enumerate(self, *, serial=None, cancelled=None):
         try:
-            found = self.helper.call("search", {}, timeout=30)
+            params = {} if serial is None else {"serialNo": serial}
+            found = self.helper.call("search", params, timeout=30, cancelled=cancelled)
             if type(found) is not list or len(found) > 32:
                 raise HelperError("PROTOCOL")
             result = []
@@ -204,16 +213,17 @@ class OneKeyPlugin(HW_PluginBase):
                                      transport_ui_string="USB"))
             return result
         except HelperError as error:
+            # Recovery timeout/cancel must never reset the shared helper.
             # USB_UNAVAILABLE and SDK_FAILED can come from one unclaimed candidate.
             # Closing here would drop every device this scan already holds.
-            if error.code not in ("USB_UNAVAILABLE", "SDK_FAILED"):
+            if serial is None and error.code not in ("USB_UNAVAILABLE", "SDK_FAILED"):
                 self.helper.close()
             raise UserFacingException(str(error)) from None
 
     @runs_in_hwd_thread
     def create_client(self, device, handler):
         from .client import OneKeyClient
-        client = OneKeyClient(device.path, handler, self)
+        client = OneKeyClient(device.path, handler, self, cancelled=getattr(self, "_creation_cancelled", None))
         if client.serial != device.id_:
             client.close()
             raise UserFacingException(_("OneKey device identity changed. Select the device again."))

@@ -94,11 +94,13 @@ def _device_manager(component):
     return getattr(plugins, "device_manager", None)
 
 
-def _ensure_wizard_client(component, info, handler=None):
+def _ensure_wizard_client(component, info, handler=None, *, cancelled=None):
     """Return a paired client for info.device.id_, re-pairing if it was dropped.
 
     Without handler this must run on the GUI thread, which builds the Qt handler.
     """
+    if cancelled is not None and cancelled.is_set():
+        return None
     manager = _device_manager(component)
     if manager is None:
         return None
@@ -117,17 +119,26 @@ def _ensure_wizard_client(component, info, handler=None):
 
     @runs_in_hwd_thread
     def restore():
+        if cancelled is not None and cancelled.is_set():
+            return None
         client = manager.client_by_id(info.device.id_, scan_now=False)
         if client is not None:
             if client.attached():
                 return client
             client.close()
-        devices = plugin.enumerate()
+        devices = plugin.enumerate_for_recovery(info.device.id_, cancelled=cancelled)
         matched = next((dev for dev in devices if dev.id_ == info.device.id_), None)
-        if matched is None:
+        if matched is None or (cancelled is not None and cancelled.is_set()):
             return None
         # Creation and registration must finish before a queued lookup can sweep.
-        return manager.create_client(matched, handler, plugin)
+        # DeviceMgr has no cancellation argument. Scope the token to its synchronous
+        # plugin callback on the serialized hardware worker.
+        previous = getattr(plugin, "_creation_cancelled", None)
+        plugin._creation_cancelled = cancelled
+        try:
+            return manager.create_client(matched, handler, plugin)
+        finally:
+            plugin._creation_cancelled = previous
 
     try:
         return restore()
@@ -160,7 +171,7 @@ class WCOneKeyScript(WCScriptAndDerivation):
             return None, None
         if (client is None or not getattr(client, "attached", lambda: True)()) and handler is not None:
             # A failed read closes the client. Re-pair the same serial once it is plugged in again.
-            client = _ensure_wizard_client(self, info, handler)
+            client = _ensure_wizard_client(self, info, handler, cancelled=cancelled)
         if client is None or (cancelled is not None and cancelled.is_set()):
             return None, None
         kwargs = {} if cancelled is None else {"cancelled": cancelled}

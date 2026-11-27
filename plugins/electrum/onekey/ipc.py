@@ -86,9 +86,10 @@ class Helper:
             self.generation = None
             self._release_links()
 
-    def release(self, connect_id):
+    def release(self, connect_id, *, keep_wallet=False):
         with self._lock:
-            self._wallets.pop(connect_id, None)
+            if not keep_wallet:
+                self._wallets.pop(connect_id, None)
             self._drop(connect_id)
 
     def close(self):
@@ -98,9 +99,10 @@ class Helper:
         if op == "hello":
             return {"protocol": 1, "sdkVersion": SDK_VERSION}
         if op == "search":
-            if params:
+            serial = params.get("serialNo")
+            if params and (set(params) != {"serialNo"} or type(serial) is not str or not serial or len(serial) > 256):
                 raise SessionError("INVALID_REQUEST")
-            return self._search(deadline, cancelled, on_ui)
+            return self._search(deadline, cancelled, on_ui, serial)
         if op == "dispose":
             self._wallets.clear()
             self._release_links()
@@ -151,7 +153,7 @@ class Helper:
             self._drop(connect_id)
             raise
 
-    def _search(self, deadline, cancelled, on_ui):
+    def _search(self, deadline, cancelled, on_ui, serial=None):
         paths = list(self.ports) if self.ports is not None else list_paths()
         found = []
         first_usb_error = None
@@ -164,7 +166,8 @@ class Helper:
             link = None
             try:
                 link = self._links[path] if path in self._links else self._borrow(path)
-                probe_deadline = deadline if held else min(deadline, time.monotonic() + 1)
+                # Recovery cannot let one retained peer consume the whole scan.
+                probe_deadline = deadline if held and serial is None else min(deadline, time.monotonic() + 1)
                 session = Session(link, deadline=probe_deadline, cancelled=cancelled, on_ui=on_ui,
                                   cache=self._wallets, connect_id=path)
                 session.handshake(force=True)
@@ -176,13 +179,19 @@ class Helper:
                     raise
                 found.append({"connectId": path, "deviceId": state["deviceId"],
                               "serialNo": state["serialNo"], "model": state["model"]})
+                if serial is not None and state["serialNo"] == serial:
+                    if cancelled is not None and cancelled.is_set():
+                        raise LinkError("CANCELLED")
+                    return [found[-1]]
             except LinkError as error:
                 if held:
-                    self.release(path)
+                    self.release(path, keep_wallet=serial is not None)
                 if error.code == "CANCELLED" or (cancelled is not None and cancelled.is_set()):
                     raise LinkError("CANCELLED") from None
                 if time.monotonic() >= deadline:
                     raise LinkError("TIMEOUT") from None
+                if serial is not None:
+                    continue
                 # A held device's failed probe must not hide other devices.
                 # Unclaimed candidates that are busy, unsupported, or reject V2 are skipped
                 # when another device succeeds; if none succeed, surface the USB error.
@@ -194,13 +203,21 @@ class Helper:
                     raise
             except SessionError as error:
                 if held:
-                    self.release(path)
+                    self.release(path, keep_wallet=serial is not None)
                 if error.code in ("CANCELLED", "FIRMWARE_CANCELLED") or (cancelled is not None and cancelled.is_set()):
                     raise LinkError("CANCELLED") from None
                 if time.monotonic() >= deadline:
                     raise LinkError("TIMEOUT") from None
+                if serial is not None:
+                    continue
                 if not held and error.code not in ("UNSUPPORTED", "PROTOCOL"):
                     raise
+            except Exception:
+                if held:
+                    self._drop(path)
+                if serial is not None:
+                    continue
+                raise
             except BaseException:
                 if held:
                     self._drop(path)

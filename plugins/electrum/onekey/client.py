@@ -1,5 +1,6 @@
 import threading
 from contextlib import contextmanager
+from types import SimpleNamespace
 
 from electrum import constants
 from electrum.bip32 import BIP32Node, convert_bip32_strpath_to_intpath
@@ -88,7 +89,7 @@ def normalized_xpub(xpub, xtype):
 
 
 class OneKeyClient(HardwareClientBase):
-    def __init__(self, path, handler, plugin):
+    def __init__(self, path, handler, plugin, *, cancelled=None):
         super().__init__(plugin=plugin)
         self.handler = handler
         self.helper = plugin.helper
@@ -110,18 +111,26 @@ class OneKeyClient(HardwareClientBase):
         self._bind_token = None
         self._taken_bind_token = None
         try:
-            state = self._call("state", {"connectId": path})
+            state = self._call("state", {"connectId": path}, cancelled=cancelled)
             self._check_state(state)
             self.device_id = state["deviceId"]
             self.serial = state["serialNo"]
             self.model = MODELS[state["model"]]
             self.passphrase_enabled = state.get("passphraseEnabled")
             self.attach_pin_enabled = state.get("attachPinEnabled")
+            if self.cancelled.is_set() or (cancelled is not None and cancelled.is_set()):
+                raise UserCancelled()
             retain = getattr(self.plugin, "retain_client", None)
             if retain is not None:
                 retain(self)
         except BaseException:
-            self.close()
+            if self.cancelled.is_set() or (cancelled is not None and cancelled.is_set()):
+                # No client was retained yet. Drop this claim without sweeping
+                # other clients or erasing a resumable wallet after cancellation.
+                self.closed = self._released = True
+                self.helper.release(path, keep_wallet=True)
+            else:
+                self.close()
             raise
 
     def attached(self):
@@ -145,9 +154,13 @@ class OneKeyClient(HardwareClientBase):
     def _call(self, op, params, *, cancelled=None):
         if self.closed:
             raise UserFacingException(_("Reconnect OneKey using the wallet wizard."))
+        call_cancelled = self.cancelled
+        if cancelled is not None:
+            dialog_cancelled = self.cancelled
+            call_cancelled = SimpleNamespace(is_set=lambda: dialog_cancelled.is_set() or cancelled.is_set())
         try:
             return self.helper.call(op, params, generation=self.generation,
-                                    cancelled=self.cancelled if cancelled is None else cancelled,
+                                    cancelled=call_cancelled,
                                     on_ui=self._ui)
         except HelperError as error:
             # flow() closes the client when this call belongs to the open wallet.

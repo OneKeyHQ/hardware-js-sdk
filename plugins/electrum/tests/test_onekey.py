@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tarfile
 import threading
+import time
 import sys
 import tempfile
 import unittest
@@ -26,7 +27,9 @@ from electrum.zip_importer import MemoryZipImporter
 
 from onekey.client import OneKeyClient, account_path, coin_name, check_binding, normalized_xpub
 from onekey.onekey import OneKeyKeyStore, OneKeyPlugin
-from onekey.ipc import HelperError
+from onekey.ipc import Helper, HelperError
+from onekey.link import LinkError
+from test_protocol import Scripted, pipe_link
 from onekey.validate import firmware_account_allowed, firmware_path_allowed
 from build import build
 
@@ -662,7 +665,7 @@ class TestOneKeyClient(unittest.TestCase):
         token.set()
         helper.call.side_effect = HelperError("CANCELLED")
         self.assertFalse(client.has_usable_connection_with_device(cancelled=token))
-        self.assertIs(token, helper.call.call_args.kwargs["cancelled"])
+        self.assertTrue(helper.call.call_args.kwargs["cancelled"].is_set())
         self.assertFalse(client.closed)
         # A cancel that this probe did not request still means the link is gone.
         self.assertFalse(client.has_usable_connection_with_device())
@@ -1395,6 +1398,289 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         wizard.current_cosigner = NewWalletWizard.current_cosigner.__get__(wizard)
         return SimpleNamespace(wizard=wizard, wizard_data=data or {})
 
+    def recovery_devices(self):
+        from electrum.plugin import DeviceMgr
+
+        plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+        plugin._live_clients = set()
+        helper = plugin.helper = Helper()
+        self.addCleanup(helper.shutdown)
+        manager = SimpleNamespace(clients={}, lock=threading.RLock(), logger=mock.Mock())
+        manager._client_by_id = lambda serial: next((c for c, id_ in manager.clients.items() if id_ == serial), None)
+        manager.client_by_id = mock.Mock(side_effect=lambda serial, **_: manager._client_by_id(serial))
+        manager.create_client = DeviceMgr.create_client.__get__(manager)
+        plugin.device_manager = lambda: manager
+        peers = {path: Scripted() for path in ("healthy", "stuck", "selected")}
+        for path, peer in peers.items():
+            peer.serial = path
+        links = {path: pipe_link(peer) for path, peer in peers.items()}
+
+        def open_link(path):
+            if links[path]._closed:
+                links[path] = pipe_link(peers[path])
+            return links[path]
+
+        self.enterContext(mock.patch("onekey.ipc.open_path", side_effect=open_link))
+        paths = self.enterContext(mock.patch("onekey.ipc.list_paths", return_value=list(peers)))
+        run_in_hwd_thread(lambda: helper.call("hello", {}))
+        healthy = run_in_hwd_thread(lambda: plugin.create_client(
+            SimpleNamespace(path="healthy", id_="healthy"), mock.Mock()))
+        manager.clients[healthy] = healthy.serial
+        run_in_hwd_thread(lambda: helper.call("open", dict(connectId="healthy", mode="standard")))
+        run_in_hwd_thread(lambda: helper.call("state", dict(connectId="stuck")))
+        component = self.wizard_component(plugin, manager)
+        info = SimpleNamespace(device=SimpleNamespace(id_="selected"), plugin_name="onekey")
+        return plugin, manager, component, info, healthy, links, paths
+
+    def test_recovery_isolates_a_stuck_retained_peer_in_either_scan_order(self):
+        for selected_first in (False, True):
+            with self.subTest(selected_first=selected_first):
+                plugin, manager, component, info, healthy, links, paths = self.recovery_devices()
+                helper = plugin.helper
+                generation = helper.generation
+                resume = helper._wallets["healthy"]
+                paths.return_value = (["healthy", "selected", "stuck"] if selected_first
+                                      else ["healthy", "stuck", "selected"])
+
+                # The real Link receive loop must obey the candidate's deadline.
+                def stalled_read(*_args):
+                    time.sleep(.002)
+                    return b""
+
+                with mock.patch.object(links["stuck"], "_read", side_effect=stalled_read) as stalled, \
+                        mock.patch.object(helper, "close", wraps=helper.close) as close, \
+                        mock.patch.object(helper, "shutdown", wraps=helper.shutdown) as shutdown:
+                    started = time.monotonic()
+                    client = self.qt._ensure_wizard_client(component, info, mock.Mock())
+                    self.assertLess(time.monotonic() - started, 2)
+                    self.assertIsNotNone(client)
+                    self.assertEqual("selected", client.serial)
+                    self.assertEqual("selected", manager.clients[client])
+                    close.assert_not_called()
+                    shutdown.assert_not_called()
+                    if selected_first:
+                        stalled.assert_not_called()
+                self.assertEqual(generation, helper.generation)
+                self.assertTrue(healthy.attached())
+                self.assertIs(resume, helper._wallets["healthy"])
+                self.assertFalse(links["healthy"]._closed)
+
+    def test_recovery_global_deadline_keeps_the_helper_and_other_wallets(self):
+        plugin, manager, component, info, healthy, links, _ = self.recovery_devices()
+        helper = plugin.helper
+        generation = helper.generation
+        resume = helper._wallets["healthy"]
+        clock = [time.monotonic()]
+
+        def expired(*_args, **_kwargs):
+            clock[0] += 31
+            raise LinkError("TIMEOUT")
+
+        with mock.patch("onekey.ipc.time.monotonic", side_effect=lambda: clock[0]), \
+                mock.patch.object(links["stuck"], "exchange", side_effect=expired), \
+                mock.patch.object(helper, "close", wraps=helper.close) as close, \
+                mock.patch.object(helper, "shutdown", wraps=helper.shutdown) as shutdown:
+            self.assertIsNone(self.qt._ensure_wizard_client(component, info, mock.Mock()))
+            close.assert_not_called()
+            shutdown.assert_not_called()
+        self.assertEqual(generation, helper.generation)
+        self.assertIs(resume, helper._wallets["healthy"])
+        self.assertEqual({healthy: "healthy"}, manager.clients)
+        self.assertFalse(links["healthy"]._closed)
+
+    def test_recovery_decoded_match_survives_deadline_but_honors_cancel(self):
+        from onekey.device import Session
+
+        for cancel in (False, True):
+            with self.subTest(cancel=cancel):
+                plugin, manager, _, _, healthy, links, paths = self.recovery_devices()
+                helper = plugin.helper
+                run_in_hwd_thread(lambda: helper.call("open", dict(connectId="selected", mode="standard")))
+                generation, wallets = helper.generation, dict(helper._wallets)
+                paths.return_value = ["selected"]
+                token = threading.Event()
+                clock = [time.monotonic()]
+                original = Session.state
+
+                def decoded(session):
+                    state = original(session)
+                    clock[0] += 31
+                    if cancel:
+                        token.set()
+                    return state
+
+                with mock.patch("onekey.ipc.time.monotonic", side_effect=lambda: clock[0]), \
+                        mock.patch.object(Session, "state", decoded):
+                    def search():
+                        return helper.call("search", {"serialNo": "selected"}, timeout=30, cancelled=token)
+
+                    if cancel:
+                        with self.assertRaisesRegex(HelperError, "CANCELLED"):
+                            run_in_hwd_thread(search)
+                    else:
+                        found = run_in_hwd_thread(search)
+                        self.assertEqual(["selected"], [device["connectId"] for device in found])
+                        self.assertFalse(links["selected"]._closed)
+                self.assertEqual(generation, helper.generation)
+                self.assertEqual(wallets, helper._wallets)
+                self.assertEqual({healthy: "healthy"}, manager.clients)
+                self.assertFalse(links["healthy"]._closed)
+
+    def test_dialog_cancel_interrupts_recovery_creation_with_page_token(self):
+        from electrum.plugin import _hwd_comms_executor
+
+        plugin, manager, component, info, healthy, links, paths = self.recovery_devices()
+        helper = plugin.helper
+        generation = helper.generation
+        resume = helper._wallets["healthy"]
+        paths.return_value = ["selected"]
+        token, entered = threading.Event(), threading.Event()
+        handler = mock.Mock()
+        original = helper._dispatch
+
+        def dispatch(op, params, deadline, cancelled, on_ui):
+            if op == "state":
+                on_ui("button")
+                active = helper._acquire("selected")
+                active._read = lambda *_: (entered.set(), time.sleep(.002), b"")[-1]
+            return original(op, params, deadline, cancelled, on_ui)
+
+        with mock.patch.object(helper, "_dispatch", side_effect=dispatch), \
+                mock.patch.object(helper, "close", wraps=helper.close) as close, \
+                mock.patch.object(helper, "shutdown", wraps=helper.shutdown) as shutdown:
+            future = _hwd_comms_executor.submit(
+                self.qt._ensure_wizard_client, component, info, handler, cancelled=token)
+            try:
+                self.assertTrue(entered.wait(1))
+                handler.show_message.call_args.kwargs["on_cancel"]()
+                self.assertIsNone(future.result(timeout=1))
+                self.assertFalse(token.is_set())
+            finally:
+                token.set()
+                future.result(timeout=1)
+            _hwd_comms_executor.submit(lambda: None).result(timeout=1)
+            close.assert_not_called()
+            shutdown.assert_not_called()
+        self.assertTrue(links["selected"]._closed)
+        self.assertEqual(generation, helper.generation)
+        self.assertIs(resume, helper._wallets["healthy"])
+        self.assertEqual({healthy: "healthy"}, manager.clients)
+        self.assertTrue(healthy.attached())
+        self.assertFalse(links["healthy"]._closed)
+        self.assertIsNone(getattr(plugin, "_creation_cancelled", None))
+
+    def test_dialog_cancel_during_init_preserves_wallets_without_retained_clients(self):
+        from electrum.plugin import _hwd_comms_executor
+
+        for state_complete in (False, True):
+            with self.subTest(state_complete=state_complete):
+                plugin = OneKeyPlugin.__new__(OneKeyPlugin)
+                plugin._live_clients = set()
+                helper = plugin.helper = Helper()
+                self.addCleanup(helper.shutdown)
+                peers = {path: Scripted() for path in ("selected", "unrelated")}
+                links = {path: pipe_link(peer) for path, peer in peers.items()}
+                token, entered = threading.Event(), threading.Event()
+                handler = mock.Mock()
+                clients = []
+                original = helper._dispatch
+
+                def dispatch(op, params, deadline, cancelled, on_ui):
+                    if op == "state":
+                        clients.append(on_ui.__self__)
+                        on_ui("button")
+                        if not state_complete:
+                            active = helper._acquire("selected")
+                            active._read = lambda *_: (entered.set(), time.sleep(.002), b"")[-1]
+                    result = original(op, params, deadline, cancelled, on_ui)
+                    if op == "state" and state_complete:
+                        handler.show_message.call_args.kwargs["on_cancel"]()
+                        entered.set()
+                    return result
+
+                with mock.patch("onekey.ipc.open_path", side_effect=links.__getitem__):
+                    run_in_hwd_thread(lambda: helper.call("hello", {}))
+                    for path in peers:
+                        run_in_hwd_thread(lambda: helper.call("open", dict(connectId=path, mode="standard")))
+                    generation, wallets = helper.generation, dict(helper._wallets)
+                    self.assertEqual(set(peers), set(wallets))
+                    self.assertFalse(plugin._live_clients)
+                    with mock.patch.object(helper, "_dispatch", side_effect=dispatch), \
+                            mock.patch.object(helper, "release", wraps=helper.release) as release, \
+                            mock.patch.object(helper, "shutdown", wraps=helper.shutdown) as shutdown, \
+                            mock.patch.object(plugin, "release_helper", wraps=plugin.release_helper) as release_helper, \
+                            mock.patch.object(plugin, "retain_client", wraps=plugin.retain_client) as retain:
+                        future = _hwd_comms_executor.submit(
+                            OneKeyClient, "selected", handler, plugin, cancelled=token)
+                        try:
+                            self.assertTrue(entered.wait(1))
+                            handler.show_message.call_args.kwargs["on_cancel"]()
+                            with self.assertRaises(UserCancelled):
+                                future.result(timeout=1)
+                            self.assertFalse(token.is_set())
+                        finally:
+                            token.set()
+                            _hwd_comms_executor.submit(lambda: None).result(timeout=1)
+                        retain.assert_not_called()
+                        release_helper.assert_not_called()
+                        shutdown.assert_not_called()
+                        release.assert_called_once_with("selected", keep_wallet=True)
+                    self.assertTrue(clients[0].closed)
+                    self.assertTrue(clients[0]._released)
+                    self.assertFalse(plugin._live_clients)
+                    self.assertEqual(generation, helper.generation)
+                    self.assertEqual(wallets, helper._wallets)
+                    self.assertTrue(links["selected"]._closed)
+                    self.assertFalse(links["unrelated"]._closed)
+
+    def test_page_cancel_interrupts_recovery_discovery_and_creation(self):
+        from electrum.plugin import _hwd_comms_executor
+
+        for phase in ("discovery", "creation"):
+            with self.subTest(phase=phase):
+                plugin, manager, component, info, healthy, links, paths = self.recovery_devices()
+                helper = plugin.helper
+                active_path = "stuck" if phase == "discovery" else "selected"
+                run_in_hwd_thread(lambda: helper.call("open", dict(connectId=active_path, mode="standard")))
+                if phase == "creation":
+                    # Model a resume entry left by an earlier interrupted status read.
+                    run_in_hwd_thread(lambda: helper._drop(active_path))
+                generation = helper.generation
+                wallets = dict(helper._wallets)
+                token, entered = threading.Event(), threading.Event()
+                paths.return_value = ["stuck"] if phase == "discovery" else ["selected"]
+                original = helper._dispatch
+
+                def dispatch(op, params, deadline, cancelled, on_ui):
+                    if op == ("search" if phase == "discovery" else "state"):
+                        self.assertFalse(cancelled.is_set())
+                        # Block the actual USB read, not a mock discovery/create result.
+                        active = helper._acquire(active_path)
+                        active._read = lambda *_: (entered.set(), time.sleep(.002), b"")[-1]
+                    return original(op, params, deadline, cancelled, on_ui)
+
+                component.wizard_data = dict(hardware_device=("onekey", info))
+                with mock.patch.object(helper, "_dispatch", side_effect=dispatch), \
+                        mock.patch.object(helper, "close", wraps=helper.close) as close, \
+                        mock.patch.object(helper, "shutdown", wraps=helper.shutdown) as shutdown:
+                    future = _hwd_comms_executor.submit(
+                        self.qt.WCOneKeyScript._wallet_options_known_off, component, token, mock.Mock())
+                    try:
+                        self.assertTrue(entered.wait(1))
+                    finally:
+                        token.set()
+                    self.assertEqual((None, None), future.result(timeout=1))
+                    _hwd_comms_executor.submit(lambda: None).result(timeout=1)
+                    close.assert_not_called()
+                    shutdown.assert_not_called()
+                self.assertTrue(links[active_path]._closed)
+                self.assertEqual(generation, helper.generation)
+                self.assertEqual(wallets, helper._wallets)
+                self.assertIsNone(getattr(plugin, "_creation_cancelled", None))
+                self.assertEqual({healthy: "healthy"}, manager.clients)
+                self.assertTrue(healthy.attached())
+                self.assertFalse(links["healthy"]._closed)
+
     def test_legacy_multisig_wizard_uses_a_signable_network_default(self):
         from PyQt6.QtWidgets import QApplication
 
@@ -1580,7 +1866,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                 handler_threads = []
                 plugin.create_handler.side_effect = lambda _w: handler_threads.append(threading.current_thread()) \
                     or mock.Mock(name="handler")
-                plugin.enumerate.return_value = []
+                plugin.enumerate_for_recovery.return_value = []
                 info = SimpleNamespace(device=SimpleNamespace(id_=STATE["serialNo"]), plugin_name="onekey")
                 component = self.wizard_component(plugin, manager, dict(
                     wallet_type="standard", keystore_type="hardware", hardware_device=("onekey", info),
@@ -1611,7 +1897,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                     # Still unplugged: Refresh finds no device and keeps the block.
                     step.refresh_button.click()
                     settle()
-                    plugin.enumerate.assert_called()
+                    plugin.enumerate_for_recovery.assert_called()
                     manager.create_client.assert_not_called()
                     self.assertFalse(step.valid)
                     self.assertIn(warning, step.warn_label.label.text())
@@ -1620,7 +1906,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
                     new = mock.Mock(passphrase_enabled=True, attach_pin_enabled=True)
                     new.has_usable_connection_with_device.return_value = True
                     device = SimpleNamespace(id_=STATE["serialNo"])
-                    plugin.enumerate.return_value = [SimpleNamespace(id_="other"), device]
+                    plugin.enumerate_for_recovery.return_value = [SimpleNamespace(id_="other"), device]
                     manager.create_client.return_value = new
                     step.refresh_button.click()
                     settle()
@@ -1648,7 +1934,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         plugin.device_manager = lambda: manager
         selected = SimpleNamespace(path="new-usb-port", id_=STATE["serialNo"])
         info = SimpleNamespace(device=selected, plugin_name="onekey")
-        plugin.enumerate = mock.Mock(return_value=[selected])
+        plugin.enumerate_for_recovery = mock.Mock(return_value=[selected])
         plugin.create_handler = mock.Mock(return_value=mock.Mock())
         original_create = OneKeyPlugin.create_client.__get__(plugin)
         queued = []
@@ -1670,7 +1956,7 @@ class TestOneKeyWizardRepairs(unittest.TestCase):
         self.assertEqual({client: selected.id_}, manager.clients)
         self.assertEqual("new-usb-port", client.connect_id)
         self.assertTrue(all(call.kwargs == {"scan_now": False} for call in manager.client_by_id.call_args_list))
-        plugin.enumerate.assert_called_once_with()
+        plugin.enumerate_for_recovery.assert_called_once_with(selected.id_, cancelled=None)
         plugin.helper.release.assert_not_called()
         self.assertIs(client, self.qt._ensure_wizard_client(component, info))
         plugin.create_handler.assert_called_once_with(component.wizard)
